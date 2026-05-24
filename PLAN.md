@@ -737,7 +737,7 @@ for episode in range(EPISODES):
 
 - [x] Create `client/src/app/api/simulations/route.ts`
   - `GET` → `prisma.simulation.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })`
-- [ ] Create `client/src/app/api/episodes/route.ts`
+- [x] Create `client/src/app/api/episodes/route.ts`
   - `GET ?simulationId=` → `prisma.episode.findMany({ where: { simulationId } })`
 - [ ] Create `client/src/app/api/metrics/route.ts`
   - `GET ?simulationId=` → `prisma.performanceMetric.findMany({ where: { simulationId } })`
