@@ -735,7 +735,7 @@ for episode in range(EPISODES):
 
 ### 1.3 — Next.js API Routes
 
-- [ ] Create `client/src/app/api/simulations/route.ts`
+- [x] Create `client/src/app/api/simulations/route.ts`
   - `GET` → `prisma.simulation.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })`
 - [ ] Create `client/src/app/api/episodes/route.ts`
   - `GET ?simulationId=` → `prisma.episode.findMany({ where: { simulationId } })`
