@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Simulation {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  mode        String   // "fixed" | "ai"
+  status      String   // "running" | "completed" | "stopped"
+  totalSteps  Int      @default(0)
+  durationMs  Int      @default(0)
+
+  episodes    Episode[]
+  metrics     PerformanceMetric[]
+  trafficLogs TrafficLog[]
+
+  @@map("simulations")
+}
+
+model Episode {
+  id            String     @id @default(cuid())
+  simulationId  String
+  simulation    Simulation @relation(fields: [simulationId], references: [id])
+  episodeNumber Int
+  totalReward   Float
+  avgWaitTime   Float
+  throughput    Int
+  epsilon       Float
+  loss          Float?
+  steps         Int
+  createdAt     DateTime   @default(now())
+
+  @@map("episodes")
+}
+
+model SignalState {
+  id           String   @id @default(cuid())
+  simulationId String
+  timestep     Int
+  phase        Int      // 0=NS_GREEN, 1=EW_GREEN, 2=NS_LEFT, 3=EW_LEFT
+  duration     Int      // seconds this phase was held
+  queueNorth   Int
+  queueSouth   Int
+  queueEast    Int
+  queueWest    Int
+  createdAt    DateTime @default(now())
+
+  @@map("signal_states")
+}
+
+model TrafficLog {
+  id            String     @id @default(cuid())
+  simulationId  String
+  simulation    Simulation @relation(fields: [simulationId], references: [id])
+  timestep      Int
+  vehiclesSpawned    Int
+  vehiclesPassed     Int
+  avgWaitTime        Float
+  maxQueueLength     Int
+  createdAt     DateTime   @default(now())
+
+  @@map("traffic_logs")
+}
+
+model RLModel {
+  id          String   @id @default(cuid())
+  name        String
+  version     String
+  storagePath String   // Supabase Storage path
+  avgReward   Float
+  epsilon     Float
+  totalEpisodes Int
+  createdAt   DateTime @default(now())
+  isActive    Boolean  @default(false)
+
+  @@map("rl_models")
+}
+
+model PerformanceMetric {
+  id               String     @id @default(cuid())
+  simulationId     String
+  simulation       Simulation @relation(fields: [simulationId], references: [id])
+  mode             String     // "fixed" | "ai"
+  avgWaitTimeFixed Float?
+  avgWaitTimeAI    Float?
+  throughputFixed  Int?
+  throughputAI     Int?
+  improvementPct   Float?
+  createdAt        DateTime   @default(now())
+
+  @@map("performance_metrics")
+}

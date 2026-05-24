@@ -686,14 +686,14 @@ for episode in range(EPISODES):
 
 ### 0.4 — Supabase Project Setup
 
-- [ ] Create new Supabase project at supabase.com
-- [ ] Copy `DATABASE_URL` (direct connection), `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY` into both `.env` files
-- [ ] Create Storage bucket `model-checkpoints` (private)
-- [ ] Initialize Prisma in `client/`: `pnpm prisma init`
-- [ ] Paste the schema from Section 4.2 into `client/prisma/schema.prisma`
-- [ ] Run `pnpm prisma db push` to create all tables in Supabase
-- [ ] Run `pnpm prisma generate` to generate client
-- [ ] Create `client/src/lib/prisma.ts`:
+- [x] Create new Supabase project at supabase.com
+- [x] Copy `DATABASE_URL` (direct connection), `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY` into both `.env` files
+- [x] Create Storage bucket `model-checkpoints` (private)
+- [x] Initialize Prisma in `client/`: `pnpm prisma init`
+- [x] Paste the schema from Section 4.2 into `client/prisma/schema.prisma`
+- [x] Run `pnpm prisma db push` to create all tables in Supabase
+- [x] Run `pnpm prisma generate` to generate client
+- [x] Create `client/src/lib/prisma.ts`:
   ```typescript
   import { PrismaClient } from "@prisma/client";
   const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -702,6 +702,8 @@ for episode in range(EPISODES):
   ```
 
 **✅ Phase 0 Deliverable:** Both projects boot. DB schema is live. Environment configured.
+
+✅ Phase 0 complete
 
 ---
 
