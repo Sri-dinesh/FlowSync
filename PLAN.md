@@ -632,17 +632,17 @@ for episode in range(EPISODES):
   pnpm add recharts
   pnpm add -D prisma
   ```
-- [ ] Install Shadcn/ui: `pnpm dlx shadcn@latest init`
-- [ ] Apply Vercel theme: `pnpm dlx shadcn@latest add https://tweakcn.com/r/themes/vercel.json`
-- [ ] Add Shadcn components needed:
+- [x] Install Shadcn/ui: `pnpm dlx shadcn@latest init`
+- [x] Apply Vercel theme: `pnpm dlx shadcn@latest add https://tweakcn.com/r/themes/vercel.json`
+- [x] Add Shadcn components needed:
   ```
   pnpm dlx shadcn@latest add button card badge tabs select slider switch tooltip separator scroll-area
   ```
-- [ ] Replace `client/src/app/globals.css` with the Vercel theme CSS (provided `index.css` content)
-- [ ] Update `client/src/app/layout.tsx` with Geist + Geist Mono fonts exactly as specified
-- [ ] Configure `next.config.ts`:
+- [x] Replace `client/src/app/globals.css` with the Vercel theme CSS (provided `index.css` content)
+- [x] Update `client/src/app/layout.tsx` with Geist + Geist Mono fonts exactly as specified
+- [x] Configure `next.config.ts`:
   - Add `NEXT_PUBLIC_FASTAPI_WS_URL` and `NEXT_PUBLIC_FASTAPI_HTTP_URL` to env passthrough
-- [ ] Create `client/.env.local`:
+- [x] Create `client/.env.local`:
   ```
   DATABASE_URL=...
   NEXT_PUBLIC_SUPABASE_URL=...
@@ -650,7 +650,7 @@ for episode in range(EPISODES):
   NEXT_PUBLIC_FASTAPI_WS_URL=ws://localhost:8000
   NEXT_PUBLIC_FASTAPI_HTTP_URL=http://localhost:8000
   ```
-- [ ] Verify `pnpm dev` runs with no errors
+- [x] Verify `pnpm dev` runs with no errors
 
 ---
 
