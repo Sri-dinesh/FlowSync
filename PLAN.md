@@ -728,10 +728,10 @@ for episode in range(EPISODES):
 
 ### 1.2 — Model Service (FastAPI)
 
-- [ ] Create `server/app/services/model_service.py`
-- [ ] Implement `save_checkpoint(model_id: str, episode: int, state_dict: dict)` → uploads `.pt` file to Supabase Storage bucket `model-checkpoints`
-- [ ] Implement `load_checkpoint(model_id: str, episode: int) -> dict` → downloads and loads `.pt` file
-- [ ] Implement `list_checkpoints(model_id: str) -> List[str]`
+- [x] Create `server/app/services/model_service.py`
+- [x] Implement `save_checkpoint(model_id: str, episode: int, state_dict: dict)` → uploads `.pt` file to Supabase Storage bucket `model-checkpoints`
+- [x] Implement `load_checkpoint(model_id: str, episode: int) -> dict` → downloads and loads `.pt` file
+- [x] Implement `list_checkpoints(model_id: str) -> List[str]`
 
 ### 1.3 — Next.js API Routes
 
