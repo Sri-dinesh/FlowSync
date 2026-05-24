@@ -746,9 +746,9 @@ for episode in range(EPISODES):
 
 ### 1.4 — TanStack Query Setup
 
-- [ ] Create `client/src/app/providers.tsx` wrapping `QueryClientProvider`
-- [ ] Wrap root `layout.tsx` with `<Providers>`
-- [ ] Create `client/src/hooks/useSimulations.ts`:
+- [x] Create `client/src/app/providers.tsx` wrapping `QueryClientProvider`
+- [x] Wrap root `layout.tsx` with `<Providers>`
+- [x] Create `client/src/hooks/useSimulations.ts`:
   ```typescript
   export const useSimulations = () =>
     useQuery({
@@ -756,7 +756,7 @@ for episode in range(EPISODES):
       queryFn: () => fetch("/api/simulations").then((r) => r.json()),
     });
   ```
-- [ ] Create `client/src/hooks/useEpisodes.ts` (similar pattern, takes `simulationId`)
+- [x] Create `client/src/hooks/useEpisodes.ts` (similar pattern, takes `simulationId`)
 
 **✅ Phase 1 Deliverable:** Data layer complete. API routes respond. Supabase writes confirmed.
 
