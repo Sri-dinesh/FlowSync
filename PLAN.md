@@ -844,8 +844,8 @@ for episode in range(EPISODES):
 
 ### 2.5 — Metrics Calculator
 
-- [ ] Create `server/app/simulation/metrics.py`
-- [ ] Implement `MetricsTracker`:
+- [x] Create `server/app/simulation/metrics.py`
+- [x] Implement `MetricsTracker`:
   - Tracks running averages: wait time, throughput, queue lengths per tick
   - `update(intersection: Intersection, reward: float)`
   - `get_snapshot() -> dict` — returns current metrics dict
