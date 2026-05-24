@@ -614,7 +614,7 @@ for episode in range(EPISODES):
 ### 0.1 — Repository & Root Setup
 
 - [x] Create root `/` folder with `README.md`
-- [ ] Create `client/` and `server/` subdirectories
+- [x] Create `client/` and `server/` subdirectories
 - [ ] Initialize git repo at root: `git init`
 - [ ] Create root `.gitignore` covering `node_modules/`, `__pycache__/`, `.env`, `*.pt`, `models/`
 
