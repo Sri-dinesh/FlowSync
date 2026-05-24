@@ -656,8 +656,8 @@ for episode in range(EPISODES):
 
 ### 0.3 — FastAPI Server Setup
 
-- [ ] Inside `server/`, create Python virtual environment: `python -m venv venv`
-- [ ] Create `server/requirements.txt`:
+- [x] Inside `server/`, create Python virtual environment: `python -m venv venv`
+- [x] Create `server/requirements.txt`:
   ```
   fastapi==0.115.0
   uvicorn[standard]==0.30.0
@@ -671,16 +671,16 @@ for episode in range(EPISODES):
   python-dotenv==1.0.1
   httpx==0.27.0
   ```
-- [ ] Install: `pip install -r requirements.txt`
-- [ ] Create `server/.env`:
+- [x] Install: `pip install -r requirements.txt`
+- [x] Create `server/.env`:
   ```
   SUPABASE_URL=...
   SUPABASE_SERVICE_KEY=...
   CORS_ORIGINS=http://localhost:3000,https://your-vercel-app.vercel.app
   ```
-- [ ] Create `server/app/main.py` with bare FastAPI app, CORS middleware, health check `GET /health`
-- [ ] Create `server/app/config.py` using `pydantic-settings` to load `.env` values
-- [ ] Verify `uvicorn app.main:app --reload` starts on port 8000
+- [x] Create `server/app/main.py` with bare FastAPI app, CORS middleware, health check `GET /health`
+- [x] Create `server/app/config.py` using `pydantic-settings` to load `.env` values
+- [x] Verify `uvicorn app.main:app --reload` starts on port 8000
 
 ---
 
