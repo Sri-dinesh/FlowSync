@@ -770,8 +770,8 @@ for episode in range(EPISODES):
 
 ### 2.1 — Vehicle Entity
 
-- [ ] Create `server/app/simulation/vehicle.py`
-- [ ] Define `Vehicle` dataclass:
+- [x] Create `server/app/simulation/vehicle.py`
+- [x] Define `Vehicle` dataclass:
   ```python
   @dataclass
   class Vehicle:
@@ -782,7 +782,7 @@ for episode in range(EPISODES):
       speed: float       # current speed
       state: str         # "moving" | "waiting" | "passed"
   ```
-- [ ] Implement `Vehicle.tick(dt: float, is_green: bool)`:
+- [x] Implement `Vehicle.tick(dt: float, is_green: bool)`:
   - If `is_green` and `position < 1.0`: `position += speed * dt`; `state = "moving"`
   - If not `is_green`: `speed = 0`; `state = "waiting"`; `wait_time += dt`
   - If `position >= 1.0`: `state = "passed"`
