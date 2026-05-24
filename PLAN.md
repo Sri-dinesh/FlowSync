@@ -741,7 +741,7 @@ for episode in range(EPISODES):
   - `GET ?simulationId=` → `prisma.episode.findMany({ where: { simulationId } })`
 - [x] Create `client/src/app/api/metrics/route.ts`
   - `GET ?simulationId=` → `prisma.performanceMetric.findMany({ where: { simulationId } })`
-- [ ] Create `client/src/app/api/models/route.ts`
+- [x] Create `client/src/app/api/models/route.ts`
   - `GET` → `prisma.rLModel.findMany({ orderBy: { createdAt: 'desc' } })`
 
 ### 1.4 — TanStack Query Setup

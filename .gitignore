@@ -6,4 +6,6 @@ __pycache__/
 .env
 *.pt
 models/
+!client/src/app/api/models/
+!client/src/app/api/models/**
 server/venv/
