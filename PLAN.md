@@ -616,7 +616,7 @@ for episode in range(EPISODES):
 - [x] Create root `/` folder with `README.md`
 - [x] Create `client/` and `server/` subdirectories
 - [x] Initialize git repo at root: `git init`
-- [ ] Create root `.gitignore` covering `node_modules/`, `__pycache__/`, `.env`, `*.pt`, `models/`
+- [x] Create root `.gitignore` covering `node_modules/`, `__pycache__/`, `.env`, `*.pt`, `models/`
 
 ---
 

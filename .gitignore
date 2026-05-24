@@ -1,3 +1,8 @@
 .kiro/
 .vscode/
 .agents/
+node_modules/
+__pycache__/
+.env
+*.pt
+models/
