@@ -813,8 +813,8 @@ for episode in range(EPISODES):
 
 ### 2.3 — Vehicle Spawner
 
-- [ ] Create `server/app/simulation/spawner.py`
-- [ ] Implement `PoissonSpawner`:
+- [x] Create `server/app/simulation/spawner.py`
+- [x] Implement `PoissonSpawner`:
   - `lambda_rate: float = 0.3` (vehicles/second/lane, configurable)
   - `spawn(dt: float, lanes: dict) -> List[Vehicle]`:
     - For each lane: sample `n ~ Poisson(lambda_rate * dt)`
