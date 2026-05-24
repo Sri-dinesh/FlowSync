@@ -853,8 +853,8 @@ for episode in range(EPISODES):
 
 ### 2.6 — Simulation Frame Builder
 
-- [ ] Create `server/app/schemas/simulation_schema.py`
-- [ ] Define Pydantic models:
+- [x] Create `server/app/schemas/simulation_schema.py`
+- [x] Define Pydantic models:
 
   ```python
   class VehicleState(BaseModel):
@@ -877,7 +877,7 @@ for episode in range(EPISODES):
       episode: int
   ```
 
-- [ ] Implement `build_frame(intersection, mode, reward, episode) -> SimulationFrame`
+- [x] Implement `build_frame(intersection, mode, reward, episode) -> SimulationFrame`
 
 ### 2.7 — Gymnasium Environment
 
