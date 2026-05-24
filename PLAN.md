@@ -715,16 +715,16 @@ for episode in range(EPISODES):
 
 ### 1.1 — Supabase Service (FastAPI)
 
-- [ ] Create `server/app/services/supabase_service.py`
-- [ ] Initialize Supabase client using `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`
-- [ ] Implement `create_simulation(mode: str) -> str` → inserts into `simulations`, returns `id`
-- [ ] Implement `update_simulation(id, status, total_steps, duration_ms)`
-- [ ] Implement `save_episode(simulation_id, episode_num, total_reward, avg_wait, throughput, epsilon, loss, steps)`
-- [ ] Implement `save_traffic_log(simulation_id, timestep, spawned, passed, avg_wait, max_queue)`
-- [ ] Implement `save_signal_state(simulation_id, timestep, phase, duration, queues: dict)`
-- [ ] Implement `save_performance_metric(simulation_id, mode, avg_wait, throughput)`
-- [ ] Implement `save_model_metadata(name, version, storage_path, avg_reward, epsilon, total_episodes) -> str`
-- [ ] Implement `set_active_model(model_id: str)` → sets `isActive=true` for this model, false for others
+- [x] Create `server/app/services/supabase_service.py`
+- [x] Initialize Supabase client using `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`
+- [x] Implement `create_simulation(mode: str) -> str` → inserts into `simulations`, returns `id`
+- [x] Implement `update_simulation(id, status, total_steps, duration_ms)`
+- [x] Implement `save_episode(simulation_id, episode_num, total_reward, avg_wait, throughput, epsilon, loss, steps)`
+- [x] Implement `save_traffic_log(simulation_id, timestep, spawned, passed, avg_wait, max_queue)`
+- [x] Implement `save_signal_state(simulation_id, timestep, phase, duration, queues: dict)`
+- [x] Implement `save_performance_metric(simulation_id, mode, avg_wait, throughput)`
+- [x] Implement `save_model_metadata(name, version, storage_path, avg_reward, epsilon, total_episodes) -> str`
+- [x] Implement `set_active_model(model_id: str)` → sets `isActive=true` for this model, false for others
 
 ### 1.2 — Model Service (FastAPI)
 
