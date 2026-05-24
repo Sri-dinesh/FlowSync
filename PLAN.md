@@ -789,10 +789,10 @@ for episode in range(EPISODES):
 
 ### 2.2 — Traffic Signal Controller
 
-- [ ] Create `server/app/simulation/traffic_signal.py`
-- [ ] Define `SignalPhase` enum: `NS_GREEN=0`, `EW_GREEN=1`, `NS_LEFT=2`, `EW_LEFT=3`
-- [ ] Define `SignalColor` enum: `GREEN`, `YELLOW`, `RED`
-- [ ] Define which lanes get GREEN per phase:
+- [x] Create `server/app/simulation/traffic_signal.py`
+- [x] Define `SignalPhase` enum: `NS_GREEN=0`, `EW_GREEN=1`, `NS_LEFT=2`, `EW_LEFT=3`
+- [x] Define `SignalColor` enum: `GREEN`, `YELLOW`, `RED`
+- [x] Define which lanes get GREEN per phase:
   ```python
   PHASE_GREEN_LANES = {
       0: ["north", "south"],
@@ -801,7 +801,7 @@ for episode in range(EPISODES):
       3: ["east_left", "west_left"],
   }
   ```
-- [ ] Implement `TrafficSignal` class:
+- [x] Implement `TrafficSignal` class:
   - `current_phase: int`
   - `color: SignalColor`
   - `time_in_phase: float`
