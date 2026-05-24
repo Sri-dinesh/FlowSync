@@ -739,7 +739,7 @@ for episode in range(EPISODES):
   - `GET` → `prisma.simulation.findMany({ orderBy: { createdAt: 'desc' }, take: 20 })`
 - [x] Create `client/src/app/api/episodes/route.ts`
   - `GET ?simulationId=` → `prisma.episode.findMany({ where: { simulationId } })`
-- [ ] Create `client/src/app/api/metrics/route.ts`
+- [x] Create `client/src/app/api/metrics/route.ts`
   - `GET ?simulationId=` → `prisma.performanceMetric.findMany({ where: { simulationId } })`
 - [ ] Create `client/src/app/api/models/route.ts`
   - `GET` → `prisma.rLModel.findMany({ orderBy: { createdAt: 'desc' } })`
