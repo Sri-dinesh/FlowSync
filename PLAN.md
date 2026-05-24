@@ -622,7 +622,7 @@ for episode in range(EPISODES):
 
 ### 0.2 — Next.js Client Setup
 
-- [ ] Inside `client/`, bootstrap Next.js: `pnpm create next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"`
+- [x] Inside `client/`, bootstrap Next.js: `pnpm create next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"`
 - [ ] Install core dependencies:
   ```
   pnpm add @prisma/client @supabase/supabase-js
