@@ -823,8 +823,8 @@ for episode in range(EPISODES):
 
 ### 2.4 — Intersection State
 
-- [ ] Create `server/app/simulation/intersection.py`
-- [ ] Implement `Intersection` class:
+- [x] Create `server/app/simulation/intersection.py`
+- [x] Implement `Intersection` class:
   - `lanes: Dict[str, List[Vehicle]]` — queues for north/south/east/west
   - `signal: TrafficSignal`
   - `timestep: int`
