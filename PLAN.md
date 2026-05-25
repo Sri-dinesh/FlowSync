@@ -936,8 +936,8 @@ for episode in range(EPISODES):
 
 ### 3.3 — DQN Agent
 
-- [ ] Create `server/app/rl/dqn_agent.py`
-- [ ] Implement `DQNAgent`:
+- [x] Create `server/app/rl/dqn_agent.py`
+- [x] Implement `DQNAgent`:
   - `__init__`: create `online_net`, `target_net` (both `DQNNetwork`), Adam optimizer, `ReplayBuffer`
   - `select_action(state: np.ndarray, epsilon: float) -> int`:
     - With probability `epsilon`: random action
@@ -953,8 +953,8 @@ for episode in range(EPISODES):
 
 ### 3.4 — Trainer Orchestrator
 
-- [ ] Create `server/app/rl/trainer.py`
-- [ ] Implement `Trainer`:
+- [x] Create `server/app/rl/trainer.py`
+- [x] Implement `Trainer`:
   - `__init__(env, agent, supabase_service, model_service, ws_broadcast_fn)`
   - `is_training: bool = False`
   - `current_episode: int = 0`
@@ -968,8 +968,8 @@ for episode in range(EPISODES):
 
 ### 3.5 — Hyperparameters
 
-- [ ] Create `server/app/rl/hyperparams.py` with all constants from Section 6.6
-- [ ] Ensure all hyperparams are importable as a single `HyperParams` dataclass
+- [x] Create `server/app/rl/hyperparams.py` with all constants from Section 6.6
+- [x] Ensure all hyperparams are importable as a single `HyperParams` dataclass
 
 **✅ Phase 3 Deliverable:** DQN trains standalone on `TrafficEnv`. Reward improves over episodes. Checkpoints save.
 
