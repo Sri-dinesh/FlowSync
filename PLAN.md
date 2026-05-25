@@ -906,8 +906,8 @@ for episode in range(EPISODES):
 
 ### 3.1 — DQN Neural Network
 
-- [ ] Create `server/app/rl/dqn_network.py`
-- [ ] Implement `DQNNetwork(nn.Module)`:
+- [x] Create `server/app/rl/dqn_network.py`
+- [x] Implement `DQNNetwork(nn.Module)`:
   ```python
   class DQNNetwork(nn.Module):
       def __init__(self, state_dim=8, action_dim=4):
