@@ -927,8 +927,8 @@ for episode in range(EPISODES):
 
 ### 3.2 — Replay Buffer
 
-- [ ] Create `server/app/rl/replay_buffer.py`
-- [ ] Implement `ReplayBuffer(maxlen=10_000)`:
+- [x] Create `server/app/rl/replay_buffer.py`
+- [x] Implement `ReplayBuffer(maxlen=10_000)`:
   - Internal: `collections.deque(maxlen=maxlen)`
   - `push(state, action, reward, next_state, done)`
   - `sample(batch_size) -> Tuple[Tensors]`: returns batched tensors for training
