@@ -6,7 +6,10 @@ import { Space_Grotesk } from "next/font/google";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display" });
+const display = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
 
 export default function Home() {
   const router = useRouter();
@@ -20,7 +23,10 @@ export default function Home() {
       <div className="pointer-events-none absolute -bottom-32 left-1/2 h-64 w-[80vw] -translate-x-1/2 rounded-full bg-gradient-to-r from-amber-400/20 via-transparent to-cyan-400/20 blur-3xl" />
 
       <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center gap-8 px-6 text-center">
-        <Badge className="border-white/20 bg-white/10 text-white/80" variant="outline">
+        <Badge
+          className="border-white/20 bg-white/10 text-white/80"
+          variant="outline"
+        >
           AI Traffic Control Lab
         </Badge>
         <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight md:text-6xl md:leading-tight font-[var(--font-display)]">

@@ -1229,7 +1229,7 @@ for episode in range(EPISODES):
 
 ### 6.1 — Canvas Setup
 
-- [ ] Create `client/src/components/simulation/SimulationCanvas.tsx`:
+- [x] Create `client/src/components/simulation/SimulationCanvas.tsx`:
   - Use `<Canvas>` from `@react-three/fiber`
   - Camera: orthographic, top-down view, positioned at (0, 10, 0) looking at (0,0,0)
   - Lighting: ambient light (0.6) + directional light from top
@@ -1239,11 +1239,11 @@ for episode in range(EPISODES):
 
 ### 6.2 — Intersection Ground & Roads
 
-- [ ] Create `client/src/components/simulation/IntersectionGrid.tsx`:
+- [x] Create `client/src/components/simulation/IntersectionGrid.tsx`:
   - Ground plane: `PlaneGeometry(20, 20)` with dark gray material
   - Grid lines using `GridHelper` or custom line geometry (subtle)
 
-- [ ] Create `client/src/components/simulation/Road.tsx`:
+- [x] Create `client/src/components/simulation/Road.tsx`:
   - Props: `direction: 'horizontal' | 'vertical'`
   - `BoxGeometry` for road surface (dark asphalt color `#1a1a1a`)
   - White lane markings using thin `PlaneGeometry` with white material
@@ -1252,7 +1252,7 @@ for episode in range(EPISODES):
 
 ### 6.3 — Traffic Light Component
 
-- [ ] Create `client/src/components/simulation/TrafficLight.tsx`:
+- [x] Create `client/src/components/simulation/TrafficLight.tsx`:
   - Props: `phase: number`, `color: 'green' | 'yellow' | 'red'`, `position: [x,y,z]`
   - 3 sphere geometries stacked: red top, yellow middle, green bottom
   - Active color uses emissive material with matching `emissiveIntensity: 2.0`
@@ -1263,7 +1263,7 @@ for episode in range(EPISODES):
 
 ### 6.4 — Vehicle Component
 
-- [ ] Create `client/src/components/simulation/Vehicle.tsx`:
+- [x] Create `client/src/components/simulation/Vehicle.tsx`:
   - Props: `vehicle: VehicleState`
   - Small `BoxGeometry(0.4, 0.2, 0.8)` with white or accent color material
   - **Position mapping**: `lane` + `position` (0→1) → world (x, y, z) coordinates:
@@ -1279,7 +1279,7 @@ for episode in range(EPISODES):
 
 ### 6.5 — Main Scene Component
 
-- [ ] Create `client/src/components/simulation/IntersectionScene.tsx`:
+- [x] Create `client/src/components/simulation/IntersectionScene.tsx`:
   - Reads `currentFrame` from Zustand store
   - Renders: `<IntersectionGrid>`, `<Road direction="vertical">`, `<Road direction="horizontal">`
   - Renders 4 `<TrafficLight>` components with current `signal_phase` and `signal_color`
@@ -1289,17 +1289,17 @@ for episode in range(EPISODES):
 
 ### 6.6 — WebSocket-Driven Rendering
 
-- [ ] Simulation frames arrive via WebSocket → Zustand store → React re-render triggers scene update
-- [ ] `useFrame` in vehicle components interpolates position smoothly between discrete WebSocket ticks
-- [ ] Vehicles spawning: appear with a brief scale-up animation (`scale: 0 → 1` over 200ms)
-- [ ] Vehicles passing: fade out (`opacity: 1 → 0` over 150ms) then unmount
-- [ ] Traffic light color changes: instant (no lerp needed, signal changes are intentional)
+- [x] Simulation frames arrive via WebSocket → Zustand store → React re-render triggers scene update
+- [x] `useFrame` in vehicle components interpolates position smoothly between discrete WebSocket ticks
+- [x] Vehicles spawning: appear with a brief scale-up animation (`scale: 0 → 1` over 200ms)
+- [x] Vehicles passing: fade out (`opacity: 1 → 0` over 150ms) then unmount
+- [x] Traffic light color changes: instant (no lerp needed, signal changes are intentional)
 
 ### 6.7 — Queue Length Indicators
 
-- [ ] Above each road arm, render a text overlay showing queue length (use `<Text>` from `@react-three/drei`)
-- [ ] Color: white when queue < 5, amber when 5–7, red when ≥ 8
-- [ ] Updates every frame from `queue_lengths` in SimulationFrame
+- [x] Above each road arm, render a text overlay showing queue length (use `<Text>` from `@react-three/drei`)
+- [x] Color: white when queue < 5, amber when 5–7, red when ≥ 8
+- [x] Updates every frame from `queue_lengths` in SimulationFrame
 
 **✅ Phase 6 Deliverable:** Intersection renders live. Vehicles move in real-time. Traffic lights change. Queue numbers show.
 

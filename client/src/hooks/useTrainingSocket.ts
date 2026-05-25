@@ -13,7 +13,9 @@ export function useTrainingSocket() {
 
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const shouldReconnectRef = useRef(true);
 
   const connect = useCallback(() => {

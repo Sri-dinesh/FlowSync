@@ -1,6 +1,7 @@
 "use client";
 
 import Header from "@/components/layout/Header";
+import SimulationCanvas from "@/components/simulation/SimulationCanvas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSimulationSocket } from "@/hooks/useSimulationSocket";
@@ -21,8 +22,8 @@ export default function SimulationPage() {
             <CardHeader>
               <CardTitle>Simulation Canvas</CardTitle>
             </CardHeader>
-            <CardContent className="flex h-full flex-1 items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/40 text-sm text-white/60">
-              Three.js scene will render here in Phase 6.
+            <CardContent className="rounded-xl border border-white/10 bg-black/40 p-3">
+              <SimulationCanvas />
             </CardContent>
           </Card>
 
@@ -56,10 +57,16 @@ export default function SimulationPage() {
                   <TabsTrigger value="training">Training</TabsTrigger>
                   <TabsTrigger value="comparison">Compare</TabsTrigger>
                 </TabsList>
-                <TabsContent value="training" className="mt-4 text-sm text-white/70">
+                <TabsContent
+                  value="training"
+                  className="mt-4 text-sm text-white/70"
+                >
                   Reward and loss charts appear here in Phase 7.
                 </TabsContent>
-                <TabsContent value="comparison" className="mt-4 text-sm text-white/70">
+                <TabsContent
+                  value="comparison"
+                  className="mt-4 text-sm text-white/70"
+                >
                   Fixed vs AI comparison charts appear here in Phase 7.
                 </TabsContent>
               </Tabs>
