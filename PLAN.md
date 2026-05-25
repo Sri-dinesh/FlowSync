@@ -881,8 +881,8 @@ for episode in range(EPISODES):
 
 ### 2.7 — Gymnasium Environment
 
-- [ ] Create `server/app/simulation/environment.py`
-- [ ] Implement `TrafficEnv(gymnasium.Env)`:
+- [x] Create `server/app/simulation/environment.py`
+- [x] Implement `TrafficEnv(gymnasium.Env)`:
   - `__init__`: create `Intersection`, define `observation_space` (Box 8,) and `action_space` (Discrete 4)
   - `reset(seed=None) -> (obs, info)`: call `intersection.reset()`, return initial observation
   - `step(action) -> (obs, reward, terminated, truncated, info)`:
