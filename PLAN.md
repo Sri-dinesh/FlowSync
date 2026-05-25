@@ -1109,7 +1109,7 @@ for episode in range(EPISODES):
 
 ### 5.1 — Zustand Store
 
-- [ ] Create `client/src/store/simulationStore.ts`:
+- [x] Create `client/src/store/simulationStore.ts`:
 
   ```typescript
   interface SimulationStore {
@@ -1132,11 +1132,11 @@ for episode in range(EPISODES):
   }
   ```
 
-- [ ] Implement with `create` from Zustand
+- [x] Implement with `create` from Zustand
 
 ### 5.2 — TypeScript Types
 
-- [ ] Create `client/src/types/simulation.ts` with all shared types:
+- [x] Create `client/src/types/simulation.ts` with all shared types:
   ```typescript
   export interface VehicleState {
     id: string;
@@ -1170,7 +1170,7 @@ for episode in range(EPISODES):
 
 ### 5.3 — WebSocket Hooks
 
-- [ ] Create `client/src/hooks/useSimulationSocket.ts`:
+- [x] Create `client/src/hooks/useSimulationSocket.ts`:
 
   ```typescript
   export function useSimulationSocket() {
@@ -1192,12 +1192,12 @@ for episode in range(EPISODES):
   }
   ```
 
-- [ ] Create `client/src/hooks/useTrainingSocket.ts` (same pattern, pushes to `addTrainingMetric`)
-- [ ] Both hooks: handle reconnect logic with exponential backoff (max 5 retries)
+- [x] Create `client/src/hooks/useTrainingSocket.ts` (same pattern, pushes to `addTrainingMetric`)
+- [x] Both hooks: handle reconnect logic with exponential backoff (max 5 retries)
 
 ### 5.4 — Landing Page
 
-- [ ] Create `client/src/app/page.tsx` — hero section:
+- [x] Create `client/src/app/page.tsx` — hero section:
   - Full viewport height
   - Centered content: project title, one-line description
   - "Launch App" `Button` → `router.push('/simulation')`
@@ -1206,16 +1206,16 @@ for episode in range(EPISODES):
 
 ### 5.5 — Simulation Page Layout
 
-- [ ] Create `client/src/app/simulation/page.tsx`
+- [x] Create `client/src/app/simulation/page.tsx`
 - [ ] Layout: two-column on desktop, stacked on mobile
   - **Left column (60%)**: Three.js simulation canvas
   - **Right column (40%)**: controls + metrics panels + tabs for charts
-- [ ] Create `client/src/components/layout/Header.tsx`:
+- [x] Create `client/src/components/layout/Header.tsx`:
   - Logo/project name left
   - Connection status badge right (`isConnected` from store)
   - Mode indicator (Fixed / AI)
-- [ ] Wire `useSimulationSocket` and `useTrainingSocket` into page-level component
-- [ ] Wrap simulation page in `<QueryClientProvider>` if not already in root layout
+- [x] Wire `useSimulationSocket` and `useTrainingSocket` into page-level component
+- [x] Wrap simulation page in `<QueryClientProvider>` if not already in root layout
 
 **✅ Phase 5 Deliverable:** App navigates. Simulation page renders shell. WebSocket hooks connect and push data to Zustand store.
 
