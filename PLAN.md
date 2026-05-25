@@ -983,7 +983,7 @@ for episode in range(EPISODES):
 
 ### 4.1 — Pydantic Schemas
 
-- [ ] Create `server/app/schemas/training_schema.py`:
+- [x] Create `server/app/schemas/training_schema.py`:
 
   ```python
   class TrainingMetric(BaseModel):
@@ -1000,7 +1000,7 @@ for episode in range(EPISODES):
       simulation_id: Optional[str] = None
   ```
 
-- [ ] Create `server/app/schemas/metrics_schema.py`:
+- [x] Create `server/app/schemas/metrics_schema.py`:
   ```python
   class MetricsSnapshot(BaseModel):
       avg_wait_time: float
@@ -1014,7 +1014,7 @@ for episode in range(EPISODES):
 
 ### 4.2 — Global State / App State
 
-- [ ] In `server/app/main.py` define app-level singletons using `lifespan`:
+- [x] In `server/app/main.py` define app-level singletons using `lifespan`:
   ```python
   app_state = {
       "env": None,           # TrafficEnv
@@ -1026,12 +1026,12 @@ for episode in range(EPISODES):
       "current_simulation_id": None,
   }
   ```
-- [ ] Initialize all singletons on FastAPI startup using `@asynccontextmanager` lifespan
+- [x] Initialize all singletons on FastAPI startup using `@asynccontextmanager` lifespan
 
 ### 4.3 — WebSocket Connection Manager
 
-- [ ] Create `server/app/websockets/simulation_ws.py`
-- [ ] Implement `ConnectionManager`:
+- [x] Create `server/app/websockets/simulation_ws.py`
+- [x] Implement `ConnectionManager`:
   ```python
   class ConnectionManager:
       def __init__(self):
@@ -1040,13 +1040,13 @@ for episode in range(EPISODES):
       def disconnect(self, ws: WebSocket)
       async def broadcast(self, data: dict)
   ```
-- [ ] Single manager instance shared between simulation and training WS handlers
+- [x] Single manager instance shared between simulation and training WS handlers
 
 ### 4.4 — Simulation WebSocket (`/ws/simulation`)
 
-- [ ] Create handler in `server/app/websockets/simulation_ws.py`
-- [ ] On connect: accept WebSocket, start simulation loop as background task
-- [ ] Simulation loop:
+- [x] Create handler in `server/app/websockets/simulation_ws.py`
+- [x] On connect: accept WebSocket, start simulation loop as background task
+- [x] Simulation loop:
   ```python
   while sim_running:
       if mode == "fixed":
@@ -1059,39 +1059,39 @@ for episode in range(EPISODES):
       await ws.send_json(frame.model_dump())
       await asyncio.sleep(0.1)  # 10fps
   ```
-- [ ] On disconnect: mark sim as paused (don't destroy state)
-- [ ] Handle client messages: `{"command": "start"}`, `{"command": "stop"}`, `{"command": "reset"}`, `{"command": "set_mode", "mode": "ai"|"fixed"}`
+- [x] On disconnect: mark sim as paused (don't destroy state)
+- [x] Handle client messages: `{"command": "start"}`, `{"command": "stop"}`, `{"command": "reset"}`, `{"command": "set_mode", "mode": "ai"|"fixed"}`
 
 ### 4.5 — Training WebSocket (`/ws/training`)
 
-- [ ] Create handler in `server/app/websockets/training_ws.py`
-- [ ] On connect: accept WebSocket
-- [ ] Handle client messages: `{"command": "start_training", "num_episodes": 500}`, `{"command": "stop_training"}`
-- [ ] On `start_training`: launch `trainer.train(...)` as background `asyncio.Task`
-- [ ] Trainer's `ws_broadcast_fn` sends `TrainingMetric` JSON to all connected clients
-- [ ] On disconnect: training continues in background
+- [x] Create handler in `server/app/websockets/training_ws.py`
+- [x] On connect: accept WebSocket
+- [x] Handle client messages: `{"command": "start_training", "num_episodes": 500}`, `{"command": "stop_training"}`
+- [x] On `start_training`: launch `trainer.train(...)` as background `asyncio.Task`
+- [x] Trainer's `ws_broadcast_fn` sends `TrainingMetric` JSON to all connected clients
+- [x] On disconnect: training continues in background
 
 ### 4.6 — REST Routers
 
-- [ ] Create `server/app/routers/simulation.py`:
+- [x] Create `server/app/routers/simulation.py`:
   - `POST /simulation/start` → creates Supabase simulation record, starts sim loop, returns `simulation_id`
   - `POST /simulation/stop` → stops sim loop, updates simulation status
   - `POST /simulation/reset` → resets intersection state
   - `PUT /simulation/mode` → switches between "fixed" and "ai"
   - `GET /simulation/status` → returns current `MetricsSnapshot`
 
-- [ ] Create `server/app/routers/training.py`:
+- [x] Create `server/app/routers/training.py`:
   - `POST /training/start` → `StartTrainingRequest` → launches training
   - `POST /training/stop` → calls `trainer.stop()`
   - `GET /training/status` → returns `trainer.get_status()`
   - `POST /training/load` → `{"model_id": "..."}` → loads checkpoint from Supabase Storage
 
-- [ ] Create `server/app/routers/metrics.py`:
+- [x] Create `server/app/routers/metrics.py`:
   - `GET /metrics/current` → returns current simulation `MetricsSnapshot`
 
 ### 4.7 — CORS & Main App Assembly
 
-- [ ] In `server/app/main.py`:
+- [x] In `server/app/main.py`:
   - Add `CORSMiddleware` with `allow_origins` from config
   - Register all routers: `app.include_router(simulation_router)`, etc.
   - Register WebSocket routes: `app.add_api_websocket_route("/ws/simulation", ...)`
