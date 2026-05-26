@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import { Color, Object3D, Vector3 } from "three";
-
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
 import TrafficLight from "@/components/simulation/TrafficLight";

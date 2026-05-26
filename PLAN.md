@@ -1313,7 +1313,7 @@ for episode in range(EPISODES):
 
 ### 7.1 — Simulation Controls Panel
 
-- [ ] Create `client/src/components/controls/SimulationControls.tsx`:
+- [x] Create `client/src/components/controls/SimulationControls.tsx`:
   - **Mode Toggle**: `Switch` component — "Fixed Timer" / "AI Agent" — sends `set_mode` command via WS
   - **Start/Stop Button**: sends `start` / `stop` command
   - **Reset Button**: sends `reset` command (with confirmation)
@@ -1323,7 +1323,7 @@ for episode in range(EPISODES):
 
 ### 7.2 — Training Controls Panel
 
-- [ ] Create `client/src/components/controls/TrainingControls.tsx`:
+- [x] Create `client/src/components/controls/TrainingControls.tsx`:
   - **Train Agent Button**: opens a small config popover → set `num_episodes` (default 500) → starts training via WS
   - **Stop Training Button**: visible only when `isTraining`
   - **Load Model Select**: dropdown of saved models from `useQuery(['models'])` → on select, sends `load` REST call
@@ -1332,7 +1332,7 @@ for episode in range(EPISODES):
 
 ### 7.3 — Live Metrics Cards
 
-- [ ] Create `client/src/components/dashboard/MetricsPanel.tsx`:
+- [x] Create `client/src/components/dashboard/MetricsPanel.tsx`:
   - 4 metric cards using Shadcn `<Card>`:
     1. **Avg Wait Time** — `currentFrame.avg_wait_time` seconds
     2. **Throughput** — `currentFrame.throughput` vehicles passed
@@ -1343,7 +1343,7 @@ for episode in range(EPISODES):
 
 ### 7.4 — Training Chart
 
-- [ ] Create `client/src/components/dashboard/TrainingChart.tsx`:
+- [x] Create `client/src/components/dashboard/TrainingChart.tsx`:
   - Recharts `<LineChart>` showing `trainingMetrics` from Zustand store
   - Two lines: **Total Reward** (primary) and **Avg Wait Time** (secondary, right Y-axis)
   - X-axis: episode number
@@ -1353,7 +1353,7 @@ for episode in range(EPISODES):
 
 ### 7.5 — Fixed vs AI Comparison Chart
 
-- [ ] Create `client/src/components/dashboard/ComparisonChart.tsx`:
+- [x] Create `client/src/components/dashboard/ComparisonChart.tsx`:
   - `<BarChart>` with grouped bars: Fixed vs AI
   - Metrics: Avg Wait Time, Throughput, Max Queue Length
   - Data source: `useQuery(['metrics', simulationId])` from Supabase via Next.js API
@@ -1362,7 +1362,7 @@ for episode in range(EPISODES):
 
 ### 7.6 — Episode History Table
 
-- [ ] Create `client/src/components/dashboard/EpisodeHistory.tsx`:
+- [x] Create `client/src/components/dashboard/EpisodeHistory.tsx`:
   - Shadcn `<Table>` showing past episodes
   - Columns: Episode #, Reward, Avg Wait, Throughput, Epsilon, Duration
   - Data: `useEpisodes(simulationId)`
@@ -1371,7 +1371,7 @@ for episode in range(EPISODES):
 
 ### 7.7 — Main Simulation Page Assembly
 
-- [ ] Update `client/src/app/simulation/page.tsx` with full layout:
+- [x] Update `client/src/app/simulation/page.tsx` with full layout:
   ```
   ┌─────────────────────────────────────────────────────┐
   │                    Header                           │
@@ -1386,8 +1386,8 @@ for episode in range(EPISODES):
   │                         │  [History]                │
   └─────────────────────────┴───────────────────────────┘
   ```
-- [ ] Use Shadcn `<Tabs>` for the bottom-right panel
-- [ ] Responsive: on mobile, stack canvas on top, panels below
+- [x] Use Shadcn `<Tabs>` for the bottom-right panel
+- [x] Responsive: on mobile, stack canvas on top, panels below
 
 **✅ Phase 7 Deliverable:** Full UI is functional. All panels render with live data. Charts update during training.
 

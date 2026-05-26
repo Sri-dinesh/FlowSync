@@ -1,15 +1,24 @@
 "use client";
 
 import Header from "@/components/layout/Header";
+import SimulationControls from "@/components/controls/SimulationControls";
+import TrainingControls from "@/components/controls/TrainingControls";
+import ComparisonChart from "@/components/dashboard/ComparisonChart";
+import EpisodeHistory from "@/components/dashboard/EpisodeHistory";
+import MetricsPanel from "@/components/dashboard/MetricsPanel";
+import TrainingChart from "@/components/dashboard/TrainingChart";
 import SimulationCanvas from "@/components/simulation/SimulationCanvas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSimulationSocket } from "@/hooks/useSimulationSocket";
 import { useTrainingSocket } from "@/hooks/useTrainingSocket";
+import { useSimulations } from "@/hooks/useSimulations";
 
 export default function SimulationPage() {
-  useSimulationSocket();
-  useTrainingSocket();
+  const { sendCommand: sendSimulationCommand } = useSimulationSocket();
+  const { sendCommand: sendTrainingCommand } = useTrainingSocket();
+  const { data: simulations = [] } = useSimulations();
+  const simulationId = simulations[0]?.id ?? null;
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white">
@@ -42,10 +51,16 @@ export default function SimulationPage() {
             <CardHeader>
               <CardTitle>Controls</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-white/70">
-              Simulation and training controls will be assembled in Phase 7.
+            <CardContent className="space-y-6">
+              <SimulationControls sendCommand={sendSimulationCommand} />
+              <TrainingControls
+                sendCommand={sendTrainingCommand}
+                simulationId={simulationId}
+              />
             </CardContent>
           </Card>
+
+          <MetricsPanel />
 
           <Card className="border-white/10 bg-white/5">
             <CardHeader>
@@ -56,18 +71,25 @@ export default function SimulationPage() {
                 <TabsList className="bg-white/5">
                   <TabsTrigger value="training">Training</TabsTrigger>
                   <TabsTrigger value="comparison">Compare</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
                 <TabsContent
                   value="training"
                   className="mt-4 text-sm text-white/70"
                 >
-                  Reward and loss charts appear here in Phase 7.
+                  <TrainingChart />
                 </TabsContent>
                 <TabsContent
                   value="comparison"
                   className="mt-4 text-sm text-white/70"
                 >
-                  Fixed vs AI comparison charts appear here in Phase 7.
+                  <ComparisonChart simulationId={simulationId} />
+                </TabsContent>
+                <TabsContent
+                  value="history"
+                  className="mt-4 text-sm text-white/70"
+                >
+                  <EpisodeHistory simulationId={simulationId} />
                 </TabsContent>
               </Tabs>
             </CardContent>
