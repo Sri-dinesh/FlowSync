@@ -53,6 +53,9 @@ class Intersection:
         total_wait = sum(vehicle.wait_time for vehicle in vehicles)
         return total_wait / len(vehicles)
 
+    def set_spawn_rate(self, lambda_rate: float) -> None:
+        self.spawner.set_rate(lambda_rate)
+
     def reset(self) -> None:
         for queue in self.lanes.values():
             queue.clear()

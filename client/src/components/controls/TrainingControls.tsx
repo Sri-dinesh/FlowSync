@@ -32,12 +32,14 @@ export default function TrainingControls({
 }: TrainingControlsProps) {
   const isTraining = useSimulationStore((state) => state.isTraining);
   const trainingMetrics = useSimulationStore((state) => state.trainingMetrics);
+  const setTraining = useSimulationStore((state) => state.setTraining);
 
   const [showConfig, setShowConfig] = useState(false);
   const [numEpisodes, setNumEpisodes] = useState(500);
   const [targetEpisodes, setTargetEpisodes] = useState<number | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
@@ -61,6 +63,7 @@ export default function TrainingControls({
 
   const startTraining = () => {
     setTargetEpisodes(numEpisodes);
+    setTraining(true);
     sendCommand({
       command: "start_training",
       num_episodes: numEpisodes,
@@ -70,6 +73,7 @@ export default function TrainingControls({
   };
 
   const stopTraining = () => {
+    setTraining(false);
     sendCommand({ command: "stop_training" });
   };
 
@@ -80,16 +84,24 @@ export default function TrainingControls({
 
     const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
     if (!baseUrl) {
+      setLoadError("FastAPI URL is not configured.");
       return;
     }
 
     setIsLoadingModel(true);
+    setLoadError(null);
     try {
-      await fetch(`${baseUrl}/training/load`, {
+      const response = await fetch(`${baseUrl}/training/load`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model_id: modelId }),
       });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setLoadError(payload?.detail ?? "Unable to load the selected model.");
+      }
+    } catch {
+      setLoadError("Unable to reach the training server.");
     } finally {
       setIsLoadingModel(false);
     }
@@ -183,6 +195,11 @@ export default function TrainingControls({
           <div className="flex items-center gap-2 text-xs text-white/60">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading checkpoint...
+          </div>
+        )}
+        {loadError && (
+          <div className="text-xs text-rose-200" role="status">
+            {loadError}
           </div>
         )}
       </div>

@@ -1,16 +1,39 @@
 import asyncio
+from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .simulation_ws import manager
+from ..services import supabase_service
+
+class TrainingConnectionManager:
+    def __init__(self) -> None:
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, data: dict) -> None:
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(data)
+            except Exception:
+                self.disconnect(connection)
+
+
+training_manager = TrainingConnectionManager()
 
 
 async def broadcast_training_metric(data: dict) -> None:
-    await manager.broadcast(data)
+    await training_manager.broadcast(data)
 
 
 async def training_socket(websocket: WebSocket) -> None:
-    await manager.connect(websocket)
+    await training_manager.connect(websocket)
     app_state = websocket.scope["app"].state.app_state
 
     try:
@@ -23,6 +46,13 @@ async def training_socket(websocket: WebSocket) -> None:
                 simulation_id = message.get("simulation_id") or app_state.get(
                     "current_simulation_id"
                 )
+                if not simulation_id:
+                    try:
+                        simulation_id = supabase_service.create_simulation("ai")
+                        if simulation_id:
+                            app_state["current_simulation_id"] = simulation_id
+                    except Exception:
+                        simulation_id = ""
                 trainer = app_state["trainer"]
 
                 if not trainer.is_training:
@@ -33,4 +63,4 @@ async def training_socket(websocket: WebSocket) -> None:
             elif command == "stop_training":
                 app_state["trainer"].stop()
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        training_manager.disconnect(websocket)

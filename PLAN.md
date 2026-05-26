@@ -1401,45 +1401,45 @@ for episode in range(EPISODES):
 
 ### 8.1 — End-to-End Simulation Flow
 
-- [ ] Start FastAPI server + Next.js dev server simultaneously
-- [ ] Open app → landing page renders → click "Launch App" → simulation page loads
-- [ ] `useSimulationSocket` connects to `ws://localhost:8000/ws/simulation`
-- [ ] Connection status badge turns green
-- [ ] Three.js scene renders intersection
-- [ ] Click "Start" → simulation begins → vehicles appear → traffic lights cycle
-- [ ] Toggle mode "Fixed → AI" → verify agent controls signals (no timer cycling)
-- [ ] Verify `SimulationFrame` JSON is well-formed in browser Network tab
+- [x] Start FastAPI server + Next.js dev server simultaneously
+- [x] Open app → landing page renders → click "Launch App" → simulation page loads
+- [x] `useSimulationSocket` connects to `ws://localhost:8000/ws/simulation`
+- [x] Connection status badge turns green
+- [x] Three.js scene renders intersection
+- [x] Click "Start" → simulation begins → vehicles appear → traffic lights cycle
+- [x] Toggle mode "Fixed → AI" → verify agent controls signals (no timer cycling)
+- [x] Verify `SimulationFrame` JSON is well-formed in browser Network tab
 
 ### 8.2 — End-to-End Training Flow
 
-- [ ] Click "Train Agent" with 100 episodes (quick test)
-- [ ] `useTrainingSocket` connects to `ws://localhost:8000/ws/training`
-- [ ] Training chart populates episode by episode
-- [ ] Epsilon decays visibly in chart
-- [ ] After training: episode history table in Supabase populates (verify in Supabase dashboard)
-- [ ] Model checkpoint uploaded to Supabase Storage (verify in Storage bucket)
-- [ ] Load trained model → switch to AI mode → verify improved signal behavior
+- [x] Click "Train Agent" with 100 episodes (quick test)
+- [x] `useTrainingSocket` connects to `ws://localhost:8000/ws/training`
+- [x] Training chart populates episode by episode
+- [x] Epsilon decays visibly in chart
+- [x] After training: episode history table in Supabase populates (verify in Supabase dashboard)
+- [x] Model checkpoint uploaded to Supabase Storage (verify in Storage bucket)
+- [x] Load trained model → switch to AI mode → verify improved signal behavior
 
 ### 8.3 — Comparison Flow
 
-- [ ] Run 50-episode fixed-mode simulation → stop → save metrics
-- [ ] Switch to AI mode → load trained model → run 50-step simulation → stop
-- [ ] Comparison chart shows both results side by side
-- [ ] Improvement percentage calculated correctly
+- [x] Run 50-episode fixed-mode simulation → stop → save metrics
+- [x] Switch to AI mode → load trained model → run 50-step simulation → stop
+- [x] Comparison chart shows both results side by side
+- [x] Improvement percentage calculated correctly
 
 ### 8.4 — Edge Cases & Resilience
 
-- [ ] WebSocket disconnect mid-simulation: verify reconnect hook retries, simulation resumes
-- [ ] FastAPI server restart: Next.js app shows disconnected state, reconnects when server is back
-- [ ] Training stop mid-episode: verify partial episode is NOT written to DB (or written with `partial` flag)
-- [ ] Max queue overflow (λ=1.0): verify vehicles are dropped, no crash
-- [ ] Load non-existent model ID: FastAPI returns 404, UI shows toast error
+- [x] WebSocket disconnect mid-simulation: verify reconnect hook retries, simulation resumes
+- [x] FastAPI server restart: Next.js app shows disconnected state, reconnects when server is back
+- [x] Training stop mid-episode: verify partial episode is NOT written to DB (or written with `partial` flag)
+- [x] Max queue overflow (λ=1.0): verify vehicles are dropped, no crash
+- [x] Load non-existent model ID: FastAPI returns 404, UI shows toast error
 
 ### 8.5 — Environment Variables Verification
 
-- [ ] All `NEXT_PUBLIC_*` vars accessible in browser
-- [ ] `DATABASE_URL` only on server-side (never leaked to client)
-- [ ] FastAPI `SUPABASE_SERVICE_KEY` never exposed to frontend
+- [x] All `NEXT_PUBLIC_*` vars accessible in browser
+- [x] `DATABASE_URL` only on server-side (never leaked to client)
+- [x] FastAPI `SUPABASE_SERVICE_KEY` never exposed to frontend
 
 **✅ Phase 8 Deliverable:** Full system works end-to-end. All flows verified. No crashes on edge cases.
 

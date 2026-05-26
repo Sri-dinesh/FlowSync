@@ -12,6 +12,9 @@ class PoissonSpawner:
     def __init__(self, lambda_rate: float = 0.3) -> None:
         self.lambda_rate = lambda_rate
 
+    def set_rate(self, lambda_rate: float) -> None:
+        self.lambda_rate = max(0.0, lambda_rate)
+
     def spawn(self, dt: float, lanes: Dict[str, List[Vehicle]]) -> List[Vehicle]:
         spawned: List[Vehicle] = []
 

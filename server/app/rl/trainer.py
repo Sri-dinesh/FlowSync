@@ -40,9 +40,12 @@ class Trainer:
             total_reward = 0.0
             loss_value: Optional[float] = None
             steps = 0
+            stopped_early = False
+            done = False
 
             for step in range(self.hyperparams.max_steps_per_episode):
                 if not self.is_training:
+                    stopped_early = True
                     break
 
                 action = self.agent.select_action(state, self.epsilon)
@@ -65,6 +68,9 @@ class Trainer:
                 if done:
                     break
 
+            if stopped_early:
+                break
+
             self.epsilon = max(
                 self.hyperparams.epsilon_end,
                 self.epsilon * self.hyperparams.epsilon_decay,
@@ -85,6 +91,7 @@ class Trainer:
                     steps,
                 )
 
+            is_last_episode = episode_index == num_episodes - 1
             await self.ws_broadcast_fn(
                 {
                     "episode": episode_num,
@@ -93,7 +100,7 @@ class Trainer:
                     "throughput": throughput,
                     "epsilon": self.epsilon,
                     "loss": loss_value,
-                    "is_training": self.is_training,
+                    "is_training": False if is_last_episode else self.is_training,
                 }
             )
 

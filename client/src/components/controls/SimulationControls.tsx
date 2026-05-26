@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Play, RotateCcw, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,12 @@ export default function SimulationControls({
     () => (mode === "ai" ? "AI Agent" : "Fixed Timer"),
     [mode],
   );
+
+  useEffect(() => {
+    if (isConnected && isRunning) {
+      sendCommand({ command: "start" });
+    }
+  }, [isConnected, isRunning, sendCommand]);
 
   const handleToggle = (checked: boolean) => {
     const nextMode: SimulationMode = checked ? "ai" : "fixed";

@@ -1,9 +1,11 @@
 import asyncio
+import logging
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ..schemas.simulation_schema import build_frame
+from ..services import supabase_service
 
 
 class ConnectionManager:
@@ -27,6 +29,7 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+logger = logging.getLogger(__name__)
 
 
 async def _simulation_loop(app_state: dict) -> None:
@@ -74,14 +77,53 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             if command == "start":
                 app_state["sim_running"] = True
+                if not app_state.get("current_simulation_id"):
+                    try:
+                        simulation_id = supabase_service.create_simulation(
+                            app_state.get("mode", "fixed")
+                        )
+                        if simulation_id:
+                            app_state["current_simulation_id"] = simulation_id
+                    except Exception:
+                        logger.exception("Failed to create simulation record")
             elif command == "stop":
                 app_state["sim_running"] = False
+                simulation_id = app_state.get("current_simulation_id")
+                if simulation_id:
+                    intersection = app_state["intersection"]
+                    total_steps = intersection.timestep
+                    duration_ms = int(total_steps * 0.1 * 1000)
+                    try:
+                        supabase_service.update_simulation(
+                            simulation_id,
+                            "stopped",
+                            total_steps,
+                            duration_ms,
+                        )
+                        supabase_service.save_performance_metric(
+                            simulation_id,
+                            app_state.get("mode", "fixed"),
+                            intersection.get_avg_wait_time(),
+                            intersection.total_passed,
+                        )
+                    except Exception:
+                        logger.exception("Failed to persist simulation metrics")
+                    app_state["current_simulation_id"] = None
             elif command == "reset":
                 app_state["intersection"].reset()
+                app_state["sim_running"] = False
+                app_state["current_simulation_id"] = None
             elif command == "set_mode":
                 mode = message.get("mode")
                 if mode in ("fixed", "ai"):
                     app_state["mode"] = mode
+            elif command == "set_spawn_rate":
+                value = message.get("value")
+                try:
+                    rate = float(value)
+                except (TypeError, ValueError):
+                    continue
+                app_state["intersection"].set_spawn_rate(rate)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         if not manager.active_connections:
