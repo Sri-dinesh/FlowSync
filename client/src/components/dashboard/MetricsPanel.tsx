@@ -30,7 +30,7 @@ function AnimatedValue({
 }
 
 function Sparkline({ data }: { data: number[] }) {
-  const chartData = data.map((value) => ({ value }));
+  const chartData = useMemo(() => data.map((value) => ({ value })), [data]);
   return (
     <div className="h-10 w-full">
       <ResponsiveContainer width="100%" height="100%">

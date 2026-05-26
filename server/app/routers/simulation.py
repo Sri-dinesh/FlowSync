@@ -1,3 +1,4 @@
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -39,7 +40,9 @@ async def start_simulation(request: Request) -> dict:
     if not app_state.get("sim_running"):
         app_state["sim_running"] = True
 
-    simulation_id = supabase_service.create_simulation(app_state["mode"])
+    simulation_id = await asyncio.to_thread(
+        supabase_service.create_simulation, app_state["mode"]
+    )
     app_state["current_simulation_id"] = simulation_id
 
     return {"simulation_id": simulation_id}
@@ -55,7 +58,8 @@ async def stop_simulation(request: Request) -> dict:
         intersection = app_state["intersection"]
         total_steps = intersection.timestep
         duration_ms = int(total_steps * 0.1 * 1000)
-        supabase_service.update_simulation(
+        await asyncio.to_thread(
+            supabase_service.update_simulation,
             simulation_id,
             "stopped",
             total_steps,

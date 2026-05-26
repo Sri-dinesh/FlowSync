@@ -62,7 +62,9 @@ async def training_status(request: Request) -> dict:
 @router.post("/load")
 async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     app_state = request.app.state.app_state
-    checkpoints = model_service.list_checkpoints(payload.model_id)
+    checkpoints = await asyncio.to_thread(
+        model_service.list_checkpoints, payload.model_id
+    )
 
     if not checkpoints:
         raise HTTPException(status_code=404, detail="No checkpoints found")
@@ -72,7 +74,9 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
         raise HTTPException(status_code=404, detail="No valid checkpoints found")
 
     latest_episode = max(episodes)
-    state_dict = model_service.load_checkpoint(payload.model_id, latest_episode)
+    state_dict = await asyncio.to_thread(
+        model_service.load_checkpoint, payload.model_id, latest_episode
+    )
 
     agent = app_state["agent"]
     agent.online_net.load_state_dict(state_dict)

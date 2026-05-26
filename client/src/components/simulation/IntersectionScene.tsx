@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
-import { Color, Object3D, Vector3 } from "three";
+import {
+  BoxGeometry,
+  Color,
+  MeshStandardMaterial,
+  Object3D,
+  Vector3,
+  type InstancedMesh,
+} from "three";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
 import TrafficLight from "@/components/simulation/TrafficLight";
@@ -88,7 +95,7 @@ export default function IntersectionScene() {
   const signalPhase = frame?.signal_phase ?? 0;
   const signalColor = frame?.signal_color ?? "red";
 
-  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const meshRef = useRef<InstancedMesh | null>(null);
   const currentPositionsRef = useRef<Map<string, Vector3>>(new Map());
   const targetPositionsRef = useRef<Map<string, Vector3>>(new Map());
   const spawnProgressRef = useRef<Map<string, number>>(new Map());
@@ -96,6 +103,18 @@ export default function IntersectionScene() {
   const tempObject = useMemo(() => new Object3D(), []);
   const movingColor = useMemo(() => new Color("#f8fafc"), []);
   const waitingColor = useMemo(() => new Color("#fbbf24"), []);
+  const vehicleGeometry = useMemo(() => new BoxGeometry(0.4, 0.2, 0.8), []);
+  const vehicleMaterial = useMemo(
+    () => new MeshStandardMaterial({ vertexColors: true }),
+    [],
+  );
+
+  useEffect(() => {
+    return () => {
+      vehicleGeometry.dispose();
+      vehicleMaterial.dispose();
+    };
+  }, [vehicleGeometry, vehicleMaterial]);
 
   useEffect(() => {
     const targets = targetPositionsRef.current;
@@ -224,10 +243,10 @@ export default function IntersectionScene() {
       <QueueLabel value={queueLengths.east ?? 0} position={[6.6, 0.6, 0]} />
       <QueueLabel value={queueLengths.west ?? 0} position={[-6.6, 0.6, 0]} />
 
-      <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_VEHICLES]}>
-        <boxGeometry args={[0.4, 0.2, 0.8]} />
-        <meshStandardMaterial vertexColors />
-      </instancedMesh>
+      <instancedMesh
+        ref={meshRef}
+        args={[vehicleGeometry, vehicleMaterial, MAX_VEHICLES]}
+      />
     </group>
   );
 }

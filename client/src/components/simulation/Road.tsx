@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { BoxGeometry, MeshStandardMaterial, PlaneGeometry } from "three";
 
 interface RoadProps {
@@ -37,6 +37,24 @@ export default function Road({ direction }: RoadProps) {
     () => new MeshStandardMaterial({ color: "#f8fafc" }),
     [],
   );
+
+  useEffect(() => {
+    return () => {
+      baseGeometry.dispose();
+      baseMaterial.dispose();
+      laneGeometry.dispose();
+      laneMaterial.dispose();
+      stopGeometry.dispose();
+      stopMaterial.dispose();
+    };
+  }, [
+    baseGeometry,
+    baseMaterial,
+    laneGeometry,
+    laneMaterial,
+    stopGeometry,
+    stopMaterial,
+  ]);
 
   const rotation = [-Math.PI / 2, 0, 0] as const;
 

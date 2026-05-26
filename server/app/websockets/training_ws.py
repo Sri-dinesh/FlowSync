@@ -2,6 +2,7 @@ import asyncio
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
+import ujson
 
 from ..services import supabase_service
 
@@ -18,9 +19,10 @@ class TrainingConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict) -> None:
+        payload = ujson.dumps(data)
         for connection in list(self.active_connections):
             try:
-                await connection.send_json(data)
+                await connection.send_text(payload)
             except Exception:
                 self.disconnect(connection)
 
@@ -48,7 +50,9 @@ async def training_socket(websocket: WebSocket) -> None:
                 )
                 if not simulation_id:
                     try:
-                        simulation_id = supabase_service.create_simulation("ai")
+                        simulation_id = await asyncio.to_thread(
+                            supabase_service.create_simulation, "ai"
+                        )
                         if simulation_id:
                             app_state["current_simulation_id"] = simulation_id
                     except Exception:

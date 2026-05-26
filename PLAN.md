@@ -1453,7 +1453,7 @@ for episode in range(EPISODES):
 
 ### 9.1 — Three.js / R3F Optimization
 
-- [ ] **InstancedMesh for vehicles**: Replace individual `<Vehicle>` mesh components with a single `<InstancedMesh count={40}>`. Update instance matrices each frame. Zero garbage collection pressure.
+- [x] **InstancedMesh for vehicles**: Replace individual `<Vehicle>` mesh components with a single `<InstancedMesh count={40}>`. Update instance matrices each frame. Zero garbage collection pressure.
   ```typescript
   const meshRef = useRef<THREE.InstancedMesh>(null);
   useFrame(() => {
@@ -1465,39 +1465,39 @@ for episode in range(EPISODES):
     meshRef.current.instanceMatrix.needsUpdate = true;
   });
   ```
-- [ ] **Memoize static geometry**: Road, grid, intersection ground — use `useMemo` so geometry is created once
-- [ ] **Dispose on unmount**: All geometries, materials, and textures must be disposed in useEffect cleanup
-- [ ] **Pixel ratio**: Set `<Canvas dpr={[1, 1.5]}>` — cap at 1.5× to avoid 4K overhead
-- [ ] **Frame budget**: Target ≤ 4ms render time. Profile with `r3f-perf` during development
+- [x] **Memoize static geometry**: Road, grid, intersection ground — use `useMemo` so geometry is created once
+- [x] **Dispose on unmount**: All geometries, materials, and textures must be disposed in useEffect cleanup
+- [x] **Pixel ratio**: Set `<Canvas dpr={[1, 1.5]}>` — cap at 1.5× to avoid 4K overhead
+- [x] **Frame budget**: Target ≤ 4ms render time. Profile with `r3f-perf` during development
 
 ### 9.2 — WebSocket Optimization
 
-- [ ] FastAPI sends simulation frames at exactly 10fps (`asyncio.sleep(0.1)`) — do not exceed this
-- [ ] JSON frame size: keep under 2KB per frame. Avoid sending full vehicle history, only current state
-- [ ] Training metrics: batch per episode (not per step) — ~0.5fps during training is fine
-- [ ] Use `ujson` in FastAPI for faster JSON serialization: `pip install ujson`
+- [x] FastAPI sends simulation frames at exactly 10fps (`asyncio.sleep(0.1)`) — do not exceed this
+- [x] JSON frame size: keep under 2KB per frame. Avoid sending full vehicle history, only current state
+- [x] Training metrics: batch per episode (not per step) — ~0.5fps during training is fine
+- [x] Use `ujson` in FastAPI for faster JSON serialization: `pip install ujson`
 
 ### 9.3 — React Rendering Optimization
 
-- [ ] Simulation canvas component: wrap in `React.memo` — only re-renders when `currentFrame` changes
-- [ ] Dashboard charts: `useMemo` on data arrays passed to Recharts
-- [ ] Training chart: only re-render on new metric added (use `trainingMetrics.length` as dep)
-- [ ] Zustand selectors: use granular selectors (not full store) to minimize re-renders
+- [x] Simulation canvas component: wrap in `React.memo` — only re-renders when `currentFrame` changes
+- [x] Dashboard charts: `useMemo` on data arrays passed to Recharts
+- [x] Training chart: only re-render on new metric added (use `trainingMetrics.length` as dep)
+- [x] Zustand selectors: use granular selectors (not full store) to minimize re-renders
 
 ### 9.4 — FastAPI Async Optimization
 
-- [ ] All Supabase calls in FastAPI are `async` — use `asyncio.gather()` where multiple DB writes happen together
-- [ ] Simulation loop runs in `asyncio` background task — never blocks the event loop
-- [ ] Training loop: runs in `asyncio.to_thread()` for CPU-bound PyTorch work — keeps FastAPI responsive
+- [x] All Supabase calls in FastAPI are `async` — use `asyncio.gather()` where multiple DB writes happen together
+- [x] Simulation loop runs in `asyncio` background task — never blocks the event loop
+- [x] Training loop: runs in `asyncio.to_thread()` for CPU-bound PyTorch work — keeps FastAPI responsive
   ```python
   await asyncio.to_thread(agent.train_step, batch)
   ```
 
 ### 9.5 — Memory Management
 
-- [ ] Replay buffer: fixed max size 10,000 (deque auto-evicts old samples) — memory bounded
-- [ ] Training metrics in Zustand: cap at 1,000 entries in store (older ones trimmed)
-- [ ] Vehicle list: max 40 vehicles total (4 lanes × 10 max queue) — bounded
+- [x] Replay buffer: fixed max size 10,000 (deque auto-evicts old samples) — memory bounded
+- [x] Training metrics in Zustand: cap at 1,000 entries in store (older ones trimmed)
+- [x] Vehicle list: max 40 vehicles total (4 lanes × 10 max queue) — bounded
 
 **✅ Phase 9 Deliverable:** Simulation runs at stable 60fps. No memory leaks. FastAPI stays responsive during training.
 

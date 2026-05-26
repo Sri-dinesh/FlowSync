@@ -15,9 +15,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSimulationStore } from "@/store/simulationStore";
 
 export default function TrainingChart() {
-  const trainingMetrics = useSimulationStore((state) => state.trainingMetrics);
+  const metricsCount = useSimulationStore(
+    (state) => state.trainingMetrics.length,
+  );
 
-  const data = useMemo(() => trainingMetrics.slice(-100), [trainingMetrics]);
+  const data = useMemo(() => {
+    const metrics = useSimulationStore.getState().trainingMetrics;
+    return metrics.slice(-100);
+  }, [metricsCount]);
   const width = Math.max(600, data.length * 10);
 
   return (

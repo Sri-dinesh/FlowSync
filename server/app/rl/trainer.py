@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Awaitable, Callable, Optional
 
 from .dqn_agent import DQNAgent
@@ -56,7 +57,7 @@ class Trainer:
 
                 if len(self.agent.replay_buffer) >= 1000:
                     batch = self.agent.replay_buffer.sample(self.hyperparams.batch_size)
-                    loss_value = self.agent.train_step(batch)
+                    loss_value = await asyncio.to_thread(self.agent.train_step, batch)
 
                 if step % self.hyperparams.target_update_freq == 0:
                     self.agent.sync_target_network()
@@ -80,7 +81,8 @@ class Trainer:
             throughput = self.env.intersection.total_passed
 
             if simulation_id:
-                self.supabase_service.save_episode(
+                await asyncio.to_thread(
+                    self.supabase_service.save_episode,
                     simulation_id,
                     episode_num,
                     total_reward,
@@ -105,7 +107,8 @@ class Trainer:
             )
 
             if simulation_id and episode_num % 50 == 0:
-                self.model_service.save_checkpoint(
+                await asyncio.to_thread(
+                    self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
                     self.agent.online_net.state_dict(),

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+
+import ujson
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -21,9 +23,10 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict) -> None:
+        payload = ujson.dumps(data)
         for connection in list(self.active_connections):
             try:
-                await connection.send_json(data)
+                await connection.send_text(payload)
             except Exception:
                 self.disconnect(connection)
 
@@ -79,8 +82,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 app_state["sim_running"] = True
                 if not app_state.get("current_simulation_id"):
                     try:
-                        simulation_id = supabase_service.create_simulation(
-                            app_state.get("mode", "fixed")
+                        simulation_id = await asyncio.to_thread(
+                            supabase_service.create_simulation,
+                            app_state.get("mode", "fixed"),
                         )
                         if simulation_id:
                             app_state["current_simulation_id"] = simulation_id
@@ -94,17 +98,21 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     total_steps = intersection.timestep
                     duration_ms = int(total_steps * 0.1 * 1000)
                     try:
-                        supabase_service.update_simulation(
-                            simulation_id,
-                            "stopped",
-                            total_steps,
-                            duration_ms,
-                        )
-                        supabase_service.save_performance_metric(
-                            simulation_id,
-                            app_state.get("mode", "fixed"),
-                            intersection.get_avg_wait_time(),
-                            intersection.total_passed,
+                        await asyncio.gather(
+                            asyncio.to_thread(
+                                supabase_service.update_simulation,
+                                simulation_id,
+                                "stopped",
+                                total_steps,
+                                duration_ms,
+                            ),
+                            asyncio.to_thread(
+                                supabase_service.save_performance_metric,
+                                simulation_id,
+                                app_state.get("mode", "fixed"),
+                                intersection.get_avg_wait_time(),
+                                intersection.total_passed,
+                            ),
                         )
                     except Exception:
                         logger.exception("Failed to persist simulation metrics")
