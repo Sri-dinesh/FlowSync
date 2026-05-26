@@ -19,8 +19,9 @@ export default function SimulationControls({
   const isConnected = useSimulationStore((state) => state.isConnected);
   const mode = useSimulationStore((state) => state.mode);
   const setMode = useSimulationStore((state) => state.setMode);
+  const isRunning = useSimulationStore((state) => state.isRunning);
+  const setRunning = useSimulationStore((state) => state.setRunning);
 
-  const [isRunning, setIsRunning] = useState(false);
   const [spawnRate, setSpawnRate] = useState(0.3);
   const [isSwitching, setIsSwitching] = useState(false);
 
@@ -45,7 +46,7 @@ export default function SimulationControls({
 
   const handleStartStop = () => {
     const nextRunning = !isRunning;
-    setIsRunning(nextRunning);
+    setRunning(nextRunning);
     sendCommand({ command: nextRunning ? "start" : "stop" });
   };
 
@@ -53,7 +54,7 @@ export default function SimulationControls({
     if (!window.confirm("Reset the simulation?")) {
       return;
     }
-    setIsRunning(false);
+    setRunning(false);
     sendCommand({ command: "reset" });
   };
 
@@ -64,11 +65,11 @@ export default function SimulationControls({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-white">Mode Toggle</p>
-          <p className="text-xs text-white/60">{modeLabel}</p>
+          <p className="text-2sm font-semibold text-white">Mode Toggle</p>
+          <p className="text-xs text-white/45">{modeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           {isSwitching && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -81,7 +82,12 @@ export default function SimulationControls({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={handleStartStop} disabled={!isConnected}>
+        <Button
+          size="sm"
+          className="min-w-[84px]"
+          onClick={handleStartStop}
+          disabled={!isConnected}
+        >
           {isRunning ? (
             <>
               <Square className="h-4 w-4" />
@@ -97,6 +103,7 @@ export default function SimulationControls({
         <Button
           size="sm"
           variant="outline"
+          className="min-w-[84px] border-white/20 bg-white/5"
           onClick={handleReset}
           disabled={!isConnected}
         >
@@ -104,9 +111,12 @@ export default function SimulationControls({
           Reset
         </Button>
       </div>
+      <div className="text-xs text-white/45">
+        Status: {isRunning ? "Running" : "Stopped"}
+      </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-white/60">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs text-white/50">
           <span>Vehicle Arrival Rate (lambda)</span>
           <span>{spawnRate.toFixed(2)}</span>
         </div>

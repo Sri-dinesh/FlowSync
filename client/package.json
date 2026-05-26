@@ -38,7 +38,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "prisma": "6.19.3",
-    "r3f-perf": "^7.2.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -80,7 +80,9 @@ class Trainer:
             avg_wait = self.env.intersection.get_avg_wait_time()
             throughput = self.env.intersection.total_passed
 
-            if simulation_id:
+            persist_remote = bool(simulation_id) and not simulation_id.startswith("local-")
+
+            if persist_remote:
                 await asyncio.to_thread(
                     self.supabase_service.save_episode,
                     simulation_id,
@@ -106,7 +108,7 @@ class Trainer:
                 }
             )
 
-            if simulation_id and episode_num % 50 == 0:
+            if simulation_id and (episode_num % 50 == 0 or is_last_episode):
                 await asyncio.to_thread(
                     self.model_service.save_checkpoint,
                     simulation_id,

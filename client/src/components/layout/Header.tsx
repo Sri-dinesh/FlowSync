@@ -10,38 +10,34 @@ export default function Header() {
   const mode = useSimulationStore((state) => state.mode);
 
   return (
-    <header className="border-b border-white/10 bg-black/30 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+    <header className="border-b border-white/10 bg-[#121212]">
+      <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400/70 via-cyan-300/40 to-amber-200/60 text-sm font-semibold text-black">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#1a6bff] text-xs font-semibold text-white">
             FS
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">
-              FlowSync
-            </div>
-            <div className="text-lg font-semibold text-white">
-              Smart Traffic Control
-            </div>
+            <div className="text-[15px] font-semibold text-white">FlowSync</div>
+            <div className="text-xs text-white/45">Smart Traffic Control</div>
           </div>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Badge
             variant="outline"
             className={
               isConnected
-                ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-100"
-                : "border-rose-400/40 bg-rose-500/15 text-rose-100"
+                ? "border-emerald-500/40 bg-emerald-900/30 text-emerald-300"
+                : "border-rose-500/40 bg-rose-900/20 text-rose-300"
             }
           >
-            {isConnected ? "Connected" : "Disconnected"}
+            {isConnected ? "• Connected" : "• Disconnected"}
           </Badge>
           <Badge
             variant="outline"
-            className="border-white/15 bg-white/5 text-white/80"
+            className="border-blue-500/30 bg-blue-900/20 text-blue-300"
           >
-            Mode: {mode === "ai" ? "AI" : "Fixed"}
+            {mode === "ai" ? "AI Mode" : "Fixed Mode"}
           </Badge>
         </div>
       </div>

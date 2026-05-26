@@ -4,10 +4,15 @@ import { GridHelper, MeshStandardMaterial, PlaneGeometry } from "three";
 export default function IntersectionGrid() {
   const geometry = useMemo(() => new PlaneGeometry(20, 20), []);
   const material = useMemo(
-    () => new MeshStandardMaterial({ color: "#111827" }),
+    () =>
+      new MeshStandardMaterial({
+        color: "#0f172a",
+        emissive: "#111827",
+        emissiveIntensity: 0.25,
+      }),
     [],
   );
-  const grid = useMemo(() => new GridHelper(20, 20, "#1f2937", "#0f172a"), []);
+  const grid = useMemo(() => new GridHelper(20, 20, "#334155", "#1f2937"), []);
 
   useEffect(() => {
     return () => {

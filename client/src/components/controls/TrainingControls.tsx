@@ -40,13 +40,24 @@ export default function TrainingControls({
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [trainInfo, setTrainInfo] = useState<string | null>(null);
 
   const { data: models = [] } = useQuery({
     queryKey: ["models"],
-    queryFn: () =>
-      fetch("/api/models").then(
-        (response) => response.json() as Promise<RLModel[]>,
-      ),
+    queryFn: async () => {
+      const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
+      if (!baseUrl) {
+        return [] as RLModel[];
+      }
+
+      const response = await fetch(`${baseUrl}/training/models`);
+      if (!response.ok) {
+        return [] as RLModel[];
+      }
+
+      const payload = (await response.json()) as { models?: RLModel[] };
+      return payload.models ?? [];
+    },
   });
 
   const currentEpisode = useMemo(() => {
@@ -64,6 +75,9 @@ export default function TrainingControls({
   const startTraining = () => {
     setTargetEpisodes(numEpisodes);
     setTraining(true);
+    setTrainInfo(
+      "Training runs episodes in the background. A model checkpoint is saved at the end so you can load it.",
+    );
     sendCommand({
       command: "start_training",
       num_episodes: numEpisodes,
@@ -108,17 +122,29 @@ export default function TrainingControls({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <AIStatusBadge
           isTraining={isTraining}
           currentEpisode={currentEpisode}
           targetEpisodes={targetEpisodes}
         />
-        <Button size="sm" onClick={() => setShowConfig((prev) => !prev)}>
-          Train Agent
-        </Button>
+        {isTraining ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-rose-500/30 bg-rose-500/10 text-rose-300"
+            onClick={stopTraining}
+          >
+            Stop Training
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => setShowConfig((prev) => !prev)}>
+            Train Agent
+          </Button>
+        )}
       </div>
+      {trainInfo && <p className="text-xs text-emerald-200/90">{trainInfo}</p>}
 
       {showConfig && (
         <div className="rounded-lg border border-white/10 bg-white/5 p-3">
@@ -148,7 +174,7 @@ export default function TrainingControls({
 
       {isTraining && (
         <div>
-          <div className="flex items-center justify-between text-xs text-white/60">
+          <div className="flex items-center justify-between text-xs text-white/45">
             <span>Episode Progress</span>
             <span>
               {currentEpisode}/{targetEpisodes ?? "-"}
@@ -160,19 +186,11 @@ export default function TrainingControls({
               style={{ width: `${progress * 100}%` }}
             />
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            onClick={stopTraining}
-          >
-            Stop Training
-          </Button>
         </div>
       )}
 
       <div className="space-y-2">
-        <div className="text-xs text-white/60">Load Model</div>
+        <div className="text-xs text-white/50">Load Model</div>
         <Select
           value={selectedModelId}
           onValueChange={(value) => {
@@ -180,10 +198,15 @@ export default function TrainingControls({
             loadModel(value);
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full border-white/15 bg-black/40 text-white/70">
             <SelectValue placeholder="Select saved model" />
           </SelectTrigger>
           <SelectContent>
+            {models.length === 0 && (
+              <SelectItem value="__none" disabled>
+                No trained models yet
+              </SelectItem>
+            )}
             {models.map((model) => (
               <SelectItem key={model.id} value={model.id}>
                 {model.name} v{model.version}

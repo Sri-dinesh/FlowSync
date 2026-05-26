@@ -123,8 +123,9 @@ def save_model_metadata(
     avg_reward: float,
     epsilon: float,
     total_episodes: int,
+    model_id: Optional[str] = None,
 ) -> str:
-    payload = {
+    payload: Dict[str, Any] = {
         "name": name,
         "version": version,
         "storagePath": storage_path,
@@ -132,6 +133,8 @@ def save_model_metadata(
         "epsilon": epsilon,
         "totalEpisodes": total_episodes,
     }
+    if model_id:
+        payload["id"] = model_id
     result = supabase_client.table("rl_models").insert(payload).execute()
     data = getattr(result, "data", [])
     return data[0]["id"] if data else ""

@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from .vehicle import Vehicle
+from .vehicle import DEFAULT_SPEED, Vehicle
 
 MAX_QUEUE = 10
 
@@ -27,7 +27,7 @@ class PoissonSpawner:
                     lane=lane_name,
                     position=0.0,
                     wait_time=0.0,
-                    speed=0.02,
+                    speed=DEFAULT_SPEED,
                     state="waiting",
                 )
                 lane_queue.append(vehicle)

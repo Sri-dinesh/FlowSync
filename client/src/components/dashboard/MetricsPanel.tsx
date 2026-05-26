@@ -110,39 +110,53 @@ export default function MetricsPanel() {
       value: metrics.avgWait,
       suffix: "s",
       history: waitHistory,
+      accent: "bg-blue-500",
+      ratio: Math.min(1, metrics.avgWait / 14),
     },
     {
       title: "Throughput",
       value: metrics.throughput,
       suffix: "",
       history: throughputHistory,
+      accent: "bg-emerald-500",
+      ratio: Math.min(1, metrics.throughput / 200),
     },
     {
       title: "Max Queue",
       value: metrics.maxQueue,
       suffix: "",
       history: queueHistory,
+      accent: "bg-amber-400",
+      ratio: Math.min(1, metrics.maxQueue / 10),
     },
     {
-      title: "Current Episode",
+      title: "Episode",
       value: metrics.currentEpisode,
       suffix: "",
       history: episodeHistory,
+      accent: "bg-violet-400",
+      ratio: Math.min(1, metrics.currentEpisode / 500),
     },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-2">
       {cards.map((card) => (
-        <Card key={card.title} className="border-white/10 bg-white/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white/70">
+        <Card key={card.title} className="border-white/10 bg-[#161616]">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-[10px] uppercase tracking-[0.09em] text-white/40">
               {card.title}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-2xl font-semibold">
+          <CardContent className="space-y-2 pt-0">
+            <div className="text-[34px] font-medium leading-none tracking-tight text-white">
               <AnimatedValue value={card.value} suffix={card.suffix} />
+            </div>
+            <div className="h-0.5 rounded bg-white/10">
+              <div
+                className={`h-0.5 rounded ${card.accent}`}
+                style={{ width: `${card.ratio * 100}%` }}
+              />
             </div>
             <Sparkline data={card.history} />
           </CardContent>

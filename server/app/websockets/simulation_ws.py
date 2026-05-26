@@ -1,7 +1,11 @@
 import asyncio
 import logging
+import time
 
-import ujson
+try:
+    import ujson as json
+except ImportError:  # pragma: no cover - fallback for missing optional dep
+    import json
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -23,7 +27,7 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict) -> None:
-        payload = ujson.dumps(data)
+        payload = json.dumps(data)
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(payload)
@@ -90,10 +94,11 @@ async def simulation_socket(websocket: WebSocket) -> None:
                             app_state["current_simulation_id"] = simulation_id
                     except Exception:
                         logger.exception("Failed to create simulation record")
+                        app_state["current_simulation_id"] = f"local-{int(time.time())}"
             elif command == "stop":
                 app_state["sim_running"] = False
                 simulation_id = app_state.get("current_simulation_id")
-                if simulation_id:
+                if simulation_id and not str(simulation_id).startswith("local-"):
                     intersection = app_state["intersection"]
                     total_steps = intersection.timestep
                     duration_ms = int(total_steps * 0.1 * 1000)

@@ -19,7 +19,7 @@ export default function Road({ direction }: RoadProps) {
     [direction],
   );
   const baseMaterial = useMemo(
-    () => new MeshStandardMaterial({ color: "#1a1a1a" }),
+    () => new MeshStandardMaterial({ color: "#1f2937" }),
     [],
   );
 
@@ -28,7 +28,7 @@ export default function Road({ direction }: RoadProps) {
     [roadLength],
   );
   const laneMaterial = useMemo(
-    () => new MeshStandardMaterial({ color: "#f8fafc" }),
+    () => new MeshStandardMaterial({ color: "#e2e8f0" }),
     [],
   );
 

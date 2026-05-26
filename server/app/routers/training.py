@@ -13,6 +13,8 @@ router = APIRouter(prefix="/training", tags=["training"])
 class LoadModelRequest(BaseModel):
     model_id: str
 
+    model_config = {"protected_namespaces": ()}
+
 
 def _parse_episode(path: str) -> Optional[int]:
     filename = path.split("/")[-1]
@@ -57,6 +59,12 @@ async def training_status(request: Request) -> dict:
     app_state = request.app.state.app_state
     trainer = app_state["trainer"]
     return trainer.get_status()
+
+
+@router.get("/models")
+async def list_models() -> dict:
+    models = await asyncio.to_thread(model_service.list_local_models)
+    return {"models": models}
 
 
 @router.post("/load")

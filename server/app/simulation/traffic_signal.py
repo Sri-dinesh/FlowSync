@@ -18,8 +18,8 @@ class SignalColor(Enum):
 PHASE_GREEN_LANES: Dict[int, List[str]] = {
     SignalPhase.NS_GREEN.value: ["north", "south"],
     SignalPhase.EW_GREEN.value: ["east", "west"],
-    SignalPhase.NS_LEFT.value: ["north_left", "south_left"],
-    SignalPhase.EW_LEFT.value: ["east_left", "west_left"],
+    SignalPhase.NS_LEFT.value: ["north", "south"],
+    SignalPhase.EW_LEFT.value: ["east", "west"],
 }
 
 

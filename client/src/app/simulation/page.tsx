@@ -5,6 +5,7 @@ import SimulationControls from "@/components/controls/SimulationControls";
 import TrainingControls from "@/components/controls/TrainingControls";
 import ComparisonChart from "@/components/dashboard/ComparisonChart";
 import EpisodeHistory from "@/components/dashboard/EpisodeHistory";
+import LiveSnapshot from "@/components/dashboard/LiveSnapshot";
 import MetricsPanel from "@/components/dashboard/MetricsPanel";
 import TrainingChart from "@/components/dashboard/TrainingChart";
 import SimulationCanvas from "@/components/simulation/SimulationCanvas";
@@ -21,37 +22,37 @@ export default function SimulationPage() {
   const simulationId = simulations[0]?.id ?? null;
 
   return (
-    <div className="min-h-screen bg-[#0b0f14] text-white">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_55%)]" />
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       <Header />
 
-      <main className="mx-auto grid w-full max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
+      <main className="mx-auto grid h-[calc(100vh-56px)] w-full max-w-[1200px] gap-0 lg:grid-cols-[1fr_320px]">
         <section className="flex flex-col gap-6">
-          <Card className="min-h-[420px] border-white/10 bg-white/5 shadow-[0_0_30px_rgba(56,189,248,0.12)]">
-            <CardHeader>
-              <CardTitle>Simulation Canvas</CardTitle>
+          <Card className="h-full rounded-none border-0 border-r border-white/10 bg-[#0f0f0f]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+                Simulation Canvas
+              </CardTitle>
             </CardHeader>
-            <CardContent className="rounded-xl border border-white/10 bg-black/40 p-3">
+            <CardContent className="h-[calc(100%-52px)] border-y border-white/10 bg-black/40 p-0">
               <SimulationCanvas />
             </CardContent>
-          </Card>
-
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader>
-              <CardTitle>Live Snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-white/70">
-              Metrics, queue lengths, and status tiles land here in Phase 7.
+            <CardContent className="border-b border-white/10 bg-[#111111] p-4">
+              <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
+                Live Snapshot
+              </CardTitle>
+              <LiveSnapshot />
             </CardContent>
           </Card>
         </section>
 
-        <aside className="flex flex-col gap-6">
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader>
-              <CardTitle>Controls</CardTitle>
+        <aside className="flex h-full flex-col overflow-hidden border-l border-white/10 bg-[#111111]">
+          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+                Controls
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-5 pb-4">
               <SimulationControls sendCommand={sendSimulationCommand} />
               <TrainingControls
                 sendCommand={sendTrainingCommand}
@@ -60,18 +61,37 @@ export default function SimulationPage() {
             </CardContent>
           </Card>
 
-          <MetricsPanel />
+          <div className="border-b border-white/10 p-4">
+            <MetricsPanel />
+          </div>
 
-          <Card className="border-white/10 bg-white/5">
-            <CardHeader>
-              <CardTitle>Analytics</CardTitle>
+          <Card className="flex-1 rounded-none border-0 bg-transparent">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+                Analytics
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <Tabs defaultValue="training" className="w-full">
-                <TabsList className="bg-white/5">
-                  <TabsTrigger value="training">Training</TabsTrigger>
-                  <TabsTrigger value="comparison">Compare</TabsTrigger>
-                  <TabsTrigger value="history">History</TabsTrigger>
+                <TabsList className="h-auto gap-1 bg-transparent p-0">
+                  <TabsTrigger
+                    value="training"
+                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                  >
+                    Training
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="comparison"
+                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                  >
+                    Compare
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                  >
+                    History
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent
                   value="training"

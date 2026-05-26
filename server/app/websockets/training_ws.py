@@ -1,8 +1,12 @@
 import asyncio
+import time
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
-import ujson
+try:
+    import ujson as json
+except ImportError:  # pragma: no cover - fallback for missing optional dep
+    import json
 
 from ..services import supabase_service
 
@@ -19,7 +23,7 @@ class TrainingConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict) -> None:
-        payload = ujson.dumps(data)
+        payload = json.dumps(data)
         for connection in list(self.active_connections):
             try:
                 await connection.send_text(payload)
@@ -56,7 +60,7 @@ async def training_socket(websocket: WebSocket) -> None:
                         if simulation_id:
                             app_state["current_simulation_id"] = simulation_id
                     except Exception:
-                        simulation_id = ""
+                        simulation_id = f"local-{int(time.time())}"
                 trainer = app_state["trainer"]
 
                 if not trainer.is_training:
