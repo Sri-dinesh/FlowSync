@@ -17,6 +17,7 @@ export function useTrainingSocket() {
     null,
   );
   const shouldReconnectRef = useRef(true);
+  const connectRef = useRef<(() => void) | null>(null);
 
   const connect = useCallback(() => {
     const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_WS_URL;
@@ -52,7 +53,7 @@ export function useTrainingSocket() {
       const delay = BASE_DELAY_MS * Math.pow(2, retryRef.current);
       retryRef.current += 1;
       reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
+        connectRef.current?.();
       }, delay);
     };
 
@@ -60,6 +61,10 @@ export function useTrainingSocket() {
       socket.close();
     };
   }, [addTrainingMetric]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

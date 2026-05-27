@@ -22,99 +22,100 @@ export default function SimulationPage() {
   const simulationId = simulations[0]?.id ?? null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <Header />
+    <div className="relative min-h-screen bg-[#0a0a0a] text-white flex flex-col overflow-hidden">
+      <div className="z-50 relative">
+        <Header />
+      </div>
 
-      <main className="mx-auto grid h-[calc(100vh-56px)] w-full max-w-[1200px] gap-0 lg:grid-cols-[1fr_320px]">
-        <section className="flex flex-col gap-6">
-          <Card className="h-full rounded-none border-0 border-r border-white/10 bg-[#0f0f0f]">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
-                Simulation Canvas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-[calc(100%-52px)] border-y border-white/10 bg-black/40 p-0">
-              <SimulationCanvas />
-            </CardContent>
-            <CardContent className="border-b border-white/10 bg-[#111111] p-4">
+      <div className="absolute inset-0 z-0">
+        <SimulationCanvas />
+      </div>
+
+      <main className="flex-1 w-full z-10 pointer-events-none relative mt-[56px]">
+        <div className="absolute right-0 top-0 bottom-0 w-full max-w-[420px] pointer-events-auto">
+          <aside className="flex flex-col h-[calc(100vh-56px)] overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl">
+            <Card className="rounded-none border-0 border-b border-white/10 bg-transparent flex-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+                  Controls
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 pb-4">
+                <SimulationControls sendCommand={sendSimulationCommand} />
+                <TrainingControls
+                  sendCommand={sendTrainingCommand}
+                  simulationId={simulationId}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
               <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
-                Live Snapshot
+                Real-time Metrics
               </CardTitle>
-              <LiveSnapshot />
-            </CardContent>
-          </Card>
-        </section>
+              <MetricsPanel />
+            </Card>
 
-        <aside className="flex h-full flex-col overflow-hidden border-l border-white/10 bg-[#111111]">
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
-                Controls
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5 pb-4">
-              <SimulationControls sendCommand={sendSimulationCommand} />
-              <TrainingControls
-                sendCommand={sendTrainingCommand}
-                simulationId={simulationId}
-              />
-            </CardContent>
-          </Card>
-
-          <div className="border-b border-white/10 p-4">
-            <MetricsPanel />
-          </div>
-
-          <Card className="flex-1 rounded-none border-0 bg-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
-                Analytics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Tabs defaultValue="training" className="w-full">
-                <TabsList className="h-auto gap-1 bg-transparent p-0">
-                  <TabsTrigger
+            <Card className="rounded-none border-0 bg-transparent flex-1 min-h-[300px]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+                  Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-6">
+                <Tabs defaultValue="training" className="w-full">
+                  <TabsList className="h-auto gap-1 bg-transparent p-0">
+                    <TabsTrigger
+                      value="training"
+                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    >
+                      Training
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="comparison"
+                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    >
+                      Compare
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="history"
+                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    >
+                      History
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
                     value="training"
-                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                    className="mt-4 text-sm text-white/70"
                   >
-                    Training
-                  </TabsTrigger>
-                  <TabsTrigger
+                    <TrainingChart />
+                  </TabsContent>
+                  <TabsContent
                     value="comparison"
-                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                    className="mt-4 text-sm text-white/70"
                   >
-                    Compare
-                  </TabsTrigger>
-                  <TabsTrigger
+                    <ComparisonChart simulationId={simulationId} />
+                  </TabsContent>
+                  <TabsContent
                     value="history"
-                    className="data-[state=active]:border-white/20 data-[state=active]:bg-[#1a1a1a] data-[state=active]:text-white"
+                    className="mt-4 text-sm text-white/70"
                   >
-                    History
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent
-                  value="training"
-                  className="mt-4 text-sm text-white/70"
-                >
-                  <TrainingChart />
-                </TabsContent>
-                <TabsContent
-                  value="comparison"
-                  className="mt-4 text-sm text-white/70"
-                >
-                  <ComparisonChart simulationId={simulationId} />
-                </TabsContent>
-                <TabsContent
-                  value="history"
-                  className="mt-4 text-sm text-white/70"
-                >
-                  <EpisodeHistory simulationId={simulationId} />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </aside>
+                    <EpisodeHistory simulationId={simulationId} />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+
+        <div className="absolute left-6 bottom-6 w-80 pointer-events-auto hidden lg:block">
+          <div className="rounded-xl border border-white/10 bg-black/60 backdrop-blur-xl p-4 shadow-2xl">
+            <div className="mb-3 text-[10px] uppercase tracking-[0.14em] text-white/35">
+              Live Snapshot
+            </div>
+            <LiveSnapshot />
+          </div>
+        </div>
       </main>
     </div>
   );

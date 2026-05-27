@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Line, LineChart, ResponsiveContainer } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSimulationStore } from "@/store/simulationStore";
@@ -30,21 +29,39 @@ function AnimatedValue({
 }
 
 function Sparkline({ data }: { data: number[] }) {
-  const chartData = useMemo(() => data.map((value) => ({ value })), [data]);
+  const points = useMemo(() => {
+    if (!data.length) {
+      return "";
+    }
+
+    const max = Math.max(...data, 1);
+    const min = Math.min(...data, 0);
+    const range = Math.max(max - min, 1);
+
+    return data
+      .map((value, index) => {
+        const x = data.length === 1 ? 0 : (index / (data.length - 1)) * 100;
+        const y = 100 - ((value - min) / range) * 100;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }, [data]);
+
+  if (!data.length) {
+    return <div className="h-10 w-full rounded bg-white/5" />;
+  }
+
   return (
-    <div className="h-10 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke="#38bdf8"
-            strokeWidth={2}
-            dot={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <svg viewBox="0 0 100 100" className="h-10 w-full overflow-visible">
+      <polyline
+        fill="none"
+        stroke="#38bdf8"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
   );
 }
 
@@ -63,7 +80,6 @@ export default function MetricsPanel() {
     }
 
     const maxQueue = Math.max(...Object.values(frame.queue_lengths ?? {}), 0);
-
     setWaitHistory((prev) => [
       ...prev.slice(-HISTORY_LENGTH + 1),
       frame.avg_wait_time,
@@ -73,19 +89,18 @@ export default function MetricsPanel() {
       frame.throughput,
     ]);
     setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
-  }, [frame]);
+  }, [frame?.avg_wait_time, frame?.throughput, frame?.queue_lengths]);
 
   useEffect(() => {
     const latest = trainingMetrics[trainingMetrics.length - 1];
     if (!latest) {
       return;
     }
-
     setEpisodeHistory((prev) => [
       ...prev.slice(-HISTORY_LENGTH + 1),
       latest.episode,
     ]);
-  }, [trainingMetrics]);
+  }, [trainingMetrics.length]);
 
   const metrics = useMemo(() => {
     const avgWait = frame?.avg_wait_time ?? 0;

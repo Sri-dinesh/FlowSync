@@ -40,74 +40,78 @@ export default function LiveSnapshot() {
 
   const lastUpdateText = useMemo(() => {
     if (!lastFrameAt) {
-      return "No frames yet";
+      return "No frames";
     }
     return formatSeconds((now - lastFrameAt) / 1000);
   }, [lastFrameAt, now]);
 
   return (
-    <div className="space-y-3 text-sm text-white/70">
-      <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-col gap-4">
+      {/* Active Status Badges */}
+      <div className="flex flex-wrap gap-2">
         <Badge
           variant="outline"
           className={
             isConnected
-              ? "h-5 border-emerald-500/40 bg-emerald-900/30 px-2 text-[10px] text-emerald-300"
-              : "h-5 border-rose-500/40 bg-rose-900/20 px-2 text-[10px] text-rose-300"
+              ? "border-emerald-500/30 bg-emerald-950/20 px-2 py-0.5 text-[9px] font-medium tracking-wider text-emerald-400"
+              : "border-rose-500/30 bg-rose-950/20 px-2 py-0.5 text-[9px] font-medium tracking-wider text-rose-400"
           }
         >
-          {isConnected ? "• Connected" : "• Disconnected"}
+          {isConnected ? "● CONNECTED" : "● DISCONNECTED"}
         </Badge>
         <Badge
           variant="outline"
-          className="h-5 border-white/15 bg-white/5 px-2 text-[10px] text-white/65"
+          className="border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-medium tracking-wider text-white/60"
         >
-          {isRunning ? "Running" : "Stopped"}
+          {isRunning ? "RUNNING" : "STOPPED"}
         </Badge>
         <Badge
           variant="outline"
-          className="h-5 border-white/15 bg-white/5 px-2 text-[10px] text-white/65"
+          className="border-blue-500/20 bg-blue-950/20 px-2 py-0.5 text-[9px] font-medium tracking-wider text-blue-400"
         >
-          {mode === "ai" ? "AI Mode" : "Fixed Mode"}
+          {mode === "ai" ? "AI MODE" : "FIXED MODE"}
         </Badge>
-        <Badge
-          variant="outline"
-          className="h-5 border-white/15 bg-white/5 px-2 text-[10px] text-white/65"
-        >
-          {isTraining ? "Training Active" : "Training Idle"}
-        </Badge>
+        {isTraining && (
+          <Badge
+            variant="outline"
+            className="border-violet-500/20 bg-violet-950/20 px-2 py-0.5 text-[9px] font-medium tracking-wider text-violet-400 animate-pulse"
+          >
+            TRAINING
+          </Badge>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
-        <div className="rounded-md border border-white/10 bg-[#151515] p-2.5">
-          <div className="text-[9px] uppercase tracking-[0.08em] text-white/40">
+      {/* Grid Stats */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
             Last Frame
           </div>
-          <div className="mt-0.5 text-sm font-medium text-white/90">
+          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
             {lastUpdateText}
           </div>
         </div>
-        <div className="rounded-md border border-white/10 bg-[#151515] p-2.5">
-          <div className="text-[9px] uppercase tracking-[0.08em] text-white/40">
-            Vehicles
+        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
+            Active Vehicles
           </div>
-          <div className="mt-0.5 text-sm font-medium text-white/90">
+          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
             {snapshot.vehicles}
           </div>
         </div>
-        <div className="rounded-md border border-white/10 bg-[#151515] p-2.5">
-          <div className="text-[9px] uppercase tracking-[0.08em] text-white/40">
-            Avg Wait
+        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
+            Avg Wait Time
           </div>
-          <div className="mt-0.5 text-sm font-medium text-white/90">
+          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
             {snapshot.avgWait.toFixed(1)}s
           </div>
         </div>
-        <div className="rounded-md border border-white/10 bg-[#151515] p-2.5">
-          <div className="text-[9px] uppercase tracking-[0.08em] text-white/40">
+        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
             Max Queue
           </div>
-          <div className="mt-0.5 text-sm font-medium text-white/90">
+          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
             {snapshot.maxQueue}
           </div>
         </div>

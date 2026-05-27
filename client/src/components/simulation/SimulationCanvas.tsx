@@ -1,8 +1,9 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
 import IntersectionScene from "@/components/simulation/IntersectionScene";
 import { useSimulationStore } from "@/store/simulationStore";
@@ -10,61 +11,117 @@ import { useSimulationStore } from "@/store/simulationStore";
 const SimulationCanvas = memo(function SimulationCanvas() {
   const isConnected = useSimulationStore((state) => state.isConnected);
   const isRunning = useSimulationStore((state) => state.isRunning);
-  const lastFrameAt = useSimulationStore((state) => state.lastFrameAt);
 
-  const overlayMessage = useMemo(() => {
+  const statusMessage = useMemo(() => {
     if (!isConnected) {
-      return "Waiting for backend connection...";
+      return "Backend Disconnected";
     }
     if (!isRunning) {
-      return "Click Start to run the simulation.";
+      return "Simulation Paused";
     }
-    if (!lastFrameAt) {
-      return "Waiting for frames...";
-    }
-    return null;
-  }, [isConnected, isRunning, lastFrameAt]);
+    return "Live Simulation";
+  }, [isConnected, isRunning]);
 
   return (
-    <div className="relative h-[420px] w-full">
+    <div className="relative h-full w-full">
       <Canvas
         orthographic
         shadows
-        dpr={[1, 1.5]}
-        camera={{ position: [0, 10, 0], zoom: 50, near: 0.1, far: 50 }}
-        onCreated={({ camera }) => {
-          camera.up.set(0, 0, -1);
+        dpr={[1, 2]}
+        camera={{ position: [20, 20, 20], zoom: 45, near: 0.1, far: 1000 }}
+        onCreated={({ camera, gl }) => {
           camera.lookAt(0, 0, 0);
+          gl.setClearColor('#0a0e17');
         }}
       >
-        <color attach="background" args={["#0b0f14"]} />
-        <ambientLight intensity={0.75} />
-        <directionalLight position={[6, 10, 4]} intensity={1} castShadow />
-        <IntersectionScene />
-        <OrbitControls enablePan={false} enableRotate={false} enableZoom />
+        <color attach="background" args={["#0a0e17"]} />
+        
+        <Suspense fallback={null}>
+          <ambientLight intensity={1.5} />
+          <directionalLight 
+            position={[10, 20, 10]} 
+            intensity={2.5} 
+            castShadow 
+            shadow-mapSize-width={2048} 
+            shadow-mapSize-height={2048}
+            shadow-bias={-0.0001}
+          />
+          <directionalLight 
+            position={[-10, 15, -10]} 
+            intensity={1.5} 
+            color="#6b9bd1"
+          />
+          <hemisphereLight 
+            args={["#87ceeb", "#2a2a3e", 1.0]} 
+          />
+          
+          <IntersectionScene />
+          
+          <OrbitControls 
+            makeDefault
+            enablePan={true} 
+            enableRotate={true} 
+            enableZoom={true}
+            target={[0, 0, 0]}
+            maxPolarAngle={Math.PI / 2 - 0.05}
+            minPolarAngle={0.1}
+            maxZoom={120}
+            minZoom={15}
+            autoRotate={isRunning}
+            autoRotateSpeed={0.5}
+          />
+
+          <EffectComposer disableNormalPass>
+            <Bloom 
+              luminanceThreshold={1.5} 
+              mipmapBlur 
+              intensity={1.2} 
+            />
+            <Vignette eskil={false} offset={0.1} darkness={1.1} />
+          </EffectComposer>
+        </Suspense>
       </Canvas>
-      <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-between px-3 text-[10px] uppercase tracking-[0.12em] text-white/35">
-        <span>North</span>
-        <span>East</span>
+      
+      {/* Dynamic Status Indicator */}
+      <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-md pointer-events-auto">
+        <div className={`h-2 w-2 rounded-full animate-pulse ${
+          !isConnected ? 'bg-rose-500' : !isRunning ? 'bg-amber-500' : 'bg-emerald-500'
+        }`} />
+        <span className="text-[10px] font-medium uppercase tracking-wider text-white/80">
+          {statusMessage}
+        </span>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-4 text-[10px] text-white/45">
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-[2px] bg-slate-200" />
-          vehicle
+
+      {/* Legend overlay */}
+      <div className="pointer-events-auto absolute inset-x-0 bottom-4 flex items-center justify-center gap-4 text-[10px] text-white/50 bg-black/40 backdrop-blur-md py-2 px-5 mx-auto w-fit rounded-full border border-white/5 shadow-2xl">
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-3 rounded-full bg-sky-500" />
+          moving
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-[2px] bg-blue-500" />
-          ai-moved
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-3 rounded-[2px] bg-amber-400" />
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-3 rounded-full bg-amber-400" />
           waiting
         </span>
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-3 rounded-full bg-emerald-400" />
+          green
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-3 rounded-full bg-rose-500" />
+          red
+        </span>
       </div>
-      {overlayMessage && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="rounded-lg border border-white/10 bg-black/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-white/70">
-            {overlayMessage}
+      
+      {/* Hint overlay - only show when disconnected or not running to encourage user action */}
+      {(!isConnected || !isRunning) && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10">
+          <div className="rounded-xl border border-white/10 bg-black/40 p-6 backdrop-blur-sm text-center shadow-2xl">
+            <p className="text-sm font-light tracking-[0.15em] text-white/90">
+              {!isConnected ? "READY FOR CONNECTION" : "READY TO START"}
+            </p>
+            <p className="mt-2 text-[10px] text-white/40 uppercase tracking-widest">
+              {!isConnected ? "Ensure backend server is running" : "Click the Start button to begin simulation"}
+            </p>
           </div>
         </div>
       )}

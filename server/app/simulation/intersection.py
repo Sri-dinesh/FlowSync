@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from .spawner import PoissonSpawner
 from .traffic_signal import TrafficSignal
-from .vehicle import Vehicle
+from .vehicle import DEFAULT_SPEED, Vehicle
 
 
 class Intersection:
@@ -26,10 +26,30 @@ class Intersection:
 
         self.spawner.spawn(dt, self.lanes)
 
+        STOP_LINE = 0.42
+        MIN_DIST = 0.055
+
         for lane_name, lane_queue in self.lanes.items():
             is_green = self.signal.is_green_for(lane_name)
-            for vehicle in lane_queue:
-                vehicle.tick(dt, is_green)
+            
+            for i, vehicle in enumerate(lane_queue):
+                can_move = True
+                
+                # Check stop line collision
+                if not is_green and vehicle.position <= STOP_LINE:
+                    if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
+                        vehicle.position = STOP_LINE
+                        can_move = False
+
+                # Check vehicle ahead collision
+                if i > 0:
+                    vehicle_ahead = lane_queue[i-1]
+                    if vehicle_ahead.position < 1.0:
+                        if vehicle.position + (DEFAULT_SPEED * dt) >= vehicle_ahead.position - MIN_DIST:
+                            vehicle.position = vehicle_ahead.position - MIN_DIST
+                            can_move = False
+
+                vehicle.tick(dt, can_move)
 
             passed_count = sum(1 for vehicle in lane_queue if vehicle.state == "passed")
             if passed_count:

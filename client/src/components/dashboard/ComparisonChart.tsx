@@ -74,6 +74,8 @@ export default function ComparisonChart({
     return { chartData: comparison, improvement: improvementPct };
   }, [data]);
 
+  const chartWidth = Math.max(300, chartData.length * 120);
+
   return (
     <div className="space-y-3">
       {improvement !== 0 && (
@@ -84,18 +86,26 @@ export default function ComparisonChart({
           AI reduced wait time by {improvement.toFixed(1)}%
         </Badge>
       )}
-      <BarChart width={520} height={220} data={chartData}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-        <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} />
-        <YAxis stroke="#94a3b8" tickLine={false} />
-        <Tooltip contentStyle={{ background: "#0f172a", border: "none" }} />
-        <Legend />
-        <Bar dataKey="Fixed" fill="#64748b" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="AI" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-      </BarChart>
-      <p className="text-xs text-white/60">
-        Max queue length is placeholder until traffic log aggregation is wired.
-      </p>
+      {data.length ? (
+        <div className="overflow-x-auto pb-1">
+          <BarChart width={chartWidth} height={220} data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+            <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} />
+            <YAxis stroke="#94a3b8" tickLine={false} />
+            <Tooltip contentStyle={{ background: "#0f172a", border: "none" }} />
+            <Legend />
+            <Bar dataKey="Fixed" fill="#64748b" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="AI" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </div>
+      ) : (
+        <div className="flex h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 text-center text-sm text-white/45">
+          <p>No comparison data yet.</p>
+          <p className="mt-1 text-xs text-white/30">
+            Run training to populate the AI vs fixed metrics.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

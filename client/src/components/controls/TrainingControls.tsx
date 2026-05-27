@@ -133,31 +133,37 @@ export default function TrainingControls({
           <Button
             size="sm"
             variant="outline"
-            className="border-rose-500/30 bg-rose-500/10 text-rose-300"
+            className="border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
             onClick={stopTraining}
           >
             Stop Training
           </Button>
         ) : (
-          <Button size="sm" onClick={() => setShowConfig((prev) => !prev)}>
+          <Button 
+            size="sm" 
+            onClick={() => setShowConfig((prev) => !prev)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
             Train Agent
           </Button>
         )}
       </div>
-      {trainInfo && <p className="text-xs text-emerald-200/90">{trainInfo}</p>}
+      {trainInfo && <p className="text-xs text-emerald-200/90 mt-2">{trainInfo}</p>}
 
       {showConfig && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <label className="text-xs text-white/70">Episodes</label>
-          <input
-            type="number"
-            min={1}
-            max={2000}
-            className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-            value={numEpisodes}
-            onChange={(event) => setNumEpisodes(Number(event.target.value))}
-          />
-          <div className="mt-3 flex gap-2">
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
+          <div>
+            <label className="block text-xs text-white/70 mb-1.5">Episodes</label>
+            <input
+              type="number"
+              min={1}
+              max={2000}
+              className="mt-2 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+              value={numEpisodes}
+              onChange={(event) => setNumEpisodes(Number(event.target.value))}
+            />
+          </div>
+          <div className="flex gap-2">
             <Button size="sm" onClick={startTraining}>
               Start
             </Button>
@@ -171,6 +177,7 @@ export default function TrainingControls({
           </div>
         </div>
       )}
+
 
       {isTraining && (
         <div>
@@ -198,10 +205,14 @@ export default function TrainingControls({
             loadModel(value);
           }}
         >
-          <SelectTrigger className="w-full border-white/15 bg-black/40 text-white/70">
+          <SelectTrigger className="w-full border-white/15 bg-black/40 text-white/70 hover:bg-black/50 transition-colors">
             <SelectValue placeholder="Select saved model" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent 
+            position="popper" 
+            className="z-[100] max-h-[200px] overflow-y-auto"
+            sideOffset={5}
+          >
             {models.length === 0 && (
               <SelectItem value="__none" disabled>
                 No trained models yet

@@ -42,7 +42,7 @@ export default function Home() {
             className="bg-white text-black hover:bg-white/90"
             onClick={() => router.push("/simulation")}
           >
-            Launch App
+            Launch Simulation
           </Button>
           <Button
             size="lg"
