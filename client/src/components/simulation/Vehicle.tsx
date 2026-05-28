@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { BoxGeometry, CylinderGeometry, MeshStandardMaterial, Group, Mesh, MathUtils, Vector3, CubicBezierCurve3 } from "three";
+import {
+  CylinderGeometry,
+  MeshStandardMaterial,
+  Group,
+  Mesh,
+  Vector3,
+  CubicBezierCurve3,
+} from "three";
 import type { VehicleState } from "@/types/simulation";
 
 interface VehicleProps {
@@ -16,18 +23,22 @@ function getVehicleProps(id: string) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
   }
   const colors = [
-    "#dc2626", "#2563eb", "#16a34a", "#ea580c", "#9333ea",
-    "#0891b2", "#db2777", "#f1f5f9", "#18181b", "#facc15",
+    "#dc2626",
+    "#2563eb",
+    "#16a34a",
+    "#ea580c",
+    "#9333ea",
+    "#0891b2",
+    "#db2777",
+    "#f1f5f9",
+    "#18181b",
+    "#facc15",
   ];
   const paintColor = colors[Math.abs(hash) % colors.length];
   const types = ["sedan", "suv", "hatchback", "sportscar"];
   const type = types[Math.abs(hash >> 3) % types.length];
-  
-  // Decide a turning direction: 50% straight, 25% left, 25% right
-  const turnTypes = ["straight", "straight", "left", "right"] as const;
-  const turn = turnTypes[Math.abs(hash >> 6) % turnTypes.length];
-  
-  return { paintColor, type, turn };
+
+  return { paintColor, type };
 }
 
 function getPathPoints(lane: string, turn: "straight" | "left" | "right") {
@@ -39,69 +50,100 @@ function getPathPoints(lane: string, turn: "straight" | "left" | "right") {
   const y = 0.1;
   const startDist = 12;
   const endDist = 12;
+  const laneOffset = 0.75;
+  const straightControl = 2.2;
+  const entryControl = 1.1;
+  const exitControl = 1.1;
 
   switch (lane) {
     case "north": // Southbound
-      start = [-0.5, y, startDist];
+      start = [-laneOffset, y, startDist];
       if (turn === "straight") {
-        end = [-0.5, y, -endDist];
-        p1 = [-0.5, y, 2]; p2 = [-0.5, y, -2];
-      } else if (turn === "left") { // Eastbound
-        end = [endDist, y, 0.5];
-        p1 = [-0.5, y, 0.5]; p2 = [-0.5, y, 0.5];
-      } else { // Westbound
-        end = [-endDist, y, -0.5];
-        p1 = [-0.5, y, -0.5]; p2 = [-0.5, y, -0.5];
+        end = [-laneOffset, y, -endDist];
+        p1 = [-laneOffset, y, straightControl];
+        p2 = [-laneOffset, y, -straightControl];
+      } else if (turn === "left") {
+        // Hold the approach line longer, then pivot near the center.
+        end = [endDist, y, laneOffset];
+        p1 = [-laneOffset, y, entryControl];
+        p2 = [exitControl, y, laneOffset];
+      } else {
+        // Turn later so the curve begins inside the intersection, not near the buildings.
+        end = [-endDist, y, -laneOffset];
+        p1 = [-laneOffset, y, entryControl];
+        p2 = [-exitControl, y, -laneOffset];
       }
       break;
     case "south": // Northbound
-      start = [0.5, y, -startDist];
+      start = [laneOffset, y, -startDist];
       if (turn === "straight") {
-        end = [0.5, y, endDist];
-        p1 = [0.5, y, -2]; p2 = [0.5, y, 2];
-      } else if (turn === "left") { // Westbound
-        end = [-endDist, y, -0.5];
-        p1 = [0.5, y, -0.5]; p2 = [0.5, y, -0.5];
-      } else { // Eastbound
-        end = [endDist, y, 0.5];
-        p1 = [0.5, y, 0.5]; p2 = [0.5, y, 0.5];
+        end = [laneOffset, y, endDist];
+        p1 = [laneOffset, y, -straightControl];
+        p2 = [laneOffset, y, straightControl];
+      } else if (turn === "left") {
+        // Hold the approach line longer, then pivot near the center.
+        end = [-endDist, y, -laneOffset];
+        p1 = [laneOffset, y, -entryControl];
+        p2 = [-exitControl, y, -laneOffset];
+      } else {
+        // Turn later so the curve begins inside the intersection, not near the buildings.
+        end = [endDist, y, laneOffset];
+        p1 = [laneOffset, y, -entryControl];
+        p2 = [exitControl, y, laneOffset];
       }
       break;
     case "east": // Westbound
-      start = [startDist, y, -0.5];
+      start = [startDist, y, -laneOffset];
       if (turn === "straight") {
-        end = [-endDist, y, -0.5];
-        p1 = [2, y, -0.5]; p2 = [-2, y, -0.5];
-      } else if (turn === "left") { // Southbound
-        end = [-0.5, y, -endDist];
-        p1 = [-0.5, y, -0.5]; p2 = [-0.5, y, -0.5];
-      } else { // Northbound
-        end = [0.5, y, endDist];
-        p1 = [0.5, y, -0.5]; p2 = [0.5, y, -0.5];
+        end = [-endDist, y, -laneOffset];
+        p1 = [straightControl, y, -laneOffset];
+        p2 = [-straightControl, y, -laneOffset];
+      } else if (turn === "left") {
+        // Hold the approach line longer, then pivot near the center.
+        end = [-laneOffset, y, -endDist];
+        p1 = [entryControl, y, -laneOffset];
+        p2 = [-laneOffset, y, -exitControl];
+      } else {
+        // Turn later so the curve begins inside the intersection, not near the buildings.
+        end = [laneOffset, y, endDist];
+        p1 = [entryControl, y, -laneOffset];
+        p2 = [laneOffset, y, exitControl];
       }
       break;
     case "west": // Eastbound
-      start = [-startDist, y, 0.5];
+      start = [-startDist, y, laneOffset];
       if (turn === "straight") {
-        end = [endDist, y, 0.5];
-        p1 = [-2, y, 0.5]; p2 = [2, y, 0.5];
-      } else if (turn === "left") { // Northbound
-        end = [0.5, y, endDist];
-        p1 = [0.5, y, 0.5]; p2 = [0.5, y, 0.5];
-      } else { // Southbound
-        end = [-0.5, y, -endDist];
-        p1 = [-0.5, y, 0.5]; p2 = [-0.5, y, 0.5];
+        end = [endDist, y, laneOffset];
+        p1 = [-straightControl, y, laneOffset];
+        p2 = [straightControl, y, laneOffset];
+      } else if (turn === "left") {
+        // Hold the approach line longer, then pivot near the center.
+        end = [laneOffset, y, endDist];
+        p1 = [-entryControl, y, laneOffset];
+        p2 = [laneOffset, y, exitControl];
+      } else {
+        // Turn later so the curve begins inside the intersection, not near the buildings.
+        end = [-laneOffset, y, -endDist];
+        p1 = [-entryControl, y, laneOffset];
+        p2 = [-laneOffset, y, -exitControl];
       }
       break;
     default:
-      start = [0, y, 0]; end = [0, y, 0]; p1 = [0, y, 0]; p2 = [0, y, 0];
+      start = [0, y, 0];
+      end = [0, y, 0];
+      p1 = [0, y, 0];
+      p2 = [0, y, 0];
   }
-  
+
   return { p0: start, p1, p2, p3: end };
 }
 
 export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
-  const { paintColor, type, turn } = useMemo(() => getVehicleProps(vehicle.id), [vehicle.id]);
+  const { paintColor, type } = useMemo(
+    () => getVehicleProps(vehicle.id),
+    [vehicle.id],
+  );
+  const turn = vehicle.turn ?? ("straight" as const);
 
   const curve = useMemo(() => {
     const pts = getPathPoints(vehicle.lane, turn);
@@ -109,7 +151,7 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       new Vector3(...pts.p0),
       new Vector3(...pts.p1),
       new Vector3(...pts.p2),
-      new Vector3(...pts.p3)
+      new Vector3(...pts.p3),
     );
   }, [vehicle.lane, turn]);
 
@@ -134,7 +176,7 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
     } else {
       const lerpFactor = 0.15;
       currentPosRef.current.lerp(targetPos, lerpFactor);
-      
+
       // Smooth angle interpolation handling wrap-around
       let rotDiff = targetRot - currentRotRef.current!;
       while (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
@@ -157,42 +199,65 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
     }
   });
 
-  const paintMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: paintColor, 
-    roughness: 0.2, 
-    metalness: 0.8,
-    emissive: paintColor,
-    emissiveIntensity: 0.1
-  }), [paintColor]);
-  
-  const windowMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: "#0a0a0f", 
-    roughness: 0.02,
-    metalness: 0.98,
-    transparent: true,
-    opacity: 0.85
-  }), []);
+  const paintMaterial = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: paintColor,
+        roughness: 0.2,
+        metalness: 0.8,
+        emissive: paintColor,
+        emissiveIntensity: 0.1,
+      }),
+    [paintColor],
+  );
 
-  const wheelMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: "#0f0f0f", 
-    roughness: 0.7,
-    metalness: 0.3
-  }), []);
+  const windowMaterial = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#0a0a0f",
+        roughness: 0.02,
+        metalness: 0.98,
+        transparent: true,
+        opacity: 0.85,
+      }),
+    [],
+  );
 
-  const headlightMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: "#fffacd",
-    emissive: "#fffacd",
-    emissiveIntensity: 2.5,
-  }), []);
+  const wheelMaterial = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#0f0f0f",
+        roughness: 0.7,
+        metalness: 0.3,
+      }),
+    [],
+  );
+
+  const headlightMaterial = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#fffacd",
+        emissive: "#fffacd",
+        emissiveIntensity: 2.5,
+      }),
+    [],
+  );
 
   const brakeLightIntensity = vehicle.state === "waiting" ? 3.5 : 0.3;
-  const brakeLightMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: "#ff0000",
-    emissive: "#ff0000",
-    emissiveIntensity: brakeLightIntensity
-  }), [brakeLightIntensity]);
+  const brakeLightMaterial = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#ff0000",
+        emissive: "#ff0000",
+        emissiveIntensity: brakeLightIntensity,
+      }),
+    [brakeLightIntensity],
+  );
 
-  const wheelGeometry = useMemo(() => new CylinderGeometry(0.08, 0.08, 0.06, 8), []);
+  const wheelGeometry = useMemo(
+    () => new CylinderGeometry(0.08, 0.08, 0.06, 8),
+    [],
+  );
 
   useEffect(() => {
     return () => {
@@ -203,10 +268,27 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       brakeLightMaterial.dispose();
       wheelGeometry.dispose();
     };
-  }, [paintMaterial, windowMaterial, wheelMaterial, headlightMaterial, brakeLightMaterial, wheelGeometry]);
+  }, [
+    paintMaterial,
+    windowMaterial,
+    wheelMaterial,
+    headlightMaterial,
+    brakeLightMaterial,
+    wheelGeometry,
+  ]);
 
-  const renderWheel = (ref: React.RefObject<Mesh | null>, localPos: [number, number, number]) => (
-    <mesh ref={ref} position={localPos} rotation={[0, 0, Math.PI / 2]} castShadow geometry={wheelGeometry} material={wheelMaterial} />
+  const renderWheel = (
+    ref: React.RefObject<Mesh | null>,
+    localPos: [number, number, number],
+  ) => (
+    <mesh
+      ref={ref}
+      position={localPos}
+      rotation={[0, 0, Math.PI / 2]}
+      castShadow
+      geometry={wheelGeometry}
+      material={wheelMaterial}
+    />
   );
 
   const renderCarBody = () => {
@@ -214,10 +296,19 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       case "suv":
         return (
           <>
-            <mesh castShadow receiveShadow position={[0, 0.1, 0]} material={paintMaterial}>
+            <mesh
+              castShadow
+              receiveShadow
+              position={[0, 0.1, 0]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.44, 0.18, 0.8]} />
             </mesh>
-            <mesh castShadow position={[0, 0.23, -0.06]} material={paintMaterial}>
+            <mesh
+              castShadow
+              position={[0, 0.23, -0.06]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.4, 0.12, 0.5]} />
             </mesh>
             <mesh position={[0, 0.23, -0.05]} material={windowMaterial}>
@@ -228,10 +319,19 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       case "hatchback":
         return (
           <>
-            <mesh castShadow receiveShadow position={[0, 0.08, 0]} material={paintMaterial}>
+            <mesh
+              castShadow
+              receiveShadow
+              position={[0, 0.08, 0]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.42, 0.14, 0.72]} />
             </mesh>
-            <mesh castShadow position={[0, 0.18, -0.08]} material={paintMaterial}>
+            <mesh
+              castShadow
+              position={[0, 0.18, -0.08]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.38, 0.1, 0.42]} />
             </mesh>
             <mesh position={[0, 0.18, -0.08]} material={windowMaterial}>
@@ -242,10 +342,19 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       case "sportscar":
         return (
           <>
-            <mesh castShadow receiveShadow position={[0, 0.05, 0]} material={paintMaterial}>
+            <mesh
+              castShadow
+              receiveShadow
+              position={[0, 0.05, 0]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.46, 0.1, 0.86]} />
             </mesh>
-            <mesh castShadow position={[0, 0.13, -0.04]} material={paintMaterial}>
+            <mesh
+              castShadow
+              position={[0, 0.13, -0.04]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.38, 0.08, 0.38]} />
             </mesh>
             <mesh position={[0, 0.13, -0.04]} material={windowMaterial}>
@@ -271,10 +380,19 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
       default:
         return (
           <>
-            <mesh castShadow receiveShadow position={[0, 0.08, 0]} material={paintMaterial}>
+            <mesh
+              castShadow
+              receiveShadow
+              position={[0, 0.08, 0]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.42, 0.14, 0.82]} />
             </mesh>
-            <mesh castShadow position={[0, 0.18, -0.04]} material={paintMaterial}>
+            <mesh
+              castShadow
+              position={[0, 0.18, -0.04]}
+              material={paintMaterial}
+            >
               <boxGeometry args={[0.38, 0.1, 0.44]} />
             </mesh>
             <mesh position={[0, 0.18, -0.04]} material={windowMaterial}>
@@ -285,22 +403,39 @@ export default function Vehicle({ vehicle, scaleProgress = 1 }: VehicleProps) {
     }
   };
 
-  const wheelZOffset = type === "sportscar" ? 0.25 : type === "suv" ? 0.23 : 0.21;
+  const wheelZOffset =
+    type === "sportscar" ? 0.25 : type === "suv" ? 0.23 : 0.21;
   const wheelYOffset = -0.02;
 
   return (
     <group ref={groupRef} scale={[scaleProgress, scaleProgress, scaleProgress]}>
       {renderCarBody()}
-      <mesh position={[-0.15, 0.06, 0.4]} castShadow material={headlightMaterial}>
+      <mesh
+        position={[-0.15, 0.06, 0.4]}
+        castShadow
+        material={headlightMaterial}
+      >
         <boxGeometry args={[0.05, 0.04, 0.01]} />
       </mesh>
-      <mesh position={[0.15, 0.06, 0.4]} castShadow material={headlightMaterial}>
+      <mesh
+        position={[0.15, 0.06, 0.4]}
+        castShadow
+        material={headlightMaterial}
+      >
         <boxGeometry args={[0.05, 0.04, 0.01]} />
       </mesh>
-      <mesh position={[-0.15, 0.06, -0.4]} castShadow material={brakeLightMaterial}>
+      <mesh
+        position={[-0.15, 0.06, -0.4]}
+        castShadow
+        material={brakeLightMaterial}
+      >
         <boxGeometry args={[0.05, 0.04, 0.01]} />
       </mesh>
-      <mesh position={[0.15, 0.06, -0.4]} castShadow material={brakeLightMaterial}>
+      <mesh
+        position={[0.15, 0.06, -0.4]}
+        castShadow
+        material={brakeLightMaterial}
+      >
         <boxGeometry args={[0.05, 0.04, 0.01]} />
       </mesh>
       {renderWheel(wheelRFRef, [0.21, wheelYOffset, wheelZOffset])}

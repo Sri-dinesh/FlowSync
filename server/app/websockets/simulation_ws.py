@@ -84,6 +84,11 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             if command == "start":
                 app_state["sim_running"] = True
+                # enable spawner to allow vehicle arrivals
+                try:
+                    app_state["intersection"].spawner.set_enabled(True)
+                except Exception:
+                    pass
                 if not app_state.get("current_simulation_id"):
                     try:
                         simulation_id = await asyncio.to_thread(
@@ -97,6 +102,11 @@ async def simulation_socket(websocket: WebSocket) -> None:
                         app_state["current_simulation_id"] = f"local-{int(time.time())}"
             elif command == "stop":
                 app_state["sim_running"] = False
+                # disable spawner so no new vehicles are introduced while stopped
+                try:
+                    app_state["intersection"].spawner.set_enabled(False)
+                except Exception:
+                    pass
                 simulation_id = app_state.get("current_simulation_id")
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     intersection = app_state["intersection"]
@@ -126,6 +136,10 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 app_state["intersection"].reset()
                 app_state["sim_running"] = False
                 app_state["current_simulation_id"] = None
+                try:
+                    app_state["intersection"].spawner.set_enabled(False)
+                except Exception:
+                    pass
             elif command == "set_mode":
                 mode = message.get("mode")
                 if mode in ("fixed", "ai"):

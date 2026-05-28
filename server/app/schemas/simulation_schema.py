@@ -8,6 +8,7 @@ from ..simulation.intersection import Intersection
 class VehicleState(BaseModel):
     id: str
     lane: str
+    turn: str
     position: float
     state: str
     wait_time: float
@@ -36,6 +37,7 @@ def build_frame(
         VehicleState(
             id=vehicle.id,
             lane=vehicle.lane,
+            turn=getattr(vehicle, "turn", "straight"),
             position=vehicle.position,
             state=vehicle.state,
             wait_time=vehicle.wait_time,

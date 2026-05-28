@@ -17,39 +17,63 @@ class Intersection:
         self.timestep = 0
         self.total_passed = 0
         self.spawner = PoissonSpawner()
+        # id of vehicle that currently occupies the intersection (between stop line and passed)
+        self.intersection_reserved_by: Optional[str] = None
 
     def tick(self, dt: float, action: Optional[int] = None) -> None:
-        if action is not None:
-            self.signal.set_phase(action)
-        else:
-            self.signal.tick(dt)
+        # give the signal visibility into lane queues for smarter decisions and
+        # make AI phase changes respect the same clearance timing as fixed mode
+        self.signal.tick(dt, self.lanes, requested_phase=action)
 
         self.spawner.spawn(dt, self.lanes)
 
         STOP_LINE = 0.42
-        MIN_DIST = 0.055
+        MIN_DIST = 0.08
 
         for lane_name, lane_queue in self.lanes.items():
-            is_green = self.signal.is_green_for(lane_name)
+            # consult signal including vehicle turn intent
+            # will allow/prohibit left turns depending on phase
+            # Determine per-vehicle during loop below
             
             for i, vehicle in enumerate(lane_queue):
                 can_move = True
                 
-                # Check stop line collision
-                if not is_green and vehicle.position <= STOP_LINE:
+                # Check stop line collision and signal permission
+                is_green_for_movement = self.signal.is_green_for(lane_name, getattr(vehicle, "turn", None))
+                # If signal disallows movement and vehicle is approaching stop line, stop at stop line
+                if not is_green_for_movement and vehicle.position <= STOP_LINE:
                     if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
                         vehicle.position = STOP_LINE
                         can_move = False
 
-                # Check vehicle ahead collision
-                if i > 0:
-                    vehicle_ahead = lane_queue[i-1]
-                    if vehicle_ahead.position < 1.0:
-                        if vehicle.position + (DEFAULT_SPEED * dt) >= vehicle_ahead.position - MIN_DIST:
-                            vehicle.position = vehicle_ahead.position - MIN_DIST
+                # If signal allows and vehicle would enter intersection, ensure reservation is free
+                if is_green_for_movement and vehicle.position < STOP_LINE:
+                    entering = vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE
+                    if entering:
+                        # If intersection reserved by someone else, block entering
+                        if self.intersection_reserved_by is None or self.intersection_reserved_by == vehicle.id:
+                            # reserve intersection for this vehicle
+                            self.intersection_reserved_by = vehicle.id
+                        else:
+                            # block at stop line
+                            vehicle.position = STOP_LINE
                             can_move = False
 
+                # Check vehicle ahead collision
+                if i > 0:
+                    vehicle_ahead = lane_queue[i - 1]
+                    if vehicle_ahead.position < 1.0:
+                        max_position = max(0.0, vehicle_ahead.position - MIN_DIST)
+                        if vehicle.position + (DEFAULT_SPEED * dt) >= max_position:
+                            vehicle.position = max_position
+                            can_move = False
+                # If this vehicle is marked passed after tick, release reservation
+                # (release after tick below when vehicle.position >= 1.0 / state == 'passed')
                 vehicle.tick(dt, can_move)
+
+                # Release reservation when the reserved vehicle has left the intersection
+                if self.intersection_reserved_by and vehicle.id == self.intersection_reserved_by and vehicle.state == "passed":
+                    self.intersection_reserved_by = None
 
             passed_count = sum(1 for vehicle in lane_queue if vehicle.state == "passed")
             if passed_count:
@@ -82,3 +106,4 @@ class Intersection:
         self.signal = TrafficSignal()
         self.timestep = 0
         self.total_passed = 0
+        self.intersection_reserved_by = None

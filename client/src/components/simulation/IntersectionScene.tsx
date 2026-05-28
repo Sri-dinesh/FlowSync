@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { Text } from "@react-three/drei";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
@@ -83,6 +82,7 @@ function QueueLabel({ value, position }: QueueLabelProps) {
 
 export default function IntersectionScene() {
   const frame = useSimulationStore((state) => state.currentFrame);
+  const isRunning = useSimulationStore((state) => state.isRunning);
   const vehicles = frame?.vehicles ?? [];
   const queueLengths = frame?.queue_lengths ?? {};
   const signalPhase = frame?.signal_phase ?? 0;
@@ -134,9 +134,11 @@ export default function IntersectionScene() {
       <QueueLabel value={displayQueueLengths.west} position={[-6.2, 0.8, 0]} />
 
       {/* Map active live vehicles to their detailed 3D components */}
-      {vehicles.map((vehicle) => (
-        <Vehicle key={vehicle.id} vehicle={vehicle} />
-      ))}
+      {isRunning
+        ? vehicles.map((vehicle) => (
+            <Vehicle key={vehicle.id} vehicle={vehicle} />
+          ))
+        : null}
     </group>
   );
 }

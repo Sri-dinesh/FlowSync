@@ -3,6 +3,7 @@ export type SimulationMode = "fixed" | "ai";
 export interface VehicleState {
   id: string;
   lane: string;
+  turn?: "straight" | "left" | "right";
   position: number;
   state: string;
   wait_time: number;

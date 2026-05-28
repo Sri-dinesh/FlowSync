@@ -8,6 +8,7 @@ DEFAULT_SPEED = 0.12
 class Vehicle:
     id: str
     lane: str
+    turn: str
     position: float
     wait_time: float
     speed: float
