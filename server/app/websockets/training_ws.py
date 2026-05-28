@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from typing import List
 
@@ -9,6 +10,10 @@ except ImportError:  # pragma: no cover - fallback for missing optional dep
     import json
 
 from ..services import supabase_service
+
+
+logger = logging.getLogger(__name__)
+
 
 class TrainingConnectionManager:
     def __init__(self) -> None:
@@ -59,7 +64,10 @@ async def training_socket(websocket: WebSocket) -> None:
                         )
                         if simulation_id:
                             app_state["current_simulation_id"] = simulation_id
+                        else:
+                            logger.error("Supabase create_simulation returned an empty id for training")
                     except Exception:
+                        logger.exception("Failed to create training simulation record")
                         simulation_id = f"local-{int(time.time())}"
                 trainer = app_state["trainer"]
 

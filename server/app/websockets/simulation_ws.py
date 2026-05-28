@@ -97,6 +97,8 @@ async def simulation_socket(websocket: WebSocket) -> None:
                         )
                         if simulation_id:
                             app_state["current_simulation_id"] = simulation_id
+                        else:
+                            logger.error("Supabase create_simulation returned an empty id")
                     except Exception:
                         logger.exception("Failed to create simulation record")
                         app_state["current_simulation_id"] = f"local-{int(time.time())}"

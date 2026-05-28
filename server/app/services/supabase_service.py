@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 from supabase import Client, create_client
 
@@ -11,7 +12,9 @@ supabase_client: Client = create_client(
 
 
 def create_simulation(mode: str) -> str:
+    simulation_id = str(uuid4())
     payload = {
+        "id": simulation_id,
         "mode": mode,
         "status": "running",
         "totalSteps": 0,
@@ -19,7 +22,7 @@ def create_simulation(mode: str) -> str:
     }
     result = supabase_client.table("simulations").insert(payload).execute()
     data = getattr(result, "data", [])
-    return data[0]["id"] if data else ""
+    return data[0]["id"] if data else simulation_id
 
 
 def update_simulation(
@@ -46,7 +49,9 @@ def save_episode(
     loss: Optional[float],
     steps: int,
 ) -> None:
+    episode_id = str(uuid4())
     payload = {
+        "id": episode_id,
         "simulationId": simulation_id,
         "episodeNumber": episode_num,
         "totalReward": total_reward,
@@ -67,7 +72,9 @@ def save_traffic_log(
     avg_wait: float,
     max_queue: int,
 ) -> None:
+    traffic_log_id = str(uuid4())
     payload = {
+        "id": traffic_log_id,
         "simulationId": simulation_id,
         "timestep": timestep,
         "vehiclesSpawned": spawned,
@@ -85,7 +92,9 @@ def save_signal_state(
     duration: int,
     queues: Dict[str, int],
 ) -> None:
+    signal_state_id = str(uuid4())
     payload = {
+        "id": signal_state_id,
         "simulationId": simulation_id,
         "timestep": timestep,
         "phase": phase,
@@ -105,7 +114,9 @@ def save_performance_metric(
     throughput: int,
 ) -> None:
     is_fixed = mode == "fixed"
+    metric_id = str(uuid4())
     payload: Dict[str, Any] = {
+        "id": metric_id,
         "simulationId": simulation_id,
         "mode": mode,
         "avgWaitTimeFixed": avg_wait if is_fixed else None,
@@ -126,6 +137,7 @@ def save_model_metadata(
     model_id: Optional[str] = None,
 ) -> str:
     payload: Dict[str, Any] = {
+        "id": model_id or str(uuid4()),
         "name": name,
         "version": version,
         "storagePath": storage_path,
@@ -133,11 +145,9 @@ def save_model_metadata(
         "epsilon": epsilon,
         "totalEpisodes": total_episodes,
     }
-    if model_id:
-        payload["id"] = model_id
     result = supabase_client.table("rl_models").insert(payload).execute()
     data = getattr(result, "data", [])
-    return data[0]["id"] if data else ""
+    return data[0]["id"] if data else payload["id"]
 
 
 def set_active_model(model_id: str) -> None:
