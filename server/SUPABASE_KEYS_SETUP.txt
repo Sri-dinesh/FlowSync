@@ -1,0 +1,95 @@
+Supabase Keys Needed For FlowSync
+
+Backend server/.env
+
+1. SUPABASE_URL
+- What it is: Your Supabase project URL.
+- What it looks like:
+  https://your-project-ref.supabase.co
+- Where to get it:
+  Supabase Dashboard -> Project Settings -> API -> Project URL
+
+2. SUPABASE_SERVICE_ROLE_KEY
+- What it is: The backend admin key used by FastAPI to insert/update rows.
+- Use this for:
+  server/app/services/supabase_service.py
+- What it looks like:
+  Usually a long JWT-like token with 3 dot-separated parts, or a secret key starting with:
+  sb_secret_
+- Important:
+  This must be a service-role/admin key.
+  Do not use an anon key.
+  Do not use a publishable key.
+- Where to get it:
+  Supabase Dashboard -> Project Settings -> API -> Project API keys
+  Look for one of these:
+  service_role
+  secret
+
+3. CORS_ORIGINS
+- What it is: Comma-separated frontend origins allowed to call the backend.
+- Example:
+  http://localhost:3000,https://your-vercel-app.vercel.app
+
+Frontend client/.env.local
+
+1. NEXT_PUBLIC_SUPABASE_URL
+- Same value as SUPABASE_URL.
+- Example:
+  https://your-project-ref.supabase.co
+
+2. NEXT_PUBLIC_SUPABASE_ANON_KEY
+- What it is: Public browser key for frontend reads/auth flows.
+- What it looks like:
+  Often a JWT-like token, or a publishable key starting with:
+  sb_publishable_
+- Important:
+  This is safe for the browser.
+  Do not use this in the backend for inserts/updates.
+- Where to get it:
+  Supabase Dashboard -> Project Settings -> API -> Project API keys
+  Look for:
+  anon
+  publishable
+
+What is wrong in the current setup
+
+- The backend was using an anon key as SUPABASE_SERVICE_KEY.
+- That causes database writes to fail with RLS / permission errors.
+- The backend needs a real admin key instead.
+
+Recommended server/.env values
+
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_or_sb_secret_key_here
+CORS_ORIGINS=http://localhost:3000
+
+Recommended client/.env.local values
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_or_publishable_key_here
+
+How to confirm the correct key type
+
+- Backend key:
+  Good:
+  service_role
+  sb_secret_...
+
+  Bad:
+  anon
+  sb_publishable_...
+
+- Frontend key:
+  Good:
+  anon
+  sb_publishable_...
+
+  Bad:
+  service_role
+  sb_secret_...
+
+Rule to remember
+
+- Backend writes: use service-role / secret key only.
+- Frontend public app: use anon / publishable key only.
