@@ -71,7 +71,7 @@ const SimulationCanvas = memo(function SimulationCanvas() {
             autoRotateSpeed={0.5}
           />
 
-          <EffectComposer disableNormalPass>
+          <EffectComposer>
             <Bloom 
               luminanceThreshold={1.5} 
               mipmapBlur 

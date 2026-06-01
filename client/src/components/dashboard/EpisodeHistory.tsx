@@ -31,7 +31,7 @@ const PAGE_SIZE = 10;
 
 export default function EpisodeHistory({ simulationId }: EpisodeHistoryProps) {
   const { data } = useEpisodes(simulationId);
-  const episodes = (data ?? []) as EpisodeRecord[];
+  const episodes = useMemo(() => (data ?? []) as EpisodeRecord[], [data]);
   const [page, setPage] = useState(0);
 
   const bestId = useMemo(() => {

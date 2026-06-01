@@ -60,7 +60,7 @@ function QueueLabel({ value, position }: QueueLabelProps) {
         anchorX="center"
         anchorY="middle"
         fontWeight="bold"
-        opacity={0.95}
+        fillOpacity={0.95}
       >
         {value}
       </Text>
