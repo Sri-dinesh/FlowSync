@@ -1,0 +1,25 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment — never bake secrets into the image
+.env
+.env.*
+
+# Dev/test artifacts
+*.log
+*.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Editor
+.vscode/
+.idea/
+
+# Saved models (large binaries — mount via volume or object storage)
+models/*.pt
+models/*.pth

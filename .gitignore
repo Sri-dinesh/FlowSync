@@ -9,3 +9,6 @@ models/
 !client/src/app/api/models/
 !client/src/app/api/models/**
 server/venv/
+
+# Docker local overrides (may contain secrets)
+docker-compose.override.yml

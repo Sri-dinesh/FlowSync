@@ -3,11 +3,12 @@ uvicorn[standard]==0.30.0
 websockets==12.0
 pydantic==2.7.0
 pydantic-settings==2.3.0
-torch==2.7.1
+# torch is pinned and installed separately in the build command
+# using --extra-index-url https://download.pytorch.org/whl/cpu
+# so the CPU-only wheel is used. Do NOT pin it here.
 numpy==1.26.4
 gymnasium==0.29.1
 supabase==2.4.6
 python-dotenv==1.0.1
 httpx==0.27.0
 ujson==5.10.0
-
