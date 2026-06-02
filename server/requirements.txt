@@ -1,11 +1,10 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
 websockets==12.0
-pydantic==2.7.0
-pydantic-settings==2.3.0
-# torch is pinned and installed separately in the build command
-# using --extra-index-url https://download.pytorch.org/whl/cpu
-# so the CPU-only wheel is used. Do NOT pin it here.
+pydantic==2.10.6
+pydantic-settings==2.7.0
+# torch is installed separately in the build command via the CPU wheel index:
+#   pip install torch==2.3.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 numpy==1.26.4
 gymnasium==0.29.1
 supabase==2.4.6
