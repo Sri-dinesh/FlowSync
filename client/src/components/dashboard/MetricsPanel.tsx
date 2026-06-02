@@ -80,27 +80,31 @@ export default function MetricsPanel() {
     }
 
     const maxQueue = Math.max(...Object.values(frame.queue_lengths ?? {}), 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWaitHistory((prev) => [
       ...prev.slice(-HISTORY_LENGTH + 1),
       frame.avg_wait_time,
     ]);
+     
     setThroughputHistory((prev) => [
       ...prev.slice(-HISTORY_LENGTH + 1),
       frame.throughput,
     ]);
+     
     setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
-  }, [frame?.avg_wait_time, frame?.throughput, frame?.queue_lengths]);
+  }, [frame]);
 
   useEffect(() => {
     const latest = trainingMetrics[trainingMetrics.length - 1];
     if (!latest) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEpisodeHistory((prev) => [
       ...prev.slice(-HISTORY_LENGTH + 1),
       latest.episode,
     ]);
-  }, [trainingMetrics.length]);
+  }, [trainingMetrics]);
 
   const metrics = useMemo(() => {
     const avgWait = frame?.avg_wait_time ?? 0;
