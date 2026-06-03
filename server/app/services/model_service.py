@@ -33,9 +33,12 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
             file=buffer,
             file_options={"content-type": "application/octet-stream", "upsert": "true"},
         )
-    except Exception:
-        # Local checkpoints are still available when Supabase storage is blocked.
-        return
+    except Exception as exc:
+        # Log so it's visible in Render logs; local checkpoint is still saved above.
+        import logging
+        logging.getLogger(__name__).warning(
+            "Supabase storage upload failed for %s episode %d: %s", model_id, episode, exc
+        )
 
 
 def load_checkpoint(model_id: str, episode: int) -> Dict[str, Any]:

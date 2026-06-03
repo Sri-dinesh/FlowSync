@@ -70,6 +70,11 @@ app.add_api_websocket_route("/ws/simulation", simulation_socket)
 app.add_api_websocket_route("/ws/training", training_socket)
 
 
+@app.get("/")
+def root() -> dict:
+    return {"status": "ok", "service": "FlowSync API"}
+
+
 @app.get("/health")
 def health_check() -> dict:
     return {"status": "ok"}

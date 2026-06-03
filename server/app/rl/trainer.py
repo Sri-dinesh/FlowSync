@@ -1,9 +1,12 @@
 import asyncio
+import logging
 from typing import Any, Awaitable, Callable, Optional
 
 from .dqn_agent import DQNAgent
 from .hyperparams import HyperParams
 from ..simulation.environment import TrafficEnv
+
+logger = logging.getLogger(__name__)
 
 
 class Trainer:
@@ -83,17 +86,24 @@ class Trainer:
             persist_remote = bool(simulation_id) and not simulation_id.startswith("local-")
 
             if persist_remote:
-                await asyncio.to_thread(
-                    self.supabase_service.save_episode,
-                    simulation_id,
-                    episode_num,
-                    total_reward,
-                    avg_wait,
-                    throughput,
-                    self.epsilon,
-                    loss_value,
-                    steps,
-                )
+                try:
+                    await asyncio.to_thread(
+                        self.supabase_service.save_episode,
+                        simulation_id,
+                        episode_num,
+                        total_reward,
+                        avg_wait,
+                        throughput,
+                        self.epsilon,
+                        loss_value,
+                        steps,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to save episode %d for simulation %s",
+                        episode_num,
+                        simulation_id,
+                    )
 
             is_last_episode = episode_index == num_episodes - 1
             await self.ws_broadcast_fn(

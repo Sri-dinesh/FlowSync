@@ -1,12 +1,15 @@
 import asyncio
+import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..schemas.training_schema import StartTrainingRequest
-from ..services import model_service
+from ..services import model_service, supabase_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/training", tags=["training"])
 
 
@@ -34,11 +37,27 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
     if trainer.is_training:
         return {"status": "already_training"}
 
-    simulation_id = payload.simulation_id or app_state.get("current_simulation_id") or ""
+    simulation_id = payload.simulation_id or app_state.get("current_simulation_id")
+
+    # Always ensure we have a real simulation record before training
+    if not simulation_id:
+        try:
+            simulation_id = await asyncio.to_thread(
+                supabase_service.create_simulation, "ai"
+            )
+            if simulation_id:
+                app_state["current_simulation_id"] = simulation_id
+            else:
+                logger.error("create_simulation returned empty id, falling back to local")
+                simulation_id = f"local-{int(time.time())}"
+        except Exception:
+            logger.exception("Failed to create simulation record for training")
+            simulation_id = f"local-{int(time.time())}"
+
     task = asyncio.create_task(trainer.train(simulation_id, payload.num_episodes))
     app_state["training_task"] = task
 
-    return {"status": "started"}
+    return {"status": "started", "simulation_id": simulation_id}
 
 
 @router.post("/stop")
