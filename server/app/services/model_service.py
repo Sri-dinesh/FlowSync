@@ -26,15 +26,15 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
     path = _checkpoint_path(model_id, episode)
     buffer = io.BytesIO()
     torch.save(state_dict, buffer)
-    buffer.seek(0)
+    # supabase-py v2 upload() requires bytes, not a file-like object
+    raw_bytes = buffer.getvalue()
     try:
         supabase_client.storage.from_(BUCKET_NAME).upload(
             path=path,
-            file=buffer,
+            file=raw_bytes,
             file_options={"content-type": "application/octet-stream", "upsert": "true"},
         )
     except Exception as exc:
-        # Log so it's visible in Render logs; local checkpoint is still saved above.
         import logging
         logging.getLogger(__name__).warning(
             "Supabase storage upload failed for %s episode %d: %s", model_id, episode, exc
@@ -76,30 +76,74 @@ def list_checkpoints(model_id: str) -> List[str]:
     return [f"{folder}/{path.name}" for path in checkpoints]
 
 
+def list_all_models() -> List[Dict[str, Any]]:
+    """List models from both Supabase Storage and local disk, deduplicated."""
+    models: Dict[str, Dict[str, Any]] = {}
+
+    # --- Supabase Storage ---
+    try:
+        top_level = supabase_client.storage.from_(BUCKET_NAME).list("models")
+        if top_level:
+            for entry in top_level:
+                model_id = entry.get("name")
+                if not model_id:
+                    continue
+                folder = f"models/{model_id}"
+                try:
+                    checkpoints = supabase_client.storage.from_(BUCKET_NAME).list(
+                        folder,
+                        {"limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}},
+                    )
+                    if not checkpoints:
+                        continue
+                    episodes = []
+                    for c in checkpoints:
+                        name = c.get("name", "")
+                        if name.startswith("checkpoint_") and name.endswith(".pt"):
+                            ep_text = name[len("checkpoint_"):-len(".pt")]
+                            if ep_text.isdigit():
+                                episodes.append(int(ep_text))
+                    if not episodes:
+                        continue
+                    latest_ep = max(episodes)
+                    models[model_id] = {
+                        "id": model_id,
+                        "name": f"Model {model_id[:8]}",
+                        "version": str(latest_ep),
+                        "source": "remote",
+                        "episodes": latest_ep,
+                    }
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # --- Local disk (fallback / dev) ---
+    if LOCAL_MODELS_DIR.exists():
+        for model_dir in LOCAL_MODELS_DIR.iterdir():
+            if not model_dir.is_dir():
+                continue
+            checkpoints = sorted(model_dir.glob("checkpoint_*.pt"))
+            if not checkpoints:
+                continue
+            latest_name = checkpoints[-1].name
+            ep_text = latest_name[len("checkpoint_"):-len(".pt")]
+            latest_ep = int(ep_text) if ep_text.isdigit() else 0
+            model_id = model_dir.name
+            # Only add if not already found in Supabase
+            if model_id not in models:
+                models[model_id] = {
+                    "id": model_id,
+                    "name": f"Model {model_id[:8]}",
+                    "version": str(latest_ep),
+                    "source": "local",
+                    "episodes": latest_ep,
+                }
+
+    # Sort by episode count descending so the most-trained model is first
+    return sorted(models.values(), key=lambda m: m["episodes"], reverse=True)
+
+
 def list_local_models() -> List[Dict[str, Any]]:
-    if not LOCAL_MODELS_DIR.exists():
-        return []
-
-    models: List[Dict[str, Any]] = []
-    for model_dir in LOCAL_MODELS_DIR.iterdir():
-        if not model_dir.is_dir():
-            continue
-
-        checkpoints = sorted(model_dir.glob("checkpoint_*.pt"))
-        if not checkpoints:
-            continue
-
-        latest_name = checkpoints[-1].name
-        episode_text = latest_name[len("checkpoint_") : -len(".pt")]
-        latest_episode = int(episode_text) if episode_text.isdigit() else 0
-
-        models.append(
-            {
-                "id": model_dir.name,
-                "name": f"Local {model_dir.name[:8]}",
-                "version": str(latest_episode),
-                "source": "local",
-            }
-        )
-
-    return models
+    """Kept for backward compatibility — delegates to list_all_models."""
+    return list_all_models()

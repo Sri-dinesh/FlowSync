@@ -82,7 +82,7 @@ async def training_status(request: Request) -> dict:
 
 @router.get("/models")
 async def list_models() -> dict:
-    models = await asyncio.to_thread(model_service.list_local_models)
+    models = await asyncio.to_thread(model_service.list_all_models)
     return {"models": models}
 
 

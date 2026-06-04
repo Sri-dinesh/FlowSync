@@ -13,3 +13,4 @@ class HyperParams:
     target_update_freq: int = 500
     max_steps_per_episode: int = 500
     episodes: int = 500
+    min_replay_size: int = 64

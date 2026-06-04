@@ -8,6 +8,11 @@ from ..simulation.environment import TrafficEnv
 
 logger = logging.getLogger(__name__)
 
+# Yield to the event loop every N steps to keep WebSocket connections alive.
+_YIELD_EVERY_N_STEPS = 10
+# Only run a train_step every N steps to avoid saturating the CPU on free tier.
+_TRAIN_EVERY_N_STEPS = 4
+
 
 class Trainer:
     def __init__(
@@ -58,7 +63,11 @@ class Trainer:
 
                 self.agent.replay_buffer.push(state, action, reward, next_state, done)
 
-                if len(self.agent.replay_buffer) >= 1000:
+                # Only train every N steps and only once the buffer is warm.
+                if (
+                    step % _TRAIN_EVERY_N_STEPS == 0
+                    and len(self.agent.replay_buffer) >= self.hyperparams.min_replay_size
+                ):
                     batch = self.agent.replay_buffer.sample(self.hyperparams.batch_size)
                     loss_value = await asyncio.to_thread(self.agent.train_step, batch)
 
@@ -68,6 +77,11 @@ class Trainer:
                 total_reward += reward
                 state = next_state
                 steps = step + 1
+
+                # Yield to the event loop regularly so WebSocket frames
+                # and heartbeats are not starved on single-CPU hosts.
+                if step % _YIELD_EVERY_N_STEPS == 0:
+                    await asyncio.sleep(0)
 
                 if done:
                     break
@@ -124,6 +138,14 @@ class Trainer:
                     simulation_id,
                     episode_num,
                     self.agent.online_net.state_dict(),
+                )
+                # Notify the frontend that a new checkpoint is available
+                await self.ws_broadcast_fn(
+                    {
+                        "type": "checkpoint_saved",
+                        "model_id": simulation_id,
+                        "episode": episode_num,
+                    }
                 )
 
         self.is_training = False
