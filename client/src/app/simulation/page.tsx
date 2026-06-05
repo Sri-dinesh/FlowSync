@@ -56,7 +56,7 @@ export default function SimulationPage() {
               <MetricsPanel />
             </Card>
 
-            <Card className="rounded-none border-0 bg-transparent flex-1 min-h-[300px]">
+            <Card className="rounded-none border-0 bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
               <CardHeader className="pb-3">
                 <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
                   Analytics
@@ -67,19 +67,19 @@ export default function SimulationPage() {
                   <TabsList className="h-auto gap-1 bg-transparent p-0">
                     <TabsTrigger
                       value="training"
-                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                      className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
                     >
                       Training
                     </TabsTrigger>
                     <TabsTrigger
                       value="comparison"
-                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                      className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
                     >
                       Compare
                     </TabsTrigger>
                     <TabsTrigger
                       value="history"
-                      className="data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                      className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
                     >
                       History
                     </TabsTrigger>

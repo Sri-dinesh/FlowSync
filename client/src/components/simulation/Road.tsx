@@ -263,7 +263,7 @@ export default function Road({ direction }: RoadProps) {
             geometry={stopBarGeometry}
             material={stopBarMaterial}
             rotation={rotation}
-            position={[-0.75, 0.021, 1.6]}
+            position={[-0.75, 0.021, -1.6]}
           />
 
           {/* South entrance: Stop line for Northbound traffic (x > 0) */}
@@ -271,11 +271,11 @@ export default function Road({ direction }: RoadProps) {
             geometry={stopBarGeometry}
             material={stopBarMaterial}
             rotation={rotation}
-            position={[0.75, 0.021, -1.6]}
+            position={[0.75, 0.021, 1.6]}
           />
 
           {/* North Zebra Crossing */}
-          <group position={[0, 0.021, 2.1]}>
+          <group position={[0, 0.021, -2.1]}>
             {stripes.map((xOffset, index) => (
               <mesh
                 key={`n-zebra-${index}`}
@@ -288,7 +288,7 @@ export default function Road({ direction }: RoadProps) {
           </group>
 
           {/* South Zebra Crossing */}
-          <group position={[0, 0.021, -2.1]}>
+          <group position={[0, 0.021, 2.1]}>
             {stripes.map((xOffset, index) => (
               <mesh
                 key={`s-zebra-${index}`}
@@ -302,7 +302,7 @@ export default function Road({ direction }: RoadProps) {
 
           {/* Painted road text labels flat on the road */}
           <Text
-            position={[-0.75, 0.022, 5]}
+            position={[-0.75, 0.022, -5]}
             rotation={[-Math.PI / 2, 0, Math.PI]}
             fontSize={0.28}
             color="#ffffff"
@@ -311,7 +311,7 @@ export default function Road({ direction }: RoadProps) {
             ▼ SOUTHBOUND
           </Text>
           <Text
-            position={[0.75, 0.022, -5]}
+            position={[0.75, 0.022, 5]}
             rotation={[-Math.PI / 2, 0, 0]}
             fontSize={0.28}
             color="#ffffff"

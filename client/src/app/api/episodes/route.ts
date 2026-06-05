@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -7,15 +6,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const simulationId = searchParams.get("simulationId");
 
-    if (!simulationId) {
-      return NextResponse.json(
-        { error: "simulationId is required" },
-        { status: 400 },
-      );
-    }
-
     const episodes = await prisma.episode.findMany({
-      where: { simulationId },
+      where: simulationId ? { simulationId } : undefined,
+      orderBy: [
+        { simulationId: "desc" },
+        { episodeNumber: "asc" },
+      ],
+      // Cap at 500 so the page doesn't try to render thousands of rows
+      take: 500,
     });
 
     return NextResponse.json(episodes);

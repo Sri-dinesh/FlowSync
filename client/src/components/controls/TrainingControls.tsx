@@ -334,12 +334,12 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               </div>
 
               {/* Agent phase description */}
-              {latest && (
+              {latest && "epsilon" in latest && (
                 <AgentPhaseDescription epsilon={latest.epsilon} episode={currentEpisode} />
               )}
 
               {/* Stat cards */}
-              {latest && (
+              {latest && "total_reward" in latest && (
                 <div className="grid grid-cols-2 gap-2">
                   <StatCard
                     icon={<TrendingUp className="h-3 w-3 text-sky-400" />}
@@ -385,7 +385,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               )}
 
               {/* Throughput */}
-              {latest && (
+              {latest && "throughput" in latest && (
                 <div className="flex items-center justify-between rounded-md border border-white/5 bg-white/3 px-2.5 py-2">
                   <div>
                     <span className="text-[9px] uppercase tracking-wider text-white/40">Throughput</span>

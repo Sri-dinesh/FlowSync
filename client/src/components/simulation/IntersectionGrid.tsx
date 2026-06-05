@@ -134,7 +134,7 @@ export default function IntersectionGrid() {
       />
 
       {/* ================= CORNER 1: NORTH-WEST PARK ================= */}
-      <group position={[-5.75, 0.03, 5.75]}>
+      <group position={[-5.75, 0.03, -5.75]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Grass zone */}
@@ -147,7 +147,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 4: SOUTH-EAST PARK ================= */}
-      <group position={[5.75, 0.03, -5.75]}>
+      <group position={[5.75, 0.03, 5.75]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Grass zone */}
@@ -160,7 +160,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 2: NORTH-EAST CITY BLOCK ================= */}
-      <group position={[5.75, 0.03, 5.75]}>
+      <group position={[5.75, 0.03, -5.75]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Skyscrapers */}
@@ -170,7 +170,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 3: SOUTH-WEST CITY BLOCK ================= */}
-      <group position={[-5.75, 0.03, -5.75]}>
+      <group position={[-5.75, 0.03, 5.75]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Skyscrapers */}
