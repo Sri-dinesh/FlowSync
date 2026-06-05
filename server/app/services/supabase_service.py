@@ -1,15 +1,29 @@
-from typing import Any, Dict, Optional
+"""
+Supabase database service — all writes go through this module.
+
+Write strategy:
+  - All functions are synchronous (called via asyncio.to_thread from async context).
+  - Bulk inserts use a single .insert([...]) call to reduce round-trips.
+  - Logging is attached to every failure so nothing silently disappears.
+"""
+
+import logging
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from supabase import Client, create_client
 
 from ..config import settings
 
+logger = logging.getLogger(__name__)
+
 supabase_client: Client = create_client(
     settings.supabase_url,
     settings.supabase_service_key,
 )
 
+
+# ─── Simulations ─────────────────────────────────────────────────────────────
 
 def create_simulation(mode: str) -> str:
     simulation_id = str(uuid4())
@@ -20,9 +34,13 @@ def create_simulation(mode: str) -> str:
         "totalSteps": 0,
         "durationMs": 0,
     }
-    result = supabase_client.table("simulations").insert(payload).execute()
-    data = getattr(result, "data", [])
-    return data[0]["id"] if data else simulation_id
+    try:
+        result = supabase_client.table("simulations").insert(payload).execute()
+        data = getattr(result, "data", [])
+        return data[0]["id"] if data else simulation_id
+    except Exception:
+        logger.exception("create_simulation failed for mode=%s", mode)
+        return simulation_id
 
 
 def update_simulation(
@@ -31,13 +49,17 @@ def update_simulation(
     total_steps: int,
     duration_ms: int,
 ) -> None:
-    payload = {
-        "status": status,
-        "totalSteps": total_steps,
-        "durationMs": duration_ms,
-    }
-    supabase_client.table("simulations").update(payload).eq("id", simulation_id).execute()
+    try:
+        supabase_client.table("simulations").update({
+            "status": status,
+            "totalSteps": total_steps,
+            "durationMs": duration_ms,
+        }).eq("id", simulation_id).execute()
+    except Exception:
+        logger.exception("update_simulation failed for id=%s", simulation_id)
 
+
+# ─── Episodes ────────────────────────────────────────────────────────────────
 
 def save_episode(
     simulation_id: str,
@@ -49,19 +71,39 @@ def save_episode(
     loss: Optional[float],
     steps: int,
 ) -> None:
-    episode_id = str(uuid4())
-    payload = {
-        "id": episode_id,
-        "simulationId": simulation_id,
-        "episodeNumber": episode_num,
-        "totalReward": total_reward,
-        "avgWaitTime": avg_wait,
-        "throughput": throughput,
-        "epsilon": epsilon,
-        "loss": loss,
-        "steps": steps,
-    }
-    supabase_client.table("episodes").insert(payload).execute()
+    try:
+        supabase_client.table("episodes").insert({
+            "id": str(uuid4()),
+            "simulationId": simulation_id,
+            "episodeNumber": episode_num,
+            "totalReward": total_reward,
+            "avgWaitTime": avg_wait,
+            "throughput": throughput,
+            "epsilon": epsilon,
+            "loss": loss,
+            "steps": steps,
+        }).execute()
+    except Exception:
+        logger.exception(
+            "save_episode failed for simulation=%s episode=%d", simulation_id, episode_num
+        )
+
+
+# ─── Traffic logs (sampled) ───────────────────────────────────────────────────
+
+def save_traffic_logs_bulk(rows: List[Dict[str, Any]]) -> None:
+    """
+    Insert multiple traffic log rows in one round-trip.
+    Each row must have: simulationId, timestep, vehiclesSpawned,
+    vehiclesPassed, avgWaitTime, maxQueueLength.
+    """
+    if not rows:
+        return
+    payloads = [{"id": str(uuid4()), **row} for row in rows]
+    try:
+        supabase_client.table("traffic_logs").insert(payloads).execute()
+    except Exception:
+        logger.exception("save_traffic_logs_bulk failed (%d rows)", len(rows))
 
 
 def save_traffic_log(
@@ -72,17 +114,31 @@ def save_traffic_log(
     avg_wait: float,
     max_queue: int,
 ) -> None:
-    traffic_log_id = str(uuid4())
-    payload = {
-        "id": traffic_log_id,
+    save_traffic_logs_bulk([{
         "simulationId": simulation_id,
         "timestep": timestep,
         "vehiclesSpawned": spawned,
         "vehiclesPassed": passed,
         "avgWaitTime": avg_wait,
         "maxQueueLength": max_queue,
-    }
-    supabase_client.table("traffic_logs").insert(payload).execute()
+    }])
+
+
+# ─── Signal states (sampled) ──────────────────────────────────────────────────
+
+def save_signal_states_bulk(rows: List[Dict[str, Any]]) -> None:
+    """
+    Insert multiple signal state rows in one round-trip.
+    Each row must have: simulationId, timestep, phase, duration,
+    queueNorth, queueSouth, queueEast, queueWest.
+    """
+    if not rows:
+        return
+    payloads = [{"id": str(uuid4()), **row} for row in rows]
+    try:
+        supabase_client.table("signal_states").insert(payloads).execute()
+    except Exception:
+        logger.exception("save_signal_states_bulk failed (%d rows)", len(rows))
 
 
 def save_signal_state(
@@ -92,9 +148,7 @@ def save_signal_state(
     duration: int,
     queues: Dict[str, int],
 ) -> None:
-    signal_state_id = str(uuid4())
-    payload = {
-        "id": signal_state_id,
+    save_signal_states_bulk([{
         "simulationId": simulation_id,
         "timestep": timestep,
         "phase": phase,
@@ -103,9 +157,10 @@ def save_signal_state(
         "queueSouth": queues.get("south", 0),
         "queueEast": queues.get("east", 0),
         "queueWest": queues.get("west", 0),
-    }
-    supabase_client.table("signal_states").insert(payload).execute()
+    }])
 
+
+# ─── Performance metrics ──────────────────────────────────────────────────────
 
 def save_performance_metric(
     simulation_id: str,
@@ -114,42 +169,79 @@ def save_performance_metric(
     throughput: int,
 ) -> None:
     is_fixed = mode == "fixed"
-    metric_id = str(uuid4())
-    payload: Dict[str, Any] = {
-        "id": metric_id,
-        "simulationId": simulation_id,
-        "mode": mode,
-        "avgWaitTimeFixed": avg_wait if is_fixed else None,
-        "avgWaitTimeAI": avg_wait if not is_fixed else None,
-        "throughputFixed": throughput if is_fixed else None,
-        "throughputAI": throughput if not is_fixed else None,
-    }
-    supabase_client.table("performance_metrics").insert(payload).execute()
+    try:
+        supabase_client.table("performance_metrics").insert({
+            "id": str(uuid4()),
+            "simulationId": simulation_id,
+            "mode": mode,
+            "avgWaitTimeFixed": avg_wait if is_fixed else None,
+            "avgWaitTimeAI": avg_wait if not is_fixed else None,
+            "throughputFixed": throughput if is_fixed else None,
+            "throughputAI": throughput if not is_fixed else None,
+        }).execute()
+    except Exception:
+        logger.exception(
+            "save_performance_metric failed for simulation=%s mode=%s", simulation_id, mode
+        )
 
+
+# ─── RL model metadata ────────────────────────────────────────────────────────
 
 def save_model_metadata(
-    name: str,
-    version: str,
-    storage_path: str,
+    simulation_id: str,
+    episode: int,
     avg_reward: float,
     epsilon: float,
     total_episodes: int,
-    model_id: Optional[str] = None,
 ) -> str:
-    payload: Dict[str, Any] = {
-        "id": model_id or str(uuid4()),
-        "name": name,
-        "version": version,
-        "storagePath": storage_path,
-        "avgReward": avg_reward,
-        "epsilon": epsilon,
-        "totalEpisodes": total_episodes,
-    }
-    result = supabase_client.table("rl_models").insert(payload).execute()
-    data = getattr(result, "data", [])
-    return data[0]["id"] if data else payload["id"]
+    """
+    Upsert a row in rl_models keyed on simulation_id.
+    Updates the existing row if it already exists (checkpoint at episode 50, 100, …)
+    so we don't accumulate duplicate rows per training run.
+    """
+    model_id = simulation_id  # reuse simulation UUID as model identifier
+    storage_path = f"models/{simulation_id}/checkpoint_{episode}.pt"
+    name = f"Model {simulation_id[:8]}"
+    version = str(episode)
+
+    try:
+        # Check if a row already exists for this simulation
+        existing = (
+            supabase_client.table("rl_models")
+            .select("id")
+            .eq("id", model_id)
+            .execute()
+        )
+        if getattr(existing, "data", []):
+            # Update in place
+            supabase_client.table("rl_models").update({
+                "version": version,
+                "storagePath": storage_path,
+                "avgReward": avg_reward,
+                "epsilon": epsilon,
+                "totalEpisodes": total_episodes,
+            }).eq("id", model_id).execute()
+        else:
+            supabase_client.table("rl_models").insert({
+                "id": model_id,
+                "name": name,
+                "version": version,
+                "storagePath": storage_path,
+                "avgReward": avg_reward,
+                "epsilon": epsilon,
+                "totalEpisodes": total_episodes,
+                "isActive": False,
+            }).execute()
+        return model_id
+    except Exception:
+        logger.exception("save_model_metadata failed for simulation=%s", simulation_id)
+        return model_id
 
 
 def set_active_model(model_id: str) -> None:
-    supabase_client.table("rl_models").update({"isActive": False}).execute()
-    supabase_client.table("rl_models").update({"isActive": True}).eq("id", model_id).execute()
+    try:
+        # Clear all active flags first, then set the target
+        supabase_client.table("rl_models").update({"isActive": False}).neq("id", "").execute()
+        supabase_client.table("rl_models").update({"isActive": True}).eq("id", model_id).execute()
+    except Exception:
+        logger.exception("set_active_model failed for id=%s", model_id)

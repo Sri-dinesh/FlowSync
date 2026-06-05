@@ -39,6 +39,10 @@ class Trainer:
         self.current_episode = 0
         self.epsilon = self.hyperparams.epsilon_start
 
+        # Rolling window of recent rewards for model metadata
+        _recent_rewards: list[dict] = []
+        _REWARD_WINDOW = 50
+
         for episode_index in range(num_episodes):
             if not self.is_training:
                 break
@@ -97,6 +101,11 @@ class Trainer:
             avg_wait = self.env.intersection.get_avg_wait_time()
             throughput = self.env.intersection.total_passed
 
+            # Track rolling rewards for model metadata avg_reward
+            _recent_rewards.append({"reward": total_reward})
+            if len(_recent_rewards) > _REWARD_WINDOW:
+                _recent_rewards.pop(0)
+
             persist_remote = bool(simulation_id) and not simulation_id.startswith("local-")
 
             if persist_remote:
@@ -138,6 +147,19 @@ class Trainer:
                     simulation_id,
                     episode_num,
                     self.agent.online_net.state_dict(),
+                )
+                # Persist metadata row in rl_models so the model appears in the UI
+                avg_reward = (
+                    sum(m["reward"] for m in _recent_rewards) / len(_recent_rewards)
+                    if _recent_rewards else total_reward
+                )
+                await asyncio.to_thread(
+                    self.supabase_service.save_model_metadata,
+                    simulation_id,
+                    episode_num,
+                    avg_reward,
+                    self.epsilon,
+                    episode_num,
                 )
                 # Notify the frontend that a new checkpoint is available
                 await self.ws_broadcast_fn(
