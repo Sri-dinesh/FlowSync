@@ -21,6 +21,7 @@ interface SimulationStore {
   setRunning: (value: boolean) => void;
   setTraining: (value: boolean) => void;
   resetMetrics: () => void;
+  resetSimulation: () => void;
 }
 
 const MAX_TRAINING_METRICS = 1000;
@@ -54,4 +55,10 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   setRunning: (value) => set({ isRunning: value }),
   setTraining: (value) => set({ isTraining: value }),
   resetMetrics: () => set({ trainingMetrics: [] }),
+  resetSimulation: () =>
+    set({
+      isRunning: false,
+      currentFrame: null,
+      lastFrameAt: null,
+    }),
 }));

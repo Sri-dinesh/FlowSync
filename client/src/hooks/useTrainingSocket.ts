@@ -22,26 +22,50 @@ export function useTrainingSocket() {
   const connect = useCallback(() => {
     const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_WS_URL;
     if (!baseUrl) {
+      console.error("[TrainWS] Missing NEXT_PUBLIC_FASTAPI_WS_URL environment variable.");
       return;
     }
 
+    console.log("[TrainWS] Connecting to:", `${baseUrl}/ws/training`);
     const socket = new WebSocket(`${baseUrl}/ws/training`);
     socketRef.current = socket;
 
     socket.onopen = () => {
       retryRef.current = 0;
+      console.log("%c[TrainWS] Connected", "color:#22c55e;font-weight:bold", {
+        url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training`,
+      });
     };
 
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as TrainingMetric;
+
+        // Log every training message — they arrive only once per episode
+        console.log(
+          "%c[TrainWS] message",
+          "color:#a78bfa;font-weight:bold",
+          payload,
+        );
+
         addTrainingMetric(payload);
-      } catch {
-        // Ignore malformed payloads.
+      } catch (err) {
+        console.warn("[TrainWS] Failed to parse message:", event.data, err);
       }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (ev) => {
+      console.log("%c[TrainWS] Disconnected", "color:#f97316;font-weight:bold", {
+        code: ev.code,
+        reason: ev.reason || "(none)",
+        wasClean: ev.wasClean,
+        url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training`,
+        hint: ev.code === 1006
+          ? "Abnormal closure — backend unreachable or rejected the connection (check CORS_ORIGINS on Render)"
+          : ev.code === 1015
+          ? "TLS handshake failed — make sure you use wss:// not ws:// for production"
+          : undefined,
+      });
       if (!shouldReconnectRef.current) {
         return;
       }
@@ -58,6 +82,10 @@ export function useTrainingSocket() {
     };
 
     socket.onerror = () => {
+      console.error(
+        "[TrainWS] Connection error — waiting for close event with details.",
+        { url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training` },
+      );
       socket.close();
     };
   }, [addTrainingMetric]);
@@ -81,7 +109,10 @@ export function useTrainingSocket() {
 
   const sendCommand = useCallback((command: Record<string, unknown>) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
+      console.log("%c[TrainWS] → SENDING COMMAND:", "color:#94a3b8;font-weight:bold", command);
       socketRef.current.send(JSON.stringify(command));
+    } else {
+      console.warn("[TrainWS] Cannot send command, socket not open. State:", socketRef.current?.readyState);
     }
   }, []);
 

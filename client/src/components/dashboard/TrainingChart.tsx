@@ -1,137 +1,212 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { useSimulationStore } from "@/store/simulationStore";
+import type { TrainingMetric } from "@/types/simulation";
 
-interface ChartLine {
-  points: string;
-  color: string;
-  label: string;
-  latest: string;
-}
+// ── Chart configurations ──────────────────────────────────────────────────────
 
-function buildPoints(values: number[], h: number): string {
-  if (values.length < 2) return "";
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = Math.max(max - min, 1e-6);
-  return values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * 100;
-      const y = h - ((v - min) / range) * (h - 6) - 3;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
+const rewardConfig: ChartConfig = {
+  total_reward: { label: "Reward", color: "#38bdf8" },
+};
+
+const waitConfig: ChartConfig = {
+  avg_wait_time: { label: "Avg Wait (s)", color: "#fb923c" },
+};
+
+const epsilonConfig: ChartConfig = {
+  epsilon: { label: "Epsilon ε", color: "#facc15" },
+};
+
+const lossConfig: ChartConfig = {
+  loss: { label: "Loss", color: "#a78bfa" },
+};
+
+type Tab = "reward" | "wait" | "epsilon" | "loss";
+
+const TABS: { key: Tab; label: string; config: ChartConfig; dataKey: keyof TrainingMetric; color: string; higherBetter: boolean }[] = [
+  { key: "reward",  label: "Reward",   config: rewardConfig,  dataKey: "total_reward",  color: "#38bdf8", higherBetter: true  },
+  { key: "wait",    label: "Avg Wait", config: waitConfig,    dataKey: "avg_wait_time", color: "#fb923c", higherBetter: false },
+  { key: "epsilon", label: "Epsilon",  config: epsilonConfig, dataKey: "epsilon",       color: "#facc15", higherBetter: false },
+  { key: "loss",    label: "Loss",     config: lossConfig,    dataKey: "loss",          color: "#a78bfa", higherBetter: false },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TrainingChart() {
   const trainingMetrics = useSimulationStore((s) => s.trainingMetrics);
+  const [activeTab, setActiveTab] = useState<Tab>("reward");
 
-  // Only use real TrainingMetric objects — filter out checkpoint_saved events
+  // Filter out non-metric events (checkpoint_saved etc.)
   const metrics = useMemo(
-    () => trainingMetrics.filter((m) => "total_reward" in m),
+    () => trainingMetrics.filter((m): m is TrainingMetric => "total_reward" in m),
     [trainingMetrics],
   );
 
-  const data = useMemo(() => metrics.slice(-120), [metrics]);
-  const latest = data[data.length - 1];
+  // Last 100 episodes, shaped for recharts
+  const chartData = useMemo(
+    () =>
+      metrics.slice(-100).map((m) => ({
+        episode: m.episode,
+        total_reward: parseFloat(m.total_reward.toFixed(2)),
+        avg_wait_time: parseFloat(m.avg_wait_time.toFixed(3)),
+        epsilon: parseFloat(m.epsilon.toFixed(4)),
+        loss: m.loss != null ? parseFloat(m.loss.toFixed(5)) : null,
+      })),
+    [metrics],
+  );
 
-  const H = 60;
+  const tab = TABS.find((t) => t.key === activeTab)!;
+  const latest = metrics[metrics.length - 1];
 
-  const lines: ChartLine[] = useMemo(() => {
-    if (!data.length) return [];
-    return [
-      {
-        label: "Reward",
-        color: "#38bdf8",
-        points: buildPoints(data.map((d) => d.total_reward), H),
-        latest: latest?.total_reward != null ? latest.total_reward.toFixed(1) : "—",
-      },
-      {
-        label: "Avg Wait (s)",
-        color: "#fb923c",
-        points: buildPoints(data.map((d) => d.avg_wait_time), H),
-        latest: latest?.avg_wait_time != null ? latest.avg_wait_time.toFixed(2) : "—",
-      },
-      {
-        label: "Epsilon",
-        color: "#facc15",
-        points: buildPoints(data.map((d) => d.epsilon), H),
-        latest: latest?.epsilon != null ? latest.epsilon.toFixed(3) : "—",
-      },
-    ];
-  }, [data, latest]);
-
-  if (!data.length) {
+  if (!metrics.length) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 text-sm text-white/40 text-center px-4">
-        No training data yet. Click <span className="mx-1 text-white/60 font-medium">Train Agent</span> to begin.
+      <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 text-sm text-white/40 text-center px-6">
+        No training data yet.{" "}
+        <span className="ml-1 text-white/60 font-medium">Train Agent</span>
+        {" "}to begin.
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      {/* Episode range label */}
-      <div className="flex items-center justify-between text-[10px] text-white/35">
-        <span>Episode {data[0]?.episode ?? 1}</span>
-        <span className="text-white/50 font-medium">Last {data.length} episodes</span>
-        <span>Episode {latest?.episode ?? data.length}</span>
+      {/* Tab bar */}
+      <div className="flex gap-1 rounded-lg border border-white/5 bg-black/20 p-1">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`flex-1 rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wider transition-colors ${
+              activeTab === t.key
+                ? "bg-white/10 text-white"
+                : "text-white/35 hover:text-white/60"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Episode range */}
+      <div className="flex items-center justify-between text-[10px] text-white/30">
+        <span>Ep {chartData[0]?.episode ?? 1}</span>
+        <span className="text-white/40">
+          Last {chartData.length} of {metrics.length} episodes
+        </span>
+        <span>Ep {chartData[chartData.length - 1]?.episode ?? chartData.length}</span>
       </div>
 
       {/* Chart */}
-      <div className="rounded-lg border border-white/5 bg-black/30 p-3">
-        <svg
-          viewBox={`0 0 100 ${H}`}
-          className="w-full overflow-visible"
-          preserveAspectRatio="none"
-          style={{ height: "120px" }}
+      <ChartContainer config={tab.config} className="h-[160px] w-full">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
         >
-          {/* Gridlines */}
-          {[0.25, 0.5, 0.75].map((t) => (
-            <line
-              key={t}
-              x1="0" y1={H * t} x2="100" y2={H * t}
-              stroke="rgba(255,255,255,0.05)"
-              strokeWidth="0.5"
-            />
-          ))}
-
-          {/* Data lines */}
-          {lines.map((line) => (
-            <polyline
-              key={line.label}
-              fill="none"
-              stroke={line.color}
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={line.points}
-            />
-          ))}
-        </svg>
-      </div>
-
-      {/* Legend with latest values */}
-      <div className="grid grid-cols-3 gap-2">
-        {lines.map((line) => (
-          <div
-            key={line.label}
-            className="rounded-md border border-white/5 bg-black/20 px-2 py-1.5 space-y-0.5"
-          >
-            <div className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-1.5 w-3 rounded-full"
-                style={{ background: line.color }}
+          <defs>
+            <linearGradient id={`grad-${tab.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={tab.color} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={tab.color} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            vertical={false}
+            stroke="rgba(255,255,255,0.05)"
+            strokeDasharray="3 3"
+          />
+          <XAxis
+            dataKey="episode"
+            tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }}
+            tickLine={false}
+            axisLine={false}
+            width={40}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                labelKey="episode"
+                labelFormatter={(v) => `Episode ${v}`}
               />
-              <span className="text-[9px] uppercase tracking-wider text-white/35">
-                {line.label}
-              </span>
-            </div>
-            <div className="text-xs font-bold text-white/80">{line.latest}</div>
-          </div>
-        ))}
-      </div>
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey={tab.dataKey as string}
+            stroke={tab.color}
+            strokeWidth={1.5}
+            fill={`url(#grad-${tab.key})`}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ChartContainer>
+
+      {/* Latest value stats */}
+      {latest && (
+        <div className="grid grid-cols-4 gap-1.5">
+          {TABS.map((t) => {
+            const raw = latest[t.dataKey];
+            const val = raw != null ? Number(raw) : null;
+            const fmt =
+              val == null
+                ? "—"
+                : t.key === "loss"
+                ? val.toFixed(5)
+                : t.key === "epsilon"
+                ? val.toFixed(3)
+                : t.key === "wait"
+                ? `${val.toFixed(1)}s`
+                : val.toFixed(1);
+
+            return (
+              <div
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`cursor-pointer rounded-md border px-2 py-1.5 space-y-0.5 transition-colors ${
+                  activeTab === t.key
+                    ? "border-white/15 bg-white/8"
+                    : "border-white/5 bg-black/20 hover:border-white/10"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full flex-shrink-0"
+                    style={{ background: t.color }}
+                  />
+                  <span className="text-[8px] uppercase tracking-wider text-white/30 truncate">
+                    {t.label}
+                  </span>
+                </div>
+                <div
+                  className="text-xs font-bold leading-none"
+                  style={{ color: t.color }}
+                >
+                  {fmt}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
