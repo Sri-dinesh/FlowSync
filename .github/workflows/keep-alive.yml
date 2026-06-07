@@ -1,0 +1,32 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    - cron: "*/14 * * * *"
+  workflow_dispatch: 
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Keep-Alive API
+        run: |
+          if [ -z "${{ secrets.APP_URL }}" ]; then
+            echo "::error::APP_URL secret is not set. Please add it to your GitHub Repository Secrets (e.g., https://your-frontend.vercel.app)"
+            exit 1
+          fi
+          
+          echo "Pinging ${{ secrets.APP_URL }}/api/keep-alive..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" "${{ secrets.APP_URL }}/api/keep-alive")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo "Status: $HTTP_STATUS"
+          echo "Body: $BODY"
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Successfully pinged backend via frontend."
+          else
+            echo "::warning::Ping failed with status $HTTP_STATUS"
+            exit 1
+          fi
