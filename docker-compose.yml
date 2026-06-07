@@ -10,3 +10,25 @@ services:
     environment:
       - PORT=8000
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_FASTAPI_HTTP_URL=http://localhost:8000
+        - NEXT_PUBLIC_FASTAPI_WS_URL=ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./client/.env
+    environment:
+      - PORT=3000
+    depends_on:
+      server:
+        condition: service_healthy

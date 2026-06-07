@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+build
+dist
+.env
+.env.*
+.git
+.gitignore
+.prettierrc
+.eslintrc.json
+README.md
+Dockerfile
+docker-compose.yml
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

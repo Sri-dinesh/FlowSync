@@ -9,7 +9,8 @@ export async function GET() {
       take: 20,
     });
     return NextResponse.json(simulations);
-  } catch {
+  } catch (error) {
+    console.error("Failed to fetch simulations:", error);
     return NextResponse.json(
       { error: "Failed to fetch simulations" },
       { status: 500 },
