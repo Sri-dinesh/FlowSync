@@ -9,7 +9,10 @@ export async function GET() {
   const wsUrl = process.env.NEXT_PUBLIC_FASTAPI_WS_URL;
   const httpUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
 
-  const backendUrl = httpUrl || wsUrl?.replace(/^ws/, "http");
+  const backendUrl = (httpUrl || wsUrl?.replace(/^ws/, "http"))?.replace(
+    /\/$/,
+    "",
+  );
 
   if (!backendUrl) {
     console.error("[KeepAlive] Backend URL not configured");
