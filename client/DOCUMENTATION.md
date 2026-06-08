@@ -1,81 +1,110 @@
 # FlowSync: AI Traffic Simulation
 
-FlowSync is an intelligent, real-time 3D traffic simulation platform that leverages Reinforcement Learning (RL) to optimize traffic light signaling. The frontend provides a stunning, production-ready 3D environment to visualize the AI in action, alongside a comprehensive analytics dashboard.
+FlowSync is an intelligent traffic management system that uses Artificial Intelligence to solve one of the most frustrating parts of modern life: **traffic jams**. 
 
-## Table of Contents
-1. [System Architecture](#system-architecture)
-2. [Core Terminology](#core-terminology)
-3. [Frontend Structure](#frontend-structure)
-4. [3D Environment & Animation](#3d-environment--animation)
-5. [Data Flow](#data-flow)
+Instead of traffic lights running on simple timers, FlowSync uses a "Brain" (AI) that learns how to keep cars moving as efficiently as possible.
 
 ---
 
-## System Architecture
+## 1. What is FlowSync?
+FlowSync is a platform where you can watch an AI learn to manage a 4-way intersection. 
+*   **The Problem:** Standard traffic lights don't know if there's a mile-long line in one direction and zero cars in the other.
+*   **The Solution:** An AI that sees every car and decides when to change the lights to maximize "throughput" (getting as many cars through as possible) and minimize "wait time."
 
-The application is built on a modern decoupled architecture:
+## 2. How it Works (The Simple Version)
+Think of the project in three main parts:
 
-*   **Frontend (Client):** Built with Next.js, React, TailwindCSS, and React Three Fiber (Three.js). It is responsible for rendering the 3D environment, animating vehicles, and displaying real-time analytical dashboards.
-*   **Backend (Server - External):** A high-performance Python backend (using FastAPI) that runs the actual physics simulation and the Reinforcement Learning agent.
-*   **Communication:** 
-    *   **WebSockets:** Used for ultra-low latency, real-time streaming of simulation frames (vehicle positions, light colors) and live training metrics.
-    *   **REST API:** Used for fetching historical data, saved models, and previous simulation metrics from a database (via Prisma).
+1.  **The World (The Simulation):** A 3D environment where cars are spawned, drive, and stop at lights. This is where the physics happen.
+2.  **The Brain (The AI):** A Reinforcement Learning agent (DQN). It watches the "World" and gets "Points" (Rewards) for doing a good job. If it lets cars wait too long, it loses points.
+3.  **The Eyes (The Dashboard):** The website you see. It visualizes the 3D world and shows charts so you can see exactly how smart the AI is becoming.
 
----
+## 3. What is What? (Key Terms)
+*   **Episode:** Think of this as a "Practice Round." The AI runs the simulation for a few minutes, learns what it did wrong, and then starts a new episode to try again.
+*   **Reward:** The AI's score. High reward = Happy AI (smooth traffic). Low/Negative reward = Sad AI (gridlock).
+*   **Throughput:** The total number of cars that successfully crossed the intersection.
+*   **Fixed Mode:** The "Old School" way. Lights change on a strict timer regardless of traffic.
+*   **AI Mode:** The "Smart" way. The AI controls the lights dynamically.
 
-## Core Terminology
+## 4. Data Flow: What goes where?
 
-To understand the analytics dashboard and the AI's behavior, it is important to know the following Reinforcement Learning and Traffic metrics:
+### From Backend (Python) to Frontend (Next.js):
+*   **Live Simulation Frames:** Every 30-60 times per second, the backend sends a "snapshot" of the world. It says: *"Car #5 is at these coordinates, Light #2 is Red."* The frontend takes this data and moves the 3D cars on your screen.
+*   **Training Metrics:** While the AI is learning, the backend sends live updates on its "Score" (Reward) and "Smartness" (Loss/Epsilon).
 
-*   **Simulation Mode:** 
-    *   `Fixed`: Traditional traffic lights operating on a set, static timer (e.g., 30 seconds green, 5 seconds yellow, 30 seconds red).
-    *   `AI`: The Reinforcement Learning agent dynamically controls the lights based on real-time traffic conditions.
-*   **Simulation Frame (Timestep):** A single snapshot of the simulation environment at a specific millisecond, containing the exact positions of all vehicles, queue lengths, and the current traffic light phase.
-*   **Episode:** A single, isolated run of the simulation used during AI training. An episode runs for a fixed number of steps (or until a failure state). After an episode ends, the AI updates its internal neural network based on the results and starts a new episode, gradually getting smarter.
-*   **Reward:** The "score" given to the AI during training. The AI's sole goal is to maximize this number. It receives positive rewards for letting cars through and negative penalties (negative rewards) when cars wait too long or queues back up.
-*   **Epsilon (Exploration Rate):** A core concept in Q-Learning (RL). Epsilon dictates how often the AI tries a *random* action versus its *best known* action. At the start of training, Epsilon is high (close to 1.0) so the AI explores wildly. Over time, it decays towards 0, meaning the AI exploits its learned knowledge to behave optimally.
-*   **Throughput:** A primary performance metric. It measures the total number of vehicles that successfully navigate and exit the intersection within a given timeframe. Higher is better.
-*   **Average Wait Time:** The average time (in seconds) that vehicles currently in the system have spent stopped in traffic. Lower is better.
-*   **Queue Length:** The number of cars waiting at a red light in a specific lane (North, South, East, West).
+### From Frontend to Backend:
+*   **Commands:** When you click "Start," "Stop," or "Train," the frontend sends a signal to the backend to tell it what to do.
 
----
+### The Database (Supabase):
+*   **Memory:** When an Episode ends, the backend saves the results (how many cars passed, the average wait time) to the database.
+*   **History:** When you open the "Episode History" tab on the dashboard, the frontend asks the database for all the past results so it can show them in a table.
 
-## Frontend Structure
-
-The Next.js client is organized as follows:
-
-*   **`/src/app/`**: Contains the main Next.js pages and REST API routes (`/api/metrics`, `/api/episodes`).
-*   **`/src/components/simulation/`**: The React Three Fiber components. This contains the 3D logic for the roads, buildings, traffic lights, and vehicles.
-*   **`/src/components/dashboard/`**: The UI components overlaying the simulation, including charts (Recharts), data tables, and metrics panels.
-*   **`/src/store/simulationStore.ts`**: A global state manager using Zustand. It holds the latest WebSocket frame, the history of training metrics, and the connection status.
-*   **`/src/hooks/`**: Custom React hooks handling the WebSocket connections (`useSimulationSocket`, `useTrainingSocket`) and REST data fetching (`useEpisodes`, `useSimulations`).
+## 5. Technology Stack
+*   **Frontend:** Next.js (Web Framework), Three.js (3D Graphics), TailwindCSS (Styling), Zustand (State Management).
+*   **Backend:** Python & FastAPI (The Server), PyTorch (The AI/Neural Network).
+*   **Database:** Supabase (PostgreSQL) & Prisma.
 
 ---
 
-## 3D Environment & Animation
+# PITCH: How to explain FlowSync
 
-The 3D scene is fully parameterized to ensure physical accuracy and visual polish:
+When explaining FlowSync to a professional audience, you should present it as a **comprehensive digital twin and AI optimization platform**. Here is a structured narrative you can follow:
 
-*   **Spatial Grid:** The intersection adheres strictly to a Right-Hand Traffic mathematical grid. 
-    *   North is mapped to `-Z`
-    *   South is mapped to `+Z`
-    *   East is mapped to `+X`
-    *   West is mapped to `-X`
-*   **Vehicle Paths:** Vehicles do not move randomly. Their turning paths are defined by **Cubic Bezier Curves**.
-    *   *Right Turns* are tight radius arcs hugging the sidewalks.
-    *   *Left Turns* travel deep into the center of the intersection before arcing, preventing collisions with oncoming traffic.
-*   **Animation Logic:** To prevent vehicles from "bunching up" or moving erratically during turns, the frontend utilizes **Arc-Length Parameterization** (`getPointAt` in Three.js). This ensures that a vehicle's visual speed along the curved path maps exactly 1:1 with its logical speed on the backend, making the simulation look smooth and realistic. 
+### 1. The Vision: From Static to Dynamic Infrastructure
+"Most of our modern traffic infrastructure is based on 20th-century logic: fixed timers. FlowSync is a 21st-century solution that treats traffic as a dynamic, evolving data problem. We’ve built a system where the infrastructure doesn't just 'run'—it **learns**."
+
+### 2. The Core Workflow: The "Cycle of Intelligence"
+To explain how the AI actually operates, describe the continuous loop happening every millisecond:
+
+*   **Step 1: Perception (Sense):** The system constantly monitors the 'State' of the intersection. It knows the exact position, speed, and wait time of every vehicle, along with the current status of every traffic light.
+*   **Step 2: Decision (Think):** This data is fed into a **Deep Q-Network (DQN)**—a sophisticated AI model. Unlike a human, the AI can simulate thousands of possible light-change combinations in an instant to determine which action will result in the best traffic flow.
+*   **Step 3: Execution (Act):** The AI chooses an action (e.g., 'Switch North-South to Green'). The simulation executes this in real-time, updating the physics and vehicle behaviors accordingly.
+*   **Step 4: Optimization (Learn):** The system calculates a **Reward**. If traffic clears, the AI gets a 'positive' reward; if cars idle or queue up, it gets a 'negative' penalty. This feedback loop is how the AI trains itself to handle complex rush-hour patterns without human intervention.
+
+### 3. The Architecture: A Real-Time Data Engine
+The technical "magic" of FlowSync lies in its decoupled, high-performance architecture:
+
+*   **The Brain (Python/FastAPI):** All heavy lifting—the physics engine and the AI training—happens in a Python backend. This ensures the simulation is mathematically accurate and the AI can process neural network calculations at lightning speed.
+*   **The Nervous System (WebSockets):** To achieve a "live" feel, we don't use traditional API requests. Instead, we use a persistent **WebSocket connection**. The backend 'pushes' 60 frames of data every second to the frontend, allowing for seamless, lag-free 3D visualization.
+*   **The Visualization (Next.js/React Three Fiber):** The frontend transforms raw coordinates into a stunning 3D environment. Using **Three.js**, we render every car and light in a spatial grid, allowing users to move the camera and inspect the AI's performance from any angle.
+*   **The Memory (Supabase & Prisma):** Every practice round (Episode) is logged. We use **Supabase** for cloud storage and **Prisma** as our data bridge, allowing us to generate long-term performance charts that prove the AI is actually getting smarter over time.
+
+### 4. Why This Matters (The Impact)
+"FlowSync isn't just a visual tool; it's a proof of concept for **Smart Cities**. By reducing average wait times by even 10%, we can significantly reduce CO2 emissions from idling cars, save thousands of hours for commuters, and make our urban centers more efficient. We are using cutting-edge AI (PyTorch) and modern web tech (Next.js) to solve a real-world problem."
 
 ---
 
-## Data Flow
+---
 
-1. **User Action:** The user clicks "Start Simulation" in the UI.
-2. **Command Sent:** `useSimulationSocket` sends a JSON command `{ "action": "start", "mode": "ai" }` to the backend.
-3. **Backend Processes:** The Python backend calculates the physics (car velocities, braking) and AI decisions for the next timestep.
-4. **Frame Streamed:** The backend broadcasts a `SimulationFrame` over the WebSocket at roughly 30-60 frames per second.
-5. **State Update:** `simulationStore` receives the frame, updating `currentFrame`.
-6. **Re-render:** 
-   - The UI Dashboard updates its charts and sparklines.
-   - The `SimulationCanvas` reads the new target positions for the vehicles.
-   - The `useFrame` loop in `Vehicle.tsx` smoothly interpolates (lerps) the 3D car models from their old position to the new backend-provided position.
+# PROJECT STRUCTURE: The Technical Map
+
+FlowSync is organized into two main workspaces: the **Python Backend** (The Server) and the **Next.js Frontend** (The Client).
+
+### 📂 `/server` (The Engine)
+This is where the AI lives and the physics are calculated.
+*   **`app/main.py`**: The entry point. It sets up the FastAPI server and manages the WebSocket routes.
+*   **`app/rl/`**: The "Brain." Contains the Deep Q-Network (`dqn_network.py`) and the Agent logic (`dqn_agent.py`) that learns how to drive.
+*   **`app/simulation/`**: The "World." 
+    *   `environment.py`: The core logic that combines the AI and the traffic.
+    *   `intersection.py`: Defines the physical layout of the 4-way intersection.
+    *   `traffic_signal.py`: Manages the logic for switching light phases.
+*   **`app/websockets/`**: Handles real-time communication, broadcasting every car's position to the frontend.
+*   **`requirements.txt`**: Lists the Python dependencies (PyTorch, FastAPI, etc.).
+
+### 📂 `/client` (The Interface)
+The React-based dashboard and 3D visualization.
+*   **`src/app/`**: The main pages and Next.js API routes.
+*   **`src/components/simulation/`**: The 3D World (Three.js).
+    *   `SimulationCanvas.tsx`: The main 3D container.
+    *   `Vehicle.tsx`: Logic for rendering and animating individual cars.
+    *   `TrafficLight.tsx`: The 3D model and light logic for signals.
+*   **`src/components/dashboard/`**: The Analytics UI.
+    *   `TrainingChart.tsx`: The live graph showing the AI's learning progress.
+    *   `MetricsPanel.tsx`: Displays real-time stats like throughput and wait times.
+    *   `EpisodeHistory.tsx`: The table that fetches past runs from the database.
+*   **`src/store/simulationStore.ts`**: The global "State Management" (Zustand). It acts as the bridge between the incoming WebSocket data and the UI components.
+*   **`prisma/schema.prisma`**: Defines the database structure for saving Episodes and Simulations.
+
+### 📂 Root Level
+*   **`docker-compose.yml`**: Allows you to run the entire system (Database, Backend, Frontend) with one command.
+*   **`.agents/`**: Contains specialized instructions for AI agents working on this codebase.
+
