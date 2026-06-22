@@ -77,16 +77,45 @@ def list_checkpoints(model_id: str) -> List[str]:
 
 
 def list_all_models() -> List[Dict[str, Any]]:
-    """List models from both Supabase Storage and local disk, deduplicated."""
+    """List models from the rl_models DB table, Supabase Storage, and local disk (deduplicated)."""
+    import logging
+    logger = logging.getLogger(__name__)
     models: Dict[str, Dict[str, Any]] = {}
 
-    # --- Supabase Storage ---
+    # --- Primary source: rl_models database table ---
+    # save_model_metadata() always writes here, making this the most reliable source.
+    try:
+        result = supabase_client.table("rl_models").select("*").execute()
+        rows = getattr(result, "data", []) or []
+        for row in rows:
+            model_id = row.get("id")
+            if not model_id:
+                continue
+            total_ep = row.get("totalEpisodes") or 0
+            version = row.get("version", str(total_ep))
+            models[model_id] = {
+                "id": model_id,
+                "name": row.get("name") or f"Model {model_id[:8]}",
+                "version": version,
+                "source": "remote",
+                "episodes": int(version) if str(version).isdigit() else total_ep,
+                "avg_reward": row.get("avgReward"),
+                "is_active": row.get("isActive", False),
+            }
+    except Exception:
+        logger.warning("rl_models table query failed, falling back to storage listing", exc_info=True)
+
+    # --- Secondary source: Supabase Storage bucket ---
+    # Adds any models that exist in storage but were not recorded in rl_models.
     try:
         top_level = supabase_client.storage.from_(BUCKET_NAME).list("models")
         if top_level:
             for entry in top_level:
                 model_id = entry.get("name")
                 if not model_id:
+                    continue
+                if model_id in models:
+                    # Already found in DB — skip to avoid overwriting richer metadata
                     continue
                 folder = f"models/{model_id}"
                 try:
@@ -116,9 +145,9 @@ def list_all_models() -> List[Dict[str, Any]]:
                 except Exception:
                     pass
     except Exception:
-        pass
+        logger.warning("Supabase storage listing failed", exc_info=True)
 
-    # --- Local disk (fallback / dev) ---
+    # --- Tertiary source: local disk (dev / offline fallback) ---
     if LOCAL_MODELS_DIR.exists():
         for model_dir in LOCAL_MODELS_DIR.iterdir():
             if not model_dir.is_dir():
@@ -130,7 +159,6 @@ def list_all_models() -> List[Dict[str, Any]]:
             ep_text = latest_name[len("checkpoint_"):-len(".pt")]
             latest_ep = int(ep_text) if ep_text.isdigit() else 0
             model_id = model_dir.name
-            # Only add if not already found in Supabase
             if model_id not in models:
                 models[model_id] = {
                     "id": model_id,
@@ -140,7 +168,7 @@ def list_all_models() -> List[Dict[str, Any]]:
                     "episodes": latest_ep,
                 }
 
-    # Sort by episode count descending so the most-trained model is first
+    # Sort by episode count descending so the most-trained model appears first
     return sorted(models.values(), key=lambda m: m["episodes"], reverse=True)
 
 
