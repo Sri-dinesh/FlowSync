@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useSimulationStore } from "@/store/simulationStore";
 import type { TrainingMetric } from "@/types/simulation";
+import { getFastApiUrls } from "@/lib/utils";
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 500;
@@ -20,7 +21,7 @@ export function useTrainingSocket() {
   const connectRef = useRef<(() => void) | null>(null);
 
   const connect = useCallback(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_WS_URL;
+    const { wsUrl: baseUrl } = getFastApiUrls();
     if (!baseUrl) {
       console.error("[TrainWS] Missing NEXT_PUBLIC_FASTAPI_WS_URL environment variable.");
       return;
@@ -33,7 +34,7 @@ export function useTrainingSocket() {
     socket.onopen = () => {
       retryRef.current = 0;
       console.log("%c[TrainWS] Connected", "color:#22c55e;font-weight:bold", {
-        url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training`,
+        url: `${baseUrl}/ws/training`,
       });
     };
 
@@ -59,7 +60,7 @@ export function useTrainingSocket() {
         code: ev.code,
         reason: ev.reason || "(none)",
         wasClean: ev.wasClean,
-        url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training`,
+        url: `${baseUrl}/ws/training`,
         hint: ev.code === 1006
           ? "Abnormal closure — backend unreachable or rejected the connection (check CORS_ORIGINS on Render)"
           : ev.code === 1015
@@ -84,7 +85,7 @@ export function useTrainingSocket() {
     socket.onerror = () => {
       console.error(
         "[TrainWS] Connection error — waiting for close event with details.",
-        { url: `${process.env.NEXT_PUBLIC_FASTAPI_WS_URL}/ws/training` },
+        { url: `${baseUrl}/ws/training` },
       );
       socket.close();
     };

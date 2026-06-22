@@ -22,9 +22,22 @@ class Settings(BaseSettings):
     )
 
     def cors_origins_list(self) -> list[str]:
-        if not self.cors_origins:
-            return []
-        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+        origins = []
+        if self.cors_origins:
+            origins = [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+        default_origins = [
+            "https://flowsyncc.vercel.app",
+            "https://flowsync.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001",
+        ]
+        for origin in default_origins:
+            if origin not in origins:
+                origins.append(origin)
+        return origins
 
     @model_validator(mode="before")
     @classmethod

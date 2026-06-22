@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getFastApiUrls } from "@/lib/utils";
 
 /**
  * API route to keep the backend server awake.
@@ -6,8 +7,7 @@ import { NextResponse } from "next/server";
  * This can be triggered by a Cron job or GitHub Action.
  */
 export async function GET() {
-  const wsUrl = process.env.NEXT_PUBLIC_FASTAPI_WS_URL;
-  const httpUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
+  const { httpUrl, wsUrl } = getFastApiUrls();
 
   const backendUrl = (httpUrl || wsUrl?.replace(/^ws/, "http"))?.replace(
     /\/$/,

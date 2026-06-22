@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { TrainingMetric } from "@/types/simulation";
+import { getFastApiUrls } from "@/lib/utils";
 
 interface RLModel {
   id: string;
@@ -197,7 +198,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const { data: models = [], isLoading: modelsLoading } = useQuery({
     queryKey: ["models"],
     queryFn: async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
+      const { httpUrl: baseUrl } = getFastApiUrls();
       if (!baseUrl) return [] as RLModel[];
       const res = await fetch(`${baseUrl}/training/models`);
       if (!res.ok) return [] as RLModel[];
@@ -223,7 +224,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
   const loadModel = async (modelId: string) => {
     if (!modelId || modelId === "__none") return;
-    const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL;
+    const { httpUrl: baseUrl } = getFastApiUrls();
     if (!baseUrl) { setLoadError("FastAPI URL not configured."); return; }
     setIsLoadingModel(true);
     setLoadError(null);
