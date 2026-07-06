@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Play, RotateCcw, Square } from "lucide-react";
+import { Loader2, Play, RotateCcw, Square, Siren } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useSimulationStore } from "@/store/simulationStore";
-import type { SimulationMode } from "@/types/simulation";
+import type { SimulationMode, VehicleState } from "@/types/simulation";
+
+const EMPTY_VEHICLES: VehicleState[] = [];
 
 interface SimulationControlsProps {
   sendCommand: (command: Record<string, unknown>) => void;
@@ -66,6 +68,23 @@ export default function SimulationControls({
     const nextRate = value[0] ?? spawnRate;
     setSpawnRate(nextRate);
     sendCommand({ command: "set_spawn_rate", value: nextRate });
+  };
+
+  const vehicles = useSimulationStore((s) => s.currentFrame?.vehicles ?? EMPTY_VEHICLES);
+  
+  const isEmergencyActive = useMemo(() => {
+    return vehicles.some((v) => v.is_emergency);
+  }, [vehicles]);
+
+  const activeEmergencyLanes = useMemo(() => {
+    const laneSet = new Set(
+      vehicles.filter((v) => v.is_emergency).map((v) => v.lane.toUpperCase())
+    );
+    return Array.from(laneSet).join(" / ");
+  }, [vehicles]);
+
+  const handleEmergencyTrigger = (lane: string) => {
+    sendCommand({ command: "emergency_override", lane });
   };
 
   return (
@@ -162,6 +181,37 @@ export default function SimulationControls({
           <span>Low</span>
           <span>High</span>
         </div>
+      </div>
+
+      {/* Emergency Override Panel */}
+      <div className="mt-2 rounded-lg border border-red-500/25 bg-red-950/10 p-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 text-red-400 font-semibold text-[11px] tracking-wider uppercase">
+          <Siren className="h-3.5 w-3.5 animate-pulse" />
+          Emergency Preemption
+        </div>
+        <p className="text-[9px] text-white/40 leading-normal">
+          Force immediate priority green light and spawn an emergency vehicle to clear the approach.
+        </p>
+
+        {isEmergencyActive ? (
+          <div className="rounded border border-red-500/40 bg-red-500/20 py-1 text-center text-[9px] font-bold tracking-wider text-red-200 animate-pulse uppercase">
+            ⚠️ Preemption Active: {activeEmergencyLanes} Lane
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-1 mt-0.5">
+            {(["North", "South", "East", "West"] as const).map((direction) => (
+              <Button
+                key={direction}
+                variant="outline"
+                className="h-6 text-[9px] border-red-500/25 bg-red-500/5 text-red-300 hover:bg-red-500/20 hover:border-red-500/50 hover:text-white"
+                onClick={() => handleEmergencyTrigger(direction.toLowerCase())}
+                disabled={!isConnected || !isRunning}
+              >
+                {direction}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
