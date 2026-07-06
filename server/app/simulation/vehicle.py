@@ -13,6 +13,7 @@ class Vehicle:
     wait_time: float
     speed: float
     state: str
+    is_emergency: bool = False
 
     def tick(self, dt: float, can_move: bool) -> None:
         if can_move and self.position < 1.0:

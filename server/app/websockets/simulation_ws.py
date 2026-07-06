@@ -261,6 +261,11 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     continue
                 app_state["intersection"].set_spawn_rate(rate)
 
+            elif command == "emergency_override":
+                lane = message.get("lane")
+                if lane in ("north", "south", "east", "west"):
+                    app_state["intersection"].trigger_emergency_override(lane)
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         if not manager.active_connections:

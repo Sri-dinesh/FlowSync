@@ -7,6 +7,7 @@ export interface VehicleState {
   position: number;
   state: string;
   wait_time: number;
+  is_emergency?: boolean;
 }
 
 export interface SimulationFrame {

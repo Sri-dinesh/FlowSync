@@ -12,6 +12,7 @@ class VehicleState(BaseModel):
     position: float
     state: str
     wait_time: float
+    is_emergency: bool = False
 
 
 class SimulationFrame(BaseModel):
@@ -41,6 +42,7 @@ def build_frame(
             position=vehicle.position,
             state=vehicle.state,
             wait_time=vehicle.wait_time,
+            is_emergency=getattr(vehicle, "is_emergency", False),
         )
         for lane in intersection.lanes.values()
         for vehicle in lane

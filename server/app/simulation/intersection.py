@@ -17,10 +17,55 @@ class Intersection:
         self.timestep = 0
         self.total_passed = 0
         self.spawner = PoissonSpawner()
-        # id of vehicle that currently occupies the intersection (between stop line and passed)
-        self.intersection_reserved_by: Optional[str] = None
+        # Set of vehicle IDs currently in the intersection
+        self.vehicles_in_intersection = set()
+        # The phase during which the intersection was locked
+        self.intersection_reserved_phase: Optional[int] = None
+        # Track active emergency override lane
+        self.emergency_override_lane: Optional[str] = None
+
+    def trigger_emergency_override(self, lane: str) -> None:
+        if lane not in self.lanes:
+            return
+        # Prevent double spawning of emergency vehicles in the same lane
+        if any(getattr(v, "is_emergency", False) for v in self.lanes[lane]):
+            return
+            
+        from uuid import uuid4
+        emergency_vehicle = Vehicle(
+            id=f"emergency-{uuid4().hex[:6]}",
+            lane=lane,
+            turn="straight",
+            position=0.0,
+            wait_time=0.0,
+            speed=DEFAULT_SPEED,
+            state="waiting",
+            is_emergency=True,
+        )
+        self.lanes[lane].append(emergency_vehicle)
+        self.emergency_override_lane = lane
 
     def tick(self, dt: float, action: Optional[int] = None) -> None:
+        # Resolve active emergency override: force signal phase
+        if self.emergency_override_lane:
+            has_active_emergency = any(
+                getattr(v, "is_emergency", False)
+                for queue in self.lanes.values()
+                for v in queue
+            )
+            if has_active_emergency:
+                # Force priority signal phase immediately (0 for North/South, 1 for East/West)
+                priority_phase = 0 if self.emergency_override_lane in ("north", "south") else 1
+                from .traffic_signal import SignalColor
+                self.signal.current_phase = priority_phase
+                self.signal.color = SignalColor.GREEN
+                self.signal.time_in_phase = 0.0
+                self.signal._pending_phase = None
+                # Bypass normal action selection
+                action = None
+            else:
+                self.emergency_override_lane = None
+
         # give the signal visibility into lane queues for smarter decisions and
         # make AI phase changes respect the same clearance timing as fixed mode
         self.signal.tick(dt, self.lanes, requested_phase=action)
@@ -40,24 +85,27 @@ class Intersection:
                 
                 # Check stop line collision and signal permission
                 is_green_for_movement = self.signal.is_green_for(lane_name, getattr(vehicle, "turn", None))
-                # If signal disallows movement and vehicle is approaching stop line, stop at stop line
-                if not is_green_for_movement and vehicle.position <= STOP_LINE:
-                    if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
-                        vehicle.position = STOP_LINE
-                        can_move = False
-
-                # If signal allows and vehicle would enter intersection, ensure reservation is free
-                if is_green_for_movement and vehicle.position < STOP_LINE:
-                    entering = vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE
-                    if entering:
-                        # If intersection reserved by someone else, block entering
-                        if self.intersection_reserved_by is None or self.intersection_reserved_by == vehicle.id:
-                            # reserve intersection for this vehicle
-                            self.intersection_reserved_by = vehicle.id
-                        else:
-                            # block at stop line
+                
+                # If vehicle is behind or at the stop line, process signal/intersection entrance
+                if vehicle.position <= STOP_LINE:
+                    if not is_green_for_movement:
+                        # If light is red, vehicle stops at the stop line
+                        if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
                             vehicle.position = STOP_LINE
                             can_move = False
+                    else:
+                        # Light is green, check if entering the intersection
+                        entering = vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE
+                        if entering:
+                            # Allow entering if intersection is empty or reserved by the same phase
+                            if (self.intersection_reserved_phase is None or 
+                                self.intersection_reserved_phase == self.signal.current_phase):
+                                self.vehicles_in_intersection.add(vehicle.id)
+                                self.intersection_reserved_phase = self.signal.current_phase
+                            else:
+                                # Perpendicular traffic is still clearing the intersection
+                                vehicle.position = STOP_LINE
+                                can_move = False
 
                 # Check vehicle ahead collision
                 if i > 0:
@@ -66,14 +114,16 @@ class Intersection:
                         max_position = max(0.0, vehicle_ahead.position - MIN_DIST)
                         if vehicle.position + (DEFAULT_SPEED * dt) >= max_position:
                             vehicle.position = max_position
-                            can_move = False
-                # If this vehicle is marked passed after tick, release reservation
-                # (release after tick below when vehicle.position >= 1.0 / state == 'passed')
+                            # Can only move if vehicle ahead is moving (keeps queue flowing smoothly)
+                            can_move = (vehicle_ahead.speed > 0)
+
                 vehicle.tick(dt, can_move)
 
-                # Release reservation when the reserved vehicle has left the intersection
-                if self.intersection_reserved_by and vehicle.id == self.intersection_reserved_by and vehicle.state == "passed":
-                    self.intersection_reserved_by = None
+                # Release the phase lock when the last vehicle exits
+                if vehicle.state == "passed" and vehicle.id in self.vehicles_in_intersection:
+                    self.vehicles_in_intersection.remove(vehicle.id)
+                    if not self.vehicles_in_intersection:
+                        self.intersection_reserved_phase = None
 
             passed_count = sum(1 for vehicle in lane_queue if vehicle.state == "passed")
             if passed_count:
@@ -106,4 +156,6 @@ class Intersection:
         self.signal = TrafficSignal()
         self.timestep = 0
         self.total_passed = 0
-        self.intersection_reserved_by = None
+        self.vehicles_in_intersection.clear()
+        self.intersection_reserved_phase = None
+        self.emergency_override_lane = None
