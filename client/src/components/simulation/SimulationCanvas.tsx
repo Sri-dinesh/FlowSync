@@ -37,10 +37,10 @@ const SimulationCanvas = memo(function SimulationCanvas() {
         <color attach="background" args={["#0a0e17"]} />
         
         <Suspense fallback={null}>
-          <ambientLight intensity={1.5} />
+          <ambientLight intensity={0.5} />
           <directionalLight 
             position={[10, 20, 10]} 
-            intensity={2.5} 
+            intensity={1.2} 
             castShadow 
             shadow-mapSize-width={2048} 
             shadow-mapSize-height={2048}
@@ -48,11 +48,11 @@ const SimulationCanvas = memo(function SimulationCanvas() {
           />
           <directionalLight 
             position={[-10, 15, -10]} 
-            intensity={1.5} 
+            intensity={0.6} 
             color="#6b9bd1"
           />
           <hemisphereLight 
-            args={["#87ceeb", "#2a2a3e", 1.0]} 
+            args={["#87ceeb", "#2a2a3e", 0.4]} 
           />
           
           <IntersectionScene />
@@ -73,9 +73,9 @@ const SimulationCanvas = memo(function SimulationCanvas() {
 
           <EffectComposer>
             <Bloom 
-              luminanceThreshold={1.5} 
+              luminanceThreshold={1.2} 
               mipmapBlur 
-              intensity={1.2} 
+              intensity={0.4} 
             />
             <Vignette eskil={false} offset={0.1} darkness={1.1} />
           </EffectComposer>

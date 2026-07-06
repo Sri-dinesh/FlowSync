@@ -96,7 +96,7 @@ The React-based dashboard and 3D visualization.
 *   **`src/components/simulation/`**: The 3D World (Three.js).
     *   `SimulationCanvas.tsx`: The main 3D container.
     *   `Vehicle.tsx`: Logic for rendering and animating individual cars.
-    *   `TrafficLight.tsx`: The 3D model and light logic for signals.
+    *   `TrafficLight.tsx`: The 3D model for signals, complete with dual-bracketed CCTV surveillance cameras and animated scanning cones.
 *   **`src/components/dashboard/`**: The Analytics UI.
     *   `TrainingChart.tsx`: The live graph showing the AI's learning progress.
     *   `MetricsPanel.tsx`: Displays real-time stats like throughput and wait times.

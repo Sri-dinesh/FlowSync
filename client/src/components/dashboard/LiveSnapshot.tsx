@@ -115,6 +115,27 @@ export default function LiveSnapshot() {
             {snapshot.maxQueue}
           </div>
         </div>
+        
+        {/* CCTV AI Scanner Card */}
+        <div className="rounded-lg border border-white/5 bg-[#0b0e14] p-2.5 col-span-2 flex items-center justify-between shadow-inner">
+          <div className="flex flex-col gap-0.5">
+            <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-cyan-400/90 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              CCTV AI SCANNER
+            </div>
+            <div className="text-[10px] text-white/50">
+              Analyzing intersection traffic feeds (4 channels)
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[8px] uppercase tracking-wider text-white/30 font-medium">
+              Real-time Count
+            </div>
+            <div className="text-xs font-mono font-bold text-white/90">
+              {isRunning && snapshot.vehicles > 0 ? `${snapshot.vehicles} detected` : "0 (idle)"}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

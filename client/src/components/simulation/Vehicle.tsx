@@ -98,7 +98,13 @@ function buildCurve(lane: string, turn: Turn): CubicBezierCurve3 {
   return new CubicBezierCurve3(p0, p1, p2, p3);
 }
 
-function getVehicleProps(id: string) {
+function getVehicleProps(id: string, isEmergency?: boolean) {
+  if (isEmergency) {
+    return {
+      paintColor: "#f8fafc",
+      type: "ambulance" as const,
+    };
+  }
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
@@ -108,7 +114,7 @@ function getVehicleProps(id: string) {
     "#9333ea", "#0891b2", "#db2777", "#e2e8f0",
     "#292524", "#facc15",
   ];
-  const types = ["sedan", "suv", "hatchback", "sportscar"] as const;
+  const types = ["sedan", "suv", "hatchback", "sportscar", "bike"] as const;
   return {
     paintColor: colors[Math.abs(hash) % colors.length],
     type: types[Math.abs(hash >> 3) % types.length],
@@ -137,7 +143,7 @@ function useMaterials(paintColor: string, isWaiting: boolean) {
 }
 
 function CarBody({ type, mats }: {
-  type: "sedan" | "suv" | "hatchback" | "sportscar";
+  type: "sedan" | "suv" | "hatchback" | "sportscar" | "bike" | "ambulance";
   mats: ReturnType<typeof useMaterials>;
 }) {
   switch (type) {
@@ -183,6 +189,67 @@ function CarBody({ type, mats }: {
           </mesh>
         </>
       );
+    case "bike":
+      return (
+        <>
+          {/* Main frame block */}
+          <mesh castShadow receiveShadow position={[0, 0.12, 0]} material={mats.window}>
+            <boxGeometry args={[0.12, 0.20, 0.45]} />
+          </mesh>
+          {/* Fuel tank */}
+          <mesh castShadow position={[0, 0.22, 0.08]} material={mats.paint}>
+            <boxGeometry args={[0.11, 0.08, 0.18]} />
+          </mesh>
+          {/* Rider seat */}
+          <mesh castShadow position={[0, 0.20, -0.08]} material={mats.wheel}>
+            <boxGeometry args={[0.10, 0.03, 0.16]} />
+          </mesh>
+          {/* Handlebars */}
+          <mesh position={[0, 0.25, 0.16]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.015, 0.015, 0.26, 8]} />
+            <meshStandardMaterial color="#0f0f0f" roughness={0.5} />
+          </mesh>
+        </>
+      );
+    case "ambulance":
+      return (
+        <>
+          {/* Main Ambulance Body */}
+          <mesh castShadow receiveShadow position={[0, 0.18, -0.05]} material={mats.paint}>
+            <boxGeometry args={[0.46, 0.28, 0.85]} />
+          </mesh>
+          {/* Driver Cab (Front) */}
+          <mesh castShadow position={[0, 0.11, 0.35]} material={mats.paint}>
+            <boxGeometry args={[0.44, 0.14, 0.25]} />
+          </mesh>
+          {/* Cab Window */}
+          <mesh position={[0, 0.13, 0.38]} material={mats.window}>
+            <boxGeometry args={[0.41, 0.08, 0.18]} />
+          </mesh>
+          {/* Red Cross Left Side */}
+          <group position={[-0.231, 0.18, -0.05]} rotation={[0, -Math.PI / 2, 0]}>
+            <mesh castShadow>
+              <boxGeometry args={[0.12, 0.03, 0.005]} />
+              <meshStandardMaterial color="#dc2626" roughness={0.3} />
+            </mesh>
+            <mesh castShadow>
+              <boxGeometry args={[0.03, 0.12, 0.005]} />
+              <meshStandardMaterial color="#dc2626" roughness={0.3} />
+            </mesh>
+          </group>
+          {/* Red Cross Right Side */}
+          <group position={[0.231, 0.18, -0.05]} rotation={[0, Math.PI / 2, 0]}>
+            <mesh castShadow>
+              <boxGeometry args={[0.12, 0.03, 0.005]} />
+              <meshStandardMaterial color="#dc2626" roughness={0.3} />
+            </mesh>
+            <mesh castShadow>
+              <boxGeometry args={[0.03, 0.12, 0.005]} />
+              <meshStandardMaterial color="#dc2626" roughness={0.3} />
+            </mesh>
+          </group>
+        </>
+      );
     default:
       return (
         <>
@@ -206,13 +273,12 @@ interface VehicleProps {
 
 export default function Vehicle({ vehicle }: VehicleProps) {
   const turn = (vehicle.turn ?? "straight") as Turn;
-  const { paintColor, type } = useMemo(() => getVehicleProps(vehicle.id), [vehicle.id]);
+  const { paintColor, type } = useMemo(() => getVehicleProps(vehicle.id, vehicle.is_emergency), [vehicle.id, vehicle.is_emergency]);
   const mats = useMaterials(paintColor, vehicle.state === "waiting");
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn), [vehicle.lane, turn]);
 
   const groupRef = useRef<Group>(null);
-  const smoothPosRef = useRef<Vector3 | null>(null);
   const smoothRotRef = useRef<number | null>(null);
   const wheelAngleRef = useRef(0);
   const rfRef = useRef<Mesh>(null);
@@ -220,33 +286,64 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const rrRef = useRef<Mesh>(null);
   const lrRef = useRef<Mesh>(null);
 
+  // Siren refs for emergency vehicles
+  const sirenRedMeshRef = useRef<any>(null);
+  const sirenBlueMeshRef = useRef<any>(null);
+  const sirenRedLightRef = useRef<any>(null);
+  const sirenBlueLightRef = useRef<any>(null);
+
+  // Smooth interpolation refs
+  const lastTargetPosRef = useRef(vehicle.position);
+  const startPosRef = useRef(vehicle.position);
+  const lastVisualTRef = useRef(vehicle.position);
+  const lastUpdateTimeRef = useRef<number | null>(null);
+  const lastUpdateIntervalRef = useRef(0.1);
+
   const wheelGeo = useMemo(() => new CylinderGeometry(0.09, 0.09, 0.07, 10), []);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return;
 
-    const t = Math.min(Math.max(vehicle.position, 0), 0.999);
-    const targetPos = curve.getPointAt(t);
+    const time = state.clock.getElapsedTime();
+    if (lastUpdateTimeRef.current === null) {
+      lastUpdateTimeRef.current = time;
+    }
 
+    if (vehicle.position !== lastTargetPosRef.current) {
+      const actualInterval = time - lastUpdateTimeRef.current;
+      lastUpdateIntervalRef.current = Math.min(Math.max(actualInterval, 0.05), 0.5);
+
+      startPosRef.current = lastVisualTRef.current;
+      lastTargetPosRef.current = vehicle.position;
+      lastUpdateTimeRef.current = time;
+    }
+
+    const elapsed = time - lastUpdateTimeRef.current;
+    const duration = lastUpdateIntervalRef.current;
+    const progress = Math.min(1.0, elapsed / duration);
+
+    let t = startPosRef.current + (vehicle.position - startPosRef.current) * progress;
+    t = Math.min(Math.max(t, 0), 0.999);
+    lastVisualTRef.current = t;
+
+    const targetPos = curve.getPointAt(t);
     const tAhead = Math.min(t + 0.01, 1.0);
     const tangent = curve.getPointAt(tAhead).sub(targetPos).normalize();
     const targetRot = Math.atan2(tangent.x, tangent.z);
 
-    if (!smoothPosRef.current) {
-      smoothPosRef.current = targetPos.clone();
+    if (smoothRotRef.current === null) {
       smoothRotRef.current = targetRot;
     }
 
-    const lerpFactor = vehicle.state === "moving" ? 0.6 : 0.8;
-    smoothPosRef.current.lerp(targetPos, Math.min(1, delta * 60 * lerpFactor));
-
-    let dRot = targetRot - smoothRotRef.current!;
+    const currentRot = smoothRotRef.current;
+    let dRot = targetRot - currentRot;
     while (dRot > Math.PI) dRot -= 2 * Math.PI;
     while (dRot < -Math.PI) dRot += 2 * Math.PI;
-    smoothRotRef.current! += dRot * Math.min(1, delta * 60 * lerpFactor);
+    const nextRot = currentRot + dRot * Math.min(1, delta * 15);
+    smoothRotRef.current = nextRot;
 
-    groupRef.current.position.copy(smoothPosRef.current);
-    groupRef.current.rotation.set(0, smoothRotRef.current!, 0);
+    groupRef.current.position.copy(targetPos);
+    groupRef.current.rotation.set(0, nextRot, 0);
 
     if (vehicle.state === "moving") {
       wheelAngleRef.current += delta * 18;
@@ -256,61 +353,142 @@ export default function Vehicle({ vehicle }: VehicleProps) {
       if (rrRef.current) rrRef.current.rotation.x = a;
       if (lrRef.current) lrRef.current.rotation.x = a;
     }
+
+    // Siren blinking for emergency vehicle
+    if (vehicle.is_emergency) {
+      const flash = Math.floor(time * 8) % 2 === 0;
+      if (sirenRedMeshRef.current) {
+        sirenRedMeshRef.current.emissiveIntensity = flash ? 8.0 : 0.05;
+      }
+      if (sirenBlueMeshRef.current) {
+        sirenBlueMeshRef.current.emissiveIntensity = flash ? 0.05 : 8.0;
+      }
+      if (sirenRedLightRef.current) {
+        sirenRedLightRef.current.intensity = flash ? 4.0 : 0.0;
+      }
+      if (sirenBlueLightRef.current) {
+        sirenBlueLightRef.current.intensity = flash ? 0.0 : 4.0;
+      }
+    }
   });
 
-  const wz = type === "sportscar" ? 0.28 : type === "suv" ? 0.26 : 0.24;
+  const isBike = type === "bike";
+  const wz = type === "sportscar" ? 0.28 : (type === "suv" || type === "ambulance") ? 0.26 : 0.24;
   const wy = -0.02;
 
   return (
     <group ref={groupRef}>
       <CarBody type={type} mats={mats} />
 
-      <mesh position={[-0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
-        <boxGeometry args={[0.06, 0.04, 0.01]} />
-      </mesh>
-      <mesh position={[0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
-        <boxGeometry args={[0.06, 0.04, 0.01]} />
-      </mesh>
+      {/* Sirens for emergency vehicle (Ambulance) */}
+      {type === "ambulance" && (
+        <group position={[0, 0.33, 0.1]}>
+          {/* Siren Base Bar */}
+          <mesh castShadow>
+            <boxGeometry args={[0.3, 0.03, 0.06]} />
+            <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
+          </mesh>
+          {/* Red Flasher */}
+          <mesh position={[-0.08, 0.02, 0]}>
+            <boxGeometry args={[0.1, 0.03, 0.05]} />
+            <meshStandardMaterial ref={sirenRedMeshRef} color="#ff0000" emissive="#ff0000" emissiveIntensity={0.2} />
+          </mesh>
+          {/* Blue Flasher */}
+          <mesh position={[0.08, 0.02, 0]}>
+            <boxGeometry args={[0.1, 0.03, 0.05]} />
+            <meshStandardMaterial ref={sirenBlueMeshRef} color="#0000ff" emissive="#0000ff" emissiveIntensity={0.2} />
+          </mesh>
+          {/* Sirens point lights */}
+          <pointLight ref={sirenRedLightRef} color="#ff0000" intensity={0} distance={4} decay={2} position={[-0.08, 0.05, 0]} />
+          <pointLight ref={sirenBlueLightRef} color="#0066ff" intensity={0} distance={4} decay={2} position={[0.08, 0.05, 0]} />
+        </group>
+      )}
 
-      <mesh position={[-0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
-        <boxGeometry args={[0.06, 0.04, 0.01]} />
-      </mesh>
-      <mesh position={[0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
-        <boxGeometry args={[0.06, 0.04, 0.01]} />
-      </mesh>
+      {isBike ? (
+        <mesh position={[0, 0.22, 0.32]} material={mats.headlight} castShadow>
+          <boxGeometry args={[0.08, 0.06, 0.01]} />
+        </mesh>
+      ) : (
+        <>
+          <mesh position={[-0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
+            <boxGeometry args={[0.06, 0.04, 0.01]} />
+          </mesh>
+          <mesh position={[0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
+            <boxGeometry args={[0.06, 0.04, 0.01]} />
+          </mesh>
+        </>
+      )}
 
-      <mesh
-        ref={rfRef}
-        geometry={wheelGeo}
-        material={mats.wheel}
-        position={[0.22, wy, wz]}
-        rotation={[0, 0, Math.PI / 2]}
-        castShadow
-      />
-      <mesh
-        ref={lfRef}
-        geometry={wheelGeo}
-        material={mats.wheel}
-        position={[-0.22, wy, wz]}
-        rotation={[0, 0, Math.PI / 2]}
-        castShadow
-      />
-      <mesh
-        ref={rrRef}
-        geometry={wheelGeo}
-        material={mats.wheel}
-        position={[0.22, wy, -wz]}
-        rotation={[0, 0, Math.PI / 2]}
-        castShadow
-      />
-      <mesh
-        ref={lrRef}
-        geometry={wheelGeo}
-        material={mats.wheel}
-        position={[-0.22, wy, -wz]}
-        rotation={[0, 0, Math.PI / 2]}
-        castShadow
-      />
+      {isBike ? (
+        <mesh position={[0, 0.18, -0.32]} material={mats.brakelight} castShadow>
+          <boxGeometry args={[0.06, 0.04, 0.01]} />
+        </mesh>
+      ) : (
+        <>
+          <mesh position={[-0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
+            <boxGeometry args={[0.06, 0.04, 0.01]} />
+          </mesh>
+          <mesh position={[0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
+            <boxGeometry args={[0.06, 0.04, 0.01]} />
+          </mesh>
+        </>
+      )}
+
+      {isBike ? (
+        <>
+          <mesh
+            ref={rfRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[0, wy, 0.25]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+          <mesh
+            ref={rrRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[0, wy, -0.25]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+        </>
+      ) : (
+        <>
+          <mesh
+            ref={rfRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[0.22, wy, wz]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+          <mesh
+            ref={lfRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[-0.22, wy, wz]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+          <mesh
+            ref={rrRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[0.22, wy, -wz]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+          <mesh
+            ref={lrRef}
+            geometry={wheelGeo}
+            material={mats.wheel}
+            position={[-0.22, wy, -wz]}
+            rotation={[0, 0, Math.PI / 2]}
+            castShadow
+          />
+        </>
+      )}
     </group>
   );
 }

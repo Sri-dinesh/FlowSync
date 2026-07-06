@@ -118,12 +118,12 @@ export default function IntersectionScene() {
       />
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "east")}
-        position={[2.5, 0, 0.5]}
+        position={[2.5, 0, -2.0]}
         direction="east"
       />
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "west")}
-        position={[-2.5, 0, -0.5]}
+        position={[-2.5, 0, 2.0]}
         direction="west"
       />
 

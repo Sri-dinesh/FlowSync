@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { BoxGeometry, CylinderGeometry, Color, MathUtils, MeshStandardMaterial, SphereGeometry } from "three";
+import { BoxGeometry, CylinderGeometry, Color, MathUtils, MeshStandardMaterial, SphereGeometry, DoubleSide } from "three";
 
 interface TrafficLightProps {
   color: "green" | "yellow" | "red";
@@ -30,9 +30,38 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     metalness: 0.4 
   }), []);
 
+  // CCTV Camera Geometries & Materials
+  const cctvBodyGeometry = useMemo(() => new CylinderGeometry(0.05, 0.05, 0.2, 12), []);
+  const cctvVisorGeometry = useMemo(() => new BoxGeometry(0.12, 0.02, 0.22), []);
+  const cctvLensGeometry = useMemo(() => new CylinderGeometry(0.04, 0.04, 0.02, 12), []);
+  const cctvLedGeometry = useMemo(() => new SphereGeometry(0.02, 8, 8), []);
+
+  const cctvHousingMaterial = useMemo(() => new MeshStandardMaterial({
+    color: "#27272a", // Sleek dark charcoal to match poles
+    roughness: 0.3,
+    metalness: 0.4
+  }), []);
+  const cctvVisorMaterial = useMemo(() => new MeshStandardMaterial({
+    color: "#18181b", // Dark visor
+    roughness: 0.4,
+    metalness: 0.2
+  }), []);
+  const cctvLensMaterial = useMemo(() => new MeshStandardMaterial({
+    color: "#09090b", // Glossy camera lens face
+    roughness: 0.05,
+    metalness: 0.9
+  }), []);
+  const cctvLedMaterial = useMemo(() => new MeshStandardMaterial({
+    color: "#ef4444",
+    emissive: "#ef4444",
+    emissiveIntensity: 0.2,
+    roughness: 0.5
+  }), []);
+
   const redMaterial = useRef<MeshStandardMaterial>(null);
   const yellowMaterial = useRef<MeshStandardMaterial>(null);
   const greenMaterial = useRef<MeshStandardMaterial>(null);
+  const cctvLedMaterialRef = useRef<MeshStandardMaterial>(null);
 
   useEffect(() => {
     return () => {
@@ -41,10 +70,23 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       housingGeometry.dispose();
       poleMaterial.dispose();
       housingMaterial.dispose();
-    };
-  }, [poleGeometry, lensGeometry, housingGeometry, poleMaterial, housingMaterial]);
 
-  useFrame((_, delta) => {
+      cctvBodyGeometry.dispose();
+      cctvVisorGeometry.dispose();
+      cctvLensGeometry.dispose();
+      cctvLedGeometry.dispose();
+      cctvHousingMaterial.dispose();
+      cctvVisorMaterial.dispose();
+      cctvLensMaterial.dispose();
+      cctvLedMaterial.dispose();
+    };
+  }, [
+    poleGeometry, lensGeometry, housingGeometry, poleMaterial, housingMaterial,
+    cctvBodyGeometry, cctvVisorGeometry, cctvLensGeometry, cctvLedGeometry,
+    cctvHousingMaterial, cctvVisorMaterial, cctvLensMaterial, cctvLedMaterial
+  ]);
+
+  useFrame((state, delta) => {
     const lerpFactor = Math.min(1, delta * 8);
     const targets = [
       { ref: redMaterial, active: color === "red" },
@@ -55,13 +97,20 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     for (const target of targets) {
       const material = target.ref.current;
       if (material) {
-        const targetIntensity = target.active ? 6.0 : 0.0;
+        const targetIntensity = target.active ? 4.0 : 0.0;
         material.emissiveIntensity = MathUtils.lerp(
           material.emissiveIntensity,
           targetIntensity,
           lerpFactor,
         );
       }
+    }
+
+    // Blink status LED: lit for 0.4s every 1.2s
+    if (cctvLedMaterialRef.current) {
+      const elapsedTime = state.clock.getElapsedTime();
+      const isLit = (elapsedTime % 1.2) < 0.4;
+      cctvLedMaterialRef.current.emissiveIntensity = isLit ? 2.0 : 0.05;
     }
   });
 
@@ -75,6 +124,11 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
           lensOffset: [0.8, 0] as [number, number],
           zSign: 1,
           lightPos: [0.8, -0.3, 0.3] as [number, number, number],
+          // CCTV offsets
+          cctvPos: [0.45, 0.95, -0.2] as [number, number, number],
+          cctvMountPos: [0.45, 0.825, -0.1] as [number, number, number],
+          cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
+          cctvRot: [0.35, Math.PI + 0.3, 0] as [number, number, number],
         };
       case "south":
         return {
@@ -84,24 +138,39 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
           lensOffset: [-0.8, 0] as [number, number],
           zSign: -1,
           lightPos: [-0.8, -0.3, -0.3] as [number, number, number],
+          // CCTV offsets
+          cctvPos: [-0.45, 0.95, 0.2] as [number, number, number],
+          cctvMountPos: [-0.45, 0.825, 0.1] as [number, number, number],
+          cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
+          cctvRot: [0.35, -0.3, 0] as [number, number, number],
         };
       case "east":
-        return {
-          bracketPos: [0, 0.7, -0.4] as [number, number, number],
-          bracketSize: [0.05, 0.05, 0.8] as [number, number, number],
-          housingPos: [0, 0.7, -0.8] as [number, number, number],
-          lensOffset: [0, -0.8] as [number, number],
-          zSign: 1,
-          lightPos: [0.3, -0.3, -0.8] as [number, number, number],
-        };
-      case "west":
         return {
           bracketPos: [0, 0.7, 0.4] as [number, number, number],
           bracketSize: [0.05, 0.05, 0.8] as [number, number, number],
           housingPos: [0, 0.7, 0.8] as [number, number, number],
           lensOffset: [0, 0.8] as [number, number],
+          zSign: 1,
+          lightPos: [0.3, -0.3, 0.8] as [number, number, number],
+          // CCTV offsets
+          cctvPos: [0.2, 0.95, 0.45] as [number, number, number],
+          cctvMountPos: [0.1, 0.825, 0.45] as [number, number, number],
+          cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
+          cctvRot: [0.35, Math.PI / 2 + 0.3, 0] as [number, number, number],
+        };
+      case "west":
+        return {
+          bracketPos: [0, 0.7, -0.4] as [number, number, number],
+          bracketSize: [0.05, 0.05, 0.8] as [number, number, number],
+          housingPos: [0, 0.7, -0.8] as [number, number, number],
+          lensOffset: [0, -0.8] as [number, number],
           zSign: -1,
-          lightPos: [-0.3, -0.3, 0.8] as [number, number, number],
+          lightPos: [-0.3, -0.3, -0.8] as [number, number, number],
+          // CCTV offsets
+          cctvPos: [-0.2, 0.95, -0.45] as [number, number, number],
+          cctvMountPos: [-0.1, 0.825, -0.45] as [number, number, number],
+          cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
+          cctvRot: [0.35, -Math.PI / 2 - 0.3, 0] as [number, number, number],
         };
     }
   }, [direction]);
@@ -136,15 +205,20 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     );
   };
 
-  const pointLightIntensity = color === "red" || color === "yellow" || color === "green" ? 4.5 : 0;
+  const pointLightIntensity = color === "red" || color === "yellow" || color === "green" ? 2.0 : 0;
 
   return (
     <group position={position}>
+      {/* Main vertical pole */}
       <mesh geometry={poleGeometry} material={poleMaterial} position={[0, 0.8, 0]} castShadow />
+      
+      {/* Traffic light extension arm */}
       <mesh position={offsets.bracketPos} castShadow>
         <boxGeometry args={offsets.bracketSize} />
         <meshStandardMaterial color="#374151" roughness={0.3} metalness={0.4} />
       </mesh>
+      
+      {/* Traffic light housing & lenses */}
       <mesh geometry={housingGeometry} material={housingMaterial} position={offsets.housingPos} castShadow />
       {lensElement(red, color === "red", 0.25, redMaterial)}
       {lensElement(yellow, color === "yellow", 0.1, yellowMaterial)}
@@ -156,6 +230,27 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
         distance={6}
         decay={2}
       />
+
+      {/* CCTV Camera bracket arm */}
+      <mesh position={offsets.cctvMountPos} castShadow>
+        <boxGeometry args={offsets.cctvMountSize} />
+        <meshStandardMaterial color="#374151" roughness={0.3} metalness={0.4} />
+      </mesh>
+
+      {/* CCTV Camera Unit */}
+      <group position={offsets.cctvPos} rotation={offsets.cctvRot}>
+        {/* Camera Body */}
+        <mesh geometry={cctvBodyGeometry} material={cctvHousingMaterial} rotation={[Math.PI / 2, 0, 0]} castShadow />
+        
+        {/* Sun Visor / Shield */}
+        <mesh geometry={cctvVisorGeometry} material={cctvVisorMaterial} position={[0, 0.06, 0]} castShadow />
+        
+        {/* Lens */}
+        <mesh geometry={cctvLensGeometry} material={cctvLensMaterial} position={[0, 0, 0.101]} rotation={[Math.PI / 2, 0, 0]} />
+        
+        {/* Blinking Status LED */}
+        <mesh geometry={cctvLedGeometry} material={cctvLedMaterial} ref={cctvLedMaterialRef} position={[0, 0.04, -0.101]} />
+      </group>
     </group>
   );
 }
