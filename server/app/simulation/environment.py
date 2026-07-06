@@ -14,7 +14,10 @@ class TrafficEnv(gym.Env):
     def __init__(self) -> None:
         super().__init__()
         self.intersection = Intersection()
-        self.observation_space = Box(low=0, high=10, shape=(8,), dtype=np.float32)
+        # Correct observations bounds: queue[0..100], phase[0..3], time[0..100], color[0..1], timestep[0..1]
+        low = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
+        high = np.array([100, 100, 100, 100, 3, 100, 1.0, 1.0], dtype=np.float32)
+        self.observation_space = Box(low=low, high=high, dtype=np.float32)
         self.action_space = Discrete(4)
         self._last_reward = 0.0
         self._episode = 0
@@ -40,7 +43,9 @@ class TrafficEnv(gym.Env):
         queue_lengths = self.intersection.get_queue_lengths()
         total_waiting = self.intersection.get_total_waiting()
         vehicles_passed = self.intersection.total_passed - prev_total_passed
-        phase_changed = action != prev_phase
+        
+        # Only count switch penalty if light was green and a switch actually happened
+        phase_changed = (action != prev_phase) and (self.intersection.signal.color.value == "green")
 
         wait_penalty = -0.1 * total_waiting
         throughput_bonus = 1.0 * vehicles_passed
@@ -58,8 +63,12 @@ class TrafficEnv(gym.Env):
 
     def _get_obs(self) -> np.ndarray:
         queue_lengths = self.intersection.get_queue_lengths()
-        total_waiting = self.intersection.get_total_waiting()
         normalized_timestep = self.intersection.timestep / MAX_STEPS_PER_EPISODE
+        
+        # Normalize color: 1.0 for green, 0.5 for yellow, 0.0 for red
+        color_val = 1.0 if self.intersection.signal.color.value == "green" else (
+            0.5 if self.intersection.signal.color.value == "yellow" else 0.0
+        )
 
         observation = np.array(
             [
@@ -69,7 +78,7 @@ class TrafficEnv(gym.Env):
                 queue_lengths.get("west", 0),
                 self.intersection.signal.current_phase,
                 self.intersection.signal.time_in_phase,
-                total_waiting,
+                color_val,
                 normalized_timestep,
             ],
             dtype=np.float32,
