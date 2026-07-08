@@ -154,7 +154,7 @@ class Intersection:
         self.timestep += 1
 
     def get_queue_lengths(self) -> Dict[str, int]:
-        return {lane: len(queue) for lane, queue in self.lanes.items()}
+        return {lane: sum(1 for v in queue if v.state == "waiting") for lane, queue in self.lanes.items()}
 
     def get_total_waiting(self) -> int:
         return sum(len(queue) for queue in self.lanes.values())
