@@ -11,6 +11,9 @@ export function useTrainingSocket() {
   const addTrainingMetric = useSimulationStore(
     (state) => state.addTrainingMetric,
   );
+  const setTraining = useSimulationStore(
+    (state) => state.setTraining,
+  );
 
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -40,7 +43,19 @@ export function useTrainingSocket() {
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as TrainingMetric;
+        const payload = JSON.parse(event.data);
+
+        // Filter out checkpoint notification payloads
+        if (payload && typeof payload === "object" && "type" in payload && payload.type === "checkpoint_saved") {
+          console.log("[TrainWS] Checkpoint saved:", payload);
+          return;
+        }
+
+        // Handle initial status sync response
+        if (payload && typeof payload === "object" && "is_training" in payload && !("total_reward" in payload)) {
+          setTraining(payload.is_training);
+          return;
+        }
 
         // Log every training message — they arrive only once per episode
         console.log(
@@ -49,7 +64,7 @@ export function useTrainingSocket() {
           payload,
         );
 
-        addTrainingMetric(payload);
+        addTrainingMetric(payload as TrainingMetric);
       } catch (err) {
         console.warn("[TrainWS] Failed to parse message:", event.data, err);
       }

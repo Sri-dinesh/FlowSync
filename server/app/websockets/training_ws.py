@@ -47,6 +47,14 @@ async def training_socket(websocket: WebSocket) -> None:
     await training_manager.connect(websocket)
     app_state = websocket.scope["app"].state.app_state
 
+    # Send current status immediately on connect
+    trainer = app_state["trainer"]
+    await websocket.send_json({
+        "is_training": trainer.is_training,
+        "current_episode": trainer.current_episode,
+        "epsilon": trainer.epsilon,
+    })
+
     try:
         while True:
             message = await websocket.receive_json()
@@ -80,3 +88,5 @@ async def training_socket(websocket: WebSocket) -> None:
                 app_state["trainer"].stop()
     except WebSocketDisconnect:
         training_manager.disconnect(websocket)
+        if not training_manager.active_connections:
+            app_state["trainer"].stop()

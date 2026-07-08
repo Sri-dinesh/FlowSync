@@ -277,6 +277,7 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const mats = useMaterials(paintColor, vehicle.state === "waiting");
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn), [vehicle.lane, turn]);
+  const t_stop = useMemo(() => 9.4 / curve.getLength(), [curve]);
 
   const groupRef = useRef<Group>(null);
   const smoothRotRef = useRef<number | null>(null);
@@ -315,7 +316,7 @@ export default function Vehicle({ vehicle }: VehicleProps) {
 
       startPosRef.current = lastVisualTRef.current;
       lastTargetPosRef.current = vehicle.position;
-      lastUpdateTimeRef.current = time;
+      lastUpdateTimeRef.current = time - delta;
     }
 
     const elapsed = time - lastUpdateTimeRef.current;
@@ -326,8 +327,17 @@ export default function Vehicle({ vehicle }: VehicleProps) {
     t = Math.min(Math.max(t, 0), 0.999);
     lastVisualTRef.current = t;
 
-    const targetPos = curve.getPointAt(t);
-    const tAhead = Math.min(t + 0.01, 1.0);
+    // Piecewise mapping from unitless backend position to arclength parameterized t_visual
+    let t_visual = 0;
+    if (t <= 0.42) {
+      t_visual = (t / 0.42) * t_stop;
+    } else {
+      t_visual = t_stop + ((t - 0.42) / 0.58) * (1.0 - t_stop);
+    }
+    t_visual = Math.min(Math.max(t_visual, 0), 0.999);
+
+    const targetPos = curve.getPointAt(t_visual);
+    const tAhead = Math.min(t_visual + 0.01, 1.0);
     const tangent = curve.getPointAt(tAhead).sub(targetPos).normalize();
     const targetRot = Math.atan2(tangent.x, tangent.z);
 

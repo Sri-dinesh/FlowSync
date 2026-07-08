@@ -23,6 +23,8 @@ class Intersection:
         self.intersection_reserved_phase: Optional[int] = None
         # Track active emergency override lane
         self.emergency_override_lane: Optional[str] = None
+        self._spawned_this_interval = 0
+        self._passed_this_interval = 0
 
     def trigger_emergency_override(self, lane: str) -> None:
         if lane not in self.lanes:
@@ -44,6 +46,7 @@ class Intersection:
         )
         self.lanes[lane].append(emergency_vehicle)
         self.emergency_override_lane = lane
+        self._spawned_this_interval += 1
 
     def tick(self, dt: float, action: Optional[int] = None) -> None:
         # Resolve active emergency override: force signal phase
@@ -70,7 +73,8 @@ class Intersection:
         # make AI phase changes respect the same clearance timing as fixed mode
         self.signal.tick(dt, self.lanes, requested_phase=action)
 
-        self.spawner.spawn(dt, self.lanes)
+        spawned_vehicles = self.spawner.spawn(dt, self.lanes)
+        self._spawned_this_interval += len(spawned_vehicles)
 
         STOP_LINE = 0.42
         MIN_DIST = 0.08
@@ -86,6 +90,18 @@ class Intersection:
                 # Check stop line collision and signal permission
                 is_green_for_movement = self.signal.is_green_for(lane_name, getattr(vehicle, "turn", None))
                 
+                # Yield-on-left check:
+                # If vehicle is at or before the stop line, wants to turn left, and the signal is a parallel green (0 or 1),
+                # it must yield to oncoming straight traffic.
+                if vehicle.position <= STOP_LINE and getattr(vehicle, "turn", None) == "left" and self.signal.current_phase in (0, 1):
+                    oncoming_lane_name = {"north": "south", "south": "north", "east": "west", "west": "east"}[lane_name]
+                    oncoming_queue = self.lanes.get(oncoming_lane_name, [])
+                    for oncoming_veh in oncoming_queue:
+                        if getattr(oncoming_veh, "turn", "straight") in ("straight", "right"):
+                            if 0.15 <= oncoming_veh.position < 1.0:
+                                is_green_for_movement = False
+                                break
+
                 # If vehicle is behind or at the stop line, process signal/intersection entrance
                 if vehicle.position <= STOP_LINE:
                     if not is_green_for_movement:
@@ -97,9 +113,11 @@ class Intersection:
                         # Light is green, check if entering the intersection
                         entering = vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE
                         if entering:
-                            # Allow entering if intersection is empty or reserved by the same phase
-                            if (self.intersection_reserved_phase is None or 
-                                self.intersection_reserved_phase == self.signal.current_phase):
+                            # Allow entering if intersection is empty or reserved by the same direction group
+                            current_group = 0 if self.signal.current_phase in (0, 2) else 1
+                            reserved_group = 0 if self.intersection_reserved_phase in (0, 2) else 1 if self.intersection_reserved_phase is not None else None
+                            
+                            if (self.intersection_reserved_phase is None or current_group == reserved_group):
                                 self.vehicles_in_intersection.add(vehicle.id)
                                 self.intersection_reserved_phase = self.signal.current_phase
                             else:
@@ -115,7 +133,7 @@ class Intersection:
                         if vehicle.position + (DEFAULT_SPEED * dt) >= max_position:
                             vehicle.position = max_position
                             # Can only move if vehicle ahead is moving (keeps queue flowing smoothly)
-                            can_move = (vehicle_ahead.speed > 0)
+                            can_move = can_move and (vehicle_ahead.speed > 0)
 
                 vehicle.tick(dt, can_move)
 
@@ -128,6 +146,7 @@ class Intersection:
             passed_count = sum(1 for vehicle in lane_queue if vehicle.state == "passed")
             if passed_count:
                 self.total_passed += passed_count
+                self._passed_this_interval += passed_count
                 self.lanes[lane_name] = [
                     vehicle for vehicle in lane_queue if vehicle.state != "passed"
                 ]
@@ -139,6 +158,9 @@ class Intersection:
 
     def get_total_waiting(self) -> int:
         return sum(len(queue) for queue in self.lanes.values())
+
+    def get_total_wait_time(self) -> float:
+        return sum(vehicle.wait_time for queue in self.lanes.values() for vehicle in queue)
 
     def get_avg_wait_time(self) -> float:
         vehicles = [vehicle for queue in self.lanes.values() for vehicle in queue]
@@ -159,3 +181,5 @@ class Intersection:
         self.vehicles_in_intersection.clear()
         self.intersection_reserved_phase = None
         self.emergency_override_lane = None
+        self._spawned_this_interval = 0
+        self._passed_this_interval = 0

@@ -65,7 +65,7 @@ class Trainer:
                 next_state, reward, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
 
-                self.agent.replay_buffer.push(state, action, reward, next_state, done)
+                self.agent.replay_buffer.push(state, action, reward, next_state, terminated)
 
                 # Only train every N steps and only once the buffer is warm.
                 if (

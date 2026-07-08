@@ -1,5 +1,14 @@
-import pytest
+import os
 from unittest.mock import MagicMock, patch
+
+# Set dummy env vars for Settings validation
+os.environ["SUPABASE_URL"] = "https://dummy.supabase.co"
+os.environ["SUPABASE_SERVICE_KEY"] = "sb_secret_dummy"
+
+# Mock create_client before importing the app
+mock_create_client = patch("supabase.create_client", return_value=MagicMock()).start()
+
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 

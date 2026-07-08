@@ -94,6 +94,8 @@ class _SimBuffer:
             "queueEast": queues.get("east", 0),
             "queueWest": queues.get("west", 0),
         })
+        intersection._spawned_this_interval = 0
+        intersection._passed_this_interval = 0
         self.sample_count += 1
         return self.sample_count % FLUSH_EVERY_N_SAMPLES == 0
 
@@ -270,6 +272,42 @@ async def simulation_socket(websocket: WebSocket) -> None:
         manager.disconnect(websocket)
         if not manager.active_connections:
             app_state["sim_running"] = False
+            try:
+                app_state["intersection"].spawner.set_enabled(False)
+            except Exception:
+                pass
+
+            simulation_id = app_state.get("current_simulation_id")
+            if simulation_id and not str(simulation_id).startswith("local-"):
+                intersection = app_state["intersection"]
+                total_steps = intersection.timestep
+                duration_ms = int(total_steps * 0.1 * 1000)
+
+                # Flush buffered rows before closing the simulation
+                await _flush_buffer()
+
+                try:
+                    await asyncio.gather(
+                        asyncio.to_thread(
+                            supabase_service.update_simulation,
+                            simulation_id,
+                            "stopped",
+                            total_steps,
+                            duration_ms,
+                        ),
+                        asyncio.to_thread(
+                            supabase_service.save_performance_metric,
+                            simulation_id,
+                            app_state.get("mode", "fixed"),
+                            intersection.get_avg_wait_time(),
+                            intersection.total_passed,
+                        ),
+                    )
+                except Exception:
+                    logger.exception("Failed to persist simulation metrics on disconnect")
+
+                app_state["current_simulation_id"] = None
+
             task = app_state.get("sim_task")
             if task and not task.done():
                 task.cancel()

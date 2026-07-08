@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Text } from "@react-three/drei";
 import { BoxGeometry, CylinderGeometry, Color, MathUtils, MeshStandardMaterial, SphereGeometry, DoubleSide } from "three";
 
 interface TrafficLightProps {
-  color: "green" | "yellow" | "red";
+  color: "green" | "yellow" | "red" | "left-green" | "left-yellow";
   position: [number, number, number];
   direction: "north" | "south" | "east" | "west";
 }
@@ -89,9 +90,9 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
   useFrame((state, delta) => {
     const lerpFactor = Math.min(1, delta * 8);
     const targets = [
-      { ref: redMaterial, active: color === "red" },
-      { ref: yellowMaterial, active: color === "yellow" },
-      { ref: greenMaterial, active: color === "green" },
+      { ref: redMaterial, active: color === "red" || color === "left-green" || color === "left-yellow" },
+      { ref: yellowMaterial, active: color === "yellow" || color === "left-yellow" },
+      { ref: greenMaterial, active: color === "green" || color === "left-green" },
     ];
 
     for (const target of targets) {
@@ -205,7 +206,37 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     );
   };
 
-  const pointLightIntensity = color === "red" || color === "yellow" || color === "green" ? 2.0 : 0;
+  const arrowElement = (localY: number, arrowColor: string, isActive: boolean) => {
+    if (!isActive) return null;
+
+    const textPos: [number, number, number] = direction === "north" || direction === "south"
+      ? [offsets.lensOffset[0], 0.7 + localY, offsets.zSign * 0.17]
+      : [offsets.zSign * 0.17, 0.7 + localY, offsets.lensOffset[1]];
+
+    const textRot: [number, number, number] = direction === "north"
+      ? [0, 0, 0]
+      : direction === "south"
+      ? [0, Math.PI, 0]
+      : direction === "east"
+      ? [0, -Math.PI / 2, 0]
+      : [0, Math.PI / 2, 0];
+
+    return (
+      <Text
+        position={textPos}
+        rotation={textRot}
+        fontSize={0.25}
+        color={arrowColor}
+        anchorX="center"
+        anchorY="middle"
+        fontWeight="bold"
+      >
+        ←
+      </Text>
+    );
+  };
+
+  const pointLightIntensity = color === "red" || color === "yellow" || color === "green" || color === "left-green" || color === "left-yellow" ? 2.0 : 0;
 
   return (
     <group position={position}>
@@ -220,9 +251,11 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       
       {/* Traffic light housing & lenses */}
       <mesh geometry={housingGeometry} material={housingMaterial} position={offsets.housingPos} castShadow />
-      {lensElement(red, color === "red", 0.25, redMaterial)}
-      {lensElement(yellow, color === "yellow", 0.1, yellowMaterial)}
-      {lensElement(green, color === "green", -0.15, greenMaterial)}
+      {lensElement(red, color === "red" || color === "left-green" || color === "left-yellow", 0.25, redMaterial)}
+      {lensElement(yellow, color === "yellow" || color === "left-yellow", 0.1, yellowMaterial)}
+      {lensElement(green, color === "green" || color === "left-green", -0.15, greenMaterial)}
+      {arrowElement(-0.15, "#00ff00", color === "left-green")}
+      {arrowElement(0.1, "#ffcc00", color === "left-yellow")}
       <pointLight
         position={offsets.lightPos}
         color={lightColorHex}

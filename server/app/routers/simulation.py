@@ -36,6 +36,7 @@ async def start_simulation(request: Request) -> dict:
     app_state = request.app.state.app_state
     intersection = app_state["intersection"]
     intersection.reset()
+    intersection.spawner.set_enabled(True)
 
     if not app_state.get("sim_running"):
         app_state["sim_running"] = True
@@ -52,6 +53,7 @@ async def start_simulation(request: Request) -> dict:
 async def stop_simulation(request: Request) -> dict:
     app_state = request.app.state.app_state
     app_state["sim_running"] = False
+    app_state["intersection"].spawner.set_enabled(False)
 
     simulation_id = app_state.get("current_simulation_id")
     if simulation_id:
@@ -74,6 +76,7 @@ async def reset_simulation(request: Request) -> dict:
     app_state = request.app.state.app_state
     app_state["intersection"].reset()
     app_state["sim_running"] = False
+    app_state["intersection"].spawner.set_enabled(False)
     return {"status": "reset"}
 
 

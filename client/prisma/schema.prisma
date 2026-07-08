@@ -36,6 +36,7 @@ model Episode {
   steps         Int
   createdAt     DateTime   @default(now())
 
+  @@index([simulationId])
   @@map("episodes")
 }
 
@@ -51,6 +52,7 @@ model SignalState {
   queueWest    Int
   createdAt    DateTime @default(now())
 
+  @@index([simulationId])
   @@map("signal_states")
 }
 
@@ -65,6 +67,7 @@ model TrafficLog {
   maxQueueLength     Int
   createdAt     DateTime   @default(now())
 
+  @@index([simulationId])
   @@map("traffic_logs")
 }
 
@@ -79,6 +82,8 @@ model RLModel {
   createdAt   DateTime @default(now())
   isActive    Boolean  @default(false)
 
+  @@index([isActive])
+  @@index([createdAt])
   @@map("rl_models")
 }
 
@@ -94,5 +99,6 @@ model PerformanceMetric {
   improvementPct   Float?
   createdAt        DateTime   @default(now())
 
+  @@index([simulationId])
   @@map("performance_metrics")
 }

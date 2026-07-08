@@ -39,6 +39,7 @@ class TrafficSignal:
         self.min_green_duration: float = 4.0
         self.fixed_duration: float = 8.0
         self.yellow_duration: float = 2.0
+        self.red_duration: float = 1.0
         self._pending_phase: Optional[int] = None
 
     def set_phase(self, phase: int) -> None:
@@ -64,22 +65,23 @@ class TrafficSignal:
                 self.time_in_phase = 0.0
             return
 
-        # Red -> resolve pending phase
+        # Red -> resolve pending phase after red_duration
         if self.color == SignalColor.RED:
-            if self._pending_phase is not None:
-                self.current_phase = self._pending_phase
-                self._pending_phase = None
-            self.color = SignalColor.GREEN
-            self.time_in_phase = 0.0
+            if self.time_in_phase >= self.red_duration:
+                if self._pending_phase is not None:
+                    self.current_phase = self._pending_phase
+                    self._pending_phase = None
+                self.color = SignalColor.GREEN
+                self.time_in_phase = 0.0
             return
 
         # In AI mode, phase requests still respect minimum green + yellow clearance.
-        if (
-            requested_phase is not None
-            and requested_phase != self.current_phase
-            and self.time_in_phase >= self.min_green_duration
-        ):
-            self.set_phase(requested_phase)
+        if requested_phase is not None:
+            if (
+                requested_phase != self.current_phase
+                and self.time_in_phase >= self.min_green_duration
+            ):
+                self.set_phase(requested_phase)
             return
 
         # When green: allow a minimum green time and then pick next phase
@@ -102,20 +104,14 @@ class TrafficSignal:
 
         # Normal fixed duration rollover
         if self.time_in_phase >= self.fixed_duration:
-            # choose phase with highest queued vehicles to improve fairness
+            # Find the next phase in sequence that has vehicles waiting, or default to next sequential
             if lanes is not None:
-                best_phase = None
-                best_count = -1
-                for phase, lane_list in PHASE_GREEN_LANES.items():
-                    count = 0
-                    for ln in lane_list:
-                        count += len(lanes.get(ln, []))
-                    if count > best_count:
-                        best_count = count
-                        best_phase = phase
-                if best_phase is not None:
-                    self.set_phase(best_phase)
-                    return
+                for offset in range(1, len(SignalPhase) + 1):
+                    candidate_phase = (self.current_phase + offset) % len(SignalPhase)
+                    candidate_lanes = PHASE_GREEN_LANES[candidate_phase]
+                    if any(len(lanes.get(ln, [])) > 0 for ln in candidate_lanes):
+                        self.set_phase(candidate_phase)
+                        return
 
             next_phase = (self.current_phase + 1) % len(SignalPhase)
             self.set_phase(next_phase)

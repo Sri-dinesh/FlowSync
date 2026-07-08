@@ -41,13 +41,13 @@ class TrafficEnv(gym.Env):
         self.intersection.tick(dt=0.1, action=action)
 
         queue_lengths = self.intersection.get_queue_lengths()
-        total_waiting = self.intersection.get_total_waiting()
+        total_wait_time = self.intersection.get_total_wait_time()
         vehicles_passed = self.intersection.total_passed - prev_total_passed
         
         # Only count switch penalty if light was green and a switch actually happened
         phase_changed = (action != prev_phase) and (self.intersection.signal.color.value == "green")
 
-        wait_penalty = -0.1 * total_waiting
+        wait_penalty = -0.1 * total_wait_time
         throughput_bonus = 1.0 * vehicles_passed
         switch_penalty = -0.5 if phase_changed else 0.0
         overflow_penalty = -2.0 * sum(1 for q in queue_lengths.values() if q >= 8)
@@ -56,8 +56,8 @@ class TrafficEnv(gym.Env):
         self._last_reward = reward
 
         observation = self._get_obs()
-        terminated = self.intersection.timestep >= MAX_STEPS_PER_EPISODE
-        truncated = False
+        terminated = False
+        truncated = self.intersection.timestep >= MAX_STEPS_PER_EPISODE
 
         return observation, reward, terminated, truncated, {}
 
@@ -70,13 +70,16 @@ class TrafficEnv(gym.Env):
             0.5 if self.intersection.signal.color.value == "yellow" else 0.0
         )
 
+        # Observe target/pending phase if signal is transitioning (yellow/red), otherwise current_phase
+        obs_phase = self.intersection.signal._pending_phase if self.intersection.signal._pending_phase is not None else self.intersection.signal.current_phase
+
         observation = np.array(
             [
                 queue_lengths.get("north", 0),
                 queue_lengths.get("south", 0),
                 queue_lengths.get("east", 0),
                 queue_lengths.get("west", 0),
-                self.intersection.signal.current_phase,
+                obs_phase,
                 self.intersection.signal.time_in_phase,
                 color_val,
                 normalized_timestep,

@@ -31,9 +31,10 @@ app_state: dict = {
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     env = TrafficEnv()
+    training_env = TrafficEnv()
     agent = DQNAgent()
     trainer = Trainer(
-        env,
+        training_env,
         agent,
         supabase_service,
         model_service,

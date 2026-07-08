@@ -33,11 +33,7 @@ export default function SimulationControls({
     [mode],
   );
 
-  useEffect(() => {
-    if (isConnected && isRunning) {
-      sendCommand({ command: "start" });
-    }
-  }, [isConnected, isRunning, sendCommand]);
+
 
   const handleToggle = (checked: boolean) => {
     const nextMode: SimulationMode = checked ? "ai" : "fixed";
