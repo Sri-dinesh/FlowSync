@@ -154,6 +154,12 @@ async def _simulation_loop(app_state: dict) -> None:
                     asyncio.create_task(_flush_buffer())
 
             frame = build_frame(intersection, mode, reward, episode)
+            
+            import os
+            # Log frames if in local/development environment
+            if os.getenv("ENV") != "production" and os.getenv("FASTAPI_ENV") != "production":
+                print(f"[SimWS Send Data] Timestep {intersection.timestep}: {frame.model_dump()}")
+                
             await manager.broadcast(frame.model_dump())
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:
