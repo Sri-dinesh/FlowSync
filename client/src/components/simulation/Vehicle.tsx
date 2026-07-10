@@ -14,15 +14,15 @@ import {
 } from "three";
 import type { VehicleState } from "@/types/simulation";
 
-const SPAWN_DIST = 11;
-const EXIT_DIST = 11;
+const SPAWN_DIST = 20;
+const EXIT_DIST = 20;
 const Y = 0.12;
 
 type Turn = "straight" | "left" | "right";
 
 function buildCurve(lane: string, turn: Turn): CurvePath<Vector3> {
   const path = new CurvePath<Vector3>();
-  const STOP = 3.1;
+  const STOP = 3.5;
   
   // Lane offsets from center (0): left=0.5, straight=1.5, right=2.5
   const off = turn === "left" ? 0.5 : turn === "straight" ? 1.5 : 2.5;
@@ -296,7 +296,7 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const mats = useMaterials(paintColor, vehicle.state === "waiting");
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn), [vehicle.lane, turn]);
-  const t_stop = useMemo(() => 7.9 / curve.getLength(), [curve]);
+  const t_stop = useMemo(() => (SPAWN_DIST - 3.5) / curve.getLength(), [curve]);
 
   const groupRef = useRef<Group>(null);
   const smoothRotRef = useRef<number | null>(null);

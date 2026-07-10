@@ -9,8 +9,8 @@ interface RoadProps {
 }
 
 export default function Road({ direction }: RoadProps) {
-  // Road goes all the way across the grid (22 units)
-  const roadLength = 22;
+  // Road goes all the way across the grid (40 units)
+  const roadLength = 40;
   const roadWidth = 6;
 
   const baseGeometry = useMemo(
@@ -34,7 +34,7 @@ export default function Road({ direction }: RoadProps) {
   );
 
   // Yellow double-center line geometry (split into two blocks, stopping at intersection)
-  const yellowLineLength = 8;
+  const yellowLineLength = 17;
   const yellowLineGeometry = useMemo(
     () =>
       new PlaneGeometry(
@@ -141,13 +141,13 @@ export default function Road({ direction }: RoadProps) {
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[-7, 0.021, 0.03]}
+            position={[-11.5, 0.021, 0.03]}
           />
           <mesh
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[-7, 0.021, -0.03]}
+            position={[-11.5, 0.021, -0.03]}
           />
 
           {/* Double Yellow Center Lines (Right side) */}
@@ -155,13 +155,13 @@ export default function Road({ direction }: RoadProps) {
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[7, 0.021, 0.03]}
+            position={[11.5, 0.021, 0.03]}
           />
           <mesh
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[7, 0.021, -0.03]}
+            position={[11.5, 0.021, -0.03]}
           />
 
           {/* West entrance: Stop line for Eastbound traffic (z > 0) */}
@@ -183,7 +183,7 @@ export default function Road({ direction }: RoadProps) {
 
           {/* Painted road text labels flat on the road */}
           <Text
-            position={[-5, 0.022, 1.5]}
+            position={[-10, 0.022, 1.5]}
             rotation={[-Math.PI / 2, 0, Math.PI / 2]}
             fontSize={0.28}
             color="#ffffff"
@@ -192,7 +192,7 @@ export default function Road({ direction }: RoadProps) {
             EASTBOUND ▶
           </Text>
           <Text
-            position={[5, 0.022, -1.5]}
+            position={[10, 0.022, -1.5]}
             rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
             fontSize={0.28}
             color="#ffffff"
@@ -208,13 +208,13 @@ export default function Road({ direction }: RoadProps) {
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[-0.03, 0.021, -7]}
+            position={[-0.03, 0.021, -11.5]}
           />
           <mesh
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[0.03, 0.021, -7]}
+            position={[0.03, 0.021, -11.5]}
           />
 
           {/* Double Yellow Center Lines (Top/North side) */}
@@ -222,13 +222,13 @@ export default function Road({ direction }: RoadProps) {
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[-0.03, 0.021, 7]}
+            position={[-0.03, 0.021, 11.5]}
           />
           <mesh
             geometry={yellowLineGeometry}
             material={yellowLineMaterial}
             rotation={rotation}
-            position={[0.03, 0.021, 7]}
+            position={[0.03, 0.021, 11.5]}
           />
 
           {/* North entrance: Stop line for Southbound traffic (x < 0) */}

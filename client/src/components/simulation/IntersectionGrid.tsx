@@ -87,7 +87,7 @@ function Skyscraper({ position, size, neonColor }: SkyscraperProps) {
 }
 
 export default function IntersectionGrid() {
-  const groundGeo = useMemo(() => new PlaneGeometry(22, 22), []);
+  const groundGeo = useMemo(() => new PlaneGeometry(40, 40), []);
   const groundMat = useMemo(() => new MeshStandardMaterial({
     color: "#1a1f2e",
     roughness: 0.8,
@@ -95,7 +95,7 @@ export default function IntersectionGrid() {
   }), []);
 
   // Sidewalk concrete curbs - lighter color
-  const curbGeo = useMemo(() => new BoxGeometry(8.0, 0.06, 8.0), []);
+  const curbGeo = useMemo(() => new BoxGeometry(17.0, 0.06, 17.0), []);
   const curbMat = useMemo(() => new MeshStandardMaterial({
     color: "#52525b",
     roughness: 0.7,
@@ -103,7 +103,7 @@ export default function IntersectionGrid() {
   }), []);
 
   // Park grass tiles - brighter green
-  const parkGrassGeo = useMemo(() => new BoxGeometry(7.6, 0.02, 7.6), []);
+  const parkGrassGeo = useMemo(() => new BoxGeometry(16.6, 0.02, 16.6), []);
   const parkGrassMat = useMemo(() => new MeshStandardMaterial({
     color: "#2d5016",
     roughness: 0.9,
@@ -134,7 +134,7 @@ export default function IntersectionGrid() {
       />
 
       {/* ================= CORNER 1: NORTH-WEST PARK ================= */}
-      <group position={[-7.0, 0.03, -7.0]}>
+      <group position={[-11.5, 0.03, -11.5]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Grass zone */}
@@ -147,7 +147,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 4: SOUTH-EAST PARK ================= */}
-      <group position={[7.0, 0.03, 7.0]}>
+      <group position={[11.5, 0.03, 11.5]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Grass zone */}
@@ -160,7 +160,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 2: NORTH-EAST CITY BLOCK ================= */}
-      <group position={[7.0, 0.03, -7.0]}>
+      <group position={[11.5, 0.03, -11.5]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Skyscrapers */}
@@ -170,7 +170,7 @@ export default function IntersectionGrid() {
       </group>
 
       {/* ================= CORNER 3: SOUTH-WEST CITY BLOCK ================= */}
-      <group position={[-7.0, 0.03, 7.0]}>
+      <group position={[-11.5, 0.03, 11.5]}>
         {/* Concrete sidewalk base */}
         <mesh geometry={curbGeo} material={curbMat} castShadow receiveShadow />
         {/* Skyscrapers */}

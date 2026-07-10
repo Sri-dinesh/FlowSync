@@ -16,9 +16,9 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
   const yellow = useMemo(() => new Color("#ffcc00"), []);
   const green = useMemo(() => new Color("#00ff00"), []);
 
-  const poleGeometry = useMemo(() => new CylinderGeometry(0.08, 0.08, 2.5, 12), []);
-  const lensGeometry = useMemo(() => new SphereGeometry(0.15, 20, 20), []);
+  const poleGeometry = useMemo(() => new CylinderGeometry(0.12, 0.12, 4.0, 12), []);
   const housingGeometry = useMemo(() => new BoxGeometry(0.38, 1.0, 0.38), []);
+  const lensGeometry = useMemo(() => new SphereGeometry(0.15, 20, 20), []);
   
   const poleMaterial = useMemo(() => new MeshStandardMaterial({ 
     color: "#2d3748", 
@@ -26,9 +26,9 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     roughness: 0.2 
   }), []);
   const housingMaterial = useMemo(() => new MeshStandardMaterial({ 
-    color: "#1a1a1a", 
-    roughness: 0.3, 
-    metalness: 0.4 
+    color: "#111111", 
+    roughness: 0.4, 
+    metalness: 0.8 
   }), []);
 
   // CCTV Camera Geometries & Materials
@@ -62,13 +62,14 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
   const redMaterial = useRef<MeshStandardMaterial>(null);
   const yellowMaterial = useRef<MeshStandardMaterial>(null);
   const greenMaterial = useRef<MeshStandardMaterial>(null);
+
   const cctvLedMaterialRef = useRef<MeshStandardMaterial>(null);
 
   useEffect(() => {
     return () => {
       poleGeometry.dispose();
-      lensGeometry.dispose();
       housingGeometry.dispose();
+      lensGeometry.dispose();
       poleMaterial.dispose();
       housingMaterial.dispose();
 
@@ -82,13 +83,14 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       cctvLedMaterial.dispose();
     };
   }, [
-    poleGeometry, lensGeometry, housingGeometry, poleMaterial, housingMaterial,
+    poleGeometry, housingGeometry, lensGeometry, poleMaterial, housingMaterial,
     cctvBodyGeometry, cctvVisorGeometry, cctvLensGeometry, cctvLedGeometry,
     cctvHousingMaterial, cctvVisorMaterial, cctvLensMaterial, cctvLedMaterial
   ]);
 
   useFrame((state, delta) => {
     const lerpFactor = Math.min(1, delta * 8);
+
     const targets = [
       { ref: redMaterial, active: color === "red" || color === "left-green" || color === "left-yellow" },
       { ref: yellowMaterial, active: color === "yellow" || color === "left-yellow" },
@@ -98,7 +100,7 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     for (const target of targets) {
       const material = target.ref.current;
       if (material) {
-        const targetIntensity = target.active ? 4.0 : 0.0;
+        const targetIntensity = target.active ? 6.0 : 0.0;
         material.emissiveIntensity = MathUtils.lerp(
           material.emissiveIntensity,
           targetIntensity,
@@ -106,7 +108,6 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
         );
       }
     }
-
     // Blink status LED: lit for 0.4s every 1.2s
     if (cctvLedMaterialRef.current) {
       const elapsedTime = state.clock.getElapsedTime();
@@ -119,57 +120,53 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     switch (direction) {
       case "north":
         return {
-          bracketPos: [0.85, 0.7, 0] as [number, number, number],
-          bracketSize: [1.7, 0.05, 0.05] as [number, number, number],
-          housingPos: [1.7, 0.7, 0] as [number, number, number],
-          lensOffset: [1.7, 0] as [number, number],
+          bracketPos: [1.35, 2.0, 0] as [number, number, number],
+          bracketSize: [2.7, 0.1, 0.1] as [number, number, number],
+          housingPos: [1.7, 2.0, 0] as [number, number, number],
           zSign: 1,
-          lightPos: [1.7, -0.3, 0.3] as [number, number, number],
+          lightPos: [1.7, 1.2, 0.3] as [number, number, number],
           // CCTV offsets
-          cctvPos: [0.85, 0.95, -0.2] as [number, number, number],
-          cctvMountPos: [0.85, 0.825, -0.1] as [number, number, number],
+          cctvPos: [1.0, 2.25, -0.2] as [number, number, number],
+          cctvMountPos: [1.0, 2.125, -0.1] as [number, number, number],
           cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
           cctvRot: [0.35, Math.PI + 0.3, 0] as [number, number, number],
         };
       case "south":
         return {
-          bracketPos: [-0.85, 0.7, 0] as [number, number, number],
-          bracketSize: [1.7, 0.05, 0.05] as [number, number, number],
-          housingPos: [-1.7, 0.7, 0] as [number, number, number],
-          lensOffset: [-1.7, 0] as [number, number],
+          bracketPos: [-1.35, 2.0, 0] as [number, number, number],
+          bracketSize: [2.7, 0.1, 0.1] as [number, number, number],
+          housingPos: [-1.7, 2.0, 0] as [number, number, number],
           zSign: -1,
-          lightPos: [-1.7, -0.3, -0.3] as [number, number, number],
+          lightPos: [-1.7, 1.2, -0.3] as [number, number, number],
           // CCTV offsets
-          cctvPos: [-0.85, 0.95, 0.2] as [number, number, number],
-          cctvMountPos: [-0.85, 0.825, 0.1] as [number, number, number],
+          cctvPos: [-1.0, 2.25, 0.2] as [number, number, number],
+          cctvMountPos: [-1.0, 2.125, 0.1] as [number, number, number],
           cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
           cctvRot: [0.35, -0.3, 0] as [number, number, number],
         };
       case "east":
         return {
-          bracketPos: [0, 0.7, 0.85] as [number, number, number],
-          bracketSize: [0.05, 0.05, 1.7] as [number, number, number],
-          housingPos: [0, 0.7, 1.7] as [number, number, number],
-          lensOffset: [0, 1.7] as [number, number],
+          bracketPos: [0, 2.0, 1.35] as [number, number, number],
+          bracketSize: [0.1, 0.1, 2.7] as [number, number, number],
+          housingPos: [0, 2.0, 1.7] as [number, number, number],
           zSign: 1,
-          lightPos: [0.3, -0.3, 1.7] as [number, number, number],
+          lightPos: [0.3, 1.2, 1.7] as [number, number, number],
           // CCTV offsets
-          cctvPos: [0.2, 0.95, 0.85] as [number, number, number],
-          cctvMountPos: [0.1, 0.825, 0.85] as [number, number, number],
+          cctvPos: [0.2, 2.25, 1.0] as [number, number, number],
+          cctvMountPos: [0.1, 2.125, 1.0] as [number, number, number],
           cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
           cctvRot: [0.35, Math.PI / 2 + 0.3, 0] as [number, number, number],
         };
       case "west":
         return {
-          bracketPos: [0, 0.7, -0.85] as [number, number, number],
-          bracketSize: [0.05, 0.05, 1.7] as [number, number, number],
-          housingPos: [0, 0.7, -1.7] as [number, number, number],
-          lensOffset: [0, -1.7] as [number, number],
+          bracketPos: [0, 2.0, -1.35] as [number, number, number],
+          bracketSize: [0.1, 0.1, 2.7] as [number, number, number],
+          housingPos: [0, 2.0, -1.7] as [number, number, number],
           zSign: -1,
-          lightPos: [-0.3, -0.3, -1.7] as [number, number, number],
+          lightPos: [-0.3, 1.2, -1.7] as [number, number, number],
           // CCTV offsets
-          cctvPos: [-0.2, 0.95, -0.85] as [number, number, number],
-          cctvMountPos: [-0.1, 0.825, -0.85] as [number, number, number],
+          cctvPos: [-0.2, 2.25, -1.0] as [number, number, number],
+          cctvMountPos: [-0.1, 2.125, -1.0] as [number, number, number],
           cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
           cctvRot: [0.35, -Math.PI / 2 - 0.3, 0] as [number, number, number],
         };
@@ -182,36 +179,16 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     return "#00ff00";
   }, [color]);
 
-  const lensElement = (
-    lensColor: Color,
-    isActive: boolean,
+  const renderLensWithText = (
     localY: number,
-    materialRef: React.RefObject<MeshStandardMaterial | null>,
+    lensColor: Color,
+    ref: React.RefObject<MeshStandardMaterial | null>,
+    isActive: boolean,
+    textHex: string
   ) => {
     const lensPos: [number, number, number] = direction === "north" || direction === "south"
-      ? [offsets.lensOffset[0], 0.7 + localY, offsets.zSign * 0.15]
-      : [offsets.zSign * 0.15, 0.7 + localY, offsets.lensOffset[1]];
-
-    return (
-      <mesh geometry={lensGeometry} position={lensPos}>
-        <meshStandardMaterial
-          ref={materialRef}
-          color={lensColor}
-          emissive={lensColor}
-          emissiveIntensity={isActive ? 6.0 : 0.0}
-          roughness={0.05}
-          metalness={0.05}
-        />
-      </mesh>
-    );
-  };
-
-  const arrowElement = (localY: number, arrowColor: string, isActive: boolean, symbol: string = "←") => {
-    if (!isActive) return null;
-
-    const textPos: [number, number, number] = direction === "north" || direction === "south"
-      ? [offsets.lensOffset[0], 0.7 + localY, offsets.zSign * 0.17]
-      : [offsets.zSign * 0.17, 0.7 + localY, offsets.lensOffset[1]];
+      ? [offsets.housingPos[0], offsets.housingPos[1] + localY, offsets.zSign * 0.19]
+      : [offsets.zSign * 0.19, offsets.housingPos[1] + localY, offsets.housingPos[2]];
 
     const textRot: [number, number, number] = direction === "north"
       ? [0, 0, 0]
@@ -221,27 +198,38 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       ? [0, -Math.PI / 2, 0]
       : [0, Math.PI / 2, 0];
 
+    // Visual offset to place text exactly on the outer surface of the lens (radius 0.15)
+    const tPos: [number, number, number] = direction === "north" || direction === "south"
+      ? [lensPos[0], lensPos[1], lensPos[2] + (offsets.zSign * 0.16)]
+      : [lensPos[0] + (offsets.zSign * 0.16), lensPos[1], lensPos[2]];
+
+    const arrowText = color.includes("left") ? "←" : "↑ →";
+
     return (
-      <Text
-        position={textPos}
-        rotation={textRot}
-        fontSize={symbol.length > 1 ? 0.18 : 0.25}
-        color={arrowColor}
-        anchorX="center"
-        anchorY="middle"
-        fontWeight="bold"
-      >
-        {symbol}
-      </Text>
+      <group>
+        <mesh geometry={lensGeometry} position={lensPos}>
+          <meshStandardMaterial ref={ref} color={lensColor} emissive={lensColor} roughness={0.05} metalness={0.05} />
+        </mesh>
+        <Text
+          position={tPos}
+          rotation={textRot}
+          fontSize={0.20}
+          color="#000000"
+          fillOpacity={isActive ? 1.0 : 0.7}
+          anchorX="center"
+          anchorY="middle"
+          fontWeight="900"
+        >
+          {arrowText}
+        </Text>
+      </group>
     );
   };
-
-  const pointLightIntensity = color === "red" || color === "yellow" || color === "green" || color === "left-green" || color === "left-yellow" ? 2.0 : 0;
 
   return (
     <group position={position}>
       {/* Main vertical pole */}
-      <mesh geometry={poleGeometry} material={poleMaterial} position={[0, 0.8, 0]} castShadow />
+      <mesh geometry={poleGeometry} material={poleMaterial} position={[0, 2.0, 0]} castShadow />
       
       {/* Traffic light extension arm */}
       <mesh position={offsets.bracketPos} castShadow>
@@ -249,20 +237,19 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
         <meshStandardMaterial color="#374151" roughness={0.3} metalness={0.4} />
       </mesh>
       
-      {/* Traffic light housing & lenses */}
+      {/* Single Traffic Light Housing */}
       <mesh geometry={housingGeometry} material={housingMaterial} position={offsets.housingPos} castShadow />
-      {lensElement(red, color === "red" || color === "left-green" || color === "left-yellow", 0.25, redMaterial)}
-      {lensElement(yellow, color === "yellow" || color === "left-yellow", 0.1, yellowMaterial)}
-      {lensElement(green, color === "green" || color === "left-green", -0.15, greenMaterial)}
-      {arrowElement(-0.15, "#00ff00", color === "left-green", "←")}
-      {arrowElement(-0.15, "#00ff00", color === "green", "↑ →")}
-      {arrowElement(0.1, "#ffcc00", color === "left-yellow", "←")}
-      {arrowElement(0.1, "#ffcc00", color === "yellow", "↑ →")}
+      
+      {/* Lenses with Arrows inside */}
+      {renderLensWithText(0.25, red, redMaterial, color === "red" || color === "left-green" || color === "left-yellow", "#ff0000")}
+      {renderLensWithText(0.0, yellow, yellowMaterial, color === "yellow" || color === "left-yellow", "#ffcc00")}
+      {renderLensWithText(-0.25, green, greenMaterial, color === "green" || color === "left-green", "#00ff00")}
+
       <pointLight
         position={offsets.lightPos}
         color={lightColorHex}
-        intensity={pointLightIntensity}
-        distance={6}
+        intensity={2.0}
+        distance={8}
         decay={2}
       />
 
