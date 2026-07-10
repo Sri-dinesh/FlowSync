@@ -206,7 +206,7 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     );
   };
 
-  const arrowElement = (localY: number, arrowColor: string, isActive: boolean) => {
+  const arrowElement = (localY: number, arrowColor: string, isActive: boolean, symbol: string = "←") => {
     if (!isActive) return null;
 
     const textPos: [number, number, number] = direction === "north" || direction === "south"
@@ -225,13 +225,13 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       <Text
         position={textPos}
         rotation={textRot}
-        fontSize={0.25}
+        fontSize={symbol.length > 1 ? 0.18 : 0.25}
         color={arrowColor}
         anchorX="center"
         anchorY="middle"
         fontWeight="bold"
       >
-        ←
+        {symbol}
       </Text>
     );
   };
@@ -254,8 +254,10 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       {lensElement(red, color === "red" || color === "left-green" || color === "left-yellow", 0.25, redMaterial)}
       {lensElement(yellow, color === "yellow" || color === "left-yellow", 0.1, yellowMaterial)}
       {lensElement(green, color === "green" || color === "left-green", -0.15, greenMaterial)}
-      {arrowElement(-0.15, "#00ff00", color === "left-green")}
-      {arrowElement(0.1, "#ffcc00", color === "left-yellow")}
+      {arrowElement(-0.15, "#00ff00", color === "left-green", "←")}
+      {arrowElement(-0.15, "#00ff00", color === "green", "↑ →")}
+      {arrowElement(0.1, "#ffcc00", color === "left-yellow", "←")}
+      {arrowElement(0.1, "#ffcc00", color === "yellow", "↑ →")}
       <pointLight
         position={offsets.lightPos}
         color={lightColorHex}

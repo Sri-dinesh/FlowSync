@@ -30,24 +30,29 @@ class PoissonSpawner:
         if not lane_names:
             return spawned
 
-        # Only spawn into one approach lane per tick so the intersection reads more clearly.
-        lane_name = str(np.random.choice(lane_names))
-        lane_queue = lanes[lane_name]
+        dir_names = ["north", "south", "east", "west"]
+        
+        # Only spawn into one approach direction per tick so the intersection reads more clearly.
+        dir_name = str(np.random.choice(dir_names))
+        
         num_to_spawn = int(np.random.poisson(self.lambda_rate * dt))
-        available_slots = max(0, MAX_QUEUE - len(lane_queue))
-        for _ in range(min(num_to_spawn, available_slots)):
+        for _ in range(num_to_spawn):
             # Decide turn: 50% straight, 25% left, 25% right
-            turn = np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25])
-            vehicle = Vehicle(
-                id=str(uuid4()),
-                lane=lane_name,
-                turn=turn,
-                position=0.0,
-                wait_time=0.0,
-                speed=DEFAULT_SPEED,
-                state="waiting",
-            )
-            lane_queue.append(vehicle)
-            spawned.append(vehicle)
+            turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+            lane_id = f"{dir_name}_{turn}"
+            lane_queue = lanes.get(lane_id, [])
+            
+            if len(lane_queue) < MAX_QUEUE:
+                vehicle = Vehicle(
+                    id=str(uuid4()),
+                    lane=dir_name,
+                    turn=turn,
+                    position=0.0,
+                    wait_time=0.0,
+                    speed=DEFAULT_SPEED,
+                    state="waiting",
+                )
+                lane_queue.append(vehicle)
+                spawned.append(vehicle)
 
         return spawned

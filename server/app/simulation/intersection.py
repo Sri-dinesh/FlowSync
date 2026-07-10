@@ -8,10 +8,9 @@ from .vehicle import DEFAULT_SPEED, Vehicle
 class Intersection:
     def __init__(self) -> None:
         self.lanes: Dict[str, List[Vehicle]] = {
-            "north": [],
-            "south": [],
-            "east": [],
-            "west": [],
+            f"{dir}_{turn}": []
+            for dir in ["north", "south", "east", "west"]
+            for turn in ["straight", "left", "right"]
         }
         self.signal = TrafficSignal()
         self.timestep = 0
@@ -27,10 +26,10 @@ class Intersection:
         self._passed_this_interval = 0
 
     def trigger_emergency_override(self, lane: str) -> None:
-        if lane not in self.lanes:
+        if lane not in ["north", "south", "east", "west"]:
             return
-        # Prevent double spawning of emergency vehicles in the same lane
-        if any(getattr(v, "is_emergency", False) for v in self.lanes[lane]):
+        # Prevent double spawning of emergency vehicles in the same direction
+        if any(getattr(v, "is_emergency", False) for turn in ["straight", "left", "right"] for v in self.lanes.get(f"{lane}_{turn}", [])):
             return
             
         from uuid import uuid4
@@ -44,7 +43,7 @@ class Intersection:
             state="waiting",
             is_emergency=True,
         )
-        self.lanes[lane].append(emergency_vehicle)
+        self.lanes[f"{lane}_straight"].append(emergency_vehicle)
         self.emergency_override_lane = lane
         self._spawned_this_interval += 1
 
@@ -79,28 +78,28 @@ class Intersection:
         STOP_LINE = 0.42
         MIN_DIST = 0.08
 
-        for lane_name, lane_queue in self.lanes.items():
-            # consult signal including vehicle turn intent
-            # will allow/prohibit left turns depending on phase
-            # Determine per-vehicle during loop below
+        for lane_id, lane_queue in self.lanes.items():
+            dir_name = lane_id.split("_")[0]
             
             for i, vehicle in enumerate(lane_queue):
                 can_move = True
                 
                 # Check stop line collision and signal permission
-                is_green_for_movement = self.signal.is_green_for(lane_name, getattr(vehicle, "turn", None))
+                is_green_for_movement = self.signal.is_green_for(dir_name, getattr(vehicle, "turn", None))
                 
                 # Yield-on-left check:
                 # If vehicle is at or before the stop line, wants to turn left, and the signal is a parallel green (0 or 1),
                 # it must yield to oncoming straight traffic.
                 if vehicle.position <= STOP_LINE and getattr(vehicle, "turn", None) == "left" and self.signal.current_phase in (0, 1):
-                    oncoming_lane_name = {"north": "south", "south": "north", "east": "west", "west": "east"}[lane_name]
-                    oncoming_queue = self.lanes.get(oncoming_lane_name, [])
-                    for oncoming_veh in oncoming_queue:
-                        if getattr(oncoming_veh, "turn", "straight") in ("straight", "right"):
+                    oncoming_dir = {"north": "south", "south": "north", "east": "west", "west": "east"}[dir_name]
+                    for oncoming_turn in ["straight", "right"]:
+                        oncoming_queue = self.lanes.get(f"{oncoming_dir}_{oncoming_turn}", [])
+                        for oncoming_veh in oncoming_queue:
                             if 0.15 <= oncoming_veh.position < 1.0:
                                 is_green_for_movement = False
                                 break
+                        if not is_green_for_movement:
+                            break
 
                 # If vehicle is behind or at the stop line, process signal/intersection entrance
                 if vehicle.position <= STOP_LINE:
@@ -147,14 +146,19 @@ class Intersection:
             if passed_count:
                 self.total_passed += passed_count
                 self._passed_this_interval += passed_count
-                self.lanes[lane_name] = [
+                self.lanes[lane_id] = [
                     vehicle for vehicle in lane_queue if vehicle.state != "passed"
                 ]
 
         self.timestep += 1
 
     def get_queue_lengths(self) -> Dict[str, int]:
-        return {lane: sum(1 for v in queue if v.state == "waiting") for lane, queue in self.lanes.items()}
+        agg = {"north": 0, "south": 0, "east": 0, "west": 0}
+        for lane_id, queue in self.lanes.items():
+            dir_name = lane_id.split("_")[0]
+            if dir_name in agg:
+                agg[dir_name] += sum(1 for v in queue if v.state == "waiting")
+        return agg
 
     def get_total_waiting(self) -> int:
         return sum(len(queue) for queue in self.lanes.values())

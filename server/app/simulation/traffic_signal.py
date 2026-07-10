@@ -91,7 +91,8 @@ class TrafficSignal:
             for phase, lane_list in PHASE_GREEN_LANES.items():
                 count = 0
                 for ln in lane_list:
-                    count += len(lanes.get(ln, []))
+                    for turn in ["straight", "left", "right"]:
+                        count += len(lanes.get(f"{ln}_{turn}", []))
                 phase_wait[phase] = count
 
             # If current phase has no waiting vehicles and another phase does, switch early
@@ -109,7 +110,15 @@ class TrafficSignal:
                 for offset in range(1, len(SignalPhase) + 1):
                     candidate_phase = (self.current_phase + offset) % len(SignalPhase)
                     candidate_lanes = PHASE_GREEN_LANES[candidate_phase]
-                    if any(len(lanes.get(ln, [])) > 0 for ln in candidate_lanes):
+                    has_vehicles = False
+                    for ln in candidate_lanes:
+                        for turn in ["straight", "left", "right"]:
+                            if len(lanes.get(f"{ln}_{turn}", [])) > 0:
+                                has_vehicles = True
+                                break
+                        if has_vehicles:
+                            break
+                    if has_vehicles:
                         self.set_phase(candidate_phase)
                         return
 

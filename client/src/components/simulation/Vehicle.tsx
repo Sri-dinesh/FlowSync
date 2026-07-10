@@ -8,94 +8,113 @@ import {
   Group,
   Mesh,
   Vector3,
-  CubicBezierCurve3,
+  CurvePath,
+  LineCurve3,
+  QuadraticBezierCurve3,
 } from "three";
 import type { VehicleState } from "@/types/simulation";
 
 const SPAWN_DIST = 11;
 const EXIT_DIST = 11;
-const LANE_OFF = 0.75;
 const Y = 0.12;
 
 type Turn = "straight" | "left" | "right";
 
-function buildCurve(lane: string, turn: Turn): CubicBezierCurve3 {
-  let p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3;
+function buildCurve(lane: string, turn: Turn): CurvePath<Vector3> {
+  const path = new CurvePath<Vector3>();
+  const STOP = 3.1;
+  
+  // Lane offsets from center (0): left=0.5, straight=1.5, right=2.5
+  const off = turn === "left" ? 0.5 : turn === "straight" ? 1.5 : 2.5;
+
+  let start: Vector3, enter: Vector3, exit: Vector3, end: Vector3, control: Vector3;
 
   switch (lane) {
     case "north": // Southbound, starting North (-Z)
-      p0 = new Vector3(-LANE_OFF, Y, -SPAWN_DIST);
+      start = new Vector3(-off, Y, -SPAWN_DIST);
+      enter = new Vector3(-off, Y, -STOP);
       if (turn === "straight") {
-        p1 = new Vector3(-LANE_OFF, Y, -1.5);
-        p2 = new Vector3(-LANE_OFF, Y, 1.5);
-        p3 = new Vector3(-LANE_OFF, Y, EXIT_DIST);
+        exit = new Vector3(-off, Y, STOP);
+        end = new Vector3(-off, Y, EXIT_DIST);
+        control = new Vector3(-off, Y, 0);
       } else if (turn === "right") { // To Westbound (-X)
-        p1 = new Vector3(-LANE_OFF, Y, -1.5);
-        p2 = new Vector3(-1.5, Y, -LANE_OFF);
-        p3 = new Vector3(-EXIT_DIST, Y, -LANE_OFF);
+        exit = new Vector3(-STOP, Y, -off);
+        end = new Vector3(-EXIT_DIST, Y, -off);
+        control = new Vector3(-off, Y, -off);
       } else { // To Eastbound (+X)
-        p1 = new Vector3(-LANE_OFF, Y, 1.5);
-        p2 = new Vector3(1.5, Y, LANE_OFF);
-        p3 = new Vector3(EXIT_DIST, Y, LANE_OFF);
+        exit = new Vector3(STOP, Y, off);
+        end = new Vector3(EXIT_DIST, Y, off);
+        control = new Vector3(-off, Y, off);
       }
       break;
 
     case "south": // Northbound, starting South (+Z)
-      p0 = new Vector3(LANE_OFF, Y, SPAWN_DIST);
+      start = new Vector3(off, Y, SPAWN_DIST);
+      enter = new Vector3(off, Y, STOP);
       if (turn === "straight") {
-        p1 = new Vector3(LANE_OFF, Y, 1.5);
-        p2 = new Vector3(LANE_OFF, Y, -1.5);
-        p3 = new Vector3(LANE_OFF, Y, -EXIT_DIST);
+        exit = new Vector3(off, Y, -STOP);
+        end = new Vector3(off, Y, -EXIT_DIST);
+        control = new Vector3(off, Y, 0);
       } else if (turn === "right") { // To Eastbound (+X)
-        p1 = new Vector3(LANE_OFF, Y, 1.5);
-        p2 = new Vector3(1.5, Y, LANE_OFF);
-        p3 = new Vector3(EXIT_DIST, Y, LANE_OFF);
+        exit = new Vector3(STOP, Y, off);
+        end = new Vector3(EXIT_DIST, Y, off);
+        control = new Vector3(off, Y, off);
       } else { // To Westbound (-X)
-        p1 = new Vector3(LANE_OFF, Y, -1.5);
-        p2 = new Vector3(-1.5, Y, -LANE_OFF);
-        p3 = new Vector3(-EXIT_DIST, Y, -LANE_OFF);
+        exit = new Vector3(-STOP, Y, -off);
+        end = new Vector3(-EXIT_DIST, Y, -off);
+        control = new Vector3(off, Y, -off);
       }
       break;
 
     case "east": // Westbound, starting East (+X)
-      p0 = new Vector3(SPAWN_DIST, Y, -LANE_OFF);
+      start = new Vector3(SPAWN_DIST, Y, -off);
+      enter = new Vector3(STOP, Y, -off);
       if (turn === "straight") {
-        p1 = new Vector3(1.5, Y, -LANE_OFF);
-        p2 = new Vector3(-1.5, Y, -LANE_OFF);
-        p3 = new Vector3(-EXIT_DIST, Y, -LANE_OFF);
+        exit = new Vector3(-STOP, Y, -off);
+        end = new Vector3(-EXIT_DIST, Y, -off);
+        control = new Vector3(0, Y, -off);
       } else if (turn === "right") { // To Northbound (-Z)
-        p1 = new Vector3(1.5, Y, -LANE_OFF);
-        p2 = new Vector3(LANE_OFF, Y, -1.5);
-        p3 = new Vector3(LANE_OFF, Y, -EXIT_DIST);
+        exit = new Vector3(off, Y, -STOP);
+        end = new Vector3(off, Y, -EXIT_DIST);
+        control = new Vector3(off, Y, -off);
       } else { // To Southbound (+Z)
-        p1 = new Vector3(-1.5, Y, -LANE_OFF);
-        p2 = new Vector3(-LANE_OFF, Y, 1.5);
-        p3 = new Vector3(-LANE_OFF, Y, EXIT_DIST);
+        exit = new Vector3(-off, Y, STOP);
+        end = new Vector3(-off, Y, EXIT_DIST);
+        control = new Vector3(-off, Y, -off);
       }
       break;
 
     case "west": // Eastbound, starting West (-X)
-      p0 = new Vector3(-SPAWN_DIST, Y, LANE_OFF);
+      start = new Vector3(-SPAWN_DIST, Y, off);
+      enter = new Vector3(-STOP, Y, off);
       if (turn === "straight") {
-        p1 = new Vector3(-1.5, Y, LANE_OFF);
-        p2 = new Vector3(1.5, Y, LANE_OFF);
-        p3 = new Vector3(EXIT_DIST, Y, LANE_OFF);
+        exit = new Vector3(STOP, Y, off);
+        end = new Vector3(EXIT_DIST, Y, off);
+        control = new Vector3(0, Y, off);
       } else if (turn === "right") { // To Southbound (+Z)
-        p1 = new Vector3(-1.5, Y, LANE_OFF);
-        p2 = new Vector3(-LANE_OFF, Y, 1.5);
-        p3 = new Vector3(-LANE_OFF, Y, EXIT_DIST);
+        exit = new Vector3(-off, Y, STOP);
+        end = new Vector3(-off, Y, EXIT_DIST);
+        control = new Vector3(-off, Y, off);
       } else { // To Northbound (-Z)
-        p1 = new Vector3(1.5, Y, LANE_OFF);
-        p2 = new Vector3(LANE_OFF, Y, -1.5);
-        p3 = new Vector3(LANE_OFF, Y, -EXIT_DIST);
+        exit = new Vector3(off, Y, -STOP);
+        end = new Vector3(off, Y, -EXIT_DIST);
+        control = new Vector3(off, Y, off);
       }
       break;
 
     default:
-      p0 = p1 = p2 = p3 = new Vector3(0, Y, 0);
+      start = enter = exit = end = control = new Vector3(0, Y, 0);
   }
 
-  return new CubicBezierCurve3(p0, p1, p2, p3);
+  path.add(new LineCurve3(start, enter));
+  if (turn === "straight") {
+    path.add(new LineCurve3(enter, exit));
+  } else {
+    path.add(new QuadraticBezierCurve3(enter, control, exit));
+  }
+  path.add(new LineCurve3(exit, end));
+
+  return path;
 }
 
 function getVehicleProps(id: string, isEmergency?: boolean) {
@@ -277,7 +296,7 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const mats = useMaterials(paintColor, vehicle.state === "waiting");
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn), [vehicle.lane, turn]);
-  const t_stop = useMemo(() => 9.4 / curve.getLength(), [curve]);
+  const t_stop = useMemo(() => 7.9 / curve.getLength(), [curve]);
 
   const groupRef = useRef<Group>(null);
   const smoothRotRef = useRef<number | null>(null);
