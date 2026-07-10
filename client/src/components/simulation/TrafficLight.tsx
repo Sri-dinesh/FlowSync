@@ -119,57 +119,57 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     switch (direction) {
       case "north":
         return {
-          bracketPos: [0.4, 0.7, 0] as [number, number, number],
-          bracketSize: [0.8, 0.05, 0.05] as [number, number, number],
-          housingPos: [0.8, 0.7, 0] as [number, number, number],
-          lensOffset: [0.8, 0] as [number, number],
+          bracketPos: [0.85, 0.7, 0] as [number, number, number],
+          bracketSize: [1.7, 0.05, 0.05] as [number, number, number],
+          housingPos: [1.7, 0.7, 0] as [number, number, number],
+          lensOffset: [1.7, 0] as [number, number],
           zSign: 1,
-          lightPos: [0.8, -0.3, 0.3] as [number, number, number],
+          lightPos: [1.7, -0.3, 0.3] as [number, number, number],
           // CCTV offsets
-          cctvPos: [0.45, 0.95, -0.2] as [number, number, number],
-          cctvMountPos: [0.45, 0.825, -0.1] as [number, number, number],
+          cctvPos: [0.85, 0.95, -0.2] as [number, number, number],
+          cctvMountPos: [0.85, 0.825, -0.1] as [number, number, number],
           cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
           cctvRot: [0.35, Math.PI + 0.3, 0] as [number, number, number],
         };
       case "south":
         return {
-          bracketPos: [-0.4, 0.7, 0] as [number, number, number],
-          bracketSize: [0.8, 0.05, 0.05] as [number, number, number],
-          housingPos: [-0.8, 0.7, 0] as [number, number, number],
-          lensOffset: [-0.8, 0] as [number, number],
+          bracketPos: [-0.85, 0.7, 0] as [number, number, number],
+          bracketSize: [1.7, 0.05, 0.05] as [number, number, number],
+          housingPos: [-1.7, 0.7, 0] as [number, number, number],
+          lensOffset: [-1.7, 0] as [number, number],
           zSign: -1,
-          lightPos: [-0.8, -0.3, -0.3] as [number, number, number],
+          lightPos: [-1.7, -0.3, -0.3] as [number, number, number],
           // CCTV offsets
-          cctvPos: [-0.45, 0.95, 0.2] as [number, number, number],
-          cctvMountPos: [-0.45, 0.825, 0.1] as [number, number, number],
+          cctvPos: [-0.85, 0.95, 0.2] as [number, number, number],
+          cctvMountPos: [-0.85, 0.825, 0.1] as [number, number, number],
           cctvMountSize: [0.03, 0.25, 0.2] as [number, number, number],
           cctvRot: [0.35, -0.3, 0] as [number, number, number],
         };
       case "east":
         return {
-          bracketPos: [0, 0.7, 0.4] as [number, number, number],
-          bracketSize: [0.05, 0.05, 0.8] as [number, number, number],
-          housingPos: [0, 0.7, 0.8] as [number, number, number],
-          lensOffset: [0, 0.8] as [number, number],
+          bracketPos: [0, 0.7, 0.85] as [number, number, number],
+          bracketSize: [0.05, 0.05, 1.7] as [number, number, number],
+          housingPos: [0, 0.7, 1.7] as [number, number, number],
+          lensOffset: [0, 1.7] as [number, number],
           zSign: 1,
-          lightPos: [0.3, -0.3, 0.8] as [number, number, number],
+          lightPos: [0.3, -0.3, 1.7] as [number, number, number],
           // CCTV offsets
-          cctvPos: [0.2, 0.95, 0.45] as [number, number, number],
-          cctvMountPos: [0.1, 0.825, 0.45] as [number, number, number],
+          cctvPos: [0.2, 0.95, 0.85] as [number, number, number],
+          cctvMountPos: [0.1, 0.825, 0.85] as [number, number, number],
           cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
           cctvRot: [0.35, Math.PI / 2 + 0.3, 0] as [number, number, number],
         };
       case "west":
         return {
-          bracketPos: [0, 0.7, -0.4] as [number, number, number],
-          bracketSize: [0.05, 0.05, 0.8] as [number, number, number],
-          housingPos: [0, 0.7, -0.8] as [number, number, number],
-          lensOffset: [0, -0.8] as [number, number],
+          bracketPos: [0, 0.7, -0.85] as [number, number, number],
+          bracketSize: [0.05, 0.05, 1.7] as [number, number, number],
+          housingPos: [0, 0.7, -1.7] as [number, number, number],
+          lensOffset: [0, -1.7] as [number, number],
           zSign: -1,
-          lightPos: [-0.3, -0.3, -0.8] as [number, number, number],
+          lightPos: [-0.3, -0.3, -1.7] as [number, number, number],
           // CCTV offsets
-          cctvPos: [-0.2, 0.95, -0.45] as [number, number, number],
-          cctvMountPos: [-0.1, 0.825, -0.45] as [number, number, number],
+          cctvPos: [-0.2, 0.95, -0.85] as [number, number, number],
+          cctvMountPos: [-0.1, 0.825, -0.85] as [number, number, number],
           cctvMountSize: [0.2, 0.25, 0.03] as [number, number, number],
           cctvRot: [0.35, -Math.PI / 2 - 0.3, 0] as [number, number, number],
         };

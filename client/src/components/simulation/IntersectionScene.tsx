@@ -118,30 +118,30 @@ export default function IntersectionScene() {
       {/* Render detailed Traffic Light cantilever poles - aligned precisely to lanes */}
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "north")}
-        position={[-2.0, 0, -2.5]}
+        position={[-3.2, 0, -3.2]}
         direction="north"
       />
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "south")}
-        position={[2.0, 0, 2.5]}
+        position={[3.2, 0, 3.2]}
         direction="south"
       />
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "east")}
-        position={[2.5, 0, -2.0]}
+        position={[3.2, 0, -3.2]}
         direction="east"
       />
       <TrafficLight
         color={resolveLightColor(signalPhase, signalColor, "west")}
-        position={[-2.5, 0, 2.0]}
+        position={[-3.2, 0, 3.2]}
         direction="west"
       />
 
       {/* Floating Holographic Queue Indicators */}
-      <QueueLabel value={displayQueueLengths.north} position={[0, 0.8, -6.2]} />
-      <QueueLabel value={displayQueueLengths.south} position={[0, 0.8, 6.2]} />
-      <QueueLabel value={displayQueueLengths.east} position={[6.2, 0.8, 0]} />
-      <QueueLabel value={displayQueueLengths.west} position={[-6.2, 0.8, 0]} />
+      <QueueLabel value={displayQueueLengths.north} position={[0, 0.8, -7.2]} />
+      <QueueLabel value={displayQueueLengths.south} position={[0, 0.8, 7.2]} />
+      <QueueLabel value={displayQueueLengths.east} position={[7.2, 0.8, 0]} />
+      <QueueLabel value={displayQueueLengths.west} position={[-7.2, 0.8, 0]} />
 
       {/* Map active live vehicles to their detailed 3D components */}
       {isRunning
