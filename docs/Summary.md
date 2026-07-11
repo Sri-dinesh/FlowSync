@@ -8,15 +8,15 @@
 
 ### What Is FlowSync?
 
-FlowSync is a full-stack, real-time traffic simulation system that demonstrates how Deep Reinforcement Learning (DQN) can optimize traffic signal control at a 4-way city intersection. It serves as a **proof-of-concept Digital Twin** for smart-city infrastructure modernization, replacing traditional fixed-timer traffic signals with an autonomous, learning AI agent.
+FlowSync is a full-stack, real-time traffic simulation system that demonstrates how Deep Reinforcement Learning (DQN) can optimize traffic signal control at a 4-way city intersection. It serves as a **proof-of-concept Digital Twin** for smart-city infrastructure modernization, replacing traditional fixed-timer traffic signals with an autonomous, learning AI agent — plus a new **Manual (MNL) control mode** for human-in-the-loop operation.
 
-**Mission:** To show that Reinforcement Learning can significantly outperform static traffic systems, reducing urban congestion, wait times, and vehicle emissions.
+**Mission:** Show that Reinforcement Learning can significantly outperform static traffic systems, reducing urban congestion, wait times, and vehicle emissions.
 
 **Problem It Solves:**
 - Traditional fixed-timer traffic signals waste time by ignoring real-time demand
 - Urban congestion costs billions annually in lost productivity and fuel
 - Municipalities lack low-risk tools to evaluate AI traffic control before real-world deployment
-- FlowSync provides a sandbox to train, test, and compare AI vs. traditional control
+- FlowSync provides a sandbox to train, test, and compare AI vs. traditional vs. manual control
 
 ### Target Audience
 
@@ -60,7 +60,129 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 ### Current Status
 
-**Active Development / MVP.** The project is fully functional with a landing page, 3D simulation dashboard, live training, and data persistence. Not yet deployed for production-scale use — designed as a demonstration/research tool.
+**Active Development / MVP.** The project is fully functional with a landing page, 3D simulation dashboard, live training, manual control, and data persistence. Not yet deployed for production-scale use — designed as a demonstration/research tool.
+
+---
+
+## 1.1 Current Project Status — Detailed Breakdown
+
+### What Is Working (✅ Verified Functional)
+
+| Area | Status | Details |
+|---|---|---|
+| **Frontend Build** | ✅ Working | `pnpm dev` compiles, Next.js 16 App Router loads, TypeScript strict mode passes |
+| **Backend Server** | ✅ Working | `uvicorn app.main:app --reload` starts on :8000, lifespan initializes Env/Agent/Trainer |
+| **WebSocket Simulation** | ✅ Working | `/ws/simulation` connects, 10 Hz frames broadcast, 3D scene renders vehicles |
+| **WebSocket Training** | ✅ Working | `/ws/training` connects, per-episode metrics stream, checkpoint notifications fire |
+| **Fixed-Timer Control** | ✅ Working | 4-phase cycle with smart queue-based switching, yellow (2s) → red (1s) → green transitions |
+| **AI (DQN) Control** | ✅ Working | Agent selects phases via `select_action(ε=0)`, reward computed, observation includes pending phase |
+| **Manual (MNL) Control** | ✅ Working | 4 phase buttons, holds green indefinitely, phase changes go through yellow/red clearance |
+| **Yield-on-Left Logic** | ✅ Working | Left-turners at stop line during phases 0/1 yield to oncoming straight/right traffic |
+| **3-Lane Roads + Visuals** | ✅ Working | 40×6 roads, stop bars at ±3.1, zebra crossings, lane offsets (0.5/1.5/2.5), direction labels |
+| **Traffic Light Arrows** | ✅ Working | ← for left phases, ↑→ for through/right, rendered inside lenses, larger/bolder |
+| **Vehicle Paths** | ✅ Working | CurvePath (LineCurve3 + QuadraticBezierCurve3) with piecewise arclength mapping |
+| **Vehicle Interpolation** | ✅ Working | Smooth 60 fps between 10 Hz WS updates, wheel rotation, emergency siren lights |
+| **Day/Night 3D Toggle** | ✅ Working | State-driven lighting: emissive sun + bright ambient (day) vs moody directional (night) |
+| **Side-by-Side Layout** | ✅ Working | Canvas left (flex-1), controls sidebar right (420px, scrollable) |
+| **Live Training Dashboard** | ✅ Working | Reward/Wait/Epsilon/Loss sparklines, trend arrows, phase description, ETA, ep/min |
+| **Model Checkpointing** | ✅ Working | Every 50 eps: saves to Supabase Storage + local disk, metadata upsert to `rl_models` |
+| **Model Loading** | ✅ Working | Dropdown fetches `/training/models`, loads state dict into online + target networks |
+| **Emergency Preemption** | ✅ Working | 4 directional buttons, spawns ambulance, forces priority phase, clears on exit |
+| **Performance Comparison** | ✅ Working | Compare tab aggregates Fixed/AI/Manual wait time + throughput, improvement % |
+| **Episode History** | ✅ Working | Paginated table (10/page), auto-refresh 10s during training, best episode highlighted |
+| **Real-Time Metrics** | ✅ Working | MetricsPanel (2×2 animated cards), LiveSnapshot (bottom-left overlay) |
+| **Supabase Persistence** | ✅ Working | Simulations, Episodes, TrafficLogs, SignalStates, PerformanceMetrics, RLModels |
+| **Keep-Alive Ping** | ✅ Working | Frontend pings `/api/keep-alive` → FastAPI `/health` on mount |
+| **Docker Backend** | ✅ Working | `docker-compose up` builds CPU-only PyTorch image, runs on :8000 |
+| **Tests** | ✅ Passing | `pytest` runs 29 tests (api, rl, simulation) with mocked Supabase |
+
+### Partially Working / Known Quirks (⚠️)
+
+| Area | Status | Details |
+|---|---|---|
+| **Queue Length Accuracy** | ⚠️ Minor | `get_queue_lengths()` counts only `state=="waiting"` — vehicles at stop line with `can_move=false` are counted, but those already in intersection are not |
+| **All-Red Clearance** | ⚠️ Tunable | Fixed at 1.0s (`red_duration`); may be too short for heavy traffic — vehicles can still be in intersection when cross-traffic gets green |
+| **Manual Mode Phase Display** | ⚠️ Minor | Traffic light shows correct color but doesn't visually distinguish "manual hold" vs normal green |
+| **Training While Sim Running** | ⚠️ Architectural | Trainer and Simulation share same `Intersection` instance — training reset clears active simulation vehicles |
+| **WS Reconnection Storm** | ⚠️ Rare | Exponential backoff (max 5) works, but rapid reconnects can occur if backend restarts mid-session |
+| **Prisma Migrations** | ⚠️ Manual | No CI migration step — `prisma db push` required after schema changes |
+| **Hardcoded Render URL** | ⚠️ Config | `flowsync-gelt.onrender.com` in `utils.ts:29,32` and `next.config.ts:12-13` |
+
+### Not Implemented / Missing (❌)
+
+| Area | Status | Details |
+|---|---|---|
+| **Authentication/Authorization** | ❌ None | No user accounts, no WS auth, no API keys — single-user demo only |
+| **Rate Limiting** | ❌ None | No protection on REST or WS endpoints |
+| **CI/CD Pipeline** | ❌ None | No GitHub Actions, no automated test/lint/deploy |
+| **Multi-Intersection** | ❌ Not started | Single 4-way intersection only; env would need major refactor |
+| **GPU Training** | ❌ Blocked | Render free tier CPU-only; no CUDA in Dockerfile |
+| **GraphQL / Webhooks** | ❌ Not planned | REST + WS covers all current needs |
+| **Data Retention Policy** | ❌ None | Data persists indefinitely on Supabase free tier |
+| **Automated Security Scanning** | ❌ None | No Dependabot, Snyk, or SAST in CI |
+| **Input Validation on WS** | ❌ Partial | `set_spawn_rate` does `float(value)` without bounds check |
+| **WebSocket Message Schema Validation** | ❌ None | Commands validated by if-else chains only |
+
+### Deployment Status
+
+| Environment | Status | URL | Notes |
+|---|---|---|---|
+| **Frontend (Vercel)** | ✅ Deployed | `https://flowsyncc.vercel.app` | Auto-deploys on push to `main` |
+| **Backend (Render)** | ✅ Deployed | `https://flowsync-gelt.onrender.com` | Auto-deploys on push to `main` (Docker); spins down after 15min idle |
+| **Database (Supabase)** | ✅ Active | Project: `flowsync` | Free tier (500 MB DB, 1 GB Storage); `model-checkpoints` bucket exists |
+
+### Test Coverage
+
+| Suite | Tests | Coverage |
+|---|---|---|
+| `tests/api/test_main.py` | 2 | Root + health endpoints |
+| `tests/api/test_simulation.py` | 5 | Start/stop/reset/set_mode/status |
+| `tests/api/test_training.py` | 4 | Start/stop/status/models |
+| `tests/rl/test_replay_buffer.py` | 2 | Push + sample |
+| `tests/rl/test_dqn_agent.py` | 4 | Init, random/greedy action, train_step |
+| `tests/simulation/test_vehicle.py` | 4 | Init, move, wait, pass |
+| `tests/simulation/test_traffic_signal.py` | 6 | Phase transitions, yellow/red/green, green permission |
+| **Total** | **27** | Core logic paths; no integration/E2E tests |
+
+### Recent Commits Impact (Last 10)
+
+| Commit | Date | Impact |
+|---|---|---|
+| `df5a3a4` | Latest | Manual (MNL) mode + WebSocket `manual_override` command |
+| `926a754` | Latest | Sun emissive intensity increase for bloom rays |
+| `4b390b2` | Latest | Traffic light arrows: larger, bolder, pitch black |
+| `2885db9` | Latest | Environment elements scaled to 3-lane road width |
+| `630aac6` | Latest | 3-lane visual road with exact stop line tracking |
+| `07e3448` | Latest | `get_queue_lengths` counts only waiting vehicles |
+| `6f95862` | Latest | Standard print for WS frame logs (replaced ujson) |
+| `462b560` | Latest | Yield-on-left check + dynamic phase cycling fix |
+| `121e66c` | Latest | Added Summary.md + ISSUES.md |
+| `1edc45e` | Latest | Added ISSUES.md with 17 audit findings |
+
+---
+
+## 1.2 Readiness Assessment
+
+| Criterion | Rating | Notes |
+|---|---|---|
+| **Demo Ready** | ✅ **Yes** | All 3 control modes work, 3D visuals polished, training visible, comparison works |
+| **Hackathon Submission** | ✅ **Yes** | Impressive full-stack AI + 3D, live training, manual override for judges to try |
+| **Research/Thesis Use** | ✅ **Yes** | DQN implementation correct, reproducible, metrics logged, checkpoints loadable |
+| **Production Deployment** | ❌ **No** | No auth, no rate limits, free-tier infra, single-process, no CI/CD |
+| **Multi-User SaaS** | ❌ **No** | Shared `Intersection` instance, no session isolation, no user accounts |
+| **CI/CD Ready** | ❌ **No** | No GitHub Actions, manual `prisma db push`, no lint/test gates |
+
+---
+
+## 1.3 Immediate Next Steps (Priority Order)
+
+1. **Fix Shared Environment Bug** — Give Trainer its own `TrafficEnv` copy so training doesn't reset active simulation
+2. **Add Prisma Migration to CI** — Write GitHub Action: `prisma migrate deploy` + `pytest` on PR
+3. **WS Message Validation** — Add Pydantic/Zod schemas for all WS commands (client + server)
+4. **Rate Limiting** — Add `slowapi` or similar to FastAPI; per-IP WS connection limits
+5. **Environment Variable Cleanup** — Remove hardcoded Render URL from `utils.ts`/`next.config.ts`
+6. **All-Red Duration Config** — Expose `red_duration` as env var / UI slider for tuning
+7. **E2E Tests** — Add Playwright/Cypress for critical user journeys (start → train → load → compare)
 
 ---
 
@@ -75,6 +197,8 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - Frontend interpolates vehicle positions between frames for smooth 60 fps rendering
 - Orthographic camera with orbit controls; auto-rotates while simulation is running
 - Bloom + Vignette postprocessing for visual polish
+- **Day/Night mode toggle** with dynamic lighting (sun with emissive rays at day, moody night lighting)
+- Traffic light arrows rendered inside lenses (↑ → for through/right, ← for left-turn phases)
 
 **User Flow:** Navigate to `/simulation` → immediately see the 3D scene → orbit/zoom with mouse → watch vehicles spawn and move.
 
@@ -86,9 +210,9 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **How It Works:**
 - 4 phases: NS Green, EW Green, NS Left, EW Left
-- Default 8s green, 2s yellow, minimum 4s green
+- Default 8s green, 2s yellow, **1s all-red clearance**, minimum 4s green
 - After minimum green, system can switch early if current phase has no waiting vehicles
-- At timeout, selects the phase with the highest queue count (not just round-robin)
+- At timeout, selects the next phase in sequence that has vehicles waiting, or defaults to next sequential phase
 - Turn restrictions enforced by phase (left-turn-only phases)
 
 **User Flow:** Launch simulation → toggle to "Fixed" mode → watch traditional cycle.
@@ -105,12 +229,29 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - **Reward function:** wait_penalty (−0.1 × total waiting) + throughput_bonus (+1.0 per passed vehicle) + switch_penalty (−0.5 for unnecessary changes) + overflow_penalty (−2.0 per lane with queue ≥ 8)
 - **Terminal:** 500 timesteps per episode
 - Epsilon-greedy exploration starts at 1.0, decays by 0.995 per episode, floor at 0.05
+- **Observation includes pending phase** during yellow/red transitions for better learning
 
 **User Flow:** Launch simulation → toggle "AI" mode → watch AI decisions → see live metrics improve over time.
 
 **Priority:** ★★★★★ (core differentiator)
 
-### 2.4 Live Training Dashboard
+### 2.4 Manual (MNL) Signal Control — **NEW**
+
+**What:** Human-in-the-loop control mode where the operator directly sets signal phases.
+
+**How It Works:**
+- Backend `TrafficSignal.tick()` receives `is_manual=true` flag
+- In manual mode, the signal **holds the current green phase indefinitely** — no auto-cycling
+- Frontend provides 4 phase buttons: NS Green (0), EW Green (1), NS Left (2), EW Left (3)
+- User clicks a button → `manual_override` WebSocket command → backend calls `signal.set_phase(phase)` → goes through yellow (2s) → red (1s) → green for new phase
+- **Yield-on-left logic still applies** during manual green phases
+- Emergency override still forces priority phase
+
+**User Flow:** Select "Manual" mode → 4 phase buttons appear → click to change phase → observe traffic response.
+
+**Priority:** ★★★★☆ (educational/human-factors evaluation)
+
+### 2.5 Live Training Dashboard
 
 **What:** Watch the DQN agent learn in real-time with streaming metrics.
 
@@ -126,9 +267,9 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **Priority:** ★★★★★ (key educational feature)
 
-### 2.5 Performance Comparison (AI vs Fixed)
+### 2.6 Performance Comparison (AI vs Fixed vs Manual)
 
-**What:** Side-by-side bar charts comparing AI-controlled vs fixed-timer performance.
+**What:** Side-by-side bar charts comparing all three control modes.
 
 **How It Works:**
 - Aggregates all performance metrics from the database
@@ -136,11 +277,11 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - Calculates and displays improvement percentage (green positive, red negative)
 - Data persisted via `performance_metrics` table
 
-**User Flow:** Run simulations in both modes → switch to "Compare" tab → view bar chart.
+**User Flow:** Run simulations in each mode → switch to "Compare" tab → view bar chart.
 
 **Priority:** ★★★★☆ (proves value)
 
-### 2.6 Episode History
+### 2.7 Episode History
 
 **What:** Paginated table of all training episodes with color-coded rewards.
 
@@ -155,7 +296,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **Priority:** ★★★☆☆
 
-### 2.7 Real-Time Metrics Panel
+### 2.8 Real-Time Metrics Panel
 
 **What:** Live stats updating during simulation.
 
@@ -169,7 +310,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **Priority:** ★★★★☆
 
-### 2.8 Model Persistence & Loading
+### 2.9 Model Persistence & Loading
 
 **What:** Save and load trained model checkpoints.
 
@@ -180,26 +321,26 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - "Load Model" dropdown in Training Controls panel
 - Loading a model sets its state dict into the agent's online + target networks
 
-**User Flow:** Train agent → checkpoints auto-save → click "Load Model" → select checkpoint → run AI inference with loaded weights.
+**User Flow:** Train agent → checkpoints auto-save → click "Load Model" → select checkpoint → run AI mode inference with loaded weights.
 
 **Priority:** ★★★★☆
 
-### 2.9 Emergency Vehicle Preemption
+### 2.10 Emergency Vehicle Preemption
 
 **What:** Spawn emergency vehicles that force priority green lights.
 
 **How It Works:**
 - 4 directional buttons in the control panel (North/South/East/West)
 - Spawns an emergency vehicle with siren lights (red/blue alternating) and point lights
-- Forces the traffic signal to the priority phase immediately
-- Skips normal RL/fixed control while emergency is active
-- Only one emergency vehicle per lane at a time
+- Forces the traffic signal to the priority phase immediately (skips normal RL/fixed control)
+- Only one emergency vehicle per direction at a time
+- Normal control resumes after emergency clears
 
 **User Flow:** Click "Emergency" button for a direction → watch emergency vehicle spawn → see signals change → ambulance clears intersection.
 
 **Priority:** ★★★☆☆ (showcase feature)
 
-### 2.10 Configurable Traffic Flow
+### 2.11 Configurable Traffic Flow
 
 **What:** Slider to adjust vehicle arrival rate.
 
@@ -208,13 +349,13 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - Slider range: 0.1–1.0
 - 50% straight, 25% left, 25% right turn probability
 - Max 10 vehicles per lane
-- Spawns into one random lane per tick
+- Spawns into one random direction per tick
 
 **User Flow:** Drag slider → see traffic density change immediately.
 
 **Priority:** ★★★☆☆
 
-### 2.11 Keep-Alive Ping
+### 2.12 Keep-Alive Ping
 
 **What:** Prevents backend cold-start on free-tier hosting.
 
@@ -225,14 +366,15 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **Priority:** ★★☆☆☆ (infrastructure)
 
-### 2.12 Dark Theme UI
+### 2.13 Dark Theme UI with Day/Night 3D Mode
 
-**What:** Comprehensive dark mode with cyberpunk aesthetic.
+**What:** Comprehensive dark mode with cyberpunk aesthetic + **NEW** Day/Night toggle for 3D scene.
 
 **How It Works:**
 - Tailwind v4 custom CSS variables for light/dark
 - Semi-transparent glassmorphism panels (backdrop-blur)
-- Animated borders, glow effects, and floating holographic queue labels
+- Animated borders, glow effects, floating holographic queue labels
+- **3D Scene:** Day mode = bright sky, emissive sun with rays, high ambient; Night mode = dark sky, moody directional lights, bloom
 - Consistent across all pages
 
 **Priority:** ★★★☆☆
@@ -251,15 +393,16 @@ None currently implemented. All features are accessible to all users.
 1. Navigate to `/simulation`
 2. 3D scene renders immediately (static, no vehicles)
 3. Click **Start** — vehicles begin spawning and moving
-4. Watch queue lengths, wait times, and throughput on the right panel
-5. Click **Stop** — simulation pauses, metrics finalized
-6. Click **Reset** — intersection clears
+3. Watch queue lengths, wait times, and throughput on the right panel
+4. Click **Stop** — simulation pauses, metrics finalized
+5. Click **Reset** — intersection clears
 
-#### Journey B: Compare AI vs Fixed Control
-1. Start simulation in **Fixed mode** → let it run for a while → Stop
+#### Journey B: Compare Fixed vs AI vs Manual Control
+1. Start simulation in **Fixed mode** → let it run → Stop
 2. Toggle to **AI mode** → Start again → let it run → Stop
-3. Switch to **Compare tab** → side-by-side bar chart shows wait time and throughput
-4. Improvement percentage displayed if data exists
+3. Toggle to **Manual mode** → Start → use phase buttons to control → Stop
+4. Switch to **Compare tab** → side-by-side bar chart shows wait time and throughput for all modes
+5. Improvement percentages displayed if data exists
 
 #### Journey C: Train the AI Agent
 1. Ensure backend is running and WebSocket connected
@@ -278,6 +421,13 @@ None currently implemented. All features are accessible to all users.
 4. Signal immediately switches to priority green
 5. Vehicle passes through intersection
 6. Normal control resumes
+
+#### Journey E: Manual Control
+1. Select **Manual** mode from the three-way toggle
+2. Four phase buttons appear: NS Green, EW Green, NS Left, EW Left
+3. Click a button → signal transitions through yellow (2s) → red (1s) → green for selected phase
+4. Signal holds that green indefinitely until next manual override
+5. Yield-on-left logic still applies during green phases
 
 ### 3.2 Background Jobs / Scheduled Operations
 
@@ -343,7 +493,7 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
 | `POST` | `/simulation/start` | Start a new simulation | — | `{"simulation_id": "..."}` |
 | `POST` | `/simulation/stop` | Stop current simulation | — | `{"status": "stopped"}` |
 | `POST` | `/simulation/reset` | Reset intersection state | — | `{"status": "reset"}` |
-| `PUT` | `/simulation/mode` | Toggle fixed/ai mode | `{"mode": "fixed" \| "ai"}` | `{"mode": "fixed" \| "ai"}` |
+| `PUT` | `/simulation/mode` | Toggle fixed/ai/manual mode | `{"mode": "fixed" \| "ai" \| "manual"}` | `{"mode": "..."}` |
 | `GET` | `/simulation/status` | Current metrics snapshot | — | MetricsSnapshot |
 | `POST` | `/training/start` | Start training | `{"num_episodes": 500, "simulation_id": "..."}` | `{"status": "started", "simulation_id": "..."}` |
 | `POST` | `/training/stop` | Stop training | — | `{"status": "stopping"}` |
@@ -370,9 +520,10 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
   - `{"command": "start"}`
   - `{"command": "stop"}`
   - `{"command": "reset"}`
-  - `{"command": "set_mode", "mode": "fixed" | "ai"}`
+  - `{"command": "set_mode", "mode": "fixed" \| "ai" \| "manual"}`
   - `{"command": "set_spawn_rate", "value": 0.1-1.0}`
-  - `{"command": "emergency_override", "lane": "north"|"south"|"east"|"west"}`
+  - `{"command": "emergency_override", "lane": "north"\|"south"\|"east"\|"west"}`
+  - `{"command": "manual_override", "phase": 0-3}` — **NEW**
 
 **`/ws/training`** — Bidirectional
 - **Server → Client (per episode):** `TrainingMetric` JSON — episode, reward, avg wait, throughput, epsilon, loss, is_training
@@ -405,7 +556,7 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
 Simulation
   ├── id            (String, PK, cuid)
   ├── createdAt     (DateTime)
-  ├── mode          (String: "fixed" | "ai")
+  ├── mode          (String: "fixed" | "ai" | "manual")
   ├── status        (String: "running" | "completed" | "stopped")
   ├── totalSteps    (Int)
   └── durationMs    (Int)
@@ -497,9 +648,9 @@ RLModel (standalone)
 
 ### 5.6 Data Retention & Privacy
 
-- No user accounts or PII is collected
+- No user accounts or PII collected
 - Simulation data persists indefinitely (no retention policy configured)
-- The Supabase project is on the free tier (500 MB database, 1 GB storage)
+- Supabase project is on free tier (500 MB database, 1 GB storage)
 - No data anonymization or deletion mechanisms implemented
 
 ---
@@ -635,7 +786,8 @@ docker-compose up
 | **Presentation Outline** | `ppt.txt` | 8-slide technical presentation |
 | **Supabase Setup Guide** | `server/SUPABASE_KEYS_SETUP.txt` | Key setup instructions |
 | **API Docs (auto)** | `/docs` (FastAPI Swagger) | Automatic OpenAPI documentation |
-| **This Summary** | `Summary.md` | Comprehensive project analysis |
+| **This Summary** | `docs/Summary.md` | Comprehensive project analysis |
+| **Issues Audit** | `ISSUES.md` | Full-stack audit findings |
 
 ### 8.3 Onboarding Notes for New Developers
 
@@ -661,8 +813,8 @@ Based on the pitch and presentation materials:
 | Feature | Timeline | Notes |
 |---|---|---|
 | **Multi-Agent RL** | Long-term | Coordinate multiple intersections for "Green Wave" synchronization |
-| **V2X Integration** | Long-term | Communicate directly with smart vehicles |
-| **Edge Deployment** | Long-term | Run AI core on local traffic controller hardware |
+| **V2X Integration** | Long-term | Communicate directly with smart vehicles for precision control |
+| **Edge Deployment** | Long-term | Run the AI core on local traffic controller hardware |
 | **GPU Training** | Medium-term | Enable CUDA for faster training |
 | **3D model enhancements** | Short-term | More vehicle types, pedestrian models, weather effects |
 | **Multi-intersection view** | Long-term | City-wide traffic management |
@@ -691,41 +843,40 @@ From `ppt.txt`:
 | `runtime.txt` | Pins Python version to 3.11.9 |
 | `.gitignore` | Ignores `.kiro/`, `.vscode/`, `.agents/`, node_modules, __pycache__, .env, *.pt, models/, venv/ |
 | `pitch.md` | Team pitch script (4 roles + technical deep-dive + glossary) |
-| `ppt.txt` | 8-slide presentation outline (abstract, modules, requirements, architecture, algorithms, working, features, future scope) |
+| `ppt.txt` | 8-slide technical presentation outline |
+| `ISSUES.md` | Full-stack audit findings (17 issues across 7 layers) |
 
-### Client (`client/`) — Next.js Frontend
-
-#### Configuration Files
+### Client Config Files
 
 | File | Purpose |
 |---|---|
-| `package.json` | Dependencies: Next.js 16, React 19, Three.js, Tailwind v4, shadcn/ui, Zustand, TanStack Query, Recharts, Framer Motion |
-| `next.config.ts` | Image optimization, env defaults (production backend URL), strict mode, compression |
-| `tsconfig.json` | TypeScript config: ES2017 target, strict mode, `@/` → `./src/*` alias |
-| `postcss.config.mjs` | PostCSS with `@tailwindcss/postcss` |
-| `eslint.config.mjs` | ESLint v9 flat config (Next.js core-web-vitals + TS presets) |
-| `components.json` | shadcn/ui config: Nova style, RSC enabled, neutral base, lucide icons |
-| `prisma/schema.prisma` | Database schema with 6 models (details in §5.1) |
+| `package.json` | Next.js 16.2.6 project with all frontend dependencies |
+| `next.config.ts` | Image optimization, env defaults (production backend URL), compression, strict mode |
+| `tsconfig.json` | TypeScript config: ES2017 target, strict mode, bundler module resolution, `@/` → `./src/*` alias |
+| `postcss.config.mjs` | PostCSS config using `@tailwindcss/postcss` |
+| `eslint.config.mjs` | ESLint v9 flat config using `eslint-config-next` core-web-vitals and typescript presets |
+| `components.json` | shadcn/ui configuration: Radix Nova style, RSC enabled, neutral base color, lucide icons, custom path aliases |
+| `prisma/schema.prisma` | Database schema with 6 models (Simulation, Episode, SignalState, TrafficLog, RLModel, PerformanceMetric) |
 | `next-env.d.ts` | Auto-generated Next.js type references |
 
-#### Source Files
+### Client Source Files
 
 | File | Purpose |
 |---|---|
-| `src/app/globals.css` | Tailwind v4 with custom theme variables (light/dark), shadcn/ui integration, scrollbar styles |
-| `src/app/layout.tsx` | Root layout — Geist fonts, TooltipProvider, KeepAlivePing, QueryClient Provider |
-| `src/app/providers.tsx` | Client component — initializes TanStack React Query's QueryClient |
-| `src/app/page.tsx` | Landing page — hero, "How it works" (Simulate-Train-Compare), feature cards, tech stack, CTA |
-| `src/app/simulation/page.tsx` | Main dashboard — Three.js canvas background, right sidebar (controls + metrics + analytics tabs), bottom-left Live Snapshot |
-| `src/app/api/simulations/route.ts` | GET — returns 20 most recent simulations via Prisma |
-| `src/app/api/models/route.ts` | GET — returns all RL models (descending by creation) via Prisma |
+| `src/app/globals.css` | Tailwind v4 with custom theme variables (light/dark), shadcn/ui integration, scrollbar custom styles |
+| `src/app/layout.tsx` | Root layout with Geist fonts, TooltipProvider, KeepAlivePing component, Providers wrapper |
+| `src/app/providers.tsx` | Client component that initializes TanStack React Query's QueryClient |
+| `src/app/page.tsx` | Landing page with 5 sections: hero header, "How it works" (Simulate-Train-Compare), feature cards, tech stack display, CTA |
+| `src/app/simulation/page.tsx` | **UPDATED** Main simulation dashboard — side-by-side layout: left 3D canvas, right sidebar (controls, metrics, analytics tabs) |
+| `src/app/api/simulations/route.ts` | GET — returns 20 most recent simulations from Prisma |
+| `src/app/api/models/route.ts` | GET — returns all RL models from Prisma (descending by creation) |
 | `src/app/api/metrics/route.ts` | GET — returns performance metrics, optional `?simulationId` filter (max 100) |
 | `src/app/api/episodes/route.ts` | GET — returns episodes, optional `?simulationId` filter (max 500) |
-| `src/app/api/keep-alive/route.ts` | GET — pings FastAPI `/health` to prevent backend cold start |
-| `src/types/simulation.ts` | TypeScript interfaces: `SimulationMode`, `VehicleState`, `SimulationFrame`, `TrainingMetric` |
-| `src/store/simulationStore.ts` | Zustand store — connection/running/training state, current frame, training metrics (capped at 1000), action methods |
+| `src/app/api/keep-alive/route.ts` | GET — pings FastAPI backend's `/health` endpoint to prevent cold starts |
+| `src/types/simulation.ts` | **UPDATED** TypeScript interfaces: `SimulationMode` now includes `"manual"`, `VehicleState.turn` now required |
+| `src/store/simulationStore.ts` | Zustand store managing connection/running/training state, current frame, training metrics (capped at 1000) |
 | `src/lib/utils.ts` | `cn()` class merging, `getFastApiUrls()` — environment-aware backend URL resolution |
-| `src/lib/prisma.ts` | Singleton PrismaClient (prevents hot-reload connection leaks) |
+| `src/lib/prisma.ts` | Singleton PrismaClient instance for server-side database access |
 
 #### Hooks
 
@@ -733,146 +884,121 @@ From `ppt.txt`:
 |---|---|
 | `src/hooks/useSimulationSocket.ts` | WebSocket hook for `/ws/simulation` — auto-connect, exponential backoff retry (max 5), frame logging, `sendCommand()` |
 | `src/hooks/useTrainingSocket.ts` | WebSocket hook for `/ws/training` — same reconnect strategy, handles training metric streaming |
-| `src/hooks/useSimulations.ts` | React Query hook — fetches `/api/simulations` |
-| `src/hooks/useEpisodes.ts` | React Query hook — fetches episodes, auto-refresh every 10s |
+| `src/hooks/useSimulations.ts` | React Query hook fetching `/api/simulations` |
+| `src/hooks/useEpisodes.ts` | React Query hook fetching episodes, auto-refreshes every 10s |
 
 #### Control Components
 
 | File | Purpose |
 |---|---|
-| `src/components/controls/SimulationControls.tsx` | Start/Stop/Reset buttons, mode toggle (Fixed/AI) with debounce, spawn rate slider, emergency override buttons (4 directions), status indicators |
-| `src/components/controls/TrainingControls.tsx` | Train Agent button with config modal (1-2000 episodes), live training stats (reward with trend + sparkline, avg wait, epsilon phases, loss), progress bar + ETA + speed, Load Model dropdown with success/error feedback |
+| `src/components/controls/SimulationControls.tsx` | **UPDATED** Three-mode toggle (Fixed/Manual/AI) with debounce, Start/Stop/Reset buttons, vehicle arrival rate slider, emergency vehicle preemption panel (4 directional buttons + active status display), connection/running status indicator |
+| `src/components/controls/TrainingControls.tsx` | Training panel with Train Agent button (config modal 1-2000 episodes), live training metrics display with animated stat cards (reward, avg wait, epsilon, loss), progress bar + ETA + episodes/min speed, Load Model dropdown (fetches from `/training/models`), model loading with success/error feedback |
 
 #### Simulation (3D) Components
 
 | File | Purpose |
 |---|---|
-| `src/components/simulation/SimulationCanvas.tsx` | Three.js canvas — orthographic camera (zoom 45), multi-light setup (ambient + 2 directional + hemisphere), OrbitControls with auto-rotate, Bloom + Vignette postprocessing, status overlay, bottom legend |
-| `src/components/simulation/IntersectionScene.tsx` | Main scene composer — grid, roads, traffic lights, floating holographic queue labels (color-coded: cyan <5, yellow <8, red >=8), vehicle instances |
-| `src/components/simulation/IntersectionGrid.tsx` | Ground plane + 4 corner zones: NW/SE parks (grass, trees), NE/SW city blocks (neon skyscrapers with cyan/amber/purple stripes) |
-| `src/components/simulation/Road.tsx` | Detailed 3D road — asphalt base, double yellow lines, white stop bars, zebra crossings (7 stripes), directional text labels (EASTBOUND, WESTBOUND, etc.) |
-| `src/components/simulation/TrafficLight.tsx` | Cantilever pole + bracket arm, housing with 3 lens spheres (red/yellow/green) with emissive glow, point lights, CCTV camera with blinking LED, direction-specific positioning |
-| `src/components/simulation/Vehicle.tsx` | 6 vehicle types (sedan, suv, hatchback, sportscar, bike, ambulance), hash-based color selection, cubic Bezier path curves per turn, position interpolation, wheel rotation, emergency siren lights (red/blue alternating + point lights) |
+| `src/components/simulation/SimulationCanvas.tsx` | **UPDATED** Three.js canvas setup — orthographic camera, multi-light setup, OrbitControls with auto-rotate, Bloom + Vignette postprocessing, **Day/Night mode toggle**, status overlay, bottom legend |
+| `src/components/simulation/IntersectionScene.tsx` | **UPDATED** Main 3D scene composing: IntersectionGrid, Roads (horizontal + vertical), 4 TrafficLights with `resolveLightColor` that distinguishes left-turn phases (`left-green`, `left-yellow`), floating holographic queue count labels (color-coded: cyan<5, yellow<8, red≥8), Vehicle instances mapped from frame data |
+| `src/components/simulation/IntersectionGrid.tsx` | **UPDATED** Detailed 3D environment: 45×45 ground plane, 4 corner zones (NW/SE parks with trees, NE/SW city blocks with neon skyscrapers), scaled for new 40-unit roads |
+| `src/components/simulation/Road.tsx` | **UPDATED** 3-lane roads (40 units long, 6 units wide) with: asphalt base, double yellow center lines (split at intersection), white stop bars (6 units wide), zebra crossing stripes, directional text labels (EASTBOUND, WESTBOUND, SOUTHBOUND, NORTHBOUND) |
+| `src/components/simulation/TrafficLight.tsx` | **UPDATED** Complex 3D traffic light with: cantilever pole + bracket arm, single housing with 3 lens spheres (red/yellow/green) with emissive glow, **arrows inside lenses** (↑→ for through/right, ← for left-turn phases), point lights matching active color, CCTV camera unit with blinking status LED, direction-specific positioning |
+| `src/components/simulation/Vehicle.tsx` | **UPDATED** 3D vehicle system with: 6 types (sedan, suv, hatchback, sportscar, bike, ambulance), hash-based color diversity, **CurvePath-based paths** (LineCurve3 for straight, QuadraticBezierCurve3 for turns) with **piecewise arclength mapping** from backend [0,1] position to visual parameter, smooth position interpolation between WS updates, dynamic wheel rotation, emergency vehicle siren lights (alternating red/blue with point lights) |
 
 #### Dashboard Components
 
 | File | Purpose |
 |---|---|
-| `src/components/dashboard/AIStatusBadge.tsx` | Training/Ready/Idle status badge |
-| `src/components/dashboard/LiveSnapshot.tsx` | Real-time stats — connection/running/mode badges, training pulse, last frame time, active vehicles, avg wait, max queue, "CCTV AI Scanner" detection count |
-| `src/components/dashboard/TrainingChart.tsx` | Recharts area chart — 4 toggleable metrics (reward cyan, avg wait orange, epsilon yellow, loss purple), last 100 episodes, summary cards |
-| `src/components/dashboard/MetricsPanel.tsx` | 2x2 card grid — avg wait time, throughput, max queue, episode. Animated numbers, progress bars, SVG sparklines (20-point rolling) |
-| `src/components/dashboard/EpisodeHistory.tsx` | Paginated table (10/page) — episode #, reward (color-coded), wait time, throughput, epsilon, duration. Best episode green highlight. Live training indicator. |
-| `src/components/dashboard/ComparisonChart.tsx` | Bar chart — Fixed vs AI avg wait + throughput, improvement % (green positive, red negative). Aggregates all performance metrics. |
+| `src/components/dashboard/AIStatusBadge.tsx` | Shows Training/Ready/Idle status based on training state |
+| `src/components/dashboard/LiveSnapshot.tsx` | Real-time stats panel: connection/running/mode badges, training pulse badge, grid: Last Frame time, Active Vehicles, Avg Wait Time, Max Queue, "CCTV AI Scanner" card with vehicle detection count |
+| `src/components/dashboard/TrainingChart.tsx` | Recharts area chart with 4 toggleable metrics: Reward (cyan), Avg Wait (orange), Epsilon (yellow), Loss (purple), last 100 episodes, interactive summary cards |
+| `src/components/dashboard/MetricsPanel.tsx` | 2×2 card grid: Avg Wait Time, Throughput, Max Queue, Episode. Animated numbers, progress bars, SVG sparklines (20-point rolling) |
+| `src/components/dashboard/EpisodeHistory.tsx` | Paginated table (10/page): Episode #, Reward (color-coded), Wait Time, Throughput, Epsilon, Duration. Best episode highlighted green. Live training indicator. |
+| `src/components/dashboard/ComparisonChart.tsx` | Bar chart comparing Fixed vs AI vs Manual: Avg Wait Time and Throughput, improvement percentage display (green positive, red negative) |
 
 #### Layout Components
 
 | File | Purpose |
 |---|---|
-| `src/components/layout/Header.tsx` | Top bar — FlowSync branding, connection status badge (green/red), current mode badge |
-| `src/components/layout/KeepAlivePing.tsx` | Pings `/api/keep-alive` on mount to prevent backend cold start |
+| `src/components/layout/Header.tsx` | Top bar showing FlowSync branding, connection status badge (green/red), current mode badge |
+| `src/components/layout/KeepAlivePing.tsx` | Client component that pings `/api/keep-alive` on mount to wake backend |
 
 #### shadcn/ui Components
 
-| File | Purpose |
-|---|---|
-| `src/components/ui/badge.tsx` | Badge component with variants (default, secondary, destructive, outline) |
-| `src/components/ui/button.tsx` | Button with variants (default, destructive, outline, secondary, ghost, link) and sizes |
-| `src/components/ui/card.tsx` | Card layout components (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter) |
-| `src/components/ui/chart.tsx` | Chart container with Recharts integration, custom tooltip, legend |
-| `src/components/ui/scroll-area.tsx` | Scrollable container with Radix ScrollArea primitive |
-| `src/components/ui/select.tsx` | Select dropdown with Radix Select primitive |
-| `src/components/ui/separator.tsx` | Horizontal/vertical divider |
-| `src/components/ui/slider.tsx` | Range slider with Radix Slider primitive |
-| `src/components/ui/switch.tsx` | Toggle switch with Radix Switch primitive |
-| `src/components/ui/table.tsx` | Table component (Table, TableHeader, TableBody, TableRow, TableHead, TableCell) |
-| `src/components/ui/tabs.tsx` | Tab navigation with Radix Tabs primitive |
-| `src/components/ui/tooltip.tsx` | Tooltip with Radix Tooltip primitive |
+Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.tsx`, `scroll-area.tsx`, `select.tsx`, `separator.tsx`, `slider.tsx`, `switch.tsx`, `table.tsx`, `tabs.tsx`, `tooltip.tsx`
 
-### Server (`server/`) — FastAPI Backend
-
-#### Configuration
+### Server Source Files
 
 | File | Purpose |
 |---|---|
-| `requirements.txt` | Production dependencies (11 packages) |
-| `requirements-dev.txt` | Test dependencies (pytest, pytest-asyncio, pytest-cov, httpx, pytest-mock) |
-| `pytest.ini` | Pytest config: asyncio auto-mode, coverage on `app/`, term-missing report |
-| `runtime.txt` | Python 3.11.9 version pin |
-| `SUPABASE_KEYS_SETUP.txt` | Guide explaining service_role vs anon key distinction |
-| `Dockerfile` | Multi-stage build — python:3.11-slim, build deps, CPU-only PyTorch, uvicorn on port 8000 |
-
-#### Application Core
-
-| File | Purpose |
-|---|---|
-| `app/__init__.py` | Empty package init |
-| `app/main.py` | FastAPI entry — lifespan creates TrafficEnv, DQNAgent, Trainer; stores in app_state dict; CORS with allowlist + regex; registers 3 routers + 2 WebSocket routes; `/` and `/health` endpoints |
-| `app/config.py` | Pydantic Settings — loads `SUPABASE_URL`, `supabase_service_key` (with alias resolution from 4 env var names), `CORS_ORIGINS`; validates service key is admin-level (decodes JWT, checks `role=service_role`); default CORS origins include Vercel URLs + localhost |
-
-#### Routers
-
-| File | Purpose |
-|---|---|
-| `app/routers/simulation.py` | 5 endpoints: POST `/start` (reset + create simulation record), POST `/stop` (update simulation), POST `/reset` (clear intersection), PUT `/mode` (toggle fixed/ai), GET `/status` (MetricsSnapshot) |
-| `app/routers/training.py` | 5 endpoints: POST `/start` (async training with configurable episodes), POST `/stop` (graceful stop + cancel task), GET `/status` (trainer state), GET `/models` (all saved models), POST `/load` (load checkpoint into agent) |
-| `app/routers/metrics.py` | 1 endpoint: GET `/current` (returns MetricsSnapshot) |
-
-#### Schemas
-
-| File | Purpose |
-|---|---|
-| `app/schemas/simulation_schema.py` | Pydantic models: `VehicleState` (id, lane, turn, position, state, wait_time, is_emergency), `SimulationFrame` (complete frame), `build_frame()` (constructs from Intersection) |
-| `app/schemas/training_schema.py` | Pydantic models: `TrainingMetric` (episode reward, avg wait, throughput, epsilon, loss, is_training), `StartTrainingRequest` (num_episodes default 500, simulation_id optional) |
-| `app/schemas/metrics_schema.py` | `MetricsSnapshot`: avg_wait_time, throughput, max_queue, current_phase, is_training, current_episode, epsilon |
+| `server/app/__init__.py` | Empty package init |
+| `server/app/main.py` | FastAPI application entry point: lifespan creates TrafficEnv, DQNAgent, Trainer; stores in app_state dict; CORS middleware with allowlist + regex fallback; includes 3 routers; registers 2 WebSocket routes; `/` and `/health` endpoints |
+| `server/app/config.py` | Pydantic Settings: loads `SUPABASE_URL`, `supabase_service_key` (with alias resolution from 4 env var names), `CORS_ORIGINS`; validates service key is admin-level (decodes JWT, checks `role=service_role`) |
+| `server/app/routers/simulation.py` | REST endpoints: POST `/simulation/start`, POST `/simulation/stop`, POST `/simulation/reset`, PUT `/simulation/mode`, GET `/simulation/status` (MetricsSnapshot) |
+| `server/app/routers/training.py` | REST endpoints: POST `/training/start`, POST `/training/stop`, GET `/training/status`, GET `/training/models`, POST `/training/load` |
+| `server/app/routers/metrics.py` | REST endpoint: GET `/metrics/current` (MetricsSnapshot) |
+| `server/app/schemas/simulation_schema.py` | Pydantic models: `VehicleState`, `SimulationFrame`, `build_frame()` |
+| `server/app/schemas/training_schema.py` | Pydantic models: `TrainingMetric`, `StartTrainingRequest` |
+| `server/app/schemas/metrics_schema.py` | `MetricsSnapshot`: avg_wait_time, throughput, max_queue, current_phase, is_training, current_episode, epsilon |
 
 #### Services
 
 | File | Purpose |
 |---|---|
-| `app/services/supabase_service.py` | All DB writes — `create_simulation`, `update_simulation`, `save_episode`, `save_traffic_logs_bulk`, `save_traffic_log`, `save_signal_states_bulk`, `save_signal_state`, `save_performance_metric`, `save_model_metadata` (upsert), `set_active_model`. All sync, called via `asyncio.to_thread`. Error logging on every failure. |
-| `app/services/model_service.py` | Checkpoint management — `save_checkpoint` (local disk + Supabase Storage), `load_checkpoint` (Storage with local fallback), `list_checkpoints`, `list_all_models` (3-tier discovery: DB → Storage listing → local disk, deduplicated), `list_local_models` (backward compat) |
+| `server/app/services/supabase_service.py` | All DB writes: `create_simulation`, `update_simulation`, `save_episode`, `save_traffic_logs_bulk`, `save_signal_states_bulk`, `save_performance_metric`, `save_model_metadata` (upsert), `set_active_model`. All sync, called via `asyncio.to_thread`. Error logging on every failure. |
+| `server/app/services/model_service.py` | Checkpoint management: `save_checkpoint` (local disk + Supabase Storage), `load_checkpoint` (Storage with local fallback), `list_checkpoints`, `list_all_models` (3-tier: DB → Storage listing → local disk, deduplicated) |
 
 #### Simulation Engine
 
 | File | Purpose |
 |---|---|
-| `app/simulation/environment.py` | Gymnasium `TrafficEnv` — 8-dim observation space (queue lengths x4, phase, time_in_phase, color_val, normalized_timestep), Discrete(4) action space. `reset()` resets intersection, `step(action)` computes reward (wait penalty + throughput bonus + switch penalty + overflow penalty), terminal at 500 timesteps. `render()` returns SimulationFrame. |
-| `app/simulation/intersection.py` | Core `Intersection` — 4 lane queues (north/south/east/west), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (vehicles wait for perpendicular traffic to clear), emergency override (forces priority green). `tick(dt, action)` — resolves emergency, ticks signal, spawns vehicles, moves vehicles with stop-line collision detection + signal checking + intersection entrance reservation + vehicle-ahead collision avoidance. |
-| `app/simulation/vehicle.py` | `Vehicle` dataclass — id, lane, turn, position, wait_time, speed, state, is_emergency. `tick(dt, can_move)` — moves at DEFAULT_SPEED (0.12) if allowed, tracks wait time, transitions to "passed" at position ≥ 1.0. |
-| `app/simulation/traffic_signal.py` | `TrafficSignal` — 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). Phase-to-lane mapping, allowed turns per phase. Fixed timing: 8s green default, 2s yellow, 4s minimum green. Smart phase selection (highest queue after minimum green). AI requests go through yellow-red-green transition. `is_green_for(lane, turn)` checks phase + color + turn restrictions. |
-| `app/simulation/spawner.py` | `PoissonSpawner` — configurable λ (default 0.3), Poisson distribution per tick, spawns into one random lane, 50% straight / 25% left / 25% right, max 10 vehicles per lane. |
-| `app/simulation/metrics.py` | `MetricsTracker` — rolling calculation of avg_wait_time, avg_throughput, avg_queue_length with running totals. `get_snapshot()` returns current state dict. |
+| `server/app/simulation/environment.py` | Gymnasium RL environment (`TrafficEnv`): 8-dim observation (queue lengths×4, phase, time_in_phase, color_val, normalized_timestep), Discrete(4) action space. `reset()` resets intersection, `step(action)` advances simulation, computes reward (wait_penalty + throughput_bonus + switch_penalty + overflow_penalty), terminal at 500 steps. **Observation includes pending phase** during yellow/red transitions. |
+| `server/app/simulation/intersection.py` | **MAJOR UPDATE** Core traffic intersection: 12 lanes (4 directions × 3 turns), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (by direction group: NS vs EW), emergency override. **`get_queue_lengths()` now counts only `state=="waiting"` vehicles**. **Yield-on-left logic**: left-turning vehicles at stop line during phases 0/1 must yield to oncoming straight/right traffic. **Per-lane queues** with `_spawned_this_interval` / `_passed_this_interval` counters for telemetry. |
+| `server/app/simulation/vehicle.py` | Vehicle dataclass: id, lane (direction), turn, position, wait_time, speed, state, is_emergency. `tick(dt, can_move)` moves vehicle at DEFAULT_SPEED (0.12) if allowed, tracks wait time, transitions to "passed" at position ≥ 1.0 |
+| `server/app/simulation/traffic_signal.py` | **MAJOR UPDATE** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). **Added `red_duration=1.0` for all-red clearance**. **Manual mode support**: `is_manual` flag holds current green indefinitely. Phase-to-lane mapping and allowed turns per phase. Fixed timing: 8s green default, 2s yellow, 1s red, 4s minimum green. Smart phase selection (highest queue after minimum green). AI phase requests go through yellow-red-green transition. `is_green_for(lane, turn)` checks phase + color + turn restrictions. |
+| `server/app/simulation/spawner.py` | **UPDATED** `PoissonSpawner`: configurable λ (default 0.3), spawns into one random direction per tick, 50% straight / 25% left / 25% right, max 10 vehicles per lane. Lanes now keyed by `{direction}_{turn}`. |
+| `server/app/simulation/metrics.py` | `MetricsTracker`: rolling calculation of avg_wait_time, avg_throughput, avg_queue_length with running totals. (Currently unused but retained) |
 
 #### Reinforcement Learning
 
 | File | Purpose |
 |---|---|
-| `app/rl/dqn_network.py` | Neural network — 3 hidden layers: Linear(8,128) → ReLU → Linear(128,128) → ReLU → Linear(128,64) → ReLU → Linear(64,4) |
-| `app/rl/dqn_agent.py` | DQN Agent — online + target networks, Adam optimizer, MSELoss. `select_action(state, epsilon)` — epsilon-greedy. `train_step(batch)` — Q-learning targets with γ=0.95. `sync_target_network()` — copies online weights to target. `save()` / `load()` — PyTorch state dict serialization. |
-| `app/rl/replay_buffer.py` | Deque-based buffer (max 10,000 transitions). `push(state, action, reward, next_state, done)`. `sample(batch_size)` — returns batched torch tensors. |
-| `app/rl/hyperparams.py` | Dataclass: lr=1e-3, γ=0.95, ε_start=1.0, ε_end=0.05, ε_decay=0.995, batch_size=64, replay_buffer=10000, target_update_freq=500, max_steps=500, episodes=500, min_replay_size=64 |
-| `app/rl/trainer.py` | Training orchestrator — async episodes loop. Every 4th step: sample buffer → train (via `asyncio.to_thread`). Target sync every 500 steps. Yields event loop every 10 steps. Epsilon decays per episode. Saves episode to Supabase + broadcasts via WebSocket. Checkpoints every 50 episodes (model save + metadata upsert). Rolling 50-episode reward window for metadata. |
+| `server/app/rl/dqn_network.py` | Neural network architecture: 3 hidden layers — Linear(8,128) → ReLU → Linear(128,128) → ReLU → Linear(128,64) → ReLU → Linear(64,4) |
+| `server/app/rl/dqn_agent.py` | DQN Agent: online + target networks, Adam optimizer, MSELoss. `select_action(state, epsilon)` — epsilon-greedy. `train_step(batch)` — Q-learning targets with γ=0.95. `sync_target_network()` — copies online weights to target. `save()` / `load()` — PyTorch state dict serialization. |
+| `server/app/rl/replay_buffer.py` | Deque-based buffer (max 10,000 transitions). `push(state, action, reward, next_state, done)`. `sample(batch_size)` — returns batched torch tensors. |
+| `server/app/rl/hyperparams.py` | Dataclass: lr=1e-3, γ=0.95, ε_start=1.0, ε_end=0.05, ε_decay=0.995, batch_size=64, replay_buffer=10000, target_update_freq=500, max_steps=500, episodes=500, min_replay_size=64 |
+| `server/app/rl/trainer.py` | Training orchestrator: async episodes loop. Every 4th step: sample buffer → train (via `asyncio.to_thread`). Target sync every 500 steps. Yields event loop every 10 steps. Episode completion: saves to Supabase, broadcasts via WebSocket. Checkpoint every 50 episodes: saves model + metadata. Epsilon decay per episode. Rolling 50-episode reward window for metadata. |
 
 #### WebSocket Handlers
 
 | File | Purpose |
 |---|---|
-| `app/websockets/simulation_ws.py` | Simulation WebSocket — ConnectionManager for multi-client broadcast. Main loop at 10 Hz. Fixed mode: `intersection.tick(action=None)`. AI mode: `env._get_obs()` → `agent.select_action(ε=0)` → `env.step()`. DB sampling every 50 ticks, flushing every 10 samples. Handles 6 commands (start, stop, reset, set_mode, set_spawn_rate, emergency_override). Flushes buffer on cancel/crash. |
-| `app/websockets/training_ws.py` | Training WebSocket — separate ConnectionManager. `broadcast_training_metric()` used by Trainer. Handles start_training/stop_training commands. Creates simulation record if needed. |
+| `server/app/websockets/simulation_ws.py` | Simulation WebSocket: ConnectionManager for multi-client broadcast. Main loop at 10 Hz. Fixed mode: `intersection.tick(action=None)`. AI mode: `env._get_obs()` → `agent.select_action(ε=0)` → `env.step()`. **Manual mode**: `intersection.tick(action=None, is_manual=True)`. DB sampling every 50 ticks, flushing every 10 samples. Handles 7 commands (start, stop, reset, set_mode, set_spawn_rate, emergency_override, **manual_override**). Flushes buffer on cancel/crash. |
+| `server/app/websockets/training_ws.py` | Training WebSocket: separate ConnectionManager. `broadcast_training_metric()` used by Trainer. Handles start_training/stop_training commands. Creates simulation record if needed. |
 
-### Tests (`server/tests/`)
+### Server Config Files
 
 | File | Purpose |
 |---|---|
-| `conftest.py` | Pytest fixtures — `mock_supabase` (patches supabase_client), `mock_model_service` (patches save/load/list), `client` (FastAPI TestClient with lifespan), `app_state` |
-| `tests/api/test_main.py` | Tests root (`/`) and `/health` endpoints |
-| `tests/api/test_simulation.py` | Tests start/stop/reset/set_mode/get_status — 5 test functions |
-| `tests/api/test_training.py` | Tests start/stop/status/models — 4 test functions |
-| `tests/rl/test_replay_buffer.py` | Tests buffer push and sample — 2 test functions |
-| `tests/rl/test_dqn_agent.py` | Tests init, random action, greedy action, train_step — 4 test functions |
-| `tests/simulation/test_vehicle.py` | Tests init, movement, waiting, passed state — 4 test functions |
-| `tests/simulation/test_traffic_signal.py` | Tests init, phase change, yellow→red→green transitions, fixed duration rollover, green permission — 6 test functions |
+| `server/requirements.txt` | Production dependencies (11 packages) |
+| `server/requirements-dev.txt` | Test dependencies (pytest, pytest-asyncio, pytest-cov, httpx, pytest-mock) |
+| `server/pytest.ini` | Pytest config: asyncio auto mode, coverage on `app/`, term-missing report |
+| `server/runtime.txt` | Python 3.11.9 version pin |
+| `server/SUPABASE_KEYS_SETUP.txt` | Detailed Supabase key setup guide explaining service_role vs anon key distinction |
+| `server/Dockerfile` | Multi-stage Docker build: python:3.11-slim, installs build deps, CPU-only PyTorch, runs uvicorn on port 8000 |
+
+### Tests
+
+| File | Purpose |
+|---|---|
+| `server/tests/conftest.py` | Pytest fixtures: `mock_supabase`, `mock_model_service`, `client` (FastAPI TestClient with lifespan), `app_state` |
+| `server/tests/api/test_main.py` | Tests root (`/`) and `/health` endpoints |
+| `server/tests/api/test_simulation.py` | Tests start/stop/reset/set_mode/get_status — 5 test functions |
+| `server/tests/api/test_training.py` | Tests start/stop/status/models — 4 test functions |
+| `server/tests/rl/test_replay_buffer.py` | Tests buffer push and sample — 2 test functions |
+| `server/tests/rl/test_dqn_agent.py` | Tests init, random action, greedy action, train_step — 4 test functions |
+| `server/tests/simulation/test_vehicle.py` | Tests init, movement, waiting, passed state — 4 test functions |
+| `server/tests/simulation/test_traffic_signal.py` | Tests init, phase change, yellow→red→green transitions, fixed duration rollover, green permission — 6 test functions |
 
 ---
 
@@ -890,7 +1016,8 @@ The project evolved through numbered phases early on, then shifted to feature-ba
 | **UI & Docs** | `302d2a2`, `b6e2668`, `20f13cb`, `7bab979` | Documentation, landing page, animations |
 | **Infrastructure** | `6f94c89`, `b162c34`, `50c1e1c`, `c1a267c`, `d4b2670` | Keep-alive (added, moved to API route, workflows removed) |
 | **Recent** | `f042669`, `7ad81e8`, `7ca7d8c` | Emergency preemption UI, multi-vehicle intersection locks, 3D lighting fixes with CCTV cameras |
+| **Latest** | `df5a3a4`...`462b560` | **Manual (MNL) mode**, 3-lane roads, yield-on-left, vehicle interpolation fixes, traffic light arrows, environment scaling, get_queue_lengths fix |
 
 ---
 
-*Generated: 2026-07-08 — Comprehensive project analysis of FlowSync*
+*Generated: 2026-07-11 — Comprehensive project analysis of FlowSync (updated with Manual mode, 3-lane roads, yield-on-left, 3D visual overhaul, and side-by-side layout)*
