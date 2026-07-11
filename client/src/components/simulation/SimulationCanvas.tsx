@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, Suspense } from "react";
+import { memo, useMemo, Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
@@ -11,6 +11,7 @@ import { useSimulationStore } from "@/store/simulationStore";
 const SimulationCanvas = memo(function SimulationCanvas() {
   const isConnected = useSimulationStore((state) => state.isConnected);
   const isRunning = useSimulationStore((state) => state.isRunning);
+  const [timeOfDay, setTimeOfDay] = useState<"day" | "night">("night");
 
   const statusMessage = useMemo(() => {
     if (!isConnected) {
@@ -22,8 +23,25 @@ const SimulationCanvas = memo(function SimulationCanvas() {
     return "Live Simulation";
   }, [isConnected, isRunning]);
 
+  const bgColor = timeOfDay === "day" ? "#f0f4f8" : "#111622";
+
   return (
     <div className="relative h-full w-full">
+      <div className="absolute top-6 left-6 z-10 flex gap-2">
+        <button 
+          onClick={() => setTimeOfDay("day")}
+          className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${timeOfDay === "day" ? 'bg-white text-black shadow-lg shadow-white/20' : 'bg-black/60 text-white/50 hover:bg-black/80 hover:text-white backdrop-blur-md border border-white/10'}`}
+        >
+          Day Mode
+        </button>
+        <button 
+          onClick={() => setTimeOfDay("night")}
+          className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${timeOfDay === "night" ? 'bg-white text-black shadow-lg shadow-white/20' : 'bg-black/60 text-white/50 hover:bg-black/80 hover:text-white backdrop-blur-md border border-white/10'}`}
+        >
+          Night Mode
+        </button>
+      </div>
+
       <Canvas
         orthographic
         shadows
@@ -31,28 +49,56 @@ const SimulationCanvas = memo(function SimulationCanvas() {
         camera={{ position: [20, 20, 20], zoom: 45, near: 0.1, far: 1000 }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(0, 0, 0);
-          gl.setClearColor('#0a0e17');
+          gl.setClearColor(bgColor);
         }}
       >
-        <color attach="background" args={["#0a0e17"]} />
+        <color attach="background" args={[bgColor]} />
         
         <Suspense fallback={null}>
-          <ambientLight intensity={0.5} />
-          <directionalLight 
-            position={[10, 20, 10]} 
-            intensity={1.2} 
-            castShadow 
-            shadow-mapSize-width={2048} 
-            shadow-mapSize-height={2048}
-            shadow-bias={-0.0001}
-          />
-          <directionalLight 
-            position={[-10, 15, -10]} 
-            intensity={0.6} 
-            color="#6b9bd1"
-          />
+          <ambientLight intensity={timeOfDay === "day" ? 1.0 : 0.5} />
+          
+          {timeOfDay === "day" ? (
+             <group>
+               <directionalLight 
+                 position={[20, 40, 20]} 
+                 intensity={2.0} 
+                 castShadow 
+                 shadow-mapSize-width={2048} 
+                 shadow-mapSize-height={2048}
+                 shadow-bias={-0.0001}
+                 color="#fffcf2"
+               />
+               {/* Glowing Physical Sun with high emission for rays */}
+               <mesh position={[-25, 30, -25]}>
+                 <sphereGeometry args={[4, 32, 32]} />
+                 <meshStandardMaterial 
+                   color="#ffdd44" 
+                   emissive="#ffaa00" 
+                   emissiveIntensity={8.0} 
+                   toneMapped={false} 
+                 />
+               </mesh>
+             </group>
+          ) : (
+             <>
+                <directionalLight 
+                  position={[10, 20, 10]} 
+                  intensity={1.2} 
+                  castShadow 
+                  shadow-mapSize-width={2048} 
+                  shadow-mapSize-height={2048}
+                  shadow-bias={-0.0001}
+                />
+                <directionalLight 
+                  position={[-10, 15, -10]} 
+                  intensity={0.6} 
+                  color="#6b9bd1"
+                />
+             </>
+          )}
+
           <hemisphereLight 
-            args={["#87ceeb", "#2a2a3e", 0.4]} 
+            args={timeOfDay === "day" ? ["#ffffff", "#aaaaaa", 0.8] : ["#87ceeb", "#2a2a3e", 0.4]} 
           />
           
           <IntersectionScene />
@@ -73,11 +119,10 @@ const SimulationCanvas = memo(function SimulationCanvas() {
 
           <EffectComposer>
             <Bloom 
-              luminanceThreshold={1.2} 
-              mipmapBlur 
-              intensity={0.4} 
+              luminanceThreshold={timeOfDay === "day" ? 0.9 : 0.2} 
+              luminanceSmoothing={0.9} 
+              intensity={timeOfDay === "day" ? 1.5 : 1.5} 
             />
-            <Vignette eskil={false} offset={0.1} darkness={1.1} />
           </EffectComposer>
         </Suspense>
       </Canvas>

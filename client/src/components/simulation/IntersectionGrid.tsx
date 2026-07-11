@@ -87,7 +87,8 @@ function Skyscraper({ position, size, neonColor }: SkyscraperProps) {
 }
 
 export default function IntersectionGrid() {
-  const groundGeo = useMemo(() => new PlaneGeometry(40, 40), []);
+  // Create a clean diorama look with a specific size
+  const groundGeo = useMemo(() => new PlaneGeometry(45, 45), []);
   const groundMat = useMemo(() => new MeshStandardMaterial({
     color: "#1a1f2e",
     roughness: 0.8,
