@@ -29,18 +29,20 @@ export default function SimulationControls({
   const [isSwitching, setIsSwitching] = useState(false);
 
   const modeLabel = useMemo(
-    () => (mode === "ai" ? "AI Agent" : "Fixed Timer"),
+    () => (mode === "ai" ? "AI Agent" : mode === "manual" ? "Manual Control" : "Fixed Timer"),
     [mode],
   );
 
-
-
-  const handleToggle = (checked: boolean) => {
-    const nextMode: SimulationMode = checked ? "ai" : "fixed";
+  const handleModeChange = (nextMode: SimulationMode) => {
+    if (mode === nextMode) return;
     setMode(nextMode);
     setIsSwitching(true);
     sendCommand({ command: "set_mode", mode: nextMode });
     setTimeout(() => setIsSwitching(false), 2000);
+  };
+
+  const handleManualPhase = (phase: number) => {
+    sendCommand({ command: "manual_override", phase });
   };
 
   const handleStart = () => {
@@ -86,20 +88,65 @@ export default function SimulationControls({
   return (
     <div className="flex flex-col gap-3">
       {/* Mode toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-white">Mode</p>
-          <p className="text-xs text-white/45">{modeLabel}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">Mode</p>
+            <p className="text-xs text-white/45">{modeLabel}</p>
+          </div>
           {isSwitching && <Loader2 className="h-4 w-4 animate-spin text-white/50" />}
-          <Switch
-            checked={mode === "ai"}
-            onCheckedChange={handleToggle}
+        </div>
+        <div className="flex items-center p-1 bg-black/40 rounded-lg border border-white/5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleModeChange("fixed")}
             disabled={!isConnected || isSwitching}
-          />
+            className={`flex-1 h-7 text-xs ${mode === "fixed" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+          >
+            Fixed
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleModeChange("manual")}
+            disabled={!isConnected || isSwitching}
+            className={`flex-1 h-7 text-xs ${mode === "manual" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+          >
+            Manual
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleModeChange("ai")}
+            disabled={!isConnected || isSwitching}
+            className={`flex-1 h-7 text-xs ${mode === "ai" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+          >
+            AI
+          </Button>
         </div>
       </div>
+
+      {/* Manual Phase Controls */}
+      {mode === "manual" && (
+        <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+          <p className="text-xs text-white/70 font-medium mb-1">Set Phase</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="secondary" className="h-8 text-[10px] uppercase" onClick={() => handleManualPhase(0)}>
+              NS Green
+            </Button>
+            <Button size="sm" variant="secondary" className="h-8 text-[10px] uppercase" onClick={() => handleManualPhase(1)}>
+              EW Green
+            </Button>
+            <Button size="sm" variant="secondary" className="h-8 text-[10px] uppercase" onClick={() => handleManualPhase(2)}>
+              NS Left
+            </Button>
+            <Button size="sm" variant="secondary" className="h-8 text-[10px] uppercase" onClick={() => handleManualPhase(3)}>
+              EW Left
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Control buttons */}
       <div className="flex gap-2">

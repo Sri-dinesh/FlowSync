@@ -47,7 +47,7 @@ class Intersection:
         self.emergency_override_lane = lane
         self._spawned_this_interval += 1
 
-    def tick(self, dt: float, action: Optional[int] = None) -> None:
+    def tick(self, dt: float, action: Optional[int] = None, is_manual: bool = False) -> None:
         # Resolve active emergency override: force signal phase
         if self.emergency_override_lane:
             has_active_emergency = any(
@@ -70,7 +70,7 @@ class Intersection:
 
         # give the signal visibility into lane queues for smarter decisions and
         # make AI phase changes respect the same clearance timing as fixed mode
-        self.signal.tick(dt, self.lanes, requested_phase=action)
+        self.signal.tick(dt, self.lanes, requested_phase=action, is_manual=is_manual)
 
         spawned_vehicles = self.spawner.spawn(dt, self.lanes)
         self._spawned_this_interval += len(spawned_vehicles)

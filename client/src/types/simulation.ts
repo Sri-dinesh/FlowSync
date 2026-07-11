@@ -1,4 +1,4 @@
-export type SimulationMode = "fixed" | "ai";
+export type SimulationMode = "fixed" | "ai" | "manual";
 
 export interface VehicleState {
   id: string;

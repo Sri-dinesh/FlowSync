@@ -132,8 +132,8 @@ async def _simulation_loop(app_state: dict) -> None:
             trainer = app_state.get("trainer")
             episode = trainer.current_episode if trainer else 0
 
-            if mode == "fixed":
-                intersection.tick(dt=0.1, action=None)
+            if mode in ("fixed", "manual"):
+                intersection.tick(dt=0.1, action=None, is_manual=(mode == "manual"))
             else:
                 env = app_state["env"]
                 agent = app_state["agent"]
@@ -258,8 +258,13 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             elif command == "set_mode":
                 mode = message.get("mode")
-                if mode in ("fixed", "ai"):
+                if mode in ("fixed", "ai", "manual"):
                     app_state["mode"] = mode
+
+            elif command == "manual_override":
+                phase = message.get("phase")
+                if isinstance(phase, int) and 0 <= phase <= 3:
+                    app_state["intersection"].signal.set_phase(phase)
 
             elif command == "set_spawn_rate":
                 value = message.get("value")

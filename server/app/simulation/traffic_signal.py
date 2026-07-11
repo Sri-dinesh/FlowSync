@@ -54,6 +54,7 @@ class TrafficSignal:
         dt: float,
         lanes: Optional[Dict[str, List]] = None,
         requested_phase: Optional[int] = None,
+        is_manual: bool = False,
     ) -> None:
         # lanes: mapping lane name -> list of vehicles (for dynamic phase decisions)
         self.time_in_phase += dt
@@ -82,6 +83,11 @@ class TrafficSignal:
                 and self.time_in_phase >= self.min_green_duration
             ):
                 self.set_phase(requested_phase)
+            return
+
+        # Manual mode holds the current green phase indefinitely 
+        # (until manual_override explicitly sets a new phase)
+        if is_manual:
             return
 
         # When green: allow a minimum green time and then pick next phase
