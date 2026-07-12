@@ -94,19 +94,19 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **Supabase Persistence** | ✅ Working | Simulations, Episodes, TrafficLogs, SignalStates, PerformanceMetrics, RLModels |
 | **Keep-Alive Ping** | ✅ Working | Frontend pings `/api/keep-alive` → FastAPI `/health` on mount |
 | **Docker Backend** | ✅ Working | `docker-compose up` builds CPU-only PyTorch image, runs on :8000 |
-| **Tests** | ✅ Passing | `pytest` runs 29 tests (api, rl, simulation) with mocked Supabase |
+| **Tests** | ✅ Passing | `pytest` runs 27 tests (api, rl, simulation) with mocked Supabase |
 
 ### Partially Working / Known Quirks (⚠️)
 
 | Area | Status | Details |
 |---|---|---|
-| **Queue Length Accuracy** | ⚠️ Minor | `get_queue_lengths()` counts only `state=="waiting"` — vehicles at stop line with `can_move=false` are counted, but those already in intersection are not |
-| **All-Red Clearance** | ⚠️ Tunable | Fixed at 1.0s (`red_duration`); may be too short for heavy traffic — vehicles can still be in intersection when cross-traffic gets green |
+| **Queue Length Accuracy** | ⚠️ Minor | `get_queue_lengths()` counts only `state != "passed"` — vehicles at stop line with `can_move=false` are counted, but those already in intersection are not |
+| **All-Red Clearance** | ⚠️ Tunable | Fixed at 3.0s (`red_duration`); may be too short for heavy traffic — vehicles can still be in intersection when cross-traffic gets green |
 | **Manual Mode Phase Display** | ⚠️ Minor | Traffic light shows correct color but doesn't visually distinguish "manual hold" vs normal green |
-| **Training While Sim Running** | ⚠️ Architectural | Trainer and Simulation share same `Intersection` instance — training reset clears active simulation vehicles |
+| **Training While Sim Running** | ⚠️ Architectural | Trainer and Simulation share same `agent` instance — training gradient updates affect live AI inference; env separation is complete but agent is shared |
 | **WS Reconnection Storm** | ⚠️ Rare | Exponential backoff (max 5) works, but rapid reconnects can occur if backend restarts mid-session |
 | **Prisma Migrations** | ⚠️ Manual | No CI migration step — `prisma db push` required after schema changes |
-| **Hardcoded Render URL** | ⚠️ Config | `flowsync-gelt.onrender.com` in `utils.ts:29,32` and `next.config.ts:12-13` |
+| **Hardcoded Render URL** | ⚠️ Config | `flowsync-gelt.onrender.com` removed from `utils.ts`/`next.config.ts` but may persist in docs |
 
 ### Not Implemented / Missing (❌)
 
@@ -120,7 +120,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **GraphQL / Webhooks** | ❌ Not planned | REST + WS covers all current needs |
 | **Data Retention Policy** | ❌ None | Data persists indefinitely on Supabase free tier |
 | **Automated Security Scanning** | ❌ None | No Dependabot, Snyk, or SAST in CI |
-| **Input Validation on WS** | ❌ Partial | `set_spawn_rate` does `float(value)` without bounds check |
+| **Input Validation on WS** | ❌ Partial | `set_spawn_rate` clamped 0.1–1.0, but other commands lack validation |
 | **WebSocket Message Schema Validation** | ❌ None | Commands validated by if-else chains only |
 
 ### Deployment Status
@@ -148,16 +148,16 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 | Commit | Date | Impact |
 |---|---|---|
-| `df5a3a4` | Latest | Manual (MNL) mode + WebSocket `manual_override` command |
-| `926a754` | Latest | Sun emissive intensity increase for bloom rays |
-| `4b390b2` | Latest | Traffic light arrows: larger, bolder, pitch black |
-| `2885db9` | Latest | Environment elements scaled to 3-lane road width |
-| `630aac6` | Latest | 3-lane visual road with exact stop line tracking |
-| `07e3448` | Latest | `get_queue_lengths` counts only waiting vehicles |
-| `6f95862` | Latest | Standard print for WS frame logs (replaced ujson) |
-| `462b560` | Latest | Yield-on-left check + dynamic phase cycling fix |
-| `121e66c` | Latest | Added Summary.md + ISSUES.md |
-| `1edc45e` | Latest | Added ISSUES.md with 17 audit findings |
+| `a3d650c` | Latest | Remove hardcoded Render URLs, delete dead `metrics.py`, update pytest for redesigned obs/target net |
+| `e694309` | Latest | Redesign simulation schema: world coordinates, Q-values; refactor performance metrics DB schema |
+| `134c411` | Latest | Upgrade DQN to Double DQN + LayerNorm, larger replay buffer, Huber loss, gradient clipping, checkpoint migration |
+| `5e74135` | Latest | Redesign observation space + `compute_reward` (queue reduction, balancing, earlier overflow) |
+| `97bb6de` | Latest | Configurable all-red clearance + pending phase tracking in traffic signal |
+| `98588b4` | Latest | Queue counting + avg wait time: include all non-passed vehicles |
+| `07f018b` | Latest | **Critical:** Separate simulation + training environment instances; migrate to `app.state` |
+| `f0ac881` | Latest | Update project summary, status |
+| `df5a3a4` | Recent | Manual (MNL) mode + WebSocket `manual_override` command |
+| `926a754` | Recent | Sun emissive intensity increase for bloom rays |
 
 ---
 
@@ -176,11 +176,11 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 ## 1.3 Immediate Next Steps (Priority Order)
 
-1. **Fix Shared Environment Bug** — Give Trainer its own `TrafficEnv` copy so training doesn't reset active simulation
+1. **Fix Shared Agent Bug** — Give Trainer its own `DQNAgent` copy so training gradient updates don't affect live AI inference
 2. **Add Prisma Migration to CI** — Write GitHub Action: `prisma migrate deploy` + `pytest` on PR
 3. **WS Message Validation** — Add Pydantic/Zod schemas for all WS commands (client + server)
 4. **Rate Limiting** — Add `slowapi` or similar to FastAPI; per-IP WS connection limits
-5. **Environment Variable Cleanup** — Remove hardcoded Render URL from `utils.ts`/`next.config.ts`
+5. **Environment Variable Cleanup** — Remove hardcoded Render URL from any remaining docs
 6. **All-Red Duration Config** — Expose `red_duration` as env var / UI slider for tuning
 7. **E2E Tests** — Add Playwright/Cypress for critical user journeys (start → train → load → compare)
 
@@ -210,7 +210,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 **How It Works:**
 - 4 phases: NS Green, EW Green, NS Left, EW Left
-- Default 8s green, 2s yellow, **1s all-red clearance**, minimum 4s green
+- Default 8s green, 2s yellow, **3s all-red clearance**, minimum 4s green
 - After minimum green, system can switch early if current phase has no waiting vehicles
 - At timeout, selects the next phase in sequence that has vehicles waiting, or defaults to next sequential phase
 - Turn restrictions enforced by phase (left-turn-only phases)
@@ -224,11 +224,11 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 **What:** A Deep Q-Network agent that learns optimal signal timing through trial and error.
 
 **How It Works:**
-- **State (8-dim):** queue lengths per direction (4), current phase, time in phase, signal color, normalized timestep
+- **State (8-dim):** queue lengths per direction (4), current phase, time in phase, total vehicles in system, pending phase
 - **Action (discrete 4):** choose next signal phase
-- **Reward function:** wait_penalty (−0.1 × total waiting) + throughput_bonus (+1.0 per passed vehicle) + switch_penalty (−0.5 for unnecessary changes) + overflow_penalty (−2.0 per lane with queue ≥ 8)
+- **Reward function:** queue_reduction (0.3×Δ) + throughput (0.8×passed) + switch_penalty (-0.3) + overflow_penalty (-1.5×count@≥6) + balance_bonus (0.2 if imbalance≤2)
 - **Terminal:** 500 timesteps per episode
-- Epsilon-greedy exploration starts at 1.0, decays by 0.995 per episode, floor at 0.05
+- Epsilon-greedy exploration starts at 1.0, decays by 0.997 per episode, floor at 0.05
 - **Observation includes pending phase** during yellow/red transitions for better learning
 
 **User Flow:** Launch simulation → toggle "AI" mode → watch AI decisions → see live metrics improve over time.
@@ -243,7 +243,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - Backend `TrafficSignal.tick()` receives `is_manual=true` flag
 - In manual mode, the signal **holds the current green phase indefinitely** — no auto-cycling
 - Frontend provides 4 phase buttons: NS Green (0), EW Green (1), NS Left (2), EW Left (3)
-- User clicks a button → `manual_override` WebSocket command → backend calls `signal.set_phase(phase)` → goes through yellow (2s) → red (1s) → green for new phase
+- User clicks a button → `manual_override` WebSocket command → backend calls `signal.set_phase(phase)` → goes through yellow (2s) → red (3s) → green for new phase
 - **Yield-on-left logic still applies** during manual green phases
 - Emergency override still forces priority phase
 
@@ -425,7 +425,7 @@ None currently implemented. All features are accessible to all users.
 #### Journey E: Manual Control
 1. Select **Manual** mode from the three-way toggle
 2. Four phase buttons appear: NS Green, EW Green, NS Left, EW Left
-3. Click a button → signal transitions through yellow (2s) → red (1s) → green for selected phase
+3. Click a button → signal transitions through yellow (2s) → red (3s) → green for selected phase
 4. Signal holds that green indefinitely until next manual override
 5. Yield-on-left logic still applies during green phases
 
@@ -437,7 +437,7 @@ None currently implemented. All features are accessible to all users.
 | **Training loop** | User starts training | Per-episode (~100ms each) | DQN training, reward calc, network updates |
 | **DB buffer flush** | Every 10 samples | ~50s during simulation | Flush buffered traffic logs + signal states to Supabase |
 | **Checkpoint save** | Every 50 episodes | During training | Save model state dict to Supabase Storage + disk |
-| **Target network sync** | Every 500 steps | During training | Copy online network weights to target network |
+| **Target network sync** | Every 200 steps | During training | Copy online network weights to target network |
 | **Keep-alive ping** | Frontend mount | Once on page load | Wake backend from cold start |
 
 ### 3.3 Data Flows
@@ -455,7 +455,7 @@ Backend (Intersection.tick) ──[10 Hz JSON frame]──WebSocket──▶ Fro
 ```
 DQN Agent (select_action) → Environment (step) → Replay Buffer (push)
                                                          │
-                                                    [every 4 steps]
+                                                    [every 1 step]
                                                          ▼
                                                   Train Step (sample + backprop)
                                                          │
@@ -515,7 +515,7 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
 ### 4.3 WebSocket Endpoints
 
 **`/ws/simulation`** — Bidirectional
-- **Server → Client (10 Hz):** `SimulationFrame` JSON — timestep, mode, signal state, all vehicle positions/states, queue lengths, metrics
+- **Server → Client (10 Hz):** `SimulationFrame` JSON — timestep, mode, signal state, all vehicle positions/states, queue lengths, metrics, RL state (Q-values, action labels, exploration flag)
 - **Client → Server (commands):**
   - `{"command": "start"}`
   - `{"command": "stop"}`
@@ -556,6 +556,7 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
 Simulation
   ├── id            (String, PK, cuid)
   ├── createdAt     (DateTime)
+  ├── updatedAt     (DateTime) — **NEW**
   ├── mode          (String: "fixed" | "ai" | "manual")
   ├── status        (String: "running" | "completed" | "stopped")
   ├── totalSteps    (Int)
@@ -573,14 +574,14 @@ Simulation
   │     └── steps         (Int)
   │
   ├──< PerformanceMetric (1:N)
-  │     ├── id               (String, PK)
-  │     ├── simulationId     (FK → Simulation)
-  │     ├── mode             (String)
-  │     ├── avgWaitTimeFixed (Float?)
-  │     ├── avgWaitTimeAI    (Float?)
-  │     ├── throughputFixed  (Int?)
-  │     ├── throughputAI     (Int?)
-  │     └── improvementPct   (Float?)
+  │     ├── id             (String, PK)
+  │     ├── simulationId   (FK → Simulation)
+  │     ├── mode           (String)
+  │     ├── avgWaitTime    (Float)
+  │     ├── throughput     (Int)
+  │     ├── maxQueueLength (Int)
+  │     ├── totalSteps     (Int)
+  │     └── improvementPct (Float?)
   │
   └──< TrafficLog (1:N)
         ├── id              (String, PK)
@@ -593,7 +594,7 @@ Simulation
 
 SignalState (standalone)
   ├── id           (String, PK)
-  ├── simulationId (String — no FK constraint)
+  ├── simulationId (String — FK with Cascade) — **NEW**
   ├── timestep     (Int)
   ├── phase        (Int: 0-3)
   ├── duration     (Int)
@@ -612,14 +613,16 @@ RLModel (standalone)
   ├── totalEpisodes (Int)
   ├── createdAt     (DateTime)
   └── isActive      (Boolean, default false)
+  └── @@unique([name, version]) — **NEW**
+
 ```
 
 #### Key Relationships
 - **Simulation 1:N Episode** — Each simulation can have many training episodes
-- **Simulation 1:N PerformanceMetric** — Each simulation creates one performance metric
+- **Simulation 1:N PerformanceMetric** — Each simulation creates one performance metric per mode
 - **Simulation 1:N TrafficLog** — Sampled traffic data per timestep
-- **SignalState** — No formal FK; stored with simulationId for querying
-- **RLModel** — Standalone; model_id reuses simulation UUID
+- **Simulation 1:N SignalState** — **NEW FK with Cascade**
+- **RLModel** — Standalone; model_id reuses simulation UUID; unique constraint on (name, version)
 
 ### 5.2 Database Write Strategy
 
@@ -711,6 +714,7 @@ docker-compose up
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY` (aliases: `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_KEY`)
 - `CORS_ORIGINS` — comma-separated (defaults include localhost:3000 and Vercel URLs)
+- `SIGNAL_RED_DURATION` — all-red clearance seconds (default: 3.0)
 
 ### 6.5 Monitoring, Logging, Alerting
 
@@ -743,9 +747,8 @@ docker-compose up
 | **Single-process bottleneck** | Medium | Training blocks the event loop despite `asyncio.sleep(0)` — no GPU acceleration. |
 | **No WebSocket auth** | Low | Any client can connect to `/ws/simulation` and `/ws/training`. Fine for demo but not production. |
 | **DB buffer loss on crash** | Low | If the server crashes between flushes (~50s window), buffered traffic logs are lost. |
-| **Fixed deployment URLs** | Low | Backend URL hardcoded as `flowsync-gelt.onrender.com` in client/src/lib/utils.ts. |
-| **No Prisma migrations in CI** | Low | DB schema must be applied manually via `prisma db push`. |
-| **No input validation on spawn rate** | Low | Slider is 0.1–1.0 but WS handler does `float(value)` without clamp. |
+| **Prisma migrations in CI** | Low | DB schema must be applied manually via `prisma db push`. |
+| **No input validation on spawn rate** | Low | Slider is 0.1–1.0 but WS handler does `float(value)` without clamp (now fixed in WS handler). |
 
 ### 7.2 Planned Refactors & Migrations
 
@@ -814,7 +817,7 @@ Based on the pitch and presentation materials:
 |---|---|---|
 | **Multi-Agent RL** | Long-term | Coordinate multiple intersections for "Green Wave" synchronization |
 | **V2X Integration** | Long-term | Communicate directly with smart vehicles for precision control |
-| **Edge Deployment** | Long-term | Run the AI core on local traffic controller hardware |
+| **Edge Deployment** | Long-term | Run AI core on local traffic controller hardware |
 | **GPU Training** | Medium-term | Enable CUDA for faster training |
 | **3D model enhancements** | Short-term | More vehicle types, pedestrian models, weather effects |
 | **Multi-intersection view** | Long-term | City-wide traffic management |
@@ -843,19 +846,20 @@ From `ppt.txt`:
 | `runtime.txt` | Pins Python version to 3.11.9 |
 | `.gitignore` | Ignores `.kiro/`, `.vscode/`, `.agents/`, node_modules, __pycache__, .env, *.pt, models/, venv/ |
 | `pitch.md` | Team pitch script (4 roles + technical deep-dive + glossary) |
-| `ppt.txt` | 8-slide technical presentation outline |
+| `ppt.txt` | 8-slide presentation outline (abstract, modules, requirements, architecture/ER diagrams, algorithms, working, features, future scope) |
 | `ISSUES.md` | Full-stack audit findings (17 issues across 7 layers) |
+| `fixes.md` | Complete step-by-step fix plan (9 fixes, 90+ tasks) |
 
 ### Client Config Files
 
 | File | Purpose |
 |---|---|
-| `package.json` | Next.js 16.2.6 project with all frontend dependencies |
-| `next.config.ts` | Image optimization, env defaults (production backend URL), compression, strict mode |
-| `tsconfig.json` | TypeScript config: ES2017 target, strict mode, bundler module resolution, `@/` → `./src/*` alias |
-| `postcss.config.mjs` | PostCSS config using `@tailwindcss/postcss` |
-| `eslint.config.mjs` | ESLint v9 flat config using `eslint-config-next` core-web-vitals and typescript presets |
-| `components.json` | shadcn/ui configuration: Radix Nova style, RSC enabled, neutral base color, lucide icons, custom path aliases |
+| `package.json` | Dependencies: Next.js 16, React 19, Three.js, Tailwind v4, shadcn/ui, Zustand, TanStack Query, Recharts, Framer Motion |
+| `next.config.ts` | Image optimization, env defaults (production backend URL), strict mode, compression |
+| `tsconfig.json` | TypeScript config: ES2017 target, strict mode, `@/` → `./src/*` alias |
+| `postcss.config.mjs` | PostCSS with `@tailwindcss/postcss` |
+| `eslint.config.mjs` | ESLint v9 flat config (Next.js core-web-vitals + TS presets) |
+| `components.json` | shadcn/ui config: Nova style, RSC enabled, neutral base, lucide icons |
 | `prisma/schema.prisma` | Database schema with 6 models (Simulation, Episode, SignalState, TrafficLog, RLModel, PerformanceMetric) |
 | `next-env.d.ts` | Auto-generated Next.js type references |
 
@@ -863,20 +867,20 @@ From `ppt.txt`:
 
 | File | Purpose |
 |---|---|
-| `src/app/globals.css` | Tailwind v4 with custom theme variables (light/dark), shadcn/ui integration, scrollbar custom styles |
-| `src/app/layout.tsx` | Root layout with Geist fonts, TooltipProvider, KeepAlivePing component, Providers wrapper |
-| `src/app/providers.tsx` | Client component that initializes TanStack React Query's QueryClient |
-| `src/app/page.tsx` | Landing page with 5 sections: hero header, "How it works" (Simulate-Train-Compare), feature cards, tech stack display, CTA |
-| `src/app/simulation/page.tsx` | **UPDATED** Main simulation dashboard — side-by-side layout: left 3D canvas, right sidebar (controls, metrics, analytics tabs) |
-| `src/app/api/simulations/route.ts` | GET — returns 20 most recent simulations from Prisma |
-| `src/app/api/models/route.ts` | GET — returns all RL models from Prisma (descending by creation) |
+| `src/app/globals.css` | Tailwind v4 with custom theme variables (light/dark), shadcn/ui integration, scrollbar styles |
+| `src/app/layout.tsx` | Root layout — Geist fonts, TooltipProvider, KeepAlivePing, QueryClient Provider |
+| `src/app/providers.tsx` | Client component — initializes TanStack React Query's QueryClient |
+| `src/app/page.tsx` | Landing page — hero, "How it works" (Simulate-Train-Compare), feature cards, tech stack, CTA |
+| `src/app/simulation/page.tsx` | **UPDATED** Main dashboard — side-by-side layout: left 3D canvas, right sidebar (controls, metrics, analytics tabs) |
+| `src/app/api/simulations/route.ts` | GET — returns 20 most recent simulations via Prisma |
+| `src/app/api/models/route.ts` | GET — returns all RL models (descending by creation) via Prisma |
 | `src/app/api/metrics/route.ts` | GET — returns performance metrics, optional `?simulationId` filter (max 100) |
 | `src/app/api/episodes/route.ts` | GET — returns episodes, optional `?simulationId` filter (max 500) |
-| `src/app/api/keep-alive/route.ts` | GET — pings FastAPI backend's `/health` endpoint to prevent cold starts |
-| `src/types/simulation.ts` | **UPDATED** TypeScript interfaces: `SimulationMode` now includes `"manual"`, `VehicleState.turn` now required |
-| `src/store/simulationStore.ts` | Zustand store managing connection/running/training state, current frame, training metrics (capped at 1000) |
-| `src/lib/utils.ts` | `cn()` class merging, `getFastApiUrls()` — environment-aware backend URL resolution |
-| `src/lib/prisma.ts` | Singleton PrismaClient instance for server-side database access |
+| `src/app/api/keep-alive/route.ts` | GET — pings FastAPI `/health` to prevent backend cold start |
+| `src/types/simulation.ts` | TypeScript interfaces: `SimulationMode` (includes `"manual"`), `VehicleState`, `SimulationFrame`, `TrainingMetric` |
+| `src/store/simulationStore.ts` | Zustand store — connection/running/training state, current frame, training metrics (capped at 1000), action methods |
+| `src/lib/utils.ts` | `cn()` class merging, `getFastApiUrls()` — environment-aware backend URL resolution (no hardcoded URLs) |
+| `src/lib/prisma.ts` | Singleton PrismaClient (prevents hot-reload connection leaks) |
 
 #### Hooks
 
@@ -884,8 +888,8 @@ From `ppt.txt`:
 |---|---|
 | `src/hooks/useSimulationSocket.ts` | WebSocket hook for `/ws/simulation` — auto-connect, exponential backoff retry (max 5), frame logging, `sendCommand()` |
 | `src/hooks/useTrainingSocket.ts` | WebSocket hook for `/ws/training` — same reconnect strategy, handles training metric streaming |
-| `src/hooks/useSimulations.ts` | React Query hook fetching `/api/simulations` |
-| `src/hooks/useEpisodes.ts` | React Query hook fetching episodes, auto-refreshes every 10s |
+| `src/hooks/useSimulations.ts` | React Query hook — fetches `/api/simulations` |
+| `src/hooks/useEpisodes.ts` | React Query hook — fetches episodes, auto-refresh every 10s |
 
 #### Control Components
 
@@ -932,12 +936,12 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 | File | Purpose |
 |---|---|
 | `server/app/__init__.py` | Empty package init |
-| `server/app/main.py` | FastAPI application entry point: lifespan creates TrafficEnv, DQNAgent, Trainer; stores in app_state dict; CORS middleware with allowlist + regex fallback; includes 3 routers; registers 2 WebSocket routes; `/` and `/health` endpoints |
-| `server/app/config.py` | Pydantic Settings: loads `SUPABASE_URL`, `supabase_service_key` (with alias resolution from 4 env var names), `CORS_ORIGINS`; validates service key is admin-level (decodes JWT, checks `role=service_role`) |
+| `server/app/main.py` | **MAJOR UPDATE** FastAPI application entry point: lifespan creates **two independent environments** — `sim_intersection` for live simulation, `training_env` for Trainer; stores in `app.state` dict; CORS middleware with allowlist + regex; includes 3 routers; registers 2 WebSocket routes; `/` and `/health` endpoints |
+| `server/app/config.py` | Pydantic Settings: loads `SUPABASE_URL`, `supabase_service_key` (with alias resolution from 4 env var names), `CORS_ORIGINS`, **`SIGNAL_RED_DURATION`**; validates service key is admin-level (decodes JWT, checks `role=service_role`) |
 | `server/app/routers/simulation.py` | REST endpoints: POST `/simulation/start`, POST `/simulation/stop`, POST `/simulation/reset`, PUT `/simulation/mode`, GET `/simulation/status` (MetricsSnapshot) |
 | `server/app/routers/training.py` | REST endpoints: POST `/training/start`, POST `/training/stop`, GET `/training/status`, GET `/training/models`, POST `/training/load` |
 | `server/app/routers/metrics.py` | REST endpoint: GET `/metrics/current` (MetricsSnapshot) |
-| `server/app/schemas/simulation_schema.py` | Pydantic models: `VehicleState`, `SimulationFrame`, `build_frame()` |
+| `server/app/schemas/simulation_schema.py` | Pydantic models: `VehicleState`, `SignalState`, `QueueState`, `MetricsState`, `RLState`, `SimulationFrame`; **enhanced `build_frame()`** with world coordinates, per-lane signal colors, Q-values, action labels, exploration flags |
 | `server/app/schemas/training_schema.py` | Pydantic models: `TrainingMetric`, `StartTrainingRequest` |
 | `server/app/schemas/metrics_schema.py` | `MetricsSnapshot`: avg_wait_time, throughput, max_queue, current_phase, is_training, current_episode, epsilon |
 
@@ -946,16 +950,16 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 | File | Purpose |
 |---|---|
 | `server/app/services/supabase_service.py` | All DB writes: `create_simulation`, `update_simulation`, `save_episode`, `save_traffic_logs_bulk`, `save_signal_states_bulk`, `save_performance_metric`, `save_model_metadata` (upsert), `set_active_model`. All sync, called via `asyncio.to_thread`. Error logging on every failure. |
-| `server/app/services/model_service.py` | Checkpoint management: `save_checkpoint` (local disk + Supabase Storage), `load_checkpoint` (Storage with local fallback), `list_checkpoints`, `list_all_models` (3-tier: DB → Storage listing → local disk, deduplicated) |
+| `server/app/services/model_service.py` | Checkpoint management: `save_checkpoint` (local disk + Supabase Storage), `load_checkpoint` (Storage with local fallback), `list_checkpoints`, `list_all_models` (3-tier discovery: DB → Storage listing → local disk, deduplicated) |
 
 #### Simulation Engine
 
 | File | Purpose |
 |---|---|
-| `server/app/simulation/environment.py` | Gymnasium RL environment (`TrafficEnv`): 8-dim observation (queue lengths×4, phase, time_in_phase, color_val, normalized_timestep), Discrete(4) action space. `reset()` resets intersection, `step(action)` advances simulation, computes reward (wait_penalty + throughput_bonus + switch_penalty + overflow_penalty), terminal at 500 steps. **Observation includes pending phase** during yellow/red transitions. |
-| `server/app/simulation/intersection.py` | **MAJOR UPDATE** Core traffic intersection: 12 lanes (4 directions × 3 turns), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (by direction group: NS vs EW), emergency override. **`get_queue_lengths()` now counts only `state=="waiting"` vehicles**. **Yield-on-left logic**: left-turning vehicles at stop line during phases 0/1 must yield to oncoming straight/right traffic. **Per-lane queues** with `_spawned_this_interval` / `_passed_this_interval` counters for telemetry. |
+| `server/app/simulation/environment.py` | Gymnasium `TrafficEnv`: 8-dim observation (queue lengths×4, phase, time_in_phase, total_vehicles, pending_phase), Discrete(4) action space. `reset()` resets intersection, `step(action)` advances simulation, computes reward via `compute_reward()`, terminal at 500 steps. **Observation includes pending phase** during yellow/red transitions. |
+| `server/app/simulation/intersection.py` | **MAJOR UPDATE** Core traffic intersection: 12 lanes (4 directions × 3 turns), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (by direction group: NS vs EW), emergency override. **`get_queue_lengths()` now counts only `state != "passed"` vehicles**. **Yield-on-left logic**: left-turning vehicles at stop line during phases 0/1 must yield to oncoming straight/right traffic. **Per-lane queues** with `_spawned_this_interval` / `_passed_this_interval` counters for telemetry. |
 | `server/app/simulation/vehicle.py` | Vehicle dataclass: id, lane (direction), turn, position, wait_time, speed, state, is_emergency. `tick(dt, can_move)` moves vehicle at DEFAULT_SPEED (0.12) if allowed, tracks wait time, transitions to "passed" at position ≥ 1.0 |
-| `server/app/simulation/traffic_signal.py` | **MAJOR UPDATE** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). **Added `red_duration=1.0` for all-red clearance**. **Manual mode support**: `is_manual` flag holds current green indefinitely. Phase-to-lane mapping and allowed turns per phase. Fixed timing: 8s green default, 2s yellow, 1s red, 4s minimum green. Smart phase selection (highest queue after minimum green). AI phase requests go through yellow-red-green transition. `is_green_for(lane, turn)` checks phase + color + turn restrictions. |
+| `server/app/simulation/traffic_signal.py` | **MAJOR UPDATE** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). **Added `red_duration=3.0` for all-red clearance**. **Manual mode support**: `is_manual` flag holds current green indefinitely. Phase-to-lane mapping, allowed turns per phase. Fixed timing: 8s green default, 2s yellow, 3s red, 4s minimum green. Smart phase selection (highest queue after minimum green). AI phase requests go through yellow-red-green transition. `is_green_for(lane, turn)` checks phase + color + turn restrictions. |
 | `server/app/simulation/spawner.py` | **UPDATED** `PoissonSpawner`: configurable λ (default 0.3), spawns into one random direction per tick, 50% straight / 25% left / 25% right, max 10 vehicles per lane. Lanes now keyed by `{direction}_{turn}`. |
 | `server/app/simulation/metrics.py` | `MetricsTracker`: rolling calculation of avg_wait_time, avg_throughput, avg_queue_length with running totals. (Currently unused but retained) |
 
@@ -963,18 +967,18 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 
 | File | Purpose |
 |---|---|
-| `server/app/rl/dqn_network.py` | Neural network architecture: 3 hidden layers — Linear(8,128) → ReLU → Linear(128,128) → ReLU → Linear(128,64) → ReLU → Linear(64,4) |
-| `server/app/rl/dqn_agent.py` | DQN Agent: online + target networks, Adam optimizer, MSELoss. `select_action(state, epsilon)` — epsilon-greedy. `train_step(batch)` — Q-learning targets with γ=0.95. `sync_target_network()` — copies online weights to target. `save()` / `load()` — PyTorch state dict serialization. |
-| `server/app/rl/replay_buffer.py` | Deque-based buffer (max 10,000 transitions). `push(state, action, reward, next_state, done)`. `sample(batch_size)` — returns batched torch tensors. |
-| `server/app/rl/hyperparams.py` | Dataclass: lr=1e-3, γ=0.95, ε_start=1.0, ε_end=0.05, ε_decay=0.995, batch_size=64, replay_buffer=10000, target_update_freq=500, max_steps=500, episodes=500, min_replay_size=64 |
-| `server/app/rl/trainer.py` | Training orchestrator: async episodes loop. Every 4th step: sample buffer → train (via `asyncio.to_thread`). Target sync every 500 steps. Yields event loop every 10 steps. Episode completion: saves to Supabase, broadcasts via WebSocket. Checkpoint every 50 episodes: saves model + metadata. Epsilon decay per episode. Rolling 50-episode reward window for metadata. |
+| `server/app/rl/dqn_network.py` | **UPDATED** Neural network: 3 hidden layers — Linear(8,256) → LayerNorm → ReLU → Linear(256,256) → LayerNorm → ReLU → Linear(256,128) → ReLU → Linear(128,4). Kaiming uniform weight initialization. |
+| `server/app/rl/dqn_agent.py` | **MAJOR UPDATE** DQN Agent: online + target networks, Adam optimizer, **Huber Loss (SmoothL1Loss)**. `select_action(state, epsilon)` — epsilon-greedy. `get_q_values(state)` — exposes Q-values for dashboard. **Double DQN training step**: online net selects best action, target net evaluates it. Gradient clipping (max_norm=10). `save()` / `load()` support both old (raw state_dict) and new (dict with online/target/optimizer/step_count) checkpoint formats. |
+| `server/app/rl/replay_buffer.py` | **UPDATED** Deque-based buffer (max 50,000 transitions). `push(state, action, reward, next_state, done)`. `sample(batch_size)` — returns batched torch tensors. `is_ready` property checks against `MIN_REPLAY_SIZE`. |
+| `server/app/rl/hyperparams.py` | **UPDATED** Dataclass: STATE_DIM=8, ACTION_DIM=4, HIDDEN_LAYERS=(256,256,128), LR=5e-4, γ=0.95, BATCH=64, TRAIN_EVERY=1, REPLAY=50000, MIN_REPLAY=1000, ε_start=1.0, ε_end=0.05, ε_decay=0.997, MAX_STEPS=500, DEFAULT_EPISODES=500, TARGET_UPDATE=200, CHECKPOINT_EVERY=50. Lowercase property mappings for backward compatibility. |
+| `server/app/rl/trainer.py` | **UPDATED** Training orchestrator: async episodes loop. Every step: train if buffer ready (Double DQN). Target sync every 200 steps. Yields event loop every step during warmup, every 4 steps during active training. Episode completion: saves to Supabase, broadcasts via WebSocket. Checkpoint every 50 episodes (model save + metadata upsert). Rolling 50-episode reward window for metadata. **Uses `agent.replay_buffer.is_ready` for warmup check**. |
 
 #### WebSocket Handlers
 
 | File | Purpose |
 |---|---|
-| `server/app/websockets/simulation_ws.py` | Simulation WebSocket: ConnectionManager for multi-client broadcast. Main loop at 10 Hz. Fixed mode: `intersection.tick(action=None)`. AI mode: `env._get_obs()` → `agent.select_action(ε=0)` → `env.step()`. **Manual mode**: `intersection.tick(action=None, is_manual=True)`. DB sampling every 50 ticks, flushing every 10 samples. Handles 7 commands (start, stop, reset, set_mode, set_spawn_rate, emergency_override, **manual_override**). Flushes buffer on cancel/crash. |
-| `server/app/websockets/training_ws.py` | Training WebSocket: separate ConnectionManager. `broadcast_training_metric()` used by Trainer. Handles start_training/stop_training commands. Creates simulation record if needed. |
+| `server/app/websockets/simulation_ws.py` | **MAJOR UPDATE** Simulation WebSocket: ConnectionManager for multi-client broadcast. Main loop at 10 Hz. Fixed mode: `intersection.tick(action=None)`. AI mode: `_build_obs_from_intersection()` → `agent.select_action(ε=0)` → `intersection.tick(action)`. Manual mode: `intersection.tick(is_manual=True)`. DB sampling every 50 ticks, flushing every 10 samples. Handles 7 commands (start, stop, reset, set_mode, set_spawn_rate, emergency_override, **manual_override**). **Command validation** with schemas. Flushes buffer on cancel/crash. |
+| `server/app/websockets/training_ws.py` | Training WebSocket: separate ConnectionManager. `broadcast_training_metric()` used by Trainer. Handles start_training/stop_training commands. Creates simulation record if needed. Sends current status immediately on connect. |
 
 ### Server Config Files
 
@@ -982,23 +986,23 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 |---|---|
 | `server/requirements.txt` | Production dependencies (11 packages) |
 | `server/requirements-dev.txt` | Test dependencies (pytest, pytest-asyncio, pytest-cov, httpx, pytest-mock) |
-| `server/pytest.ini` | Pytest config: asyncio auto mode, coverage on `app/`, term-missing report |
+| `server/pytest.ini` | Pytest config: asyncio auto-mode, coverage on `app/`, term-missing report |
 | `server/runtime.txt` | Python 3.11.9 version pin |
 | `server/SUPABASE_KEYS_SETUP.txt` | Detailed Supabase key setup guide explaining service_role vs anon key distinction |
-| `server/Dockerfile` | Multi-stage Docker build: python:3.11-slim, installs build deps, CPU-only PyTorch, runs uvicorn on port 8000 |
+| `server/Dockerfile` | Multi-stage Docker build: python:3.11-slim, build deps, CPU-only PyTorch, runs uvicorn on port 8000 |
 
-### Tests
+### Tests (`server/tests/`)
 
 | File | Purpose |
 |---|---|
-| `server/tests/conftest.py` | Pytest fixtures: `mock_supabase`, `mock_model_service`, `client` (FastAPI TestClient with lifespan), `app_state` |
-| `server/tests/api/test_main.py` | Tests root (`/`) and `/health` endpoints |
-| `server/tests/api/test_simulation.py` | Tests start/stop/reset/set_mode/get_status — 5 test functions |
-| `server/tests/api/test_training.py` | Tests start/stop/status/models — 4 test functions |
-| `server/tests/rl/test_replay_buffer.py` | Tests buffer push and sample — 2 test functions |
-| `server/tests/rl/test_dqn_agent.py` | Tests init, random action, greedy action, train_step — 4 test functions |
-| `server/tests/simulation/test_vehicle.py` | Tests init, movement, waiting, passed state — 4 test functions |
-| `server/tests/simulation/test_traffic_signal.py` | Tests init, phase change, yellow→red→green transitions, fixed duration rollover, green permission — 6 test functions |
+| `conftest.py` | Pytest fixtures: `mock_supabase` (patches supabase_client), `mock_model_service` (patches save/load/list), `client` (FastAPI TestClient with lifespan), `app_state` |
+| `tests/api/test_main.py` | Tests root (`/`) and `/health` endpoints |
+| `tests/api/test_simulation.py` | Tests start/stop/reset/set_mode/get_status — 5 test functions |
+| `tests/api/test_training.py` | Tests start/stop/status/models — 4 test functions |
+| `tests/rl/test_replay_buffer.py` | Tests buffer push and sample — 2 test functions |
+| `tests/rl/test_dqn_agent.py` | Tests init, random action, greedy action, train_step — 4 test functions |
+| `tests/simulation/test_vehicle.py` | Tests init, movement, waiting, passed state — 4 test functions |
+| `tests/simulation/test_traffic_signal.py` | Tests init, phase change, yellow→red→green transitions, fixed duration rollover, green permission — 6 test functions |
 
 ---
 
@@ -1016,8 +1020,10 @@ The project evolved through numbered phases early on, then shifted to feature-ba
 | **UI & Docs** | `302d2a2`, `b6e2668`, `20f13cb`, `7bab979` | Documentation, landing page, animations |
 | **Infrastructure** | `6f94c89`, `b162c34`, `50c1e1c`, `c1a267c`, `d4b2670` | Keep-alive (added, moved to API route, workflows removed) |
 | **Recent** | `f042669`, `7ad81e8`, `7ca7d8c` | Emergency preemption UI, multi-vehicle intersection locks, 3D lighting fixes with CCTV cameras |
-| **Latest** | `df5a3a4`...`462b560` | **Manual (MNL) mode**, 3-lane roads, yield-on-left, vehicle interpolation fixes, traffic light arrows, environment scaling, get_queue_lengths fix |
+| **Latest Fixes (Fixes 1-9)** | `07f018b`...`a3d650c` | **Env separation, queue counting, all-red duration, observation space, DQN upgrade, reward redesign, WS JSON redesign, DB schema, cleanup** |
+| **Manual Mode** | `df5a3a4` | Manual (MNL) mode + WebSocket `manual_override` command |
+| **Visual Polish** | `926a754`, `4b390b2`, `2885db9`, `630aac6` | Sun emissive intensity, traffic light arrows, environment scaling, 3-lane roads with exact stop line tracking |
 
 ---
 
-*Generated: 2026-07-11 — Comprehensive project analysis of FlowSync (updated with Manual mode, 3-lane roads, yield-on-left, 3D visual overhaul, and side-by-side layout)*
+*Generated: 2026-07-11 — Comprehensive project analysis of FlowSync (updated with Fixes 1-9, Manual mode, 3-lane roads, yield-on-left, Double DQN, observation space redesign, reward redesign, WS JSON schema v2, DB schema v2, and all cleanup)*
