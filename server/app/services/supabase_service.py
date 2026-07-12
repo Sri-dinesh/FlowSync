@@ -167,17 +167,18 @@ def save_performance_metric(
     mode: str,
     avg_wait: float,
     throughput: int,
+    max_queue: int = 0,
+    total_steps: int = 0,
 ) -> None:
-    is_fixed = mode == "fixed"
     try:
         supabase_client.table("performance_metrics").insert({
             "id": str(uuid4()),
             "simulationId": simulation_id,
             "mode": mode,
-            "avgWaitTimeFixed": avg_wait if is_fixed else None,
-            "avgWaitTimeAI": avg_wait if not is_fixed else None,
-            "throughputFixed": throughput if is_fixed else None,
-            "throughputAI": throughput if not is_fixed else None,
+            "avgWaitTime": avg_wait,
+            "throughput": throughput,
+            "maxQueueLength": max_queue,
+            "totalSteps": total_steps,
         }).execute()
     except Exception:
         logger.exception(
