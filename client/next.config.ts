@@ -9,8 +9,8 @@ const nextConfig: NextConfig = {
 
   // Production environment variables
   env: {
-    NEXT_PUBLIC_FASTAPI_WS_URL: process.env.NEXT_PUBLIC_FASTAPI_WS_URL ?? "wss://flowsync-gelt.onrender.com",
-    NEXT_PUBLIC_FASTAPI_HTTP_URL: process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL ?? "https://flowsync-gelt.onrender.com",
+    NEXT_PUBLIC_FASTAPI_WS_URL: process.env.NEXT_PUBLIC_FASTAPI_WS_URL || "ws://localhost:8000",
+    NEXT_PUBLIC_FASTAPI_HTTP_URL: process.env.NEXT_PUBLIC_FASTAPI_HTTP_URL || "http://localhost:8000",
   },
 
   // Optimize for production builds

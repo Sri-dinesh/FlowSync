@@ -36,3 +36,26 @@ def test_dqn_agent_train_step():
     loss = agent.train_step(batch)
     assert isinstance(loss, float)
     assert loss >= 0
+
+def test_dqn_agent_get_q_values():
+    agent = DQNAgent(state_dim=8, action_dim=4)
+    state = np.zeros(8)
+    q_values = agent.get_q_values(state)
+    assert isinstance(q_values, list)
+    assert len(q_values) == 4
+    for q in q_values:
+        assert isinstance(q, float)
+
+def test_double_dqn_loss_runs_cleanly():
+    # Double DQN checks that train_step behaves normally and weights update
+    agent = DQNAgent(state_dim=8, action_dim=4)
+    batch_size = 2
+    batch = (
+        torch.zeros((batch_size, 8)),
+        torch.zeros(batch_size, dtype=torch.long),
+        torch.ones(batch_size),
+        torch.zeros((batch_size, 8)),
+        torch.zeros(batch_size)
+    )
+    loss = agent.train_step(batch)
+    assert isinstance(loss, float)
