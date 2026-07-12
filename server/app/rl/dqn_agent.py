@@ -1,112 +1,111 @@
-from typing import Tuple, List, Dict, Any
-import numpy as np
 import torch
-from torch import nn
+import torch.nn as nn
 import torch.optim as optim
-
-from .dqn_network import DQNNetwork
-from .replay_buffer import ReplayBuffer
-from .hyperparams import HyperParams
+import numpy as np
+from app.rl.dqn_network import DuelingDQNNetwork
+from app.rl.replay_buffer import PrioritizedReplayBuffer
+from app.rl.hyperparams import HyperParams
 
 HP = HyperParams()
 
 
 class DQNAgent:
-    def __init__(
-        self,
-        state_dim: int = 8,
-        action_dim: int = 4,
-        learning_rate: float = 5e-4,
-        gamma: float = 0.95,
-        replay_buffer_size: int = 50_000,
-    ) -> None:
-        self.action_dim = action_dim
-        self.gamma = gamma
-        self.online_net = DQNNetwork(state_dim, action_dim)
-        self.target_net = DQNNetwork(state_dim, action_dim)
+    """
+    Dueling Double DQN with Prioritized Experience Replay.
+
+    Architecture combines:
+    - Dueling DQN: V(s) + A(s,a) decomposition for better high-density decisions
+    - Double DQN: online net selects action, target net evaluates (reduces overestimation)
+    - PER: high-TD-error transitions sampled more often (learns from critical events faster)
+
+    Based on: FPA-DQN (2025), 3DQN-PER (2025), Wang et al. 2016, Schaul et al. 2016
+    """
+    def __init__(self):
+        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
         self.target_net.load_state_dict(self.online_net.state_dict())
-        self.target_net.eval()  # target net never trains directly
+        self.target_net.eval()
 
         self.optimizer = optim.Adam(
             self.online_net.parameters(),
-            lr=learning_rate
+            lr=HP.LEARNING_RATE,
+            eps=1e-8       # Adam epsilon — slightly larger for stability
         )
-        self.loss_fn = nn.SmoothL1Loss()  # Huber Loss — replaces MSELoss
-        self.replay_buffer = ReplayBuffer(replay_buffer_size)
+        self.loss_fn = nn.SmoothL1Loss(reduction='none')  # per-sample loss for PER weighting
+        self.replay_buffer = PrioritizedReplayBuffer(HP.REPLAY_BUFFER_SIZE)
         self.step_count = 0
 
     def select_action(self, state: np.ndarray, epsilon: float) -> int:
-        """Epsilon-greedy action selection."""
         if np.random.random() < epsilon:
-            return int(np.random.randint(self.action_dim))
+            return np.random.randint(HP.ACTION_DIM)
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         with torch.no_grad():
             q_values = self.online_net(state_tensor)
         return int(q_values.argmax().item())
 
-    def get_q_values(self, state: np.ndarray) -> List[float]:
-        """Return raw Q-values for all actions (used for dashboard display)."""
+    def get_q_values(self, state: np.ndarray) -> list:
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         with torch.no_grad():
             q_values = self.online_net(state_tensor)
-        return q_values.squeeze(0).numpy().tolist()
+        return q_values.squeeze(0).tolist()
 
-    def train_step(
-        self,
-        batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-    ) -> float:
+    def train_step(self, batch) -> tuple[float, np.ndarray]:
         """
-        Double DQN training step.
+        Dueling Double DQN training step with PER importance sampling.
 
-        Standard DQN:
-            target = r + γ * max_a[target_net(s')]
-
-        Double DQN (fixes overestimation):
-            best_action = argmax_a[online_net(s')]   ← online selects action
-            target = r + γ * target_net(s')[best_action]  ← target evaluates it
+        Returns: (loss_value, td_errors) — td_errors used to update PER priorities.
         """
-        states, actions, rewards, next_states, dones = batch
+        states, actions, rewards, next_states, dones, weights, indices = batch
 
-        # Current Q-values from online network
-        current_q = self.online_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        # Current Q-values (online net)
+        current_q_all = self.online_net(states)
+        current_q = current_q_all.gather(1, actions.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
-            # DOUBLE DQN: online net selects best action for next state
-            best_next_actions = self.online_net(next_states).argmax(1)
-            # Target net evaluates that action (reduces overestimation)
+            # Double DQN: online net selects best action for next state
+            next_actions = self.online_net(next_states).argmax(1)
+            # Target net evaluates that action
             next_q = self.target_net(next_states).gather(
-                1, best_next_actions.unsqueeze(1)
+                1, next_actions.unsqueeze(1)
             ).squeeze(1)
             # Bellman target
-            target_q = rewards + self.gamma * next_q * (1 - dones)
+            target_q = rewards + HP.GAMMA * next_q * (1 - dones)
 
-        loss = self.loss_fn(current_q, target_q)
+        # Per-sample loss (needed for PER priority update)
+        td_errors = (target_q - current_q).detach().cpu().numpy()
+        per_sample_loss = self.loss_fn(current_q, target_q)
+
+        # Weight loss by importance sampling weights (PER correction)
+        weighted_loss = (per_sample_loss * weights).mean()
 
         self.optimizer.zero_grad()
-        loss.backward()
-        # Gradient clipping — prevents exploding gradients
+        weighted_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
         self.optimizer.step()
 
         self.step_count += 1
-        return float(loss.item())
 
-    def sync_target_network(self) -> None:
-        """Hard update: copy online weights to target."""
+        # Update PER priorities with new TD errors
+        self.replay_buffer.update_priorities(indices, np.abs(td_errors))
+
+        return float(weighted_loss.item()), td_errors
+
+    def sync_target_network(self):
         self.target_net.load_state_dict(self.online_net.state_dict())
 
-    def get_checkpoint_state(self) -> Dict[str, Any]:
+    def get_checkpoint_state(self) -> dict:
         return {
             'online_net': self.online_net.state_dict(),
             'target_net': self.target_net.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'step_count': self.step_count,
+            'obs_version': 'v3_20dim_pressure',
         }
 
-    def save(self, path: str) -> None:
+    def save(self, path: str):
         torch.save(self.get_checkpoint_state(), path)
 
-    def load(self, path: str) -> None:
+    def load(self, path: str):
         checkpoint = torch.load(path, map_location='cpu')
         if isinstance(checkpoint, dict) and 'online_net' in checkpoint:
             self.online_net.load_state_dict(checkpoint['online_net'])
@@ -116,7 +115,7 @@ class DQNAgent:
             if 'step_count' in checkpoint:
                 self.step_count = checkpoint['step_count']
         else:
-            # Old format (raw state dict)
+            # Legacy format
             self.online_net.load_state_dict(checkpoint)
             self.sync_target_network()
         self.target_net.eval()
