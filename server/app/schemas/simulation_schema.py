@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel
 
 class VehicleState(BaseModel):
@@ -90,28 +90,6 @@ def _lane_to_world(lane: str, position: float) -> tuple[float, float]:
         return (-8.0 + position * 8.0, road_offset)
     return (0.0, 0.0)
 
-def _build_obs_from_intersection(intersection):
-    # Local helper for when agent requires Q-value inference
-    queues = intersection.get_queue_lengths()
-    signal = intersection.signal
-    total_vehicles = intersection.get_total_waiting()
-    pending_phase = (
-        signal.pending_phase
-        if hasattr(signal, 'pending_phase') and signal.pending_phase is not None
-        else signal.current_phase
-    )
-    import numpy as np
-    return np.array([
-        float(queues.get("north", 0)),
-        float(queues.get("south", 0)),
-        float(queues.get("east", 0)),
-        float(queues.get("west", 0)),
-        float(signal.current_phase),
-        float(signal.time_in_phase),
-        float(total_vehicles),
-        float(pending_phase),
-    ], dtype=np.float32)
-
 def build_frame(
     intersection,
     mode: str,
@@ -123,6 +101,7 @@ def build_frame(
     epsilon: float = 0.0,
     last_action: int = 0,
     was_exploring: bool = False,
+    obs: Optional[Any] = None,
     # Support old keyword arguments mapping
     reward: Optional[float] = None,
 ) -> SimulationFrame:
@@ -204,8 +183,7 @@ def build_frame(
 
     # RL state (only in AI mode)
     rl_state = None
-    if mode == "ai" and agent is not None:
-        obs = _build_obs_from_intersection(intersection)
+    if mode == "ai" and agent is not None and obs is not None:
         q_values = agent.get_q_values(obs)
         rl_state = RLState(
             reward=round(last_reward, 3),

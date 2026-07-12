@@ -6,7 +6,7 @@ from .vehicle import DEFAULT_SPEED, Vehicle
 
 
 class Intersection:
-    def __init__(self, red_duration: float = 3.0) -> None:
+    def __init__(self, red_duration: float = 3.0, spawn_lambda: float = 0.3) -> None:
         self.lanes: Dict[str, List[Vehicle]] = {
             f"{dir}_{turn}": []
             for dir in ["north", "south", "east", "west"]
@@ -15,7 +15,7 @@ class Intersection:
         self.signal = TrafficSignal(red_duration=red_duration)
         self.timestep = 0
         self.total_passed = 0
-        self.spawner = PoissonSpawner()
+        self.spawner = PoissonSpawner(lambda_rate=spawn_lambda)
         # Set of vehicle IDs currently in the intersection
         self.vehicles_in_intersection = set()
         # The phase during which the intersection was locked
@@ -84,8 +84,12 @@ class Intersection:
             for i, vehicle in enumerate(lane_queue):
                 can_move = True
                 
-                # Check stop line collision and signal permission
-                is_green_for_movement = self.signal.is_green_for(dir_name, getattr(vehicle, "turn", None))
+                # Right turns ALWAYS can move (yield only to pedestrians, not signals)
+                if getattr(vehicle, "is_right_turn", False):
+                    is_green_for_movement = True
+                else:
+                    # Check stop line collision and signal permission
+                    is_green_for_movement = self.signal.is_green_for(dir_name, getattr(vehicle, "turn", None))
                 
                 # Yield-on-left check:
                 # If vehicle is at or before the stop line, wants to turn left, and the signal is a parallel green (0 or 1),
@@ -163,6 +167,33 @@ class Intersection:
             direction = lane_key.split("_")[0]  # "north_straight" → "north"
             counts[direction] += sum(1 for v in vehicles if v.state != "passed")
         return counts
+
+    def get_movement_queues(self) -> Dict[str, int]:
+        """
+        Returns queue length per traffic movement.
+        Keys: "{direction}_{turn}" for all 12 movements.
+        Counts all non-passed vehicles in each lane.
+        """
+        queues = {}
+        for lane_key, vehicles in self.lanes.items():
+            queues[lane_key] = sum(1 for v in vehicles if v.state != "passed")
+        return queues
+
+    def get_outgoing_counts(self) -> Dict[str, int]:
+        """
+        Estimates outgoing lane occupancy by counting vehicles that have recently
+        passed (position > 0.9) — these are still in the intersection/outgoing road.
+        Used for pressure calculation.
+        """
+        outgoing = {"north": 0, "south": 0, "east": 0, "west": 0}
+        for lane_key, vehicles in self.lanes.items():
+            direction = lane_key.split("_")[0]
+            # Vehicles that passed recently are in outgoing lane
+            outgoing[direction] += sum(
+                1 for v in vehicles
+                if v.position > 0.9 or v.state == "passed"
+            )
+        return outgoing
 
     def get_approaching_count(self, direction: str) -> int:
         """Count vehicles approaching (not yet at stop line) in a direction."""

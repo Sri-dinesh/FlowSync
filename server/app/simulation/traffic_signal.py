@@ -42,6 +42,36 @@ class TrafficSignal:
         self.red_duration: float = red_duration
         self.pending_phase: Optional[int] = None
 
+        self.starvation_timer: Dict[str, float] = {
+            "north": 0.0,
+            "south": 0.0,
+            "east": 0.0,
+            "west": 0.0,
+        }
+        self.STARVATION_THRESHOLD: float = 45.0  # seconds before starvation penalty
+        self.MAX_GREEN_TIME: float = 40.0         # hard cap per phase
+        self.MIN_GREEN_TIME: float = 8.0          # minimum before switching allowed
+
+    def get_starved_directions(self) -> List[str]:
+        """Returns directions that have been waiting longer than STARVATION_THRESHOLD."""
+        return [
+            d for d, t in self.starvation_timer.items()
+            if t >= self.STARVATION_THRESHOLD
+        ]
+
+    @property
+    def is_max_green_exceeded(self) -> bool:
+        """True if current phase has been green longer than MAX_GREEN_TIME."""
+        return (
+            self.color == SignalColor.GREEN
+            and self.time_in_phase >= self.MAX_GREEN_TIME
+        )
+
+    @property
+    def can_switch_phase(self) -> bool:
+        """Agent is only allowed to switch phase if minimum green time has passed."""
+        return self.time_in_phase >= self.MIN_GREEN_TIME or self.color != SignalColor.GREEN
+
     def set_phase(self, phase: int) -> None:
         if phase == self.current_phase and self.color == SignalColor.GREEN:
             return
@@ -58,6 +88,15 @@ class TrafficSignal:
     ) -> None:
         # lanes: mapping lane name -> list of vehicles (for dynamic phase decisions)
         self.time_in_phase += dt
+
+        # Update starvation timers
+        if self.color == SignalColor.GREEN:
+            green_dirs = PHASE_GREEN_LANES.get(self.current_phase, [])
+            for direction in ["north", "south", "east", "west"]:
+                if direction in green_dirs:
+                    self.starvation_timer[direction] = 0.0  # reset when getting green
+                else:
+                    self.starvation_timer[direction] += dt   # accumulate when waiting
 
         # Yellow handling
         if self.color == SignalColor.YELLOW:
@@ -132,6 +171,7 @@ class TrafficSignal:
             self.set_phase(next_phase)
 
     def is_green_for(self, lane: str, turn: Optional[str] = None) -> bool:
+        """Note: right turns are handled at the intersection level, not signal level."""
         if self.color != SignalColor.GREEN:
             return False
         if lane not in PHASE_GREEN_LANES.get(self.current_phase, []):

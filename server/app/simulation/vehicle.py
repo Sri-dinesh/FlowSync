@@ -15,6 +15,10 @@ class Vehicle:
     state: str
     is_emergency: bool = False
 
+    @property
+    def is_right_turn(self) -> bool:
+        return self.turn == "right"
+
     def tick(self, dt: float, can_move: bool) -> None:
         if can_move and self.position < 1.0:
             self.speed = DEFAULT_SPEED
