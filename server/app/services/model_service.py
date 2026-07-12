@@ -46,10 +46,17 @@ def load_checkpoint(model_id: str, episode: int) -> Dict[str, Any]:
     try:
         data = supabase_client.storage.from_(BUCKET_NAME).download(path)
         buffer = io.BytesIO(data)
-        return torch.load(buffer, map_location="cpu")
+        checkpoint = torch.load(buffer, map_location="cpu")
     except Exception:
         local_path = _local_checkpoint_path(model_id, episode)
-        return torch.load(local_path, map_location="cpu")
+        checkpoint = torch.load(local_path, map_location="cpu")
+
+    # Handle old format (raw state dict) vs new format (dict with keys)
+    if isinstance(checkpoint, dict) and 'online_net' in checkpoint:
+        return checkpoint  # new format
+    else:
+        # Old format — wrap it
+        return {'online_net': checkpoint, 'target_net': checkpoint}
 
 
 def list_checkpoints(model_id: str) -> List[str]:

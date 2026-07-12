@@ -1,16 +1,14 @@
+import random
 from collections import deque
-from random import sample
-from typing import Deque, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
 
-Transition = Tuple[np.ndarray, int, float, np.ndarray, bool]
-
 
 class ReplayBuffer:
-    def __init__(self, maxlen: int = 10_000) -> None:
-        self._buffer: Deque[Transition] = deque(maxlen=maxlen)
+    def __init__(self, maxlen: int = 50_000) -> None:
+        self.buffer = deque(maxlen=maxlen)
 
     def push(
         self,
@@ -20,12 +18,18 @@ class ReplayBuffer:
         next_state: np.ndarray,
         done: bool,
     ) -> None:
-        self._buffer.append((state, action, reward, next_state, done))
+        self.buffer.append((
+            np.array(state, dtype=np.float32),
+            int(action),
+            float(reward),
+            np.array(next_state, dtype=np.float32),
+            float(done)
+        ))
 
     def sample(
         self, batch_size: int
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        batch = sample(self._buffer, batch_size)
+        batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
         return (
@@ -37,4 +41,10 @@ class ReplayBuffer:
         )
 
     def __len__(self) -> int:
-        return len(self._buffer)
+        return len(self.buffer)
+
+    @property
+    def is_ready(self) -> bool:
+        """True when buffer has enough samples to start training."""
+        from app.rl.hyperparams import HyperParams
+        return len(self) >= HyperParams().MIN_REPLAY_SIZE
