@@ -123,8 +123,8 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
           bracketPos: [1.35, 2.0, 0] as [number, number, number],
           bracketSize: [2.7, 0.1, 0.1] as [number, number, number],
           housingPos: [1.7, 2.0, 0] as [number, number, number],
-          zSign: 1,
-          lightPos: [1.7, 1.2, 0.3] as [number, number, number],
+          zSign: -1,
+          lightPos: [1.7, 1.2, -0.3] as [number, number, number],
           // CCTV offsets
           cctvPos: [1.0, 2.25, -0.2] as [number, number, number],
           cctvMountPos: [1.0, 2.125, -0.1] as [number, number, number],
@@ -136,8 +136,8 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
           bracketPos: [-1.35, 2.0, 0] as [number, number, number],
           bracketSize: [2.7, 0.1, 0.1] as [number, number, number],
           housingPos: [-1.7, 2.0, 0] as [number, number, number],
-          zSign: -1,
-          lightPos: [-1.7, 1.2, -0.3] as [number, number, number],
+          zSign: 1,
+          lightPos: [-1.7, 1.2, 0.3] as [number, number, number],
           // CCTV offsets
           cctvPos: [-1.0, 2.25, 0.2] as [number, number, number],
           cctvMountPos: [-1.0, 2.125, 0.1] as [number, number, number],
@@ -191,12 +191,12 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       : [offsets.zSign * 0.19, offsets.housingPos[1] + localY, offsets.housingPos[2]];
 
     const textRot: [number, number, number] = direction === "north"
-      ? [0, 0, 0]
-      : direction === "south"
       ? [0, Math.PI, 0]
+      : direction === "south"
+      ? [0, 0, 0]
       : direction === "east"
-      ? [0, -Math.PI / 2, 0]
-      : [0, Math.PI / 2, 0];
+      ? [0, Math.PI / 2, 0]
+      : [0, -Math.PI / 2, 0];
 
     // Visual offset to place text exactly on the outer surface of the lens (radius 0.15)
     const tPos: [number, number, number] = direction === "north" || direction === "south"

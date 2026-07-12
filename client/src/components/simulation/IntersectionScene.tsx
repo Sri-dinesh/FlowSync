@@ -1,6 +1,6 @@
 "use client";
 
-import { Text } from "@react-three/drei";
+import { Text, Billboard } from "@react-three/drei";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
 import TrafficLight from "@/components/simulation/TrafficLight";
@@ -49,44 +49,47 @@ interface QueueLabelProps {
 }
 
 function QueueLabel({ value, position }: QueueLabelProps) {
+  const color = getQueueColor(value);
   return (
-    <group position={position}>
-      {/* Small floating backing plate */}
-      <mesh position={[0, 0, 0]} castShadow>
-        <boxGeometry args={[0.8, 0.5, 0.08]} />
-        <meshStandardMaterial
-          color="#09090b"
-          roughness={0.7}
-          opacity={0.9}
-          transparent
-        />
-      </mesh>
+    <Billboard position={position} follow={true} lockX={false} lockY={false} lockZ={false}>
+      <group>
+        {/* Sleek backing plate */}
+        <mesh position={[0, 0, 0]}>
+          <planeGeometry args={[1.2, 0.8]} />
+          <meshBasicMaterial color="#111111" opacity={0.85} transparent />
+        </mesh>
 
-      {/* Glowing text inside backing plate */}
-      <Text
-        position={[0, 0, 0.06]}
-        fontSize={0.35}
-        color={getQueueColor(value)}
-        anchorX="center"
-        anchorY="middle"
-        fontWeight="bold"
-        fillOpacity={0.95}
-      >
-        {value}
-      </Text>
+        {/* Glowing border accent */}
+        <mesh position={[0, 0, -0.01]}>
+          <planeGeometry args={[1.3, 0.9]} />
+          <meshBasicMaterial color={color} opacity={0.6} transparent />
+        </mesh>
 
-      {/* Outer glow effect */}
-      <mesh position={[0, 0, 0.04]}>
-        <boxGeometry args={[0.85, 0.55, 0.02]} />
-        <meshStandardMaterial
-          color={getQueueColor(value)}
-          emissive={getQueueColor(value)}
-          emissiveIntensity={value >= 8 ? 1.5 : 0.8}
-          transparent
-          opacity={0.3}
-        />
-      </mesh>
-    </group>
+        {/* Label title */}
+        <Text
+          position={[0, 0.2, 0.02]}
+          fontSize={0.15}
+          color="#a1a1aa"
+          anchorX="center"
+          anchorY="middle"
+          letterSpacing={0.1}
+        >
+          WAITING
+        </Text>
+
+        {/* Value Text */}
+        <Text
+          position={[0, -0.1, 0.02]}
+          fontSize={0.5}
+          color={color}
+          anchorX="center"
+          anchorY="middle"
+          fontWeight="bold"
+        >
+          {value}
+        </Text>
+      </group>
+    </Billboard>
   );
 }
 
@@ -138,10 +141,10 @@ export default function IntersectionScene() {
       />
 
       {/* Floating Holographic Queue Indicators */}
-      <QueueLabel value={displayQueueLengths.north} position={[0, 0.8, -7.2]} />
-      <QueueLabel value={displayQueueLengths.south} position={[0, 0.8, 7.2]} />
-      <QueueLabel value={displayQueueLengths.east} position={[7.2, 0.8, 0]} />
-      <QueueLabel value={displayQueueLengths.west} position={[-7.2, 0.8, 0]} />
+      <QueueLabel value={displayQueueLengths.north} position={[-1.2, 2.5, -7.2]} />
+      <QueueLabel value={displayQueueLengths.south} position={[1.2, 2.5, 7.2]} />
+      <QueueLabel value={displayQueueLengths.east} position={[7.2, 2.5, -1.2]} />
+      <QueueLabel value={displayQueueLengths.west} position={[-7.2, 2.5, 1.2]} />
 
       {/* Map active live vehicles to their detailed 3D components */}
       {isRunning
