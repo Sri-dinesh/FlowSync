@@ -1,3 +1,4 @@
+import datetime
 import io
 from pathlib import Path
 from typing import Any, Dict, List
@@ -142,9 +143,21 @@ def list_all_models() -> List[Dict[str, Any]]:
                     if not episodes:
                         continue
                     latest_ep = max(episodes)
+
+                    # Try to parse created_at for date-time
+                    created_at_str = entry.get("created_at")
+                    if created_at_str:
+                        try:
+                            dt = datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                            date_part = dt.strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    else:
+                        date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
                     models[model_id] = {
                         "id": model_id,
-                        "name": f"Model {model_id[:8]}",
+                        "name": f"Model {date_part} - {latest_ep}eps - Remote",
                         "version": str(latest_ep),
                         "source": "remote",
                         "episodes": latest_ep,
@@ -166,10 +179,19 @@ def list_all_models() -> List[Dict[str, Any]]:
             ep_text = latest_name[len("checkpoint_"):-len(".pt")]
             latest_ep = int(ep_text) if ep_text.isdigit() else 0
             model_id = model_dir.name
+
+            # File modification time for local
+            try:
+                mtime = checkpoints[-1].stat().st_mtime
+                dt = datetime.datetime.fromtimestamp(mtime)
+                date_part = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
             if model_id not in models:
                 models[model_id] = {
                     "id": model_id,
-                    "name": f"Model {model_id[:8]}",
+                    "name": f"Model {date_part} - {latest_ep}eps - Local",
                     "version": str(latest_ep),
                     "source": "local",
                     "episodes": latest_ep,
