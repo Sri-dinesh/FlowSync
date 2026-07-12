@@ -32,20 +32,20 @@ PHASE_ALLOWED_TURNS: Dict[int, set] = {
 
 
 class TrafficSignal:
-    def __init__(self) -> None:
+    def __init__(self, red_duration: float = 3.0) -> None:
         self.current_phase: int = SignalPhase.NS_GREEN.value
         self.color: SignalColor = SignalColor.GREEN
         self.time_in_phase: float = 0.0
         self.min_green_duration: float = 4.0
         self.fixed_duration: float = 8.0
         self.yellow_duration: float = 2.0
-        self.red_duration: float = 1.0
-        self._pending_phase: Optional[int] = None
+        self.red_duration: float = red_duration
+        self.pending_phase: Optional[int] = None
 
     def set_phase(self, phase: int) -> None:
         if phase == self.current_phase and self.color == SignalColor.GREEN:
             return
-        self._pending_phase = phase
+        self.pending_phase = phase
         self.color = SignalColor.YELLOW
         self.time_in_phase = 0.0
 
@@ -69,9 +69,9 @@ class TrafficSignal:
         # Red -> resolve pending phase after red_duration
         if self.color == SignalColor.RED:
             if self.time_in_phase >= self.red_duration:
-                if self._pending_phase is not None:
-                    self.current_phase = self._pending_phase
-                    self._pending_phase = None
+                if self.pending_phase is not None:
+                    self.current_phase = self.pending_phase
+                    self.pending_phase = None
                 self.color = SignalColor.GREEN
                 self.time_in_phase = 0.0
             return
