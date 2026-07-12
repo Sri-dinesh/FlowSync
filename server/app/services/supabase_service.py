@@ -188,6 +188,20 @@ def save_performance_metric(
 
 # ─── RL model metadata ────────────────────────────────────────────────────────
 
+import datetime
+
+def _get_rating(avg_reward: float) -> str:
+    if avg_reward > 10.0:
+        return "Excellent"
+    elif avg_reward > 0.0:
+        return "Efficient"
+    elif avg_reward > -10.0:
+        return "Fair"
+    elif avg_reward > -30.0:
+        return "Poor"
+    else:
+        return "Failing"
+
 def save_model_metadata(
     simulation_id: str,
     episode: int,
@@ -202,20 +216,30 @@ def save_model_metadata(
     """
     model_id = simulation_id  # reuse simulation UUID as model identifier
     storage_path = f"models/{simulation_id}/checkpoint_{episode}.pt"
-    name = f"Model {simulation_id[:8]}"
     version = str(episode)
+    rating = _get_rating(avg_reward)
 
     try:
         # Check if a row already exists for this simulation
         existing = (
             supabase_client.table("rl_models")
-            .select("id")
+            .select("id, name")
             .eq("id", model_id)
             .execute()
         )
         if getattr(existing, "data", []):
+            old_name = existing.data[0].get("name", "")
+            # Preserve the date-time part if it exists
+            if old_name.startswith("Model 20"):
+                date_part = old_name.split(" - ")[0]
+            else:
+                date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            
+            new_name = f"{date_part} - {episode}eps - {rating}"
+
             # Update in place
             supabase_client.table("rl_models").update({
+                "name": new_name,
                 "version": version,
                 "storagePath": storage_path,
                 "avgReward": avg_reward,
@@ -223,9 +247,12 @@ def save_model_metadata(
                 "totalEpisodes": total_episodes,
             }).eq("id", model_id).execute()
         else:
+            date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            new_name = f"{date_part} - {episode}eps - {rating}"
+            
             supabase_client.table("rl_models").insert({
                 "id": model_id,
-                "name": name,
+                "name": new_name,
                 "version": version,
                 "storagePath": storage_path,
                 "avgReward": avg_reward,
