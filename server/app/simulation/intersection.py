@@ -6,13 +6,13 @@ from .vehicle import DEFAULT_SPEED, Vehicle
 
 
 class Intersection:
-    def __init__(self) -> None:
+    def __init__(self, red_duration: float = 3.0) -> None:
         self.lanes: Dict[str, List[Vehicle]] = {
             f"{dir}_{turn}": []
             for dir in ["north", "south", "east", "west"]
             for turn in ["straight", "left", "right"]
         }
-        self.signal = TrafficSignal()
+        self.signal = TrafficSignal(red_duration=red_duration)
         self.timestep = 0
         self.total_passed = 0
         self.spawner = PoissonSpawner()
@@ -153,25 +153,47 @@ class Intersection:
         self.timestep += 1
 
     def get_queue_lengths(self) -> Dict[str, int]:
-        agg = {"north": 0, "south": 0, "east": 0, "west": 0}
-        for lane_id, queue in self.lanes.items():
-            dir_name = lane_id.split("_")[0]
-            if dir_name in agg:
-                agg[dir_name] += sum(1 for v in queue if v.state == "waiting")
-        return agg
+        """
+        Returns the number of vehicles per direction that are
+        actively in the queue (not yet passed the intersection).
+        Counts all non-passed vehicles regardless of state.
+        """
+        counts = {"north": 0, "south": 0, "east": 0, "west": 0}
+        for lane_key, vehicles in self.lanes.items():
+            direction = lane_key.split("_")[0]  # "north_straight" → "north"
+            counts[direction] += sum(1 for v in vehicles if v.state != "passed")
+        return counts
+
+    def get_approaching_count(self, direction: str) -> int:
+        """Count vehicles approaching (not yet at stop line) in a direction."""
+        return sum(
+            1 for lane_key, vehicles in self.lanes.items()
+            if lane_key.startswith(direction)
+            for v in vehicles
+            if v.position < 0.85 and v.state != "passed"
+        )
 
     def get_total_waiting(self) -> int:
-        return sum(len(queue) for queue in self.lanes.values())
+        """Total vehicles in ALL lanes not yet passed."""
+        return sum(
+            1 for vehicles in self.lanes.values()
+            for v in vehicles
+            if v.state != "passed"
+        )
 
     def get_total_wait_time(self) -> float:
-        return sum(vehicle.wait_time for queue in self.lanes.values() for vehicle in queue)
+        return sum(
+            vehicle.wait_time for queue in self.lanes.values()
+            for vehicle in queue if vehicle.state != "passed"
+        )
 
     def get_avg_wait_time(self) -> float:
-        vehicles = [vehicle for queue in self.lanes.values() for vehicle in queue]
-        if not vehicles:
-            return 0.0
-        total_wait = sum(vehicle.wait_time for vehicle in vehicles)
-        return total_wait / len(vehicles)
+        waiting = [
+            v.wait_time for vehicles in self.lanes.values()
+            for v in vehicles
+            if v.state != "passed"
+        ]
+        return sum(waiting) / len(waiting) if waiting else 0.0
 
     def set_spawn_rate(self, lambda_rate: float) -> None:
         self.spawner.set_rate(lambda_rate)
@@ -179,7 +201,7 @@ class Intersection:
     def reset(self) -> None:
         for queue in self.lanes.values():
             queue.clear()
-        self.signal = TrafficSignal()
+        self.signal = TrafficSignal(red_duration=self.signal.red_duration)
         self.timestep = 0
         self.total_passed = 0
         self.vehicles_in_intersection.clear()
