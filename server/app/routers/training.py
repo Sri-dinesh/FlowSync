@@ -105,20 +105,30 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
         model_service.load_checkpoint, payload.model_id, latest_episode
     )
 
-    agent = app.state.agent
-    agent.online_net.load_state_dict(checkpoint_data['online_net'])
+    sim_agent = app.state.sim_agent
+    training_agent = app.state.training_agent
+    
+    sim_agent.online_net.load_state_dict(checkpoint_data['online_net'])
+    training_agent.online_net.load_state_dict(checkpoint_data['online_net'])
+    
     if 'target_net' in checkpoint_data:
-        agent.target_net.load_state_dict(checkpoint_data['target_net'])
+        sim_agent.target_net.load_state_dict(checkpoint_data['target_net'])
+        training_agent.target_net.load_state_dict(checkpoint_data['target_net'])
     else:
-        agent.sync_target_network()
+        sim_agent.sync_target_network()
+        training_agent.sync_target_network()
     
     if 'optimizer' in checkpoint_data:
         try:
-            agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
+            sim_agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
+            training_agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
         except Exception:
             pass
     if 'step_count' in checkpoint_data:
-        agent.step_count = checkpoint_data['step_count']
-    agent.target_net.eval()
+        sim_agent.step_count = checkpoint_data['step_count']
+        training_agent.step_count = checkpoint_data['step_count']
+        
+    sim_agent.target_net.eval()
+    training_agent.target_net.eval()
 
     return {"status": "loaded", "episode": latest_episode}

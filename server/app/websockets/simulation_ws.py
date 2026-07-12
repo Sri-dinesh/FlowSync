@@ -121,27 +121,37 @@ async def _flush_buffer() -> None:
 # ─── Simulation helper ────────────────────────────────────────────────────────
 
 def _build_obs_from_intersection(intersection) -> np.ndarray:
-    """Build the same 8-dim observation vector used in TrafficEnv,
-    but from the standalone simulation intersection (no env coupling)."""
-    queues = intersection.get_queue_lengths()
+    movement_queues = intersection.get_movement_queues()
     signal = intersection.signal
-    total_vehicles = intersection.get_total_waiting()
-    pending_phase = (
-        signal.pending_phase
-        if hasattr(signal, 'pending_phase') and signal.pending_phase is not None
-        else signal.current_phase
+    MAX_CAP = 10.0
+
+    movements = [
+        movement_queues.get("north_straight", 0) / MAX_CAP,
+        movement_queues.get("north_left", 0) / MAX_CAP,
+        movement_queues.get("north_right", 0) / MAX_CAP,
+        movement_queues.get("south_straight", 0) / MAX_CAP,
+        movement_queues.get("south_left", 0) / MAX_CAP,
+        movement_queues.get("south_right", 0) / MAX_CAP,
+        movement_queues.get("east_straight", 0) / MAX_CAP,
+        movement_queues.get("east_left", 0) / MAX_CAP,
+        movement_queues.get("east_right", 0) / MAX_CAP,
+        movement_queues.get("west_straight", 0) / MAX_CAP,
+        movement_queues.get("west_left", 0) / MAX_CAP,
+        movement_queues.get("west_right", 0) / MAX_CAP,
+    ]
+
+    phase_onehot = [0.0, 0.0, 0.0, 0.0]
+    phase_onehot[signal.current_phase] = 1.0
+
+    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
+    pressure_norm = 0.0   # simplified for inference
+    max_starv_norm = min(
+        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
     )
 
-    return np.array([
-        float(queues.get("north", 0)),
-        float(queues.get("south", 0)),
-        float(queues.get("east", 0)),
-        float(queues.get("west", 0)),
-        float(signal.current_phase),
-        float(signal.time_in_phase),
-        float(total_vehicles),
-        float(pending_phase),
-    ], dtype=np.float32)
+    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+    return np.array(obs, dtype=np.float32)
 
 
 # ─── Simulation loop ──────────────────────────────────────────────────────────
@@ -151,6 +161,7 @@ async def _simulation_loop(app) -> None:
     last_reward = 0.0
     last_action = 0
     was_exploring = False
+    obs = None
 
     try:
         while True:
@@ -162,7 +173,7 @@ async def _simulation_loop(app) -> None:
             mode = app.state.mode
             trainer = app.state.trainer
             episode = trainer.current_episode if trainer else 0
-            agent = app.state.agent
+            agent = app.state.sim_agent
 
             if mode in ("fixed", "manual"):
                 intersection.tick(dt=0.1, action=None, is_manual=(mode == "manual"))
@@ -172,23 +183,24 @@ async def _simulation_loop(app) -> None:
                 action = agent.select_action(obs, epsilon=0.0)
                 last_action = action
 
-                prev_queues = intersection.get_queue_lengths()
+                prev_pressures = app.state.training_env._compute_movement_pressures()
                 prev_passed = intersection.total_passed
                 prev_phase = intersection.signal.current_phase
 
                 intersection.tick(dt=0.1, action=action)
 
-                curr_queues = intersection.get_queue_lengths()
+                curr_pressures = app.state.training_env._compute_movement_pressures()
                 curr_passed = intersection.total_passed
                 vehicles_passed = curr_passed - prev_passed
                 phase_changed = (action != prev_phase) and (intersection.signal.color.value == "green")
 
                 # Compute reward using the training_env helper
                 last_reward = app.state.training_env.compute_reward(
-                    prev_queues=prev_queues,
-                    curr_queues=curr_queues,
+                    prev_pressures=prev_pressures,
+                    curr_pressures=curr_pressures,
                     vehicles_passed=vehicles_passed,
                     phase_changed=phase_changed,
+                    signal=intersection.signal,
                 )
                 cumulative_reward += last_reward
             else:
@@ -218,6 +230,7 @@ async def _simulation_loop(app) -> None:
                 epsilon=0.0,
                 last_action=last_action,
                 was_exploring=was_exploring,
+                obs=obs,
             )
             
             import os

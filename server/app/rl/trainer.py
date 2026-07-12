@@ -22,6 +22,7 @@ class Trainer:
         supabase_service: Any,
         model_service: Any,
         ws_broadcast_fn: Callable[[dict], Awaitable[None]],
+        app_state: Any = None,
         hyperparams: Optional[HyperParams] = None,
     ) -> None:
         self.env = env
@@ -29,6 +30,7 @@ class Trainer:
         self.supabase_service = supabase_service
         self.model_service = model_service
         self.ws_broadcast_fn = ws_broadcast_fn
+        self.app_state = app_state
         self.hyperparams = hyperparams or HyperParams()
         self.is_training = False
         self.current_episode = 0
@@ -56,6 +58,9 @@ class Trainer:
             stopped_early = False
             done = False
 
+            # Anneal PER beta over training
+            self.agent.replay_buffer.anneal_beta(episode_index, num_episodes)
+
             for step in range(self.hyperparams.MAX_STEPS_PER_EPISODE):
                 if not self.is_training:
                     stopped_early = True
@@ -73,7 +78,7 @@ class Trainer:
                     and step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
                 ):
                     batch = self.agent.replay_buffer.sample(self.hyperparams.BATCH_SIZE)
-                    loss_value = await asyncio.to_thread(self.agent.train_step, batch)
+                    loss_value, td_errors = await asyncio.to_thread(self.agent.train_step, batch)
 
                 if self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0:
                     self.agent.sync_target_network()
@@ -145,8 +150,20 @@ class Trainer:
                     self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
-                    self.agent.get_checkpoint_state(),
+                    self.agent.get_checkpoint_state() if hasattr(self.agent, 'get_checkpoint_state') else {
+                        'online_net': self.agent.online_net.state_dict(),
+                        'target_net': self.agent.target_net.state_dict(),
+                        'optimizer': self.agent.optimizer.state_dict(),
+                        'step_count': self.agent.step_count,
+                        'obs_version': 'v3_20dim_pressure',
+                    },
                 )
+                if self.app_state and hasattr(self.app_state, "sim_agent"):
+                    sim_agent = self.app_state.sim_agent
+                    sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
+                    sim_agent.target_net.load_state_dict(self.agent.target_net.state_dict())
+                    logger.info(f"Synced sim_agent weights from training_agent at episode {episode_num}")
+                
                 # Persist metadata row in rl_models so the model appears in the UI
                 avg_reward = (
                     sum(m["reward"] for m in _recent_rewards) / len(_recent_rewards)

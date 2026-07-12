@@ -10,7 +10,7 @@ Write strategy:
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
-
+import datetime
 from supabase import Client, create_client
 
 from ..config import settings
@@ -27,12 +27,14 @@ supabase_client: Client = create_client(
 
 def create_simulation(mode: str) -> str:
     simulation_id = str(uuid4())
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     payload = {
         "id": simulation_id,
         "mode": mode,
         "status": "running",
         "totalSteps": 0,
         "durationMs": 0,
+        "updatedAt": now_iso,
     }
     try:
         result = supabase_client.table("simulations").insert(payload).execute()
@@ -49,11 +51,13 @@ def update_simulation(
     total_steps: int,
     duration_ms: int,
 ) -> None:
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
         supabase_client.table("simulations").update({
             "status": status,
             "totalSteps": total_steps,
             "durationMs": duration_ms,
+            "updatedAt": now_iso,
         }).eq("id", simulation_id).execute()
     except Exception:
         logger.exception("update_simulation failed for id=%s", simulation_id)
@@ -187,8 +191,6 @@ def save_performance_metric(
 
 
 # ─── RL model metadata ────────────────────────────────────────────────────────
-
-import datetime
 
 def _get_rating(avg_reward: float) -> str:
     if avg_reward > 10.0:

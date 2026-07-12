@@ -24,18 +24,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # --- Training environment (used by Trainer only, completely separate) ---
     training_env = TrafficEnv()
-    agent = DQNAgent()
+    
+    # Inference agent — used by /ws/simulation for live AI decisions
+    sim_agent = DQNAgent()
+    
+    # Training agent — used exclusively by Trainer
+    training_agent = DQNAgent()
+
     trainer = Trainer(
-        training_env,
-        agent,
-        supabase_service,
-        model_service,
-        broadcast_training_metric,
+        env=training_env,
+        agent=training_agent,
+        supabase_service=supabase_service,
+        model_service=model_service,
+        ws_broadcast_fn=broadcast_training_metric,
+        app_state=app.state,
     )
 
     app.state.sim_intersection = sim_intersection
     app.state.training_env = training_env
-    app.state.agent = agent
+    app.state.sim_agent = sim_agent
+    app.state.training_agent = training_agent
     app.state.trainer = trainer
     app.state.supabase_service = supabase_service
     app.state.model_service = model_service
