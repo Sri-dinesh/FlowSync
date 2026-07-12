@@ -41,7 +41,43 @@ export function useSimulationSocket() {
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as SimulationFrame;
+        const raw = JSON.parse(event.data);
+        if (!raw || typeof raw !== "object") {
+          return;
+        }
+
+        // Extract queue lengths from the backend nested QueueState dictionary
+        const queue_lengths: Record<string, number> = {};
+        if (raw.queues && typeof raw.queues === "object") {
+          Object.entries(raw.queues).forEach(([key, val]) => {
+            if (val && typeof val === "object") {
+              queue_lengths[key] = (val as any).length ?? 0;
+            }
+          });
+        }
+
+        // Determine the overall active signal color (green, yellow, or red)
+        let signal_color: "green" | "yellow" | "red" = "red";
+        if (raw.signal) {
+          if (raw.signal.is_transitioning) {
+            const hasYellow = Object.values(raw.signal.color_per_lane ?? {}).some(
+              (c) => c === "yellow",
+            );
+            signal_color = hasYellow ? "yellow" : "red";
+          } else {
+            signal_color = "green";
+          }
+        }
+
+        const payload: SimulationFrame = {
+          ...raw,
+          signal_phase: raw.signal?.current_phase ?? 0,
+          signal_color: signal_color,
+          queue_lengths: queue_lengths,
+          avg_wait_time: raw.metrics?.avg_wait_time ?? 0,
+          throughput: raw.metrics?.throughput_total ?? 0,
+          reward: raw.rl?.reward ?? 0,
+        };
 
         // Log all raw frames in development/local server environment
         if (process.env.NODE_ENV === "development") {
