@@ -31,13 +31,13 @@ def _parse_episode(path: str) -> Optional[int]:
 
 @router.post("/start")
 async def start_training(payload: StartTrainingRequest, request: Request) -> dict:
-    app_state = request.app.state.app_state
-    trainer = app_state["trainer"]
+    app = request.app
+    trainer = app.state.trainer
 
     if trainer.is_training:
         return {"status": "already_training"}
 
-    simulation_id = payload.simulation_id or app_state.get("current_simulation_id")
+    simulation_id = payload.simulation_id or app.state.current_simulation_id
 
     # Always ensure we have a real simulation record before training
     if not simulation_id:
@@ -46,7 +46,7 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
                 supabase_service.create_simulation, "ai"
             )
             if simulation_id:
-                app_state["current_simulation_id"] = simulation_id
+                app.state.current_simulation_id = simulation_id
             else:
                 logger.error("create_simulation returned empty id, falling back to local")
                 simulation_id = f"local-{int(time.time())}"
@@ -55,18 +55,18 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
             simulation_id = f"local-{int(time.time())}"
 
     task = asyncio.create_task(trainer.train(simulation_id, payload.num_episodes))
-    app_state["training_task"] = task
+    app.state.training_task = task
 
     return {"status": "started", "simulation_id": simulation_id}
 
 
 @router.post("/stop")
 async def stop_training(request: Request) -> dict:
-    app_state = request.app.state.app_state
-    trainer = app_state["trainer"]
+    app = request.app
+    trainer = app.state.trainer
     trainer.stop()
 
-    task = app_state.get("training_task")
+    task = app.state.training_task
     if task and not task.done():
         task.cancel()
 
@@ -75,8 +75,8 @@ async def stop_training(request: Request) -> dict:
 
 @router.get("/status")
 async def training_status(request: Request) -> dict:
-    app_state = request.app.state.app_state
-    trainer = app_state["trainer"]
+    app = request.app
+    trainer = app.state.trainer
     return trainer.get_status()
 
 
@@ -88,7 +88,7 @@ async def list_models() -> dict:
 
 @router.post("/load")
 async def load_model(payload: LoadModelRequest, request: Request) -> dict:
-    app_state = request.app.state.app_state
+    app = request.app
     checkpoints = await asyncio.to_thread(
         model_service.list_checkpoints, payload.model_id
     )
@@ -101,12 +101,24 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
         raise HTTPException(status_code=404, detail="No valid checkpoints found")
 
     latest_episode = max(episodes)
-    state_dict = await asyncio.to_thread(
+    checkpoint_data = await asyncio.to_thread(
         model_service.load_checkpoint, payload.model_id, latest_episode
     )
 
-    agent = app_state["agent"]
-    agent.online_net.load_state_dict(state_dict)
-    agent.sync_target_network()
+    agent = app.state.agent
+    agent.online_net.load_state_dict(checkpoint_data['online_net'])
+    if 'target_net' in checkpoint_data:
+        agent.target_net.load_state_dict(checkpoint_data['target_net'])
+    else:
+        agent.sync_target_network()
+    
+    if 'optimizer' in checkpoint_data:
+        try:
+            agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
+        except Exception:
+            pass
+    if 'step_count' in checkpoint_data:
+        agent.step_count = checkpoint_data['step_count']
+    agent.target_net.eval()
 
     return {"status": "loaded", "episode": latest_episode}

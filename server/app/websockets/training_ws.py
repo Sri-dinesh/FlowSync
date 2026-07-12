@@ -45,10 +45,10 @@ async def broadcast_training_metric(data: dict) -> None:
 
 async def training_socket(websocket: WebSocket) -> None:
     await training_manager.connect(websocket)
-    app_state = websocket.scope["app"].state.app_state
+    app = websocket.app
 
     # Send current status immediately on connect
-    trainer = app_state["trainer"]
+    trainer = app.state.trainer
     await websocket.send_json({
         "is_training": trainer.is_training,
         "current_episode": trainer.current_episode,
@@ -62,31 +62,29 @@ async def training_socket(websocket: WebSocket) -> None:
 
             if command == "start_training":
                 num_episodes = int(message.get("num_episodes", 500))
-                simulation_id = message.get("simulation_id") or app_state.get(
-                    "current_simulation_id"
-                )
+                simulation_id = message.get("simulation_id") or app.state.current_simulation_id
                 if not simulation_id:
                     try:
                         simulation_id = await asyncio.to_thread(
                             supabase_service.create_simulation, "ai"
                         )
                         if simulation_id:
-                            app_state["current_simulation_id"] = simulation_id
+                            app.state.current_simulation_id = simulation_id
                         else:
                             logger.error("Supabase create_simulation returned an empty id for training")
                     except Exception:
                         logger.exception("Failed to create training simulation record")
                         simulation_id = f"local-{int(time.time())}"
-                trainer = app_state["trainer"]
+                trainer = app.state.trainer
 
                 if not trainer.is_training:
                     task = asyncio.create_task(
                         trainer.train(simulation_id or "", num_episodes)
                     )
-                    app_state["training_task"] = task
+                    app.state.training_task = task
             elif command == "stop_training":
-                app_state["trainer"].stop()
+                app.state.trainer.stop()
     except WebSocketDisconnect:
         training_manager.disconnect(websocket)
         if not training_manager.active_connections:
-            app_state["trainer"].stop()
+            app.state.trainer.stop()

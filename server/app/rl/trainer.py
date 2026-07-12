@@ -56,7 +56,7 @@ class Trainer:
             stopped_early = False
             done = False
 
-            for step in range(self.hyperparams.max_steps_per_episode):
+            for step in range(self.hyperparams.MAX_STEPS_PER_EPISODE):
                 if not self.is_training:
                     stopped_early = True
                     break
@@ -67,24 +67,23 @@ class Trainer:
 
                 self.agent.replay_buffer.push(state, action, reward, next_state, terminated)
 
-                # Only train every N steps and only once the buffer is warm.
+                # Only train once the buffer is warm and on specific step intervals
                 if (
-                    step % _TRAIN_EVERY_N_STEPS == 0
-                    and len(self.agent.replay_buffer) >= self.hyperparams.min_replay_size
+                    self.agent.replay_buffer.is_ready
+                    and step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
                 ):
-                    batch = self.agent.replay_buffer.sample(self.hyperparams.batch_size)
+                    batch = self.agent.replay_buffer.sample(self.hyperparams.BATCH_SIZE)
                     loss_value = await asyncio.to_thread(self.agent.train_step, batch)
 
-                if step % self.hyperparams.target_update_freq == 0:
+                if self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0:
                     self.agent.sync_target_network()
 
                 total_reward += reward
                 state = next_state
                 steps = step + 1
 
-                # Yield to the event loop regularly so WebSocket frames
-                # and heartbeats are not starved on single-CPU hosts.
-                if step % _YIELD_EVERY_N_STEPS == 0:
+                # Yield to event loop — more frequently during warmup
+                if not self.agent.replay_buffer.is_ready or step % 4 == 0:
                     await asyncio.sleep(0)
 
                 if done:
@@ -146,7 +145,7 @@ class Trainer:
                     self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
-                    self.agent.online_net.state_dict(),
+                    self.agent.get_checkpoint_state(),
                 )
                 # Persist metadata row in rl_models so the model appears in the UI
                 avg_reward = (
