@@ -213,12 +213,14 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
         <Text
           position={tPos}
           rotation={textRot}
-          fontSize={0.20}
+          fontSize={0.28}
           color="#000000"
-          fillOpacity={isActive ? 1.0 : 0.7}
+          fillOpacity={isActive ? 1.0 : 0.3}
           anchorX="center"
           anchorY="middle"
-          fontWeight="900"
+          outlineWidth={0.04}
+          outlineColor="#000000"
+          depthOffset={-2}
         >
           {arrowText}
         </Text>

@@ -2,7 +2,7 @@
 
 import { memo, useMemo, Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 
 import IntersectionScene from "@/components/simulation/IntersectionScene";
@@ -57,6 +57,8 @@ const SimulationCanvas = memo(function SimulationCanvas() {
         <Suspense fallback={null}>
           <ambientLight intensity={timeOfDay === "day" ? 1.0 : 0.5} />
           
+          <Environment preset="city" environmentIntensity={timeOfDay === "day" ? 1.0 : 0.2} />
+          
           {timeOfDay === "day" ? (
              <group>
                <directionalLight 
@@ -102,6 +104,16 @@ const SimulationCanvas = memo(function SimulationCanvas() {
           />
           
           <IntersectionScene />
+          
+          <ContactShadows 
+            position={[0, 0.01, 0]} 
+            opacity={0.8} 
+            scale={50} 
+            blur={1.5} 
+            far={10} 
+            resolution={512} 
+            color="#000000" 
+          />
           
           <OrbitControls 
             makeDefault

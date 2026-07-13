@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { BoxGeometry, CylinderGeometry, MeshStandardMaterial, PlaneGeometry } from "three";
+import { BoxGeometry, CylinderGeometry, MeshPhysicalMaterial, MeshStandardMaterial, PlaneGeometry } from "three";
 
 // Stylized Tree component to populate our parks
 function LowPolyTree({ position }: { position: [number, number, number] }) {
@@ -49,10 +49,13 @@ interface SkyscraperProps {
 function Skyscraper({ position, size, neonColor }: SkyscraperProps) {
   const [w, h, d] = size;
   const buildingGeo = useMemo(() => new BoxGeometry(w, h, d), [w, h, d]);
-  const buildingMat = useMemo(() => new MeshStandardMaterial({ 
-    color: "#18181b", 
-    roughness: 0.2, 
-    metalness: 0.8 
+  const buildingMat = useMemo(() => new MeshPhysicalMaterial({ 
+    color: "#0a0a0c", 
+    roughness: 0.1, 
+    metalness: 0.9,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1,
+    reflectivity: 1.0
   }), []);
 
   // Glowing neon stripes running up the corners to simulate active windows/facade lights
@@ -89,10 +92,12 @@ function Skyscraper({ position, size, neonColor }: SkyscraperProps) {
 export default function IntersectionGrid() {
   // Create a clean diorama look with a specific size
   const groundGeo = useMemo(() => new PlaneGeometry(45, 45), []);
-  const groundMat = useMemo(() => new MeshStandardMaterial({
-    color: "#1a1f2e",
-    roughness: 0.8,
-    metalness: 0.2,
+  const groundMat = useMemo(() => new MeshPhysicalMaterial({
+    color: "#0f111a",
+    roughness: 0.7,
+    metalness: 0.3,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.8,
   }), []);
 
   // Sidewalk concrete curbs - lighter color
@@ -105,11 +110,13 @@ export default function IntersectionGrid() {
 
   // Park grass tiles - brighter green
   const parkGrassGeo = useMemo(() => new BoxGeometry(16.6, 0.02, 16.6), []);
-  const parkGrassMat = useMemo(() => new MeshStandardMaterial({
-    color: "#2d5016",
+  const parkGrassMat = useMemo(() => new MeshPhysicalMaterial({
+    color: "#1a3610",
     roughness: 0.9,
-    emissive: "#1a3a0f",
-    emissiveIntensity: 0.3,
+    metalness: 0.05,
+    clearcoat: 0.0,
+    emissive: "#0a1a05",
+    emissiveIntensity: 0.2,
   }), []);
 
   useEffect(() => {
