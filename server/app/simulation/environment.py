@@ -62,8 +62,9 @@ class TrafficEnv(gym.Env):
         total_curr = sum(curr_pressures.values())
         pressure_reward = (total_prev - total_curr) * 1.5   # pressure reduction = positive
 
-        # 2. Throughput bonus
-        throughput_reward = vehicles_passed * 0.5
+        # 2. Throughput bonus — only reward if vehicles actually cleared
+        #    Scale conservatively: 0.2 per vehicle to avoid dominating pressure signal
+        throughput_reward = vehicles_passed * 0.2
 
         # 3. Switch penalty — discourage unnecessary switching
         #    Only penalize if switching while current phase still has vehicles
@@ -84,15 +85,16 @@ class TrafficEnv(gym.Env):
         # 5. Max green violation penalty
         max_green_penalty = -1.0 if signal.is_max_green_exceeded else 0.0
 
-        # 6. Balance bonus — small reward when all pressures are roughly equal
-        if total_curr > 0:
+        # 6. Balance bonus — ONLY reward balance when intersection actually has traffic
+        #    Avoids the artificial 0.5/step reward during empty early steps
+        if total_curr > 0.05:  # only when there are actually vehicles
             pressure_values = list(curr_pressures.values())
             max_p = max(pressure_values)
             min_p = min(pressure_values)
             imbalance = max_p - min_p
-            balance_bonus = 0.3 if imbalance < 0.2 else 0.0
+            balance_bonus = 0.2 if imbalance < 0.2 else 0.0
         else:
-            balance_bonus = 0.5  # empty intersection
+            balance_bonus = 0.0  # no bonus for empty intersection
 
         return float(
             pressure_reward
@@ -106,6 +108,7 @@ class TrafficEnv(gym.Env):
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         prev_pressures = self._compute_movement_pressures()
         prev_passed = self.intersection.total_passed
+        prev_phase = self.intersection.signal.current_phase  # capture BEFORE tick
 
         # Enforce constraints BEFORE applying agent action
         signal = self.intersection.signal
@@ -127,7 +130,7 @@ class TrafficEnv(gym.Env):
         curr_pressures = self._compute_movement_pressures()
         curr_passed = self.intersection.total_passed
         vehicles_passed_this_step = curr_passed - prev_passed
-        phase_changed = (action != self.intersection.signal.current_phase)
+        phase_changed = (self.intersection.signal.current_phase != prev_phase)  # compare post-tick phase vs pre-tick
 
         reward = self.compute_reward(
             prev_pressures=prev_pressures,
