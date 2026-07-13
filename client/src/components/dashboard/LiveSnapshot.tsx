@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { GripVertical } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { useSimulationStore } from "@/store/simulationStore";
@@ -46,7 +48,18 @@ export default function LiveSnapshot() {
   }, [lastFrameAt, now]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <motion.div
+      drag
+      dragMomentum={false}
+      initial={{ x: 20, y: 80 }}
+      className="absolute z-50 flex w-64 cursor-grab flex-col gap-4 rounded-xl border border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl active:cursor-grabbing"
+    >
+      <div className="flex items-center justify-between opacity-50">
+        <GripVertical className="h-4 w-4" />
+        <span className="text-[10px] uppercase tracking-widest text-white/50">Live Stats</span>
+        <div className="h-4 w-4" /> {/* spacer for balance */}
+      </div>
+      
       {/* Active Status Badges */}
       <div className="flex flex-wrap gap-2">
         <Badge
@@ -137,6 +150,6 @@ export default function LiveSnapshot() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

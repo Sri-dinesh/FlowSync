@@ -15,10 +15,8 @@ import {
 
 interface PerformanceMetric {
   mode: string;
-  avgWaitTimeFixed: number | null;
-  avgWaitTimeAI: number | null;
-  throughputFixed: number | null;
-  throughputAI: number | null;
+  avgWaitTime: number;
+  throughput: number;
 }
 
 interface ComparisonChartProps {
@@ -46,45 +44,53 @@ export default function ComparisonChart({ simulationId }: ComparisonChartProps) 
       return { chartData: [], improvement: 0, hasData: false };
     }
 
-    // Aggregate: average across all fixed/ai rows
-    const fixedRows = raw.filter(
-      (r) => r.avgWaitTimeFixed != null || r.throughputFixed != null,
-    );
-    const aiRows = raw.filter(
-      (r) => r.avgWaitTimeAI != null || r.throughputAI != null,
-    );
+    const fixedRows = raw.filter((r) => r.mode === "fixed");
+    const aiRows = raw.filter((r) => r.mode === "ai");
+    const mnlRows = raw.filter((r) => r.mode === "manual" || r.mode === "mnl");
 
     const avg = (arr: (number | null)[]) => {
       const valid = arr.filter((v): v is number => v != null);
       return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
     };
 
-    const avgWaitFixed = avg(fixedRows.map((r) => r.avgWaitTimeFixed));
-    const avgWaitAI = avg(aiRows.map((r) => r.avgWaitTimeAI));
-    const throughputFixed = avg(fixedRows.map((r) => r.throughputFixed));
-    const throughputAI = avg(aiRows.map((r) => r.throughputAI));
+    const avgWaitFixed = avg(fixedRows.map((r) => r.avgWaitTime));
+    const avgWaitAI = avg(aiRows.map((r) => r.avgWaitTime));
+    const avgWaitMnl = avg(mnlRows.map((r) => r.avgWaitTime));
+    
+    const throughputFixed = avg(fixedRows.map((r) => r.throughput));
+    const throughputAI = avg(aiRows.map((r) => r.throughput));
+    const throughputMnl = avg(mnlRows.map((r) => r.throughput));
 
-    const hasData = avgWaitFixed > 0 || avgWaitAI > 0 || throughputFixed > 0 || throughputAI > 0;
+    const hasFixed = fixedRows.length > 0;
+    const hasAI = aiRows.length > 0;
+    const hasMnl = mnlRows.length > 0;
 
-    const chartData = [
-      {
-        name: "Avg Wait (s)",
-        Fixed: parseFloat(avgWaitFixed.toFixed(2)),
-        AI: parseFloat(avgWaitAI.toFixed(2)),
-      },
-      {
-        name: "Throughput",
-        Fixed: Math.round(throughputFixed),
-        AI: Math.round(throughputAI),
-      },
-    ];
+    const hasData = hasFixed || hasAI || hasMnl;
 
-    const improvement =
-      avgWaitFixed > 0
-        ? ((avgWaitFixed - avgWaitAI) / avgWaitFixed) * 100
-        : 0;
+    const waitData: any = { name: "Avg Wait (s)" };
+    const thruData: any = { name: "Throughput" };
 
-    return { chartData, improvement, hasData };
+    if (hasFixed) {
+      waitData.Fixed = parseFloat(avgWaitFixed.toFixed(2));
+      thruData.Fixed = Math.round(throughputFixed);
+    }
+    if (hasAI) {
+      waitData.AI = parseFloat(avgWaitAI.toFixed(2));
+      thruData.AI = Math.round(throughputAI);
+    }
+    if (hasMnl) {
+      waitData.Manual = parseFloat(avgWaitMnl.toFixed(2));
+      thruData.Manual = Math.round(throughputMnl);
+    }
+
+    const chartData = [waitData, thruData];
+
+    let improvement = 0;
+    if (hasFixed && hasAI && avgWaitFixed > 0) {
+      improvement = ((avgWaitFixed - avgWaitAI) / avgWaitFixed) * 100;
+    }
+
+    return { chartData, improvement, hasData, hasFixed, hasAI, hasMnl };
   }, [raw]);
 
   if (isLoading) {
@@ -149,8 +155,9 @@ export default function ComparisonChart({ simulationId }: ComparisonChartProps) 
           <Legend
             wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
           />
-          <Bar dataKey="Fixed" fill="#475569" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="AI" fill="#38bdf8" radius={[3, 3, 0, 0]} />
+          {chartData[0]?.Fixed !== undefined && <Bar dataKey="Fixed" fill="#475569" radius={[3, 3, 0, 0]} />}
+          {chartData[0]?.AI !== undefined && <Bar dataKey="AI" fill="#38bdf8" radius={[3, 3, 0, 0]} />}
+          {chartData[0]?.Manual !== undefined && <Bar dataKey="Manual" fill="#f59e0b" radius={[3, 3, 0, 0]} />}
         </BarChart>
       </ResponsiveContainer>
     </div>

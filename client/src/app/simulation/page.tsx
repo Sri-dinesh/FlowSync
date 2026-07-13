@@ -28,8 +28,9 @@ export default function SimulationPage() {
       </div>
 
       <div className="flex-1 flex w-full overflow-hidden">
-        {/* Left Side: 3D Canvas */}
+        {/* Left Side: 3D Canvas and Floating UI */}
         <div className="flex-1 relative">
+          <LiveSnapshot />
           <SimulationCanvas />
         </div>
 
@@ -57,12 +58,6 @@ export default function SimulationPage() {
             <MetricsPanel />
           </Card>
 
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
-            <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
-              Live Snapshot
-            </CardTitle>
-            <LiveSnapshot />
-          </Card>
 
           <Card className="rounded-none border-0 bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
             <CardHeader className="pb-3">
