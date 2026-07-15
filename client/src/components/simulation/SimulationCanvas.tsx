@@ -125,7 +125,7 @@ const SimulationCanvas = memo(function SimulationCanvas() {
             minPolarAngle={0.1}
             maxZoom={120}
             minZoom={15}
-            autoRotate={isRunning}
+            autoRotate={false}
             autoRotateSpeed={0.5}
           />
 
