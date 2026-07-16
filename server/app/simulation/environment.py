@@ -43,6 +43,7 @@ class TrafficEnv(gym.Env):
         vehicles_passed: int,
         phase_changed: bool,
         signal,
+        prev_phase: int = None,
     ) -> float:
         """
         Pressure-based reward function.
@@ -68,13 +69,13 @@ class TrafficEnv(gym.Env):
 
         # 3. Switch penalty — discourage unnecessary switching
         #    Only penalize if switching while current phase still has vehicles
-        if phase_changed:
-            curr_green_dirs = PHASE_GREEN_LANES.get(signal.current_phase, [])
-            curr_green_pressure = sum(
-                curr_pressures.get(d, 0) for d in curr_green_dirs
+        if phase_changed and prev_phase is not None:
+            prev_green_dirs = PHASE_GREEN_LANES.get(prev_phase, [])
+            prev_green_pressure = sum(
+                prev_pressures.get(d, 0) for d in prev_green_dirs
             )
-            # Only penalize if we left a direction that still had pressure
-            switch_penalty = -0.3 if curr_green_pressure > 0.3 else 0.0
+            # Penalize if we prematurely abandoned a phase that still had traffic
+            switch_penalty = -0.3 if prev_green_pressure > 0.3 else 0.0
         else:
             switch_penalty = 0.0
 
@@ -88,9 +89,9 @@ class TrafficEnv(gym.Env):
         # 6. Balance bonus — ONLY reward balance when intersection actually has traffic
         #    Avoids the artificial 0.5/step reward during empty early steps
         if total_curr > 0.05:  # only when there are actually vehicles
-            pressure_values = list(curr_pressures.values())
-            max_p = max(pressure_values)
-            min_p = min(pressure_values)
+            phase_pressures = [self._get_phase_pressure(curr_pressures, p) for p in range(4)]
+            max_p = max(phase_pressures)
+            min_p = min(phase_pressures)
             imbalance = max_p - min_p
             balance_bonus = 0.2 if imbalance < 0.2 else 0.0
         else:
@@ -138,6 +139,7 @@ class TrafficEnv(gym.Env):
             vehicles_passed=vehicles_passed_this_step,
             phase_changed=phase_changed,
             signal=self.intersection.signal,
+            prev_phase=prev_phase,
         )
         self._last_reward = reward
 
@@ -153,26 +155,30 @@ class TrafficEnv(gym.Env):
 
         return obs, reward, terminated, truncated, info
 
+    def _get_phase_pressure(self, pressures: dict, phase: int) -> float:
+        if phase == 0:
+            movements = ["north_straight", "north_left", "south_straight", "south_left"]
+        elif phase == 1:
+            movements = ["east_straight", "east_left", "west_straight", "west_left"]
+        elif phase == 2:
+            movements = ["north_right", "south_right"]
+        elif phase == 3:
+            movements = ["east_right", "west_right"]
+        else:
+            movements = []
+        return sum(pressures.get(m, 0) for m in movements)
+
     def _get_best_alternative_phase(self) -> int:
         """When max green exceeded, pick the phase with highest pressure."""
         pressures = self._compute_movement_pressures()
         current = self.intersection.signal.current_phase
-        current_dirs = PHASE_GREEN_LANES.get(current, [])
-
-        # Find phase whose lanes have highest pressure (excluding current)
-        PHASE_GREEN_DIRS_MAP = {
-            0: ["north", "south"],
-            1: ["east", "west"],
-            2: ["north", "south"],  # left-turn phase
-            3: ["east", "west"],    # left-turn phase
-        }
 
         best_phase = current
         best_pressure = -1
-        for phase, dirs in PHASE_GREEN_DIRS_MAP.items():
+        for phase in range(4):
             if phase == current:
                 continue
-            phase_pressure = sum(pressures.get(d, 0) for d in dirs)
+            phase_pressure = self._get_phase_pressure(pressures, phase)
             if phase_pressure > best_pressure:
                 best_pressure = phase_pressure
                 best_phase = phase
@@ -189,29 +195,26 @@ class TrafficEnv(gym.Env):
 
     def _compute_movement_pressures(self) -> dict:
         """
-        Compute traffic movement pressure per direction.
-        Pressure(direction) = incoming_vehicles / capacity - outgoing_vehicles / capacity
+        Compute traffic movement pressure per movement.
+        Pressure(movement) = incoming_vehicles / capacity - outgoing_vehicles / capacity
         Based on PressLight / MPLight / PDLight formula.
-
-        Higher pressure = more vehicles backed up = more urgent to serve this phase.
         """
         movement_queues = self.intersection.get_movement_queues()
         outgoing = self.intersection.get_outgoing_counts()
         MAX_CAP = 10.0
 
         pressures = {}
-        for direction in ["north", "south", "east", "west"]:
-            # Straight + left movements (right turns always move, excluded from pressure)
-            incoming = (
-                movement_queues.get(f"{direction}_straight", 0) +
-                movement_queues.get(f"{direction}_left", 0)
-            ) / MAX_CAP
+        dest_map = {
+            "north_straight": "south", "north_left": "east", "north_right": "west",
+            "south_straight": "north", "south_left": "west", "south_right": "east",
+            "east_straight": "west", "east_left": "south", "east_right": "north",
+            "west_straight": "east", "west_left": "north", "west_right": "south",
+        }
 
-            # Outgoing: vehicles in the outgoing lane of this direction's destination
-            # (if outgoing is congested, agent should NOT serve this incoming even if queue is high)
-            outgoing_opp = outgoing.get(direction, 0) / MAX_CAP
-
-            pressures[direction] = max(0.0, incoming - outgoing_opp)
+        for movement, dest in dest_map.items():
+            incoming = movement_queues.get(movement, 0) / MAX_CAP
+            out = outgoing.get(dest, 0) / MAX_CAP
+            pressures[movement] = max(0.0, incoming - out)
 
         return pressures
 

@@ -90,14 +90,23 @@ class TrafficSignal:
         self.time_in_phase += dt
 
         # Update starvation timers
-        if self.color == SignalColor.GREEN:
-            green_dirs = PHASE_GREEN_LANES.get(self.current_phase, [])
-            for direction in ["north", "south", "east", "west"]:
-                if direction in green_dirs:
-                    self.starvation_timer[direction] = 0.0  # reset when getting green
-                else:
-                    self.starvation_timer[direction] += dt   # accumulate when waiting
-
+        green_dirs = (
+            PHASE_GREEN_LANES.get(self.current_phase, [])
+            if self.color == SignalColor.GREEN
+            else []
+        )
+        
+        pending_dirs = (
+            PHASE_GREEN_LANES.get(self.pending_phase, [])
+            if self.pending_phase is not None
+            else []
+        )
+        
+        for direction in ["north", "south", "east", "west"]:
+            if direction in green_dirs or direction in pending_dirs:
+                self.starvation_timer[direction] = 0.0
+            else:
+                self.starvation_timer[direction] += dt
         # Yellow handling
         if self.color == SignalColor.YELLOW:
             if self.time_in_phase >= self.yellow_duration:

@@ -182,17 +182,37 @@ class Intersection:
     def get_outgoing_counts(self) -> Dict[str, int]:
         """
         Estimates outgoing lane occupancy by counting vehicles that have recently
-        passed (position > 0.9) — these are still in the intersection/outgoing road.
-        Used for pressure calculation.
+        passed (position > 0.9). Used for pressure calculation based on destination.
         """
+        dest_mapping = {
+            "south_straight": "north",
+            "west_left": "north",
+            "east_right": "north",
+
+            "north_straight": "south",
+            "east_left": "south",
+            "west_right": "south",
+
+            "west_straight": "east",
+            "north_left": "east",
+            "south_right": "east",
+
+            "east_straight": "west",
+            "south_left": "west",
+            "north_right": "west",
+        }
+
         outgoing = {"north": 0, "south": 0, "east": 0, "west": 0}
+
         for lane_key, vehicles in self.lanes.items():
-            direction = lane_key.split("_")[0]
-            # Vehicles that passed recently are in outgoing lane
-            outgoing[direction] += sum(
-                1 for v in vehicles
-                if v.position > 0.9 or v.state == "passed"
-            )
+            dest = dest_mapping.get(lane_key)
+            if dest:
+                outgoing[dest] += sum(
+                    1
+                    for v in vehicles
+                    if v.position > 0.9 or v.state == "passed"
+                )
+
         return outgoing
 
     def get_approaching_count(self, direction: str) -> int:
