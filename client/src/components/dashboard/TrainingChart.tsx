@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useSimulationStore } from "@/store/simulationStore";
+import { useEpisodes } from "@/hooks/useEpisodes";
 import type { TrainingMetric } from "@/types/simulation";
 
 // ── Chart configurations ──────────────────────────────────────────────────────
@@ -46,8 +47,9 @@ const TABS: { key: Tab; label: string; config: ChartConfig; dataKey: keyof Train
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function TrainingChart() {
+export default function TrainingChart({ simulationId }: { simulationId: string | null }) {
   const trainingMetrics = useSimulationStore((s) => s.trainingMetrics);
+  const { data: pastEpisodes = [] } = useEpisodes(simulationId);
   const [activeTab, setActiveTab] = useState<Tab>("reward");
 
   // Filter out non-metric events (checkpoint_saved etc.)
@@ -57,22 +59,47 @@ export default function TrainingChart() {
   );
 
   // Last 100 episodes, shaped for recharts
-  const chartData = useMemo(
-    () =>
-      metrics.slice(-100).map((m) => ({
+  const chartData = useMemo(() => {
+    if (metrics.length > 0) {
+      return metrics.slice(-100).map((m) => ({
         episode: m.episode,
         total_reward: parseFloat(m.total_reward.toFixed(2)),
         avg_wait_time: parseFloat(m.avg_wait_time.toFixed(3)),
         epsilon: parseFloat(m.epsilon.toFixed(4)),
         loss: m.loss != null ? parseFloat(m.loss.toFixed(5)) : null,
-      })),
-    [metrics],
-  );
+      }));
+    } else if (pastEpisodes.length > 0) {
+      const sorted = [...pastEpisodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+      return sorted.slice(-100).map((ep: any) => ({
+        episode: ep.episodeNumber,
+        total_reward: parseFloat((ep.totalReward || 0).toFixed(2)),
+        avg_wait_time: parseFloat((ep.avgWaitTime || 0).toFixed(3)),
+        epsilon: parseFloat((ep.epsilon || 0).toFixed(4)),
+        loss: null,
+      }));
+    }
+    return [];
+  }, [metrics, pastEpisodes]);
 
   const tab = TABS.find((t) => t.key === activeTab)!;
-  const latest = metrics[metrics.length - 1];
+  
+  // Find latest for the tooltip display
+  let latest = null;
+  if (metrics.length > 0) {
+    latest = metrics[metrics.length - 1];
+  } else if (pastEpisodes.length > 0) {
+    const sorted = [...pastEpisodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+    const lastEp = sorted[sorted.length - 1] as any;
+    latest = {
+      episode: lastEp.episodeNumber,
+      total_reward: lastEp.totalReward,
+      avg_wait_time: lastEp.avgWaitTime,
+      epsilon: lastEp.epsilon,
+      loss: null,
+    };
+  }
 
-  if (!metrics.length) {
+  if (!chartData.length) {
     return (
       <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 text-sm text-white/40 text-center px-6">
         No training data yet.{" "}

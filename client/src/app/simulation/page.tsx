@@ -91,7 +91,7 @@ export default function SimulationPage() {
                   value="training"
                   className="mt-4 text-sm text-white/70"
                 >
-                  <TrainingChart />
+                  <TrainingChart simulationId={simulationId} />
                 </TabsContent>
                 <TabsContent
                   value="comparison"
