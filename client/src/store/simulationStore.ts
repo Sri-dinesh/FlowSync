@@ -38,7 +38,6 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     set((state) => ({
       currentFrame: frame,
       lastFrameAt: Date.now(),
-      isRunning: true,
       mode:
         frame.mode === "fixed" || frame.mode === "ai" || frame.mode === "manual" ? frame.mode : state.mode,
     })),
