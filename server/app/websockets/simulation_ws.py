@@ -320,13 +320,6 @@ async def simulation_socket(websocket: WebSocket) -> None:
                         logger.exception("Failed to create simulation record")
                         app.state.current_simulation_id = f"local-{int(time.time())}"
 
-            elif command == "pause":
-                app.state.sim_running = False
-                try:
-                    app.state.sim_intersection.spawner.set_enabled(False)
-                except Exception:
-                    pass
-
             elif command == "stop":
                 app.state.sim_running = False
                 try:

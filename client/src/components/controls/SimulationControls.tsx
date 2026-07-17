@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Play, Pause, RotateCcw, Square, Siren } from "lucide-react";
+import { Loader2, Play, RotateCcw, Square, Siren } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -48,11 +48,6 @@ export default function SimulationControls({
   const handleStart = () => {
     setRunning(true);
     sendCommand({ command: "start" });
-  };
-
-  const handlePause = () => {
-    setRunning(false);
-    sendCommand({ command: "pause" });
   };
 
   const handleStop = () => {
@@ -174,25 +169,15 @@ export default function SimulationControls({
         ) : (
           <Button
             size="sm"
-            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={handlePause}
+            className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
+            onClick={handleStop}
             disabled={!isConnected}
+            title="Stop and save simulation, then reset for a new one"
           >
-            <Pause className="h-3.5 w-3.5 mr-1.5" />
-            Pause
+            <Square className="h-3.5 w-3.5 mr-1.5" />
+            Stop
           </Button>
         )}
-
-        <Button
-          size="sm"
-          className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
-          onClick={handleStop}
-          disabled={!isConnected}
-          title="Stop and save simulation, then reset for a new one"
-        >
-          <Square className="h-3.5 w-3.5 mr-1.5" />
-          Stop
-        </Button>
 
         {/* Reset — always visible, clears everything */}
         <Button
