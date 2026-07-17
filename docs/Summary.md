@@ -15,10 +15,12 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 **Core Research Contributions:**
 - **Dueling Double DQN** with separate value (V) and advantage (A) streams for better state-value estimation under high-density traffic
 - **Prioritized Experience Replay** with SumTree data structure, priority annealing (α=0.6), and importance-sampling bias correction (β: 0.4→1.0)
+- **Max-Pressure Formulation** (PressLight/MPLight-style): pressure computed per **movement** (12 total movements mapped to destination directions) with phase-level aggregation via `_get_phase_pressure()` — Phase 0 (NS straight+left), Phase 1 (EW straight+left), Phase 2 (NS right), Phase 3 (EW right)
 - **20-dimensional pressure-based observation space** encoding 12 lane-level movement queues, phase one-hot, signal context, and starvation metrics
-- **Multi-component pressure reward** combining pressure differential (PressLight-style), throughput bonus, switch penalty, starvation penalty (-2.0 per starved direction), max-green violation penalty (-1.0), and balance bonus — all with hard constraint enforcement
+- **Multi-component pressure reward** combining pressure differential (PressLight-style), throughput bonus, switch penalty (evaluated against **previous** phase's pressure, not current), starvation penalty (-2.0 per starved direction), max-green violation penalty (-1.0), and balance bonus (computed over **phase-level** pressures) — all with hard constraint enforcement
 - **Two-agent decoupling**: separate inference agent (live simulation) and training agent (background training) with periodic weight synchronization
-- **Starvation-aware signal control**: per-direction wait timers trigger automatic phase overrides at 45s threshold, independent of RL policy
+- **Starvation-aware signal control**: per-direction wait timers trigger automatic phase overrides at 45s threshold, independent of RL policy; **starvation bleed fix**: timers also reset for directions in the pending/next phase
+- **Destination-aware outgoing counts**: `get_outgoing_counts()` maps each lane to its actual destination direction (e.g., south_straight→north, west_left→north) for accurate pressure calculation
 
 **Problem It Solves:**
 - Traditional fixed-timer traffic signals waste time by ignoring real-time demand
@@ -87,8 +89,11 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **AI (Dueling Double DQN) Control** | ✅ Working | Dueling architecture (V + A streams), PER buffer (SumTree, α=0.6, β annealing), 20-dim pressure obs, `select_action(ε=0)` for inference |
 | **Manual (MNL) Control** | ✅ Working | 4 phase buttons, holds green indefinitely, phase changes go through yellow→red→green clearance |
 | **Yield-on-Left Logic** | ✅ Working | Left-turners at stop line during phases 0/1 yield to oncoming straight/right traffic |
+| **Max-Pressure Reward Formulation** | ✅ Working | Per-movement pressure with destination mapping (12 movements, each mapped to downstream direction); `_get_phase_pressure()` aggregates to phase level; switch penalty evaluates **previous phase** pressure |
+| **Starvation Bleed Fix** | ✅ Working | `starvation_timer` resets for BOTH current green AND pending phase directions — no false accumulation during yellow-red transitions |
+| **Destination-Aware Outgoing Counts** | ✅ Working | `get_outgoing_counts()` uses proper dest mapping (south_straight→north, west_left→north, etc.) for accurate pressure calculation |
 | **Starvation Overrides** | ✅ Working | Per-direction `starvation_timer` (45s threshold), triggers `set_phase()` to serve starved direction, -2.0 penalty in reward |
-| **Max Green Enforcement** | ✅ Working | Hard 40s cap on any green phase, forces `_get_best_alternative_phase()` (highest pressure) |
+| **Max Green Enforcement** | ✅ Working | Hard 40s cap on any green phase, forces `_get_best_alternative_phase()` (highest pressure via `_get_phase_pressure()`) |
 | **Right-Turn Always-Allowed** | ✅ Working | Right turns excluded from pressure calculation, bypass signal checks entirely, `is_right_turn` property on Vehicle |
 | **Two-Agent Decoupling** | ✅ Working | `sim_agent` (inference) + `training_agent` (training) are independent `DQNAgent` instances; weights synced at checkpoints |
 | **3-Lane Roads + Visuals** | ✅ Working | 40×6 roads, stop bars at ±3.1, zebra crossings, lane offsets (0.5/1.5/2.5), direction labels |
@@ -118,6 +123,7 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **All-Red Clearance** | ⚠️ Tunable | Fixed at 3.0s (`red_duration`); may be too short for heavy traffic — vehicles can still be in intersection when cross-traffic gets green |
 | **Manual Mode Phase Display** | ⚠️ Minor | Traffic light shows correct color but doesn't visually distinguish "manual hold" vs normal green |
 | **PER Beta Annealing Granularity** | ⚠️ Minor | Beta is annealed linearly over total episodes; on early-stop, beta may not reach 1.0 |
+| **Switch Penalty Edge Case** | ⚠️ Minor | Switch penalty checks `prev_phase` pressure > 0.3 — only penalizes if combined pressure of both left-turn lanes in the abandoned phase exceeds threshold; single-lane pressure just below 0.3 may allow premature switching without penalty |
 | **WS Reconnection Storm** | ⚠️ Rare | Exponential backoff (max 5) works, but rapid reconnects can occur if backend restarts mid-session |
 | **Prisma Migrations** | ⚠️ Manual | No CI migration step — `prisma db push` required after schema changes |
 | **Hardcoded Render URL** | ⚠️ Config | `flowsync-gelt.onrender.com` removed from `utils.ts`/`next.config.ts` but may persist in docs |
@@ -160,7 +166,8 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 ### Recent Commits Impact (Last 15)
 
 | Commit | Date | Impact |
-|---|---|---|
+|---|---|---|---|
+| `f3bcd9f` | 2026-07-16 | **Algorithm Fixes** (code-level deep-dive): **(a) Per-movement max-pressure formulation** — `_compute_movement_pressures()` changed from direction-level (4 entries summing straight+left) to movement-level (12 entries with `dest_map` lookup), enabling destination-aware pressure (e.g. `north_straight→south`, `north_left→east`). **(b) Switch penalty evaluated against previous phase** — `step()` now captures `prev_phase` pre-tick and passes it to `compute_reward()`; penalty checks `prev_pressures[PHASE_GREEN_LANES[prev_phase]]` instead of post-switch `curr_pressures[PHASE_GREEN_LANES[current_phase]]`. **(c) Starvation bleed fix** — `traffic_signal.tick()` now checks BOTH `green_dirs` (current) AND `pending_dirs` (pending_phase) before resetting starvation timers; prevents false accumulation when a direction has a pending green but is still in yellow→red→green transition. **(d) Destination-aware outgoing counts** — `get_outgoing_counts()` replaced naive `lane_key.split("_")[0]` with full `dest_mapping` dict (12 entries mapping each lane key to its physical destination). **(e) Phase-level balance bonus** — balance bonus `imbalance` now computed over 4 phase-level pressures (via `_get_phase_pressure()`) instead of 12 raw movement pressures. **(f) `_get_best_alternative_phase()`** — now uses `_get_phase_pressure()` instead of direction-level `PHASE_GREEN_DIRS_MAP`. **(g) New helper** `_get_phase_pressure(pressures, phase)` aggregates 12 movement pressures into 4 phase groups. |
 | `d5a22ec` | 2026-07-15 | Disable camera auto-rotation (manual orbit only) |
 | `2d074b3` | 2026-07-13 | Upgrade environment: MeshPhysicalMaterial, neon skyscrapers, LowPolyTree, Day/Night sun emissive 8.0 |
 | `8d7536d` | 2026-07-13 | 3-mode comparison chart, draggable LiveSnapshot framer-motion widget |
@@ -175,7 +182,6 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | `a3d650c` | 2026-07-12 | Cleanup: remove hardcoded URLs, delete dead metrics.py, update pytest |
 | `e694309` | 2026-07-12 | Schema v2: world coordinates, Q-values, performance metrics DB refactor |
 | `134c411` | 2026-07-12 | Double DQN + LayerNorm, replay buffer 50K→100K, Huber loss, gradient clipping |
-| `5e74135` | 2026-07-12 | Observation space redesign: 8-dim→20-dim, pressure-based compute_reward |
 
 ---
 
@@ -201,6 +207,248 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 5. **All-Red Duration Config** — Expose `red_duration` as env var / UI slider for tuning
 6. **E2E Tests** — Add Playwright/Cypress for critical user journeys (start → train → load → compare)
 7. **GPU Training** — Enable CUDA in Dockerfile for accelerated training (blocked by Render free tier)
+
+---
+
+## 1.4 Research Methodology
+
+### 1.4.1 Problem Formalization (Markov Decision Process)
+
+The traffic signal control problem is formalized as a discrete-time MDP with the following components:
+
+**State Space (S):** 20-dimensional continuous vector normalized to [0,1]:
+- 12 movement-level queue lengths (normalized by MAX_CAP=10.0): `north_straight`, `north_left`, `north_right`, `south_straight`, `south_left`, `south_right`, `east_straight`, `east_left`, `east_right`, `west_straight`, `west_left`, `west_right`
+- 4 one-hot phase encoding: exactly one dimension is 1.0 for the current phase (0-3)
+- 2 signal context dimensions: `time_in_phase / MAX_GREEN_TIME` (normalized, capped at 1.0), `is_transitioning` (1.0 if yellow/red, 0.0 if green)
+- 1 pressure context: `min(total_movement_pressure / 20.0, 1.0)` — aggregate congestion signal
+- 1 starvation context: `min(max(starvation_timer) / STARVATION_THRESHOLD, 1.0)` — worst-case direction wait
+
+**Action Space (A):** Discrete(4) — one of four signal phases:
+| Action | Phase ID | Description |
+|--------|----------|-------------|
+| 0 | NS_GREEN | North+South straight, left, right |
+| 1 | EW_GREEN | East+West straight, left, right |
+| 2 | NS_LEFT | North+South left-turn only |
+| 3 | EW_LEFT | East+West left-turn only |
+
+**Transition Function (T):** Deterministic state transitions driven by:
+1. Agent's phase selection (filtered through hard constraints: max-green override, starvation override, yellow-red clearance)
+2. Poisson vehicle spawn process (λ=0.8 training, λ=0.5 evaluation) — 50% straight, 25% left, 25% right
+3. Vehicle physics: constant speed (DEFAULT_SPEED=0.12), stop-line enforcement, yield-on-left logic, collision avoidance (MIN_DIST=0.08), intersection reservation by direction group
+
+**Reward Function (R):** Multi-component pressure-based reward:
+`R = 1.5·Δpressure + 0.2·throughput - 0.3·switch_penalty - 2.0·|starved| - 1.0·max_green_violation + 0.2·balance_bonus`
+- Primary signal: pressure reduction (PressLight-style, incoming-outgoing per movement)
+- Corrective signals: starvation penalty (hard constraint), max-green penalty, switch penalty
+- Shaping bonus: throughput (conservative 0.2), phase-level balance (0.2 when imbalance < 0.2)
+
+**Discount Factor (γ):** 0.97 — moderate discount for near-term congestion relief
+
+### 1.4.2 Algorithm Selection Rationale
+
+| Algorithm Component | Selection | Rationale |
+|---------------------|-----------|-----------|
+| **Base algorithm** | Deep Q-Network (DQN) | Discrete action space (4 phases), value-based methods converge stably with experience replay |
+| **Overestimation reduction** | Double DQN | Standard DQN overestimates Q-values by up to 100% in some Atari domains; Double DQN decouples action selection (online net) from evaluation (target net), reducing overestimation bias for more stable phase selection |
+| **State-value separation** | Dueling DQN | In high-density traffic, many actions yield similar Q-values; separate V(s) and A(s,a) streams let the agent learn which states are congested regardless of action, improving policy evaluation under heavy traffic |
+| **Sampling efficiency** | Prioritized Experience Replay (PER) | Critical events (starvation, max-green violations, emergency preemption) are rare; PER prioritizes high-TD-error transitions via SumTree (α=0.6), learning from important events up to O(log n) times more frequently |
+| **Gradient stability** | Smooth L1 Loss (Huber) | Less sensitive to outliers than MSE; prevents exploding gradients from high-TD-error transitions sampled early in training |
+| **Importance sampling** | PER β-annealing (0.4→1.0) | Corrects for priority bias; β starts at 0.4 for stability (allows aggressive priority sampling early), anneals linearly to 1.0 over training (fully corrected by end) |
+| **Gradient clipping** | max_norm=10.0 | Prevents destabilizing gradient updates from rare high-error transitions |
+
+**Why not other approaches:**
+- **Policy gradient (PPO/A2C):** Higher variance, more sample-inefficient for this discrete-action domain; DQN variants are well-established in traffic control literature (PressLight, MPLight, FPA-DQN)
+- **Model-based RL:** Requires accurate traffic flow model; simulation is already the model, making model-free more direct
+- **SARSA:** On-policy; would require separate behavior policy and lose efficiency of off-policy replay buffer
+
+### 1.4.3 Evaluation Protocol
+
+**Training Configuration:**
+- Episodes: 1,000 (default), capped at 1,000 steps per episode (100s simulated time)
+- Vehicle spawn: Poisson(λ=0.8) during training, Poisson(λ=0.5) during evaluation inference
+- Exploration: ε-greedy with exponential decay — ε starts at 1.0, decays by 0.998× per episode, floor at 0.05
+- PER: α=0.6, β annealed from 0.4→1.0, buffer warmup of 2,000 steps before training begins
+- Network updates: every 2 steps, batch size 128, target network sync every 300 steps
+
+**Baselines:**
+| Baseline | Type | Description |
+|----------|------|-------------|
+| Fixed-Timer | Rule-based | 4-phase cycle: GREEN 8s → YELLOW 2s → RED 3s (clearance) → next phase; smart early-switch if current queue empty, sequential fallback |
+| Manual (MNL) | Human-in-loop | Operator selects phases via UI buttons; holds green indefinitely until manual override; uses same yellow→red→green clearance |
+
+**Performance Metrics:**
+| Metric | Definition | Collection |
+|--------|------------|------------|
+| Average Wait Time | Mean `vehicle.wait_time` across all non-passed vehicles | Computed per tick via `get_avg_wait_time()` |
+| Throughput | Total vehicles with `state == "passed"` | `intersection.total_passed` accumulator |
+| Max Queue Length | Max of `get_queue_lengths()` values (per direction) | Sampled every DB flush |
+| Total Pressure | Sum of 12 per-movement pressure values | Computed via `_compute_movement_pressures()` |
+| Starvation Events | Number of directions with timer ≥ STARVATION_THRESHOLD (45s) | `signal.get_starved_directions()` |
+
+**Comparison Methodology:**
+- Each mode (Fixed, AI, Manual) runs on the same intersection geometry with comparable spawn rates
+- Performance metrics written to `performance_metrics` table on simulation stop
+- Frontend Compare tab fetches aggregated metrics from `/api/metrics` with `?mode=` filter
+- Improvement percentage: `(avgWait_baseline - avgWait_AI) / avgWait_baseline × 100`
+
+### 1.4.4 Research Contributions & Findings
+
+**Core Contributions:**
+1. **Dueling Double DQN + PER for traffic control** — Combines three established RL improvements (Dueling, Double, PER) into a single architecture for 4-phase intersection control, demonstrating feasibility with CPU-only training
+2. **Per-movement max-pressure formulation** — Extends PressLight's pressure concept from direction-level to movement-level (12 movements with destination mapping), enabling finer-grained congestion sensing
+3. **Starvation-aware constraint handling** — Novel integration of hard starvation overrides (45s threshold) with RL reward penalties (-2.0 per starved direction), preventing the "starvation bleed" bug where pending-phase directions accumulate false wait time
+4. **Two-agent decoupling** — Separate inference and training agents allow continuous simulation without training-induced latency; weight synchronization at discrete checkpoints ensures consistency
+5. **Phase-level balance bonus** — Phase-level pressure aggregation (4 groups) for the balance bonus prevents single-lane spikes from incorrectly triggering equal-service rewards
+
+**Key Findings:**
+- Per-movement pressure (12-dim) provides better signal than direction-level pressure (4-dim) — the agent can distinguish straight vs turning congestion
+- Switch penalty must evaluate the **abandoned** phase's pressure (pre-tick), not the **entered** phase's pressure (post-tick), to correctly penalize premature switching
+- Starvation timers must account for `pending_phase` directions to avoid false accumulation during yellow→red→green transitions
+- Separate inference/training agents eliminate freeze-frame issues during training updates without sacrificing policy freshness (50-episode sync interval is sufficient)
+
+---
+
+## 1.5 System Architecture
+
+### 1.5.1 High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (Next.js 16)                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────────┐ │
+│  │ Three.js │  │ Zustand  │  │ TanStack │  │ Recharts Charts │ │
+│  │  (R3F)   │  │  Store   │  │  Query   │  │ (Train/Compare) │ │
+│  │ 3D Scene │  │ State    │  │  Cache   │  │ Metrics/History │ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬────────┘ │
+│       │             │             │                  │          │
+│       └─────────────┼─────────────┼──────────────────┘          │
+│                     │             │                             │
+│              WebSocket (10Hz)     REST (/api/* → Prisma)        │
+└─────────────────────┼─────────────┼─────────────────────────────┘
+                      │             │
+┌─────────────────────┼─────────────┼─────────────────────────────┐
+│                     │             │                             │
+│              /ws/simulation  /api/metrics, /api/episodes        │
+│              /ws/training   /api/models, /api/simulations       │
+│                     │             │                             │
+│                     ▼             ▼                             │
+│                    BACKEND (FastAPI / Python / PyTorch)         │
+│                                                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                    app.state                             │   │
+│  │  ┌───────────────────┐    ┌───────────────────────────┐  │   │
+│  │  │ sim_intersection  │    │ training_env (TrafficEnv) │  │   │
+│  │  │ (Intersection)    │    │ - separate from sim       │  │   │
+│  │  │ - live simulation │    │ - used only by Trainer    │  │   │
+│  │  └────────┬──────────┘    └───────────┬───────────────┘  │   │
+│  │           │                            │                  │   │
+│  │  ┌────────▼──────────┐    ┌───────────▼───────────────┐  │   │
+│  │  │ sim_agent         │    │ training_agent            │  │   │
+│  │  │ (DQNAgent)        │    │ (DQNAgent)                │  │   │
+│  │  │ - inference only  │    │ - training with PER       │  │   │
+│  │  │ - ε = 0 (greedy)  │    │ - ε: 1.0 → 0.05          │  │   │
+│  │  │ - no replay buf   │    │ - full SumTree (100K)    │  │   │
+│  │  └────────────────────┘    └───────────┬───────────────┘  │   │
+│  │                                        │                  │   │
+│  │                          Weight Sync (every 50 episodes)  │   │
+│  │                          ◄──────────────────────────────┘ │   │
+│  │                                                                │
+│  │  ┌────────────────────────────────────────────────────────┐   │
+│  │  │ Trainer                                                │   │
+│  │  │ - orchestrates episodes                                │   │
+│  │  │ - anneals PER β                                        │   │
+│  │  │ - saves checkpoints                                    │   │
+│  │  │ - broadcasts metrics                                   │   │
+│  │  └────────────────────────────────────────────────────────┘   │
+│  │                                                                │
+│  │  ┌────────────┐  ┌────────────┐                               │
+│  │  │ Supabase   │  │ Model      │                               │
+│  │  │ Service    │  │ Service    │                               │
+│  │  │ (DB writes)│  │ (checkpts) │                               │
+│  │  └──────┬─────┘  └─────┬──────┘                               │
+│  └─────────┼──────────────┼──────────────────────────────────────┘
+│            │              │
+│     supabase-py REST      │ supabase-py Storage API
+└────────────┼──────────────┼────────────────────────────────────────
+             │              │
+             ▼              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     SUPABASE PLATFORM                            │
+│  ┌──────────────────────┐  ┌──────────────────────────────────┐ │
+│  │ PostgreSQL Database  │  │ Storage (model-checkpoints)      │ │
+│  │ - simulations        │  │ - models/{sim_id}/checkpoint_N.pt│ │
+│  │ - episodes           │  └──────────────────────────────────┘ │
+│  │ - traffic_logs       │                                       │
+│  │ - signal_states      │                                       │
+│  │ - performance_metrics│                                       │
+│  │ - rl_models          │                                       │
+│  └──────────────────────┘                                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 1.5.2 Component Interaction Model
+
+The system uses three independent processing pipelines:
+
+**1. Simulation Pipeline (Real-Time, ~10 Hz):**
+```
+User → WebSocket (/ws/simulation) → simulation_loop()
+  → Intersection.tick() [physics + vehicles + signal]
+    ├── Fixed mode: no agent, automatic phase cycling
+    ├── AI mode: 
+    │     _build_obs_from_intersection() → 20-dim obs
+    │     sim_agent.select_action(ε=0) → action
+    │     training_env.compute_reward(...) → reward
+    │     build_frame() → SimulationFrame JSON
+    └── Manual mode: no agent, holds green indefinitely
+  → manager.broadcast() → WebSocket → Frontend Three.js (60fps lerp)
+  → [every 50 ticks] _SimBuffer.add() → [every 10 samples] flush to Supabase
+```
+
+**2. Training Pipeline (Background, ~100ms per episode):**
+```
+User → REST (/training/start) → Trainer.train()
+  → Reset TrafficEnv
+  → For each step (max 1000):
+      training_agent.select_action(ε-greedy)
+      env.step(action) [hard constraints enforced]
+      PER buffer.push(state, action, reward, next_state, done)
+      [every 2 steps, if buffer ≥ 2000]: PER sample → train_step
+      [every 300 steps]: sync target network
+  → [per episode]: save_episode(), broadcast_training_metric()
+  → [every 50 episodes]: save_checkpoint(), sync sim_agent weights
+```
+
+**3. Data Pipeline (Asynchronous):**
+```
+Simulation metrics (sampled every 50 ticks)
+  → _SimBuffer (in-memory, max 10 samples)
+  → [flush trigger] asyncio.create_task(_flush_buffer)
+    → supabase_service.save_traffic_logs_bulk()
+    → supabase_service.save_signal_states_bulk()
+  → [simulation stop] supabase_service.save_performance_metric()
+
+Training metrics (per episode)
+  → supabase_service.save_episode() (sync via asyncio.to_thread)
+  
+Frontend reads:
+  → TanStack React Query (15s refetch) → Next.js API Route → Prisma → Supabase
+```
+
+### 1.5.3 Technology Stack & Rationale
+
+| Decision | Rationale | Trade-offs |
+|----------|-----------|------------|
+| **Python/FastAPI** | NumPy/PyTorch compatibility, async WebSocket support, rapid prototyping | GIL-bound training; CPU-only on Render free tier |
+| **PyTorch CPU** | Dynamic computation graphs, extensive RL ecosystem, Kaiming init built-in | No GPU acceleration; training 10× slower than CUDA |
+| **Next.js 16 App Router** | SSR for landing page, API routes for Prisma, React Server Components | Overhead for primarily client-rendered simulation |
+| **Three.js / R3F** | Declarative 3D scene graph, React integration, postprocessing via EffectComposer | Performance ceiling for 100+ vehicles with bloom |
+| **Zustand** | Minimal boilerplate, TypeScript-first, works with React 19 | No middleware ecosystem (compared to Redux) |
+| **TanStack React Query** | Auto-refetch, caching, optimistic updates, devtools | Overkill for single-user demo |
+| **Supabase** | Free PostgreSQL + file storage + REST API, no ops overhead | Vendor lock-in; no self-hosted option on free tier |
+| **Two independent agents** | Zero-contention inference during training; sync at discrete checkpoints | Double memory for network weights (~2× 1.2M params) |
+| **PER with SumTree** | O(log n) priority sampling, O(log n) priority update | ~24MB for 100K transitions at 20-dim state |
+| **Recharts** | Lightweight, React-native charting, composable | Limited animation compared to D3; no 3D charts |
 
 ---
 
@@ -273,15 +521,29 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 - After 3s red: `current_phase = pending_phase`, color → GREEN, timer resets
 - This ensures **5 seconds of clearance** (2s yellow + 3s all-red) between opposing movements
 
+**Intersection Reservation System (All Modes):**
+- Vehicles entering the intersection lock the crossing by **direction group**: phases 0,2 reserve NS group; phases 1,3 reserve EW group
+- A vehicle enters the intersection only if `intersection_reserved_phase is None` OR the requesting group matches the reserved group
+- The reservation releases when `vehicles_in_intersection` becomes empty (last `state == "passed"` vehicle)
+- This prevents perpendicular-movement collisions without full collision detection
+
+**Vehicle Collision Avoidance (All Modes):**
+- Vehicles in the same lane maintain `MIN_DIST=0.08` spacing from the vehicle ahead
+- `max_position = max(0.0, vehicle_ahead.position - MIN_DIST)`
+- A vehicle can only move if the vehicle ahead has `speed > 0`, preventing tight bumper-to-bumper creep
+- Stop-line enforcement: vehicles cap position at `STOP_LINE` (0.42) when the signal is red, preventing intersection entry
+
 **Starvation Tracking (Shared with AI Mode):**
 - Per-direction timers (`starvation_timer` dict): reset to 0 when direction receives green, accumulate `dt` when direction is red
 - `get_starved_directions()`: returns directions with timer ≥ `STARVATION_THRESHOLD` (45s)
 - In fixed mode: starvation does NOT override phase selection (only AI mode has starvation override), but the metric is still tracked for reward computation
 
 **Yield-on-Left (All Modes):**
-- When vehicle.position ≤ STOP_LINE (0.42) AND vehicle.turn == "left" AND signal.current_phase in (0, 1):
-  - Check oncoming lane (north↔south, east↔west) for straight/right vehicles with position between 0.15 and 1.0
-  - If found: set `can_move = False` to yield right-of-way
+- Condition: `vehicle.position ≤ STOP_LINE (0.42) AND turn == "left" AND signal.current_phase in (0, 1)`
+- Oncoming direction resolved via map: `{"north": "south", "south": "north", "east": "west", "west": "east"}`
+- Checks oncoming straight+right lanes for vehicles with `position` in range `[0.15, 1.0)`
+- If any oncoming vehicle found: `can_move = False`
+- Only applied for parallel green phases (0,1) where left-turners cross oncoming traffic
 
 **Right-Turn Always-Allowed (All Modes):**
 - Right-turning vehicles (`is_right_turn = True`) bypass signal checks entirely
@@ -358,28 +620,59 @@ Based on PressLight (Wei et al. 2019), MPLight, and FPA-DQN (Wang et al. 2025):
 |-----------|---------|--------|---------|
 | **Pressure Reward** | `(total_prev_pressure - total_curr_pressure) × 1.5` | 1.5 | Primary signal — reduce intersection-wide congestion pressure |
 | **Throughput Bonus** | `vehicles_passed × 0.2` | 0.2 | Reward clearing vehicles (conservative to avoid dominating) |
-| **Switch Penalty** | `-0.3` if phase changed AND green direction still has pressure > 0.3 | -0.3 | Discourage unnecessary switching that leaves pressure unserved |
+| **Switch Penalty** | `-0.3` if phase changed AND **previous** phase's green directions still have pressure > 0.3 | -0.3 | Discourage premature phase abandonment (evaluated against the phase we **left**, not the one we entered) |
+
+**Code-level switch penalty mechanism:** `step()` captures `prev_phase = self.intersection.signal.current_phase` **before** `tick()`. This pre-tick phase is passed to `compute_reward()`. The penalty evaluates `prev_pressures` of `PHASE_GREEN_LANES.get(prev_phase, [])` — i.e., the pressure of the phase the agent just abandoned. Without this pre-tick capture, the penalty would incorrectly evaluate the phase the agent *entered* (post-tick state), which always has low pressure at the start of green.
 | **Starvation Penalty** | `-2.0 × len(starved_directions)` | -2.0 | Hard penalty per direction waiting > 45s |
 | **Max Green Penalty** | `-1.0` if current phase exceeds 40s | -1.0 | Prevent agent from holding green indefinitely |
-| **Balance Bonus** | `+0.2` if pressure values are nearly equal (imbalance < 0.2) AND traffic is present | 0.2 | Encourage evenly distributed service |
+| **Balance Bonus** | `+0.2` if **phase-level** pressures are nearly equal (imbalance < 0.2) AND traffic is present | 0.2 | Encourage evenly distributed service across all 4 phases |
 
-**Pressure Calculation** (per direction):
-`Pressure(d) = max(0, incoming_count(d) / MAX_CAP - outgoing_count(d) / MAX_CAP)`
+**Pressure Calculation — Per-Movement Max-Pressure Formulation:**
+`Pressure(movement) = max(0, incoming_vehicles(movement) / MAX_CAP - outgoing_vehicles(destination) / MAX_CAP)`
 
 Where:
-- `incoming(d)` = vehicles in straight + left movements for direction d (right turns excluded — always allowed)
-- `outgoing(d)` = vehicles in outgoing lanes (position > 0.9 or state == "passed")
+- **12 movements** with **destination mapping**:
+  | Movement | Dest Direction | Movement | Dest Direction |
+  |---|---|---|---|
+  | north_straight | south | south_straight | north |
+  | north_left | east | south_left | west |
+  | north_right | west | south_right | east |
+  | east_straight | west | west_straight | east |
+  | east_left | south | west_left | north |
+  | east_right | north | west_right | south |
+- `incoming(movement)` = queue count for that specific movement lane
+- `outgoing(destination)` = vehicles in the lane that this movement **feeds into** (vehicles with position > 0.9 or state == "passed" in the destination direction's lanes)
 - `MAX_CAP = 10.0` (max vehicles per lane)
+
+**Phase-Level Pressure Aggregation (`_get_phase_pressure()`):**
+Pressure is aggregated to the phase level for `_get_best_alternative_phase()` and balance bonus:
+| Phase | Movements Included |
+|-------|-------------------|
+| 0 (NS_GREEN) | north_straight, north_left, south_straight, south_left |
+| 1 (EW_GREEN) | east_straight, east_left, west_straight, west_left |
+| 2 (NS_LEFT) | north_right, south_right |
+| 3 (EW_LEFT) | east_right, west_right |
+
+**Code-level distinction:** Before the fix, `_get_best_alternative_phase()` used a `PHASE_GREEN_DIRS_MAP` at the direction-level (grouping by N/S/E/W) and summed direction-level pressures — this meant phases 0 and 2 returned identical pressures (both NS directions). Now it uses `_get_phase_pressure()` which correctly distinguishes the straight/left vs right-turn groupings. Similarly, the balance bonus now aggregates 12 movement pressures into 4 phase-level values before computing `imbalance = max(phase_pressures) - min(phase_pressures)` — preventing single-lane pressure spikes from incorrectly triggering the bonus.
+
+This per-movement pressure formulation provides finer granularity than direction-level pressure — the agent can distinguish which specific movements within a direction are congested, and the destination-aware outgoing count prevents serving a movement whose downstream lane is already full.
 
 #### 2.3.6 Hard Constraints (Safety Overrides)
 Applied BEFORE the agent's action takes effect — these are hard guards, not learned:
 
 | Constraint | Trigger | Action | Priority |
 |------------|---------|--------|----------|
-| **Max Green Override** | Current green phase exceeds MAX_GREEN_TIME (40s) | Force switch to highest-pressure alternative phase | Overrides agent action |
-| **Starvation Override** | Any direction waits > STARVATION_THRESHOLD (45s) | Force phase that serves the starved direction | Overrides agent action |
+| **Max Green Override** | Current green phase exceeds MAX_GREEN_TIME (40s) | Force switch to highest-pressure alternative phase via `_get_best_alternative_phase()` | Overrides agent action |
+| **Starvation Override** | Any direction waits > STARVATION_THRESHOLD (45s) | Force phase serving starved direction (`_get_phase_for_direction()`: north/south→0, east/west→1) | Overrides agent action |
 | **Minimum Green** | `can_switch_phase` returns False if time_in_phase < 8s (unless transitioning) | Blocks phase change request | Signal-level guard |
 | **Yellow-Red Clearance** | Any phase change triggers yellow (2s) → red (3s) → green sequence | Enforces safety clearance | Signal-level guard |
+| **Intersection Reservation** | Perpendicular traffic group (NS vs EW) holds the crossing | Blocks perpendicular vehicles from entering until all current-group vehicles clear | Group-level guard |
+
+**Constraint enforcement order in `TrafficEnv.step()`:**
+1. `signal.is_max_green_exceeded AND action == current_phase` → override action via `_get_best_alternative_phase()`
+2. `signal.get_starved_directions()` non-empty → find starved direction's phase, if different from current → override action
+3. Pass (potentially overridden) action to `intersection.tick(action=action)`
+4. Signal-level guards (min green, yellow-red clearance) enforced inside `signal.set_phase()` and `signal.tick()`
 
 #### 2.3.7 Training Loop
 
@@ -389,8 +682,10 @@ For each episode:
   2. Reset environment → initial 20-dim observation
   3. For each step (max 1000):
      a. Select action via ε-greedy (ε decays 0.998× per episode, floor 0.05)
-     b. Execute step: action goes through hard constraints → intersection.tick()
-     c. Compute pressure-based reward
+     b. Capture prev_phase AND prev_pressures pre-tick (for correct switch penalty evaluation)
+     c. Hard constraints override action if max-green or starvation triggered
+     d. Execute step: intersection.tick(dt=0.1, action=action)
+     e. Compute pressure-based reward using pre-tick prev_phase, prev_pressures, post-tick curr_pressures
      d. Push (s, a, r, s', done) into PER buffer with max priority
      e. If buffer size ≥ MIN_REPLAY_SIZE (2000) and step % TRAIN_EVERY_N_STEPS (2) == 0:
         - Sample batch of 128 from PER with IS weights
@@ -623,12 +918,21 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **What:** Spawn emergency vehicles that force priority green lights.
 
-**How It Works:**
+**How It Works — Technical Details:**
 - 4 directional buttons in the control panel (North/South/East/West)
-- Spawns an emergency vehicle with siren lights (red/blue alternating) and point lights
-- Forces the traffic signal to the priority phase immediately (skips normal RL/fixed control)
+- `trigger_emergency_override(lane)`: spawns emergency vehicle with `is_emergency=True`, random ID `emergency-{uuid4.hex[:6]}`, straight turn, position 0.0
+- **Guard:** prevents double-spawning — checks if any vehicle in the direction's three lanes has `is_emergency=True`
+- **Signal Bypass Mechanism (`intersection.tick()` lines 52–69):**
+  1. Detect active emergency in any lane
+  2. Compute `priority_phase = 0` for north/south, `1` for east/west
+  3. Directly set `signal.current_phase = priority_phase`
+  4. Directly set `signal.color = SignalColor.GREEN`
+  5. Reset `signal.time_in_phase = 0.0`
+  6. Clear `signal._pending_phase = None`
+  7. Set `action = None` — bypasses normal RL/fixed signal logic entirely
+- Emergency vehicle passes through with siren lights (red/blue alternating emissive + point lights)
+- When last emergency vehicle exits (`state == "passed"`), `emergency_override_lane` is cleared and normal control resumes
 - Only one emergency vehicle per direction at a time
-- Normal control resumes after emergency clears
 
 **User Flow:** Click "Emergency" button for a direction → watch emergency vehicle spawn → see signals change → ambulance clears intersection.
 
@@ -729,7 +1033,8 @@ None currently implemented. All features are accessible to all users.
 |---|---|---|---|
 | **Simulation loop** | WebSocket first client connect | Continuous (~10 Hz) | Physics tick, vehicle movement, signal logic |
 | **Training loop** | User starts training | Per-episode (~100ms each) | DQN training, reward calc, network updates |
-| **DB buffer flush** | Every 10 samples | ~50s during simulation | Flush buffered traffic logs + signal states to Supabase |
+| **DB sampling** | Every 50 simulation ticks | ~5s | Sample traffic_log + signal_state row for buffer |
+| **DB buffer flush** | Every 10 samples (10×5s = 10 samples) | ~50s during simulation | Bulk insert buffered traffic logs + signal states to Supabase (reduces round-trips) |
 | **Checkpoint save** | Every 50 episodes | During training | Save model state dict to Supabase Storage + disk |
 | **Target network sync** | Every 300 steps | During training | Copy online DuelingDQNNetwork weights to target network for stable Double DQN targets |
 | **Agent weight sync** | Every 50 episodes | During training | Copy training_agent online_net → sim_agent online_net for live inference |
@@ -746,6 +1051,8 @@ Backend (Intersection.tick)
   ├── Fixed mode: tick(action=None, is_manual=False)
   ├── AI mode: 
   │     _build_obs_from_intersection() → 20-dim obs
+  │     ├── Note: sim_ws uses simplified pressure_norm=0.0 for inference
+  │     │   vs training_env._get_obs() which computes full pressure_norm from _compute_movement_pressures()
   │     → sim_agent.select_action(state, ε=0) → action
   │     → training_env.compute_reward(prev_pressures, curr_pressures, ...)
   │     → tick(action=selected, is_manual=False)
@@ -853,6 +1160,15 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
   - `{"command": "emergency_override", "lane": "north"\|"south"\|"east"\|"west"}`
   - `{"command": "manual_override", "phase": 0-3}`
 - **Command validation:** `COMMAND_SCHEMAS` dict defines required fields and types per command; `validate_ws_command()` rejects unknown commands and invalid types
+  ```python
+  COMMAND_SCHEMAS = {
+      "set_mode": {"mode": str},
+      "set_spawn_rate": {"value": float},
+      "emergency_override": {"lane": str},
+      "manual_override": {"phase": int},
+  }
+  ```
+  Commands without schema (`start`, `stop`, `reset`) accept no parameters. Type coercions are tried at validation time, and invalid types return a descriptive error message rather than crashing the connection.
 
 **`/ws/training`** — Bidirectional
 - **Server → Client (per episode):** `TrainingMetric` JSON — episode, reward, avg wait, throughput, epsilon, loss, is_training
@@ -1285,10 +1601,10 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 
 | File | Purpose |
 |---|---|
-| `server/app/simulation/environment.py` | **MAJOR UPDATE** Gymnasium `TrafficEnv`: **20-dim observation** (12 movement queues normalized by 10 + 4 one-hot phase + time_in_phase/MAX_GREEN_TIME + is_transitioning + total_pressure/20 + max_starvation/THRESHOLD), Discrete(4) action space. **Pressure-based reward** (PressLight/MPLight): pressure_change×1.5 + throughput×0.2 + switch_penalty -0.3 + starvation_penalty -2.0/starved + max_green_penalty -1.0 + balance_bonus 0.2. **Hard constraints**: max green override (forced switch at 40s), starvation override (forces phase for starved direction). `_compute_movement_pressures()`: incoming/MAX_CAP - outgoing/MAX_CAP per direction. `_get_best_alternative_phase()`: picks highest-pressure non-current phase. Terminal at 1000 steps. |
-| `server/app/simulation/intersection.py` | **MAJOR UPDATE** Core traffic intersection: 12 lanes (4 directions × 3 turns), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (by direction group: NS vs EW), emergency override. **`get_queue_lengths()` counts only `state != "passed"` vehicles**. **Yield-on-left logic**: left-turning vehicles at stop line during phases 0/1 must yield to oncoming straight/right traffic. **Per-lane queues** with `_spawned_this_interval` / `_passed_this_interval` counters for telemetry. **`get_movement_queues()`** returns 12-movement counts. **`get_outgoing_counts()`** estimates outgoing lane occupancy for pressure calculation. **`get_approaching_count(direction)`** counts vehicles before stop line. |
+| `server/app/simulation/environment.py` | **LATEST: Max-Pressure Formulation Fix** Gymnasium `TrafficEnv`: **20-dim observation** (12 movement queues normalized by 10 + 4 one-hot phase + time_in_phase/MAX_GREEN_TIME + is_transitioning + total_pressure/20 + max_starvation/THRESHOLD), Discrete(4) action space. **Pressure-based reward** (PressLight/MPLight): pressure_change×1.5 + throughput×0.2 + switch_penalty -0.3 (evaluated against **previous** phase's pressure, not current) + starvation_penalty -2.0/starved + max_green_penalty -1.0 + balance_bonus 0.2 (computed over **phase-level** pressures). `_compute_movement_pressures()`: per-movement pressure with **destination mapping** — 12 movements each mapped to their downstream direction (e.g., north_straight→south, north_left→east). `_get_phase_pressure(phase)`: aggregates movement pressures to phase-level (Phase 0: NS straight+left, Phase 1: EW straight+left, Phase 2: NS right, Phase 3: EW right). `_get_best_alternative_phase()` uses `_get_phase_pressure()`. Hard constraints: max green override (forced switch at 40s), starvation override. Terminal at 1000 steps. |
+| `server/app/simulation/intersection.py` | **LATEST: Destination-Aware Outgoing Counts Fix** Core traffic intersection: 12 lanes (4 directions × 3 turns), TrafficSignal, PoissonSpawner, timestep counter, intersection reservation system (by direction group: NS vs EW), emergency override. **`get_queue_lengths()` counts only `state != "passed"` vehicles**. **Yield-on-left logic**: left-turning vehicles at stop line during phases 0/1 must yield to oncoming straight/right traffic. **Per-lane queues** with `_spawned_this_interval` / `_passed_this_interval` counters for telemetry. **`get_movement_queues()`** returns 12-movement counts. **`get_outgoing_counts()`** — **UPDATED** with **destination mapping** (e.g., south_straight→north, west_left→north, east_right→north) instead of naive `lane_key.split("_")[0]` for accurate pressure calculation. **`get_approaching_count(direction)`** counts vehicles before stop line. |
 | `server/app/simulation/vehicle.py` | Vehicle dataclass: id, lane (direction), turn, position, wait_time, speed, state, is_emergency. `is_right_turn` property. `tick(dt, can_move)` moves vehicle at DEFAULT_SPEED (0.12) if allowed, tracks wait time, transitions to "passed" at position ≥ 1.0 |
-| `server/app/simulation/traffic_signal.py` | **MAJOR UPDATE** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). `red_duration=3.0` all-red clearance. **Starvation tracking**: `starvation_timer` dict per-direction (resets on green, accumulates on red), `STARVATION_THRESHOLD=45s`, `get_starved_directions()`, `is_max_green_exceeded` (40s cap), `can_switch_phase` (8s min). **Manual mode**: `is_manual` holds green indefinitely. `PHASE_ALLOWED_TURNS`: left-turn phases (2,3) restricted to "left" only. Smart phase selection (highest queue after min green, early switch if current phase empty). AI phase requests go through yellow→red→green transition. `set_phase(phase)` initiates yellow→red→target transition. |
+| `server/app/simulation/traffic_signal.py` | **LATEST: Starvation Bleed Fix** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). `red_duration=3.0` all-red clearance. **Starvation tracking**: `starvation_timer` dict per-direction — **FIXED**: timers now reset for directions in BOTH the current green phase AND the **pending phase**, preventing "starvation bleed" where a direction with a pending green still accumulated wait time. `STARVATION_THRESHOLD=45s`, `get_starved_directions()`, `is_max_green_exceeded` (40s cap), `can_switch_phase` (8s min). **Manual mode**: `is_manual` holds green indefinitely. `PHASE_ALLOWED_TURNS`: left-turn phases (2,3) restricted to "left" only. Smart phase selection (highest queue after min green, early switch if current phase empty). AI phase requests go through yellow→red→green transition. `set_phase(phase)` initiates yellow→red→target transition. |
 | `server/app/simulation/spawner.py` | **UPDATED** `PoissonSpawner`: configurable λ (default 0.3), spawns into one random direction per tick, 50% straight / 25% left / 25% right, max 10 vehicles per lane. Lanes now keyed by `{direction}_{turn}`. |
 | `server/app/simulation/metrics.py` | `MetricsTracker`: rolling calculation of avg_wait_time, avg_throughput, avg_queue_length with running totals. (Currently unused but retained) |
 
@@ -1358,7 +1674,8 @@ The project evolved through numbered phases early on, then shifted to feature-ba
 | **Starvation & Constraints** | `e6be1b7`, `d009830` | Starvation overrides (45s threshold with -2.0 reward penalty), right-turn always-allowed (excluded from pressure), pressure-based 20-dim obs, max-green enforcement (40s cap with -1.0 penalty), reward inflation fix (throughput 0.5→0.2, remove empty balance bonus), phase change detection fix (pre-tick vs post-tick) |
 | **Comparison + Draggable UI** | `8d7536d`, `5e2aff3` | 3-mode comparison chart (Fixed/AI/Manual with improvement %), draggable LiveSnapshot (framer-motion drag), left-turn arrow display fix, holographic queue label UI |
 | **Environment Styling II** | `2d074b3`, `d5a22ec` | MeshPhysicalMaterial upgrade (ground clearcoat 0.2/metalness 0.3, skyscraper clearcoat 1.0/metalness 0.9/reflectivity 1.0), neon corner stripes (emissiveIntensity 3.5), LowPolyTree, Day/Night sun sphere (emissiveIntensity 8.0), CCTV cameras with blinking LED, camera auto-rotation disabled |
+| **Algorithm Fixes — Max-Pressure + Starvation Bleed** | `f3bcd9f` | **(a)** Pressure computed per-movement (12 entries with `dest_map`: north_straight→south, north_left→east, etc.) instead of per-direction. **(b)** Switch penalty evaluates `prev_pressures[prev_phase]` via pre-tick capture. **(c)** Starvation timers reset for **both** current `green_dirs` AND `pending_phase` directions. **(d)** `get_outgoing_counts()` uses proper destination mapping (12-entry `dest_mapping`). **(e)** Balance bonus uses phase-level aggregation (`_get_phase_pressure()`) over 4 groups. **(f)** `_get_best_alternative_phase()` uses `_get_phase_pressure()`. **(g)** New `_get_phase_pressure()` helper for phase-level grouping. |
 
 ---
 
-*Generated: 2026-07-15 — Comprehensive project analysis of FlowSync. Architecture: Dueling Double DQN + PER + pressure-based reward + two-agent decoupling + starvation-aware constraints. Updated through commit `d5a22ec`.*
+*Generated: 2026-07-16 — Comprehensive project analysis of FlowSync. Architecture: Dueling Double DQN + PER + per-movement max-pressure formulation + two-agent decoupling + starvation-aware constraints + destination-aware outgoing counts. Deep-dive includes: intersection reservation system (direction-group locking), vehicle collision avoidance (MIN_DIST=0.08), emergency override bypass mechanism (direct signal phase mutation), command validation (COMMAND_SCHEMAS with type coercion), inference vs training observation builder distinction (simplified pressure_norm=0.0 for live inference). Updated through commit `f3bcd9f`.*
