@@ -52,12 +52,12 @@ export default function LiveSnapshot() {
       drag
       dragMomentum={false}
       initial={{ x: 20, y: 80 }}
-      className="absolute z-50 flex w-64 cursor-grab flex-col gap-4 rounded-xl border border-white/10 bg-black/80 p-4 shadow-2xl backdrop-blur-xl active:cursor-grabbing"
+      className="absolute z-50 flex w-56 cursor-grab flex-col gap-3 rounded-xl border border-white/10 bg-black/80 p-3 shadow-2xl backdrop-blur-xl active:cursor-grabbing"
     >
       <div className="flex items-center justify-between opacity-50">
-        <GripVertical className="h-4 w-4" />
-        <span className="text-[10px] uppercase tracking-widest text-white/50">Live Stats</span>
-        <div className="h-4 w-4" /> {/* spacer for balance */}
+        <GripVertical className="h-3 w-3" />
+        <span className="text-[9px] uppercase tracking-widest text-white/50">Live Stats</span>
+        <div className="h-3 w-3" /> {/* spacer for balance */}
       </div>
       
       {/* Active Status Badges */}
@@ -94,58 +94,35 @@ export default function LiveSnapshot() {
         )}
       </div>
 
-      {/* Grid Stats */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
-            Last Frame
-          </div>
-          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
-            {lastUpdateText}
-          </div>
+      {/* Vertical Stats */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between rounded border border-white/5 bg-[#0e0e0e] px-2.5 py-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-white/40 font-medium">Last Frame</div>
+          <div className="text-[11px] font-semibold tracking-tight text-white/90">{lastUpdateText}</div>
         </div>
-        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
-            Active Vehicles
-          </div>
-          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
-            {snapshot.vehicles}
-          </div>
+        <div className="flex items-center justify-between rounded border border-white/5 bg-[#0e0e0e] px-2.5 py-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-white/40 font-medium">Active Vehicles</div>
+          <div className="text-[11px] font-semibold tracking-tight text-white/90">{snapshot.vehicles}</div>
         </div>
-        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
-            Avg Wait Time
-          </div>
-          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
-            {snapshot.avgWait.toFixed(1)}s
-          </div>
+        <div className="flex items-center justify-between rounded border border-white/5 bg-[#0e0e0e] px-2.5 py-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-white/40 font-medium">Avg Wait Time</div>
+          <div className="text-[11px] font-semibold tracking-tight text-white/90">{snapshot.avgWait.toFixed(1)}s</div>
         </div>
-        <div className="rounded-lg border border-white/5 bg-[#0e0e0e] p-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-white/40 font-medium">
-            Max Queue
-          </div>
-          <div className="mt-1 text-sm font-semibold tracking-tight text-white/90">
-            {snapshot.maxQueue}
-          </div>
+        <div className="flex items-center justify-between rounded border border-white/5 bg-[#0e0e0e] px-2.5 py-1.5">
+          <div className="text-[9px] uppercase tracking-wider text-white/40 font-medium">Max Queue</div>
+          <div className="text-[11px] font-semibold tracking-tight text-white/90">{snapshot.maxQueue}</div>
         </div>
         
         {/* CCTV AI Scanner Card */}
-        <div className="rounded-lg border border-white/5 bg-[#0b0e14] p-2.5 col-span-2 flex items-center justify-between shadow-inner">
-          <div className="flex flex-col gap-0.5">
-            <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-cyan-400/90 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              CCTV AI SCANNER
-            </div>
-            <div className="text-[10px] text-white/50">
-              Analyzing intersection traffic feeds (4 channels)
-            </div>
+        <div className="mt-1 rounded-lg border border-white/5 bg-[#0b0e14] p-2 flex flex-col gap-1 shadow-inner">
+          <div className="text-[8px] font-bold uppercase tracking-[0.1em] text-cyan-400/90 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            CCTV AI SCANNER
           </div>
-          <div className="text-right">
-            <div className="text-[8px] uppercase tracking-wider text-white/30 font-medium">
-              Real-time Count
-            </div>
-            <div className="text-xs font-mono font-bold text-white/90">
-              {isRunning && snapshot.vehicles > 0 ? `${snapshot.vehicles} detected` : "0 (idle)"}
+          <div className="flex items-center justify-between">
+            <div className="text-[9px] text-white/40">4 channel feed</div>
+            <div className="text-[10px] font-mono font-bold text-white/90">
+              {isRunning && snapshot.vehicles > 0 ? `${snapshot.vehicles} det.` : "0 (idle)"}
             </div>
           </div>
         </div>
