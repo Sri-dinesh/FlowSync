@@ -13,8 +13,11 @@ interface TrafficLightProps {
 
 export default function TrafficLight({ color, position, direction }: TrafficLightProps) {
   const red = useMemo(() => new Color("#ff0000"), []);
+  const darkRed = useMemo(() => new Color("#220000"), []);
   const yellow = useMemo(() => new Color("#ffcc00"), []);
+  const darkYellow = useMemo(() => new Color("#221a00"), []);
   const green = useMemo(() => new Color("#00ff00"), []);
+  const darkGreen = useMemo(() => new Color("#002200"), []);
 
   const poleGeometry = useMemo(() => new CylinderGeometry(0.12, 0.12, 4.0, 12), []);
   const housingGeometry = useMemo(() => new BoxGeometry(0.38, 1.0, 0.38), []);
@@ -92,20 +95,22 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     const lerpFactor = Math.min(1, delta * 8);
 
     const targets = [
-      { ref: redMaterial, active: color === "red" || color === "left-green" || color === "left-yellow" },
-      { ref: yellowMaterial, active: color === "yellow" || color === "left-yellow" },
-      { ref: greenMaterial, active: color === "green" || color === "left-green" },
+      { ref: redMaterial, active: color === "red", light: red, dark: darkRed },
+      { ref: yellowMaterial, active: color === "yellow" || color === "left-yellow", light: yellow, dark: darkYellow },
+      { ref: greenMaterial, active: color === "green" || color === "left-green", light: green, dark: darkGreen },
     ];
 
     for (const target of targets) {
       const material = target.ref.current;
       if (material) {
-        const targetIntensity = target.active ? 6.0 : 0.0;
+        // Soft glow for the lens body so it doesn't swallow the arrows
+        const targetIntensity = target.active ? 0.8 : 0.0;
         material.emissiveIntensity = MathUtils.lerp(
           material.emissiveIntensity,
           targetIntensity,
           lerpFactor,
         );
+        material.color.lerpColors(target.dark, target.light, material.emissiveIntensity / 0.8);
       }
     }
     // Blink status LED: lit for 0.4s every 1.2s
@@ -179,12 +184,13 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
     return "#00ff00";
   }, [color]);
 
-  const renderLensWithText = (
+  const renderLens = (
     localY: number,
     lensColor: Color,
     ref: React.RefObject<MeshStandardMaterial | null>,
     isActive: boolean,
-    textHex: string
+    isLeftTurn: boolean,
+    isStandard: boolean
   ) => {
     const lensPos: [number, number, number] = direction === "north" || direction === "south"
       ? [offsets.housingPos[0], offsets.housingPos[1] + localY, offsets.zSign * 0.19]
@@ -203,27 +209,46 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       ? [lensPos[0], lensPos[1], lensPos[2] + (offsets.zSign * 0.16)]
       : [lensPos[0] + (offsets.zSign * 0.16), lensPos[1], lensPos[2]];
 
-    const arrowText = color.includes("left") ? "←" : "↑ →";
+    // Base text props
+    const textProps = {
+      fontSize: 0.28, // Larger arrows for visibility
+      anchorX: "center" as const,
+      anchorY: "middle" as const,
+      depthOffset: -10, // Prevent z-fighting
+    };
+
+    // Stencil active/inactive colors
+    const activeHex = "ffffff";
+    const inactiveHex = "111111";
 
     return (
       <group>
         <mesh geometry={lensGeometry} position={lensPos}>
-          <meshStandardMaterial ref={ref} color={lensColor} emissive={lensColor} roughness={0.05} metalness={0.05} />
+          <meshStandardMaterial ref={ref} color={lensColor} emissive={lensColor} roughness={0.1} metalness={0.8} />
         </mesh>
-        <Text
-          position={tPos}
-          rotation={textRot}
-          fontSize={0.28}
-          color="#000000"
-          fillOpacity={isActive ? 1.0 : 0.3}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.04}
-          outlineColor="#000000"
-          depthOffset={-2}
-        >
-          {arrowText}
-        </Text>
+        
+        {/* Render Arrows as Glowing Stencils */}
+        <group position={tPos} rotation={textRot}>
+          {isLeftTurn ? (
+            <Text position={[0, 0, 0]} {...textProps}>
+              <meshBasicMaterial color={isActive ? `#${activeHex}` : `#${inactiveHex}`} toneMapped={false} />
+              {"\u2190"}
+            </Text>
+          ) : isStandard ? (
+            <group>
+              {/* Up arrow via rotated right arrow */}
+              <Text position={[-0.08, 0, 0]} rotation={[0, 0, Math.PI / 2]} {...textProps}>
+                <meshBasicMaterial color={isActive ? `#${activeHex}` : `#${inactiveHex}`} toneMapped={false} />
+                {"\u2192"}
+              </Text>
+              {/* Right arrow */}
+              <Text position={[0.08, 0, 0]} {...textProps}>
+                <meshBasicMaterial color={isActive ? `#${activeHex}` : `#${inactiveHex}`} toneMapped={false} />
+                {"\u2192"}
+              </Text>
+            </group>
+          ) : null}
+        </group>
       </group>
     );
   };
@@ -242,10 +267,10 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       {/* Single Traffic Light Housing */}
       <mesh geometry={housingGeometry} material={housingMaterial} position={offsets.housingPos} castShadow />
       
-      {/* Lenses with Arrows inside */}
-      {renderLensWithText(0.25, red, redMaterial, color === "red" || color === "left-green" || color === "left-yellow", "#ff0000")}
-      {renderLensWithText(0.0, yellow, yellowMaterial, color === "yellow" || color === "left-yellow", "#ffcc00")}
-      {renderLensWithText(-0.25, green, greenMaterial, color === "green" || color === "left-green", "#00ff00")}
+      {/* Lenses */}
+      {renderLens(0.25, red, redMaterial, color === "red", color === "left-red", color === "red" || color === "left-red" ? false : color === "red")}
+      {renderLens(0.0, yellow, yellowMaterial, color === "yellow" || color === "left-yellow", color === "left-yellow", color === "yellow")}
+      {renderLens(-0.25, green, greenMaterial, color === "green" || color === "left-green", color === "left-green", color === "green")}
 
       <pointLight
         position={offsets.lightPos}
