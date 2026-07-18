@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/chart";
 import { useSimulationStore } from "@/store/simulationStore";
 import { useEpisodes } from "@/hooks/useEpisodes";
-import type { TrainingMetric } from "@/types/simulation";
+import type { TrainingMetric, EpisodeRecord } from "@/types/simulation";
 
 // ── Chart configurations ──────────────────────────────────────────────────────
 
@@ -58,6 +58,10 @@ export default function TrainingChart({ simulationId }: { simulationId: string |
     [trainingMetrics],
   );
 
+  const sortedPastEpisodes = useMemo(() => {
+    return [...pastEpisodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+  }, [pastEpisodes]);
+
   // Last 100 episodes, shaped for recharts
   const chartData = useMemo(() => {
     if (metrics.length > 0) {
@@ -68,36 +72,22 @@ export default function TrainingChart({ simulationId }: { simulationId: string |
         epsilon: parseFloat(m.epsilon.toFixed(4)),
         loss: m.loss != null ? parseFloat(m.loss.toFixed(5)) : null,
       }));
-    } else if (pastEpisodes.length > 0) {
-      const sorted = [...pastEpisodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
-      return sorted.slice(-100).map((ep: any) => ({
+    } else if (sortedPastEpisodes.length > 0) {
+      return sortedPastEpisodes.slice(-100).map((ep: EpisodeRecord) => ({
         episode: ep.episodeNumber,
         total_reward: parseFloat((ep.totalReward || 0).toFixed(2)),
         avg_wait_time: parseFloat((ep.avgWaitTime || 0).toFixed(3)),
         epsilon: parseFloat((ep.epsilon || 0).toFixed(4)),
-        loss: null,
+        loss: ep.loss != null ? parseFloat(ep.loss.toFixed(5)) : null,
       }));
     }
     return [];
-  }, [metrics, pastEpisodes]);
+  }, [metrics, sortedPastEpisodes]);
 
   const tab = TABS.find((t) => t.key === activeTab)!;
   
   // Find latest for the tooltip display
-  let latest = null;
-  if (metrics.length > 0) {
-    latest = metrics[metrics.length - 1];
-  } else if (pastEpisodes.length > 0) {
-    const sorted = [...pastEpisodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
-    const lastEp = sorted[sorted.length - 1] as any;
-    latest = {
-      episode: lastEp.episodeNumber,
-      total_reward: lastEp.totalReward,
-      avg_wait_time: lastEp.avgWaitTime,
-      epsilon: lastEp.epsilon,
-      loss: null,
-    };
-  }
+  const latest = chartData[chartData.length - 1] ?? null;
 
   if (!chartData.length) {
     return (

@@ -5,7 +5,10 @@ import { useQuery } from "@tanstack/react-query";
  * If simulationId is null, fetch the most recent episodes across all simulations
  * so the History tab is never empty even before the user starts a simulation.
  */
-export const useEpisodes = (simulationId: string | null) =>
+export const useEpisodes = (
+  simulationId: string | null,
+  options?: { enabled?: boolean; refetchInterval?: number | false }
+) =>
   useQuery({
     queryKey: ["episodes", simulationId],
     queryFn: async () => {
@@ -17,8 +20,6 @@ export const useEpisodes = (simulationId: string | null) =>
       if (!response.ok) throw new Error("Failed to fetch episodes");
       return response.json();
     },
-    // Always fetch — don't wait for a simulationId
-    enabled: true,
-    // Refresh every 10s while the tab is open so new episodes appear live
-    refetchInterval: 10_000,
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval ?? 10_000,
   });

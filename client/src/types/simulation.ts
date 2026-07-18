@@ -32,3 +32,15 @@ export interface TrainingMetric {
   loss: number | null;
   is_training: boolean;
 }
+
+export interface EpisodeRecord {
+  id: string;
+  simulationId: string;
+  episodeNumber: number;
+  totalReward: number;
+  avgWaitTime: number;
+  throughput: number;
+  epsilon: number;
+  loss: number | null;
+  steps: number;
+}
