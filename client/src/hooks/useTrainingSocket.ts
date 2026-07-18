@@ -104,7 +104,7 @@ export function useTrainingSocket() {
       );
       socket.close();
     };
-  }, [addTrainingMetric]);
+  }, [addTrainingMetric, setTraining]);
 
   useEffect(() => {
     connectRef.current = connect;

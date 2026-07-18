@@ -307,10 +307,10 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const lrRef = useRef<Mesh>(null);
 
   // Siren refs for emergency vehicles
-  const sirenRedMeshRef = useRef<any>(null);
-  const sirenBlueMeshRef = useRef<any>(null);
-  const sirenRedLightRef = useRef<any>(null);
-  const sirenBlueLightRef = useRef<any>(null);
+  const sirenRedMeshRef = useRef<import("three").MeshStandardMaterial>(null);
+  const sirenBlueMeshRef = useRef<import("three").MeshStandardMaterial>(null);
+  const sirenRedLightRef = useRef<import("three").PointLight>(null);
+  const sirenBlueLightRef = useRef<import("three").PointLight>(null);
 
   // Smooth interpolation refs
   const lastTargetPosRef = useRef(vehicle.position);

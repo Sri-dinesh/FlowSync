@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
-import { BoxGeometry, CylinderGeometry, Color, MathUtils, MeshStandardMaterial, SphereGeometry, DoubleSide } from "three";
+import { BoxGeometry, CylinderGeometry, Color, MathUtils, MeshStandardMaterial, SphereGeometry } from "three";
 
 interface TrafficLightProps {
   color: "green" | "yellow" | "red" | "left-green" | "left-yellow";
@@ -268,7 +268,7 @@ export default function TrafficLight({ color, position, direction }: TrafficLigh
       <mesh geometry={housingGeometry} material={housingMaterial} position={offsets.housingPos} castShadow />
       
       {/* Lenses */}
-      {renderLens(0.25, red, redMaterial, color === "red", color === "left-red", color === "red" || color === "left-red" ? false : color === "red")}
+      {renderLens(0.25, red, redMaterial, color === "red", false, false)}
       {renderLens(0.0, yellow, yellowMaterial, color === "yellow" || color === "left-yellow", color === "left-yellow", color === "yellow")}
       {renderLens(-0.25, green, greenMaterial, color === "green" || color === "left-green", color === "left-green", color === "green")}
 

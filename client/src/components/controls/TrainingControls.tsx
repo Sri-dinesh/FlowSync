@@ -161,7 +161,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
   // Speed tracking
   useEffect(() => {
-    if (!isTraining) { startTimeRef.current = null; setEpsPerMin(0); return; }
+    if (!isTraining) { startTimeRef.current = null; setTimeout(() => setEpsPerMin(0), 0); return; }
     if (startTimeRef.current === null) startTimeRef.current = Date.now();
     if (currentEpisode > 0 && startTimeRef.current) {
       const mins = (Date.now() - startTimeRef.current) / 60_000;

@@ -3,7 +3,7 @@
 import { memo, useMemo, Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 
 import IntersectionScene from "@/components/simulation/IntersectionScene";
 import { useSimulationStore } from "@/store/simulationStore";

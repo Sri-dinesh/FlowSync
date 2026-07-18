@@ -67,8 +67,8 @@ export default function ComparisonChart({ simulationId }: ComparisonChartProps) 
 
     const hasData = hasFixed || hasAI || hasMnl;
 
-    const waitData: any = { name: "Avg Wait (s)" };
-    const thruData: any = { name: "Throughput" };
+    const waitData: Record<string, string | number> = { name: "Avg Wait (s)" };
+    const thruData: Record<string, string | number> = { name: "Throughput" };
 
     if (hasFixed) {
       waitData.Fixed = parseFloat(avgWaitFixed.toFixed(2));

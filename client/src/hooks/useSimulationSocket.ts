@@ -51,7 +51,7 @@ export function useSimulationSocket() {
         if (raw.queues && typeof raw.queues === "object") {
           Object.entries(raw.queues).forEach(([key, val]) => {
             if (val && typeof val === "object") {
-              queue_lengths[key] = (val as any).length ?? 0;
+              queue_lengths[key] = (val as Record<string, unknown>).length as number ?? 0;
             }
           });
         }

@@ -140,7 +140,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-medium">3. Compare</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Evaluate the AI's performance against the baseline. Watch as average wait times decrease and throughput increases in real-time. Our dashboard provides granular metrics, showing exactly how much more efficient the AI is compared to fixed intervals.
+                    Evaluate the AI&apos;s performance against the baseline. Watch as average wait times decrease and throughput increases in real-time. Our dashboard provides granular metrics, showing exactly how much more efficient the AI is compared to fixed intervals.
                   </p>
                 </CardContent>
               </Card>

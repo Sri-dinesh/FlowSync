@@ -22,21 +22,21 @@ function resolveLightColor(
   phase: number,
   signalColor: string,
   direction: string,
-) {
+): "green" | "yellow" | "red" | "left-green" | "left-yellow" {
   const isNS = direction === "north" || direction === "south";
   const isEW = direction === "east" || direction === "west";
 
   if (isNS) {
     if (phase === 0) {
-      return signalColor as any;
+      return signalColor as "green" | "yellow" | "red";
     } else if (phase === 2) {
-      return (signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red") as any;
+      return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
     }
   } else if (isEW) {
     if (phase === 1) {
-      return signalColor as any;
+      return signalColor as "green" | "yellow" | "red";
     } else if (phase === 3) {
-      return (signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red") as any;
+      return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
     }
   }
   return "red";

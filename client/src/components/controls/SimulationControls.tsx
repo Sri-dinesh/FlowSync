@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Play, RotateCcw, Square, Siren } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { SimulationMode, VehicleState } from "@/types/simulation";
 
