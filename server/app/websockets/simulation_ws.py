@@ -183,13 +183,13 @@ async def _simulation_loop(app) -> None:
                 action = agent.select_action(obs, epsilon=0.0)
                 last_action = action
 
-                prev_pressures = app.state.training_env._compute_movement_pressures()
+                prev_pressures = app.state.training_env._compute_movement_pressures(intersection)
                 prev_passed = intersection.total_passed
                 prev_phase = intersection.signal.current_phase
 
                 intersection.tick(dt=0.1, action=action)
 
-                curr_pressures = app.state.training_env._compute_movement_pressures()
+                curr_pressures = app.state.training_env._compute_movement_pressures(intersection)
                 curr_passed = intersection.total_passed
                 vehicles_passed = curr_passed - prev_passed
                 phase_changed = (action != prev_phase) and (intersection.signal.color.value == "green")
@@ -201,6 +201,7 @@ async def _simulation_loop(app) -> None:
                     vehicles_passed=vehicles_passed,
                     phase_changed=phase_changed,
                     signal=intersection.signal,
+                    prev_phase=prev_phase,
                 )
                 cumulative_reward += last_reward
             else:
