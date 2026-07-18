@@ -24,8 +24,8 @@ PHASE_GREEN_LANES: Dict[int, List[str]] = {
 
 # Which turns are allowed during each phase
 PHASE_ALLOWED_TURNS: Dict[int, set] = {
-    SignalPhase.NS_GREEN.value: {"straight", "left", "right"},
-    SignalPhase.EW_GREEN.value: {"straight", "left", "right"},
+    SignalPhase.NS_GREEN.value: {"straight", "right"},
+    SignalPhase.EW_GREEN.value: {"straight", "right"},
     SignalPhase.NS_LEFT.value: {"left"},
     SignalPhase.EW_LEFT.value: {"left"},
 }
