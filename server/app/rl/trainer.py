@@ -67,7 +67,7 @@ class Trainer:
                     break
 
                 action = self.agent.select_action(state, self.epsilon)
-                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                next_state, reward, terminated, truncated, _ = await asyncio.to_thread(self.env.step, action)
                 done = terminated or truncated
 
                 self.agent.replay_buffer.push(state, action, reward, next_state, terminated)
