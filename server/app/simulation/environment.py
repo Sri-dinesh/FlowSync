@@ -33,6 +33,7 @@ class TrafficEnv(gym.Env):
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
         self.intersection.reset()
+        self.intersection.spawner.set_enabled(True)
         self._last_reward = 0.0
         return self._get_obs(), {}
 
@@ -72,7 +73,9 @@ class TrafficEnv(gym.Env):
         if phase_changed and prev_phase is not None:
             prev_green_dirs = PHASE_GREEN_LANES.get(prev_phase, [])
             prev_green_pressure = sum(
-                prev_pressures.get(d, 0) for d in prev_green_dirs
+                prev_pressures.get(f"{d}_{turn}", 0) 
+                for d in prev_green_dirs 
+                for turn in ["straight", "left", "right"]
             )
             # Penalize if we prematurely abandoned a phase that still had traffic
             switch_penalty = -0.3 if prev_green_pressure > 0.3 else 0.0
@@ -107,7 +110,7 @@ class TrafficEnv(gym.Env):
         )
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
-        prev_pressures = self._compute_movement_pressures()
+        prev_pressures = self._compute_movement_pressures(self.intersection)
         prev_passed = self.intersection.total_passed
         prev_phase = self.intersection.signal.current_phase  # capture BEFORE tick
 
@@ -128,10 +131,10 @@ class TrafficEnv(gym.Env):
 
         self.intersection.tick(dt=0.1, action=action)
 
-        curr_pressures = self._compute_movement_pressures()
+        curr_pressures = self._compute_movement_pressures(self.intersection)
         curr_passed = self.intersection.total_passed
         vehicles_passed_this_step = curr_passed - prev_passed
-        phase_changed = (self.intersection.signal.current_phase != prev_phase)  # compare post-tick phase vs pre-tick
+        phase_changed = (action != prev_phase) and (self.intersection.signal.color.name == "GREEN")
 
         reward = self.compute_reward(
             prev_pressures=prev_pressures,
@@ -170,7 +173,7 @@ class TrafficEnv(gym.Env):
 
     def _get_best_alternative_phase(self) -> int:
         """When max green exceeded, pick the phase with highest pressure."""
-        pressures = self._compute_movement_pressures()
+        pressures = self._compute_movement_pressures(self.intersection)
         current = self.intersection.signal.current_phase
 
         best_phase = current
@@ -193,14 +196,14 @@ class TrafficEnv(gym.Env):
         }
         return DIRECTION_PHASES.get(direction, 0)
 
-    def _compute_movement_pressures(self) -> dict:
+    def _compute_movement_pressures(self, intersection: Intersection) -> dict:
         """
         Compute traffic movement pressure per movement.
         Pressure(movement) = incoming_vehicles / capacity - outgoing_vehicles / capacity
         Based on PressLight / MPLight / PDLight formula.
         """
-        movement_queues = self.intersection.get_movement_queues()
-        outgoing = self.intersection.get_outgoing_counts()
+        movement_queues = intersection.get_movement_queues()
+        outgoing = intersection.get_outgoing_counts()
         MAX_CAP = 10.0
 
         pressures = {}
@@ -221,7 +224,7 @@ class TrafficEnv(gym.Env):
     def _get_obs(self) -> np.ndarray:
         movement_queues = self.intersection.get_movement_queues()
         signal = self.intersection.signal
-        pressures = self._compute_movement_pressures()
+        pressures = self._compute_movement_pressures(self.intersection)
 
         # 12 movement queues (normalized by max capacity 10)
         movements = [
