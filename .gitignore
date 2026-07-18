@@ -1,15 +1,26 @@
 .kiro/
 .vscode/
 .agents/
+.claude/
+.idea/
 node_modules/
 __pycache__/
+*.py[cod]
 .env
+.env.*
+!.env.example
 *.pt
 models/
 !client/src/app/api/models/
-!client/src/app/api/models/**
 server/venv/
+server/env/
+server/.venv/
 plans/
+!plans/*.md
+
+# Mac/OS
+.DS_Store
+Thumbs.db
 
 # Docker local overrides (may contain secrets)
 docker-compose.override.yml
