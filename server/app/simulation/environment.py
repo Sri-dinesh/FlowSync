@@ -160,13 +160,17 @@ class TrafficEnv(gym.Env):
 
     def _get_phase_pressure(self, pressures: dict, phase: int) -> float:
         if phase == 0:
-            movements = ["north_straight", "north_left", "south_straight", "south_left"]
+            # NS_GREEN: north and south straight movements
+            movements = ["north_straight", "south_straight"]
         elif phase == 1:
-            movements = ["east_straight", "east_left", "west_straight", "west_left"]
+            # EW_GREEN: east and west straight movements
+            movements = ["east_straight", "west_straight"]
         elif phase == 2:
-            movements = ["north_right", "south_right"]
+            # NS_LEFT: north and south left-turn movements
+            movements = ["north_left", "south_left"]
         elif phase == 3:
-            movements = ["east_right", "west_right"]
+            # EW_LEFT: east and west left-turn movements
+            movements = ["east_left", "west_left"]
         else:
             movements = []
         return sum(pressures.get(m, 0) for m in movements)

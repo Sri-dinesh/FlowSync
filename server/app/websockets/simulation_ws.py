@@ -145,7 +145,22 @@ def _build_obs_from_intersection(intersection) -> np.ndarray:
 
     time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
     is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
-    pressure_norm = 0.0   # simplified for inference
+
+    # Compute pressure identically to TrafficEnv._get_obs() — must match training exactly
+    dest_map = {
+        "north_straight": "south", "north_left": "east",   "north_right": "west",
+        "south_straight": "north", "south_left": "west",   "south_right": "east",
+        "east_straight":  "west",  "east_left":  "south",  "east_right":  "north",
+        "west_straight":  "east",  "west_left":  "north",  "west_right":  "south",
+    }
+    outgoing = intersection.get_outgoing_counts()
+    total_pressure = 0.0
+    for movement, dest in dest_map.items():
+        incoming = movement_queues.get(movement, 0) / MAX_CAP
+        out = outgoing.get(dest, 0) / MAX_CAP
+        total_pressure += max(0.0, incoming - out)
+    pressure_norm = min(total_pressure / 20.0, 1.0)
+
     max_starv_norm = min(
         max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
     )
@@ -234,11 +249,6 @@ async def _simulation_loop(app) -> None:
                 obs=obs,
             )
             
-            import os
-            # Log frames if in local/development environment
-            if os.getenv("ENV") != "production" and os.getenv("FASTAPI_ENV") != "production":
-                print(f"[SimWS Send Data] Timestep {intersection.timestep}: {frame.model_dump()}")
-                
             await manager.broadcast(frame.model_dump())
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:
