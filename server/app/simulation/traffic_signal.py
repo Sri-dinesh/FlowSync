@@ -157,27 +157,46 @@ class TrafficSignal:
                     self.set_phase(max_phase)
                     return
 
+        # Hard cap: if current phase has exceeded MAX_GREEN_TIME, force a switch
+        # (applies in both fixed and AI mode — prevents starvation from operator error)
+        if self.color == SignalColor.GREEN and self.time_in_phase >= self.MAX_GREEN_TIME:
+            best_phase = self._pick_highest_queue_phase(self.current_phase, lanes)
+            self.set_phase(best_phase)
+            return
+
         # Normal fixed duration rollover
         if self.time_in_phase >= self.fixed_duration:
-            # Find the next phase in sequence that has vehicles waiting, or default to next sequential
-            if lanes is not None:
-                for offset in range(1, len(SignalPhase) + 1):
-                    candidate_phase = (self.current_phase + offset) % len(SignalPhase)
-                    candidate_lanes = PHASE_GREEN_LANES[candidate_phase]
-                    has_vehicles = False
-                    for ln in candidate_lanes:
-                        for turn in ["straight", "left", "right"]:
-                            if len(lanes.get(f"{ln}_{turn}", [])) > 0:
-                                has_vehicles = True
-                                break
-                        if has_vehicles:
-                            break
-                    if has_vehicles:
-                        self.set_phase(candidate_phase)
-                        return
+            best_phase = self._pick_highest_queue_phase(self.current_phase, lanes)
+            self.set_phase(best_phase)
 
-            next_phase = (self.current_phase + 1) % len(SignalPhase)
-            self.set_phase(next_phase)
+    def _pick_highest_queue_phase(self, current_phase: int, lanes: Optional[Dict[str, List]]) -> int:
+        """
+        Returns the phase (excluding current) with the highest total queue count.
+        If lanes data is unavailable or all other phases are empty, falls back to
+        the next sequential phase.
+        """
+        if lanes is None:
+            return (current_phase + 1) % len(SignalPhase)
+
+        best_phase = None
+        best_count = -1
+
+        for phase in range(len(SignalPhase)):
+            if phase == current_phase:
+                continue
+            count = 0
+            for lane_dir in PHASE_GREEN_LANES[phase]:
+                for turn in ["straight", "left", "right"]:
+                    count += len(lanes.get(f"{lane_dir}_{turn}", []))
+            if count > best_count:
+                best_count = count
+                best_phase = phase
+
+        # Fall back to sequential if all other phases are empty
+        if best_phase is None or best_count == 0:
+            return (current_phase + 1) % len(SignalPhase)
+
+        return best_phase
 
     def is_green_for(self, lane: str, turn: Optional[str] = None) -> bool:
         """Note: right turns are handled at the intersection level, not signal level."""
