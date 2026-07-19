@@ -8,12 +8,12 @@ class HyperParams:
     LEARNING_RATE: float = 3e-4   # slightly lower for Dueling stability
     GAMMA: float = 0.97           # higher discount
     BATCH_SIZE: int = 128         # larger batch for PER stability
-    TRAIN_EVERY_N_STEPS: int = 2  # train every 2 steps
+    TRAIN_EVERY_N_STEPS: int = 2  # train every 2 steps for faster learning
     REPLAY_BUFFER_SIZE: int = 100_000
-    MIN_REPLAY_SIZE: int = 2_000
+    MIN_REPLAY_SIZE: int = 500    # warm up in <1 episode (500 steps × 0.1dt = 50s)
     EPSILON_START: float = 1.0
     EPSILON_END: float = 0.05
-    EPSILON_DECAY: float = 0.998
+    EPSILON_DECAY: float = 0.994  # reaches 0.05 by ~550 episodes (good for 500-ep runs)
     MAX_STEPS_PER_EPISODE: int = 1000
     DEFAULT_EPISODES: int = 1000
     TARGET_UPDATE_FREQ: int = 300
