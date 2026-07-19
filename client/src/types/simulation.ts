@@ -31,6 +31,8 @@ export interface TrainingMetric {
   epsilon: number;
   loss: number | null;
   is_training: boolean;
+  steps?: number;
+  buffer_ready?: boolean;
 }
 
 export interface EpisodeRecord {

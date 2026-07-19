@@ -406,10 +406,17 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
               {/* Status */}
               {isTraining ? (
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-400/80">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Training — metrics update after each episode
-                </div>
+                latest?.buffer_ready === false ? (
+                  <div className="flex items-center gap-1.5 text-[10px] text-amber-400/80">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Warming up replay buffer… ({latest?.steps ?? 0} steps)
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-400/80">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Training{latest?.steps ? ` — ${latest.steps} steps/ep` : " — metrics update after each episode"}
+                  </div>
+                )
               ) : currentEpisode > 0 ? (
                 <div className="flex items-center gap-1.5 text-[10px] text-white/30">
                   <CheckCircle2 className="h-3 w-3" />

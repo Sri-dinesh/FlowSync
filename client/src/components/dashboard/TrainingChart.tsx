@@ -181,7 +181,7 @@ export default function TrainingChart({ simulationId }: { simulationId: string |
       {latest && (
         <div className="grid grid-cols-4 gap-1.5">
           {TABS.map((t) => {
-            const raw = (latest as Record<string, any>)[t.dataKey];
+            const raw = (latest as Record<string, unknown>)[t.dataKey];
             const val = raw != null ? Number(raw) : null;
             const fmt =
               val == null

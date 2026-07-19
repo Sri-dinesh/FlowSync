@@ -141,6 +141,8 @@ class Trainer:
                     "throughput": throughput,
                     "epsilon": self.epsilon,
                     "loss": loss_value,
+                    "steps": steps,
+                    "buffer_ready": self.agent.replay_buffer.is_ready,
                     "is_training": False if is_last_episode else self.is_training,
                 }
             )
