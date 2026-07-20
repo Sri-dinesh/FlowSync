@@ -28,7 +28,14 @@ export default function SimulationControls({
   const [isSwitching, setIsSwitching] = useState(false);
 
   const modeLabel = useMemo(
-    () => (mode === "ai" ? "AI Agent" : mode === "manual" ? "Manual Control" : "Fixed Timer"),
+    () =>
+      mode === "ai"
+        ? "AI Agent"
+        : mode === "manual"
+        ? "Manual Control"
+        : mode === "greedy"
+        ? "Greedy Controller"
+        : "Fixed Timer",
     [mode],
   );
 
@@ -109,6 +116,15 @@ export default function SimulationControls({
             className={`flex-1 h-7 text-xs ${mode === "fixed" ? "bg-white/20 text-white hover:bg-white/30" : "text-white/50 hover:text-white hover:bg-white/10"}`}
           >
             Fixed
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleModeChange("greedy")}
+            disabled={!isConnected || isSwitching}
+            className={`flex-1 h-7 text-xs ${mode === "greedy" ? "bg-orange-500/30 text-orange-200 hover:bg-orange-500/40" : "text-white/50 hover:text-white hover:bg-white/10"}`}
+          >
+            Greedy
           </Button>
           <Button
             size="sm"

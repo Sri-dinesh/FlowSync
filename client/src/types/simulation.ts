@@ -1,4 +1,4 @@
-export type SimulationMode = "fixed" | "ai" | "manual";
+export type SimulationMode = "fixed" | "ai" | "manual" | "greedy";
 
 export interface VehicleState {
   id: string;
@@ -8,6 +8,16 @@ export interface VehicleState {
   state: string;
   wait_time: number;
   is_emergency?: boolean;
+}
+
+export interface RLInfo {
+  reward: number;
+  cumulative_reward: number;
+  epsilon: number;
+  last_action: number;
+  action_label: string;
+  q_values: number[];   // [q0, q1, q2, q3] — all 4 phase Q-values
+  is_exploring: boolean;
 }
 
 export interface SimulationFrame {
@@ -21,6 +31,7 @@ export interface SimulationFrame {
   throughput: number;
   reward: number;
   episode: number;
+  rl?: RLInfo | null;   // only populated in AI mode
 }
 
 export interface TrainingMetric {

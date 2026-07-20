@@ -77,6 +77,7 @@ export function useSimulationSocket() {
           avg_wait_time: raw.metrics?.avg_wait_time ?? 0,
           throughput: raw.metrics?.throughput_total ?? 0,
           reward: raw.rl?.reward ?? 0,
+          rl: raw.rl ?? null,
         };
 
         // Log all raw frames in development/local server environment

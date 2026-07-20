@@ -193,6 +193,36 @@ async def _simulation_loop(app) -> None:
             if mode in ("fixed", "manual"):
                 intersection.tick(dt=0.1, action=None, is_manual=(mode == "manual"))
                 last_reward = 0.0
+            elif mode == "greedy":
+                # Greedy: always serve the phase with the highest total queue count.
+                # Respects min_green (via signal.can_switch_phase) to prevent flickering.
+                signal = intersection.signal
+                queues = intersection.get_movement_queues()
+                PHASE_DIRS = {
+                    0: ["north", "south"],
+                    1: ["east", "west"],
+                    2: ["north", "south"],
+                    3: ["east", "west"],
+                }
+                PHASE_TURNS = {
+                    0: ["straight", "right"],
+                    1: ["straight", "right"],
+                    2: ["left"],
+                    3: ["left"],
+                }
+                phase_counts = {}
+                for ph in range(4):
+                    count = sum(
+                        queues.get(f"{d}_{t}", 0)
+                        for d in PHASE_DIRS[ph]
+                        for t in PHASE_TURNS[ph]
+                    )
+                    phase_counts[ph] = count
+                best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                # Only inject action if we can switch (respects MIN_GREEN_TIME)
+                greedy_action = best_phase if signal.can_switch_phase else signal.current_phase
+                intersection.tick(dt=0.1, action=greedy_action)
+                last_reward = 0.0
             elif mode == "ai":
                 obs = _build_obs_from_intersection(intersection)
                 action = agent.select_action(obs, epsilon=0.0)
@@ -387,7 +417,7 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             elif command == "set_mode":
                 mode = message.get("mode")
-                if mode in ("fixed", "ai", "manual"):
+                if mode in ("fixed", "ai", "manual", "greedy"):
                     app.state.mode = mode
 
             elif command == "manual_override":

@@ -40,7 +40,9 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       lastFrameAt: Date.now(),
       isRunning: true,
       mode:
-        frame.mode === "fixed" || frame.mode === "ai" || frame.mode === "manual" ? frame.mode : state.mode,
+        frame.mode === "fixed" || frame.mode === "ai" || frame.mode === "manual" || frame.mode === "greedy"
+          ? (frame.mode as SimulationMode)
+          : state.mode,
     })),
   addTrainingMetric: (metric) =>
     set((state) => {
