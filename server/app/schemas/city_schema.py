@@ -52,7 +52,8 @@ class RoadVehicleState(BaseModel):
     progress: float         # 0.0 → 1.0 along the road segment
     world_x: float
     world_z: float
-
+    prev_turn: str
+    next_turn: str
 
 class CityMetrics(BaseModel):
     avg_wait_time: float
@@ -145,8 +146,8 @@ def _road_vehicle_world(rv) -> tuple:
     # Normalized direction
     nx, nz = dx / dist, dz / dist
     
-    # Start and end points (8 units from center)
-    offset = 8.0
+    # Start and end points (6 units from center)
+    offset = 6.0
     start_x, start_z = ax + nx * offset, az + nz * offset
     end_x, end_z = bx - nx * offset, bz - nz * offset
     
@@ -244,6 +245,8 @@ def build_city_frame(city_network, mode: str, shared_agent=None) -> CityFrame:
             progress=round(rv.progress, 3),
             world_x=wx,
             world_z=wz,
+            prev_turn=rv.prev_turn,
+            next_turn=rv.next_turn,
         ))
 
     return CityFrame(
