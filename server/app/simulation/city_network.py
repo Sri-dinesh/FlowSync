@@ -87,6 +87,8 @@ class RoadVehicle:
         to_intersection: str,
         entry_dir: str,     # direction it will enter the destination intersection from
         wait_time: float = 0.0,
+        prev_turn: str = "straight",
+        next_turn: str = "straight",
     ) -> None:
         self.id = vehicle_id
         self.from_intersection = from_intersection
@@ -95,6 +97,8 @@ class RoadVehicle:
         self.progress: float = 0.0      # 0.0 → 1.0
         self.wait_time = wait_time
         self.ticks_traveled = 0
+        self.prev_turn = prev_turn
+        self.next_turn = next_turn
 
     def tick(self, dt: float) -> bool:
         """Returns True when the vehicle has reached the destination intersection."""
@@ -206,20 +210,24 @@ class CityNetwork:
         4. Advance road vehicles; inject arrived ones into destination intersections
         """
         # --- Step 1: Tick each intersection ---
+        all_passed_vehicles: List[Tuple[str, Vehicle]] = []
         for iid, intersection in self.intersections.items():
             if mode == "ai" and shared_agent is not None:
                 obs = self.build_obs(iid)
                 action = shared_agent.select_action(obs, epsilon=0.0)
-                intersection.tick(dt=dt, action=action)
+                passed = intersection.tick(dt=dt, action=action)
             elif mode == "greedy":
                 action = self.get_greedy_action(iid)
-                intersection.tick(dt=dt, action=action)
+                passed = intersection.tick(dt=dt, action=action)
             else:
                 # fixed timer — intersection handles it internally
-                intersection.tick(dt=dt, action=None)
+                passed = intersection.tick(dt=dt, action=None)
+            
+            for v in (passed or []):
+                all_passed_vehicles.append((iid, v))
 
         # --- Step 2: Collect passed vehicles and route them ---
-        self._route_passed_vehicles(dt)
+        self._route_passed_vehicles(dt, all_passed_vehicles)
 
         # --- Step 3: Advance road vehicles ---
         arrived: List[RoadVehicle] = []
@@ -232,50 +240,55 @@ class CityNetwork:
             else:
                 still_traveling.append(rv)
 
-        self.road_vehicles = still_traveling
-
         # --- Step 4: Inject arrived vehicles into destination intersections ---
         for rv in arrived:
             dest = self.intersections.get(rv.to_intersection)
+            injected = False
             if dest:
-                self._inject_vehicle(dest, rv)
+                injected = self._inject_vehicle(dest, rv)
+            
+            if not injected and dest is not None:
+                # Keep it waiting at the end of the road
+                rv.progress = 1.0
+                still_traveling.append(rv)
 
+        self.road_vehicles = still_traveling
         self.timestep += 1
 
-    def _route_passed_vehicles(self, dt: float) -> None:
+    def _route_passed_vehicles(self, dt: float, passed_vehicles: List[Tuple[str, Vehicle]]) -> None:
         """
         For each intersection, find all just-passed vehicles and route them:
         - To an adjacent intersection (via a road segment)
         - Or out of the city (city throughput++)
         """
-        for iid, intersection in self.intersections.items():
-            for lane_key, lane_queue in intersection.lanes.items():
-                newly_passed = [v for v in lane_queue if v.state == "passed"]
-                for vehicle in newly_passed:
-                    exit_dir = EXIT_DIR_MAP.get(lane_key)
-                    if exit_dir is None:
-                        continue  # unknown lane
+        for iid, vehicle in passed_vehicles:
+            lane_key = f"{vehicle.lane}_{vehicle.turn}"
+            exit_dir = EXIT_DIR_MAP.get(lane_key)
+            if exit_dir is None:
+                continue  # unknown lane
 
-                    connection_key = (iid, exit_dir)
+            connection_key = (iid, exit_dir)
 
-                    if connection_key in ROAD_CONNECTIONS:
-                        to_inter, entry_dir = ROAD_CONNECTIONS[connection_key]
-                        rv = RoadVehicle(
-                            vehicle_id=vehicle.id,
-                            from_intersection=iid,
-                            to_intersection=to_inter,
-                            entry_dir=entry_dir,
-                            wait_time=vehicle.wait_time,
-                        )
-                        self.road_vehicles.append(rv)
-                    else:
-                        # Exits the city boundary
-                        self.total_city_throughput += 1
+            if connection_key in ROAD_CONNECTIONS:
+                to_inter, entry_dir = ROAD_CONNECTIONS[connection_key]
+                next_turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                rv = RoadVehicle(
+                    vehicle_id=vehicle.id,
+                    from_intersection=iid,
+                    to_intersection=to_inter,
+                    entry_dir=entry_dir,
+                    wait_time=vehicle.wait_time,
+                    prev_turn=getattr(vehicle, "turn", "straight"),
+                    next_turn=next_turn,
+                )
+                self.road_vehicles.append(rv)
+            else:
+                # Exits the city boundary
+                self.total_city_throughput += 1
 
-    def _inject_vehicle(self, intersection: Intersection, rv: RoadVehicle) -> None:
+    def _inject_vehicle(self, intersection: Intersection, rv: RoadVehicle) -> bool:
         """Insert an arriving road vehicle into the destination intersection's lane."""
-        # Choose a random turn (50% straight, 25% left, 25% right)
-        turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+        turn = rv.next_turn
         lane_key = f"{rv.entry_dir}_{turn}"
         lane_queue = intersection.lanes.get(lane_key, [])
 
@@ -291,6 +304,8 @@ class CityNetwork:
             )
             lane_queue.append(vehicle)
             intersection._spawned_this_interval += 1
+            return True
+        return False
 
     # ── Metrics ────────────────────────────────────────────────────────────────
 

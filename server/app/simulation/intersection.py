@@ -47,7 +47,7 @@ class Intersection:
         self.emergency_override_lane = lane
         self._spawned_this_interval += 1
 
-    def tick(self, dt: float, action: Optional[int] = None, is_manual: bool = False) -> None:
+    def tick(self, dt: float, action: Optional[int] = None, is_manual: bool = False) -> List[Vehicle]:
         # Resolve active emergency override: force signal phase
         if self.emergency_override_lane:
             has_active_emergency = any(
@@ -77,6 +77,7 @@ class Intersection:
 
         STOP_LINE = 0.42
         MIN_DIST = 0.08
+        passed_vehicles = []
 
         for lane_id, lane_queue in self.lanes.items():
             dir_name = lane_id.split("_")[0]
@@ -146,15 +147,17 @@ class Intersection:
                     if not self.vehicles_in_intersection:
                         self.intersection_reserved_phase = None
 
-            passed_count = sum(1 for vehicle in lane_queue if vehicle.state == "passed")
-            if passed_count:
-                self.total_passed += passed_count
-                self._passed_this_interval += passed_count
+            newly_passed = [vehicle for vehicle in lane_queue if vehicle.state == "passed"]
+            if newly_passed:
+                passed_vehicles.extend(newly_passed)
+                self.total_passed += len(newly_passed)
+                self._passed_this_interval += len(newly_passed)
                 self.lanes[lane_id] = [
                     vehicle for vehicle in lane_queue if vehicle.state != "passed"
                 ]
 
         self.timestep += 1
+        return passed_vehicles
 
     def get_queue_lengths(self) -> Dict[str, int]:
         """
