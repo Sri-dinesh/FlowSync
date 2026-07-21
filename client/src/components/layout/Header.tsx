@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 
+import { usePathname } from "next/navigation";
+
 import { Badge } from "@/components/ui/badge";
 import { useSimulationStore } from "@/store/simulationStore";
 
 export default function Header() {
-  const isConnected = useSimulationStore((state) => state.isConnected);
+  const pathname = usePathname();
+  const isSimulationConnected = useSimulationStore((state) => state.isConnected);
+  const isCityConnected = useSimulationStore((state) => state.isCityConnected);
   const mode = useSimulationStore((state) => state.mode);
+
+  const isConnected = pathname === "/city" ? isCityConnected : isSimulationConnected;
 
   return (
     <header className="border-b border-white/10 bg-[#121212]">
@@ -22,7 +28,23 @@ export default function Header() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {pathname === "/city" ? (
+            <Link
+              href="/simulation"
+              className="text-[11px] text-white/40 hover:text-white/80 transition-colors px-2.5 py-1 rounded-md hover:bg-white/8 border border-transparent hover:border-white/10 font-medium tracking-wide"
+            >
+              🚦 Single Intersection
+            </Link>
+          ) : (
+            <Link
+              href="/city"
+              className="text-[11px] text-white/40 hover:text-white/80 transition-colors px-2.5 py-1 rounded-md hover:bg-white/8 border border-transparent hover:border-white/10 font-medium tracking-wide"
+            >
+              🏙 City Grid
+            </Link>
+          )}
+
           <Badge
             variant="outline"
             className={
