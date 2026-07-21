@@ -26,6 +26,8 @@ export interface CityVehicleState {
   wait_time: number;
   world_x: number;
   world_z: number;
+  prev_turn?: "straight" | "left" | "right";
+  next_turn?: "straight" | "left" | "right";
 }
 
 export interface CityIntersectionState {
@@ -47,6 +49,8 @@ export interface RoadVehicleState {
   progress: number;
   world_x: number;
   world_z: number;
+  prev_turn: "straight" | "left" | "right";
+  next_turn: "straight" | "left" | "right";
 }
 
 export interface CityMetrics {

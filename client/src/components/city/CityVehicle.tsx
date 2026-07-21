@@ -313,7 +313,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
     if (id === "C" && (exitDir === "south" || exitDir === "west")) isExtExit = true;
     if (id === "D" && (exitDir === "south" || exitDir === "east")) isExtExit = true;
 
-    return { spawnDist: isExtSpawn ? 28 : 8, exitDist: isExtExit ? 28 : 8 };
+    return { spawnDist: isExtSpawn ? 28 : 6.0, exitDist: isExtExit ? 28 : 6.0 };
   }, [intersectionId, vehicle.lane, vehicle.turn]);
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn, spawnDist, exitDist), [vehicle.lane, turn, spawnDist, exitDist]);
@@ -431,6 +431,8 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
 
         startVisualPos.current = { ...currentVisualPos.current };
         lastTargetPos.current = { x: vehicle.world_x, z: vehicle.world_z };
+        startTRef.current = lastVisualTRef.current; // reusing startTRef for road progress
+        lastTargetTRef.current = vehicle.position;  // reusing lastTargetTRef
         lastUpdateTime.current = time;
       }
 
@@ -439,6 +441,9 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
 
       const x = startVisualPos.current.x + (lastTargetPos.current.x - startVisualPos.current.x) * progress;
       const z = startVisualPos.current.z + (lastTargetPos.current.z - startVisualPos.current.z) * progress;
+      
+      const visual_progress = startTRef.current + (lastTargetTRef.current - startTRef.current) * progress;
+      lastVisualTRef.current = visual_progress;
 
       const dx = x - currentVisualPos.current.x;
       const dz = z - currentVisualPos.current.z;
@@ -460,8 +465,28 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
         smoothRotRef.current += diff * Math.min(1, delta * 12);
       }
 
+      const getOff = (t?: string) => t === "left" ? 0.5 : t === "straight" ? 1.5 : 2.5;
+      const offStart = getOff(vehicle.prev_turn);
+      const offEnd = getOff(vehicle.next_turn);
+      const currentOff = offStart + (offEnd - offStart) * visual_progress;
+
+      const path_dx = lastTargetPos.current.x - startVisualPos.current.x;
+      const path_dz = lastTargetPos.current.z - startVisualPos.current.z;
+      const path_dist = Math.sqrt(path_dx * path_dx + path_dz * path_dz);
+      let nx = 0, nz = 1;
+      if (path_dist > 0.001) {
+        nx = path_dx / path_dist;
+        nz = path_dz / path_dist;
+      }
+      
+      const lat_x = -nz;
+      const lat_z = nx;
+      
+      const final_x = x + lat_x * currentOff;
+      const final_z = z + lat_z * currentOff;
+
       currentVisualPos.current = { x, z };
-      groupRef.current.position.set(x, 0.02, z);
+      groupRef.current.position.set(final_x, 0.08, final_z);
       groupRef.current.rotation.y = smoothRotRef.current;
     }
 

@@ -231,8 +231,8 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
             // Provide default dummy data to render the poles before the simulation starts
             data = {
               id,
-              grid_x: id === "A" || id === "C" ? -7 : 7,
-              grid_z: id === "A" || id === "B" ? -7 : 7,
+              grid_x: id === "A" || id === "C" ? -10 : 10,
+              grid_z: id === "A" || id === "B" ? -10 : 10,
               avg_wait_time: 0,
               total_waiting: 0,
               signal: {
@@ -271,6 +271,8 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
               wait_time: 0,
               world_x: rv.world_x,
               world_z: rv.world_z,
+              prev_turn: rv.prev_turn,
+              next_turn: rv.next_turn,
             }}
           />
         ))}
