@@ -8,19 +8,22 @@
 
 ### What Is FlowSync?
 
-FlowSync is a full-stack, real-time traffic simulation system that demonstrates how **Dueling Double DQN with Prioritized Experience Replay (PER)** can optimize traffic signal control at a 4-way city intersection. It serves as a **proof-of-concept Digital Twin** for smart-city infrastructure modernization, replacing traditional fixed-timer traffic signals with an autonomous, learning AI agent — plus a **Manual (MNL) control mode** for human-in-the-loop operation. The system is designed as a research platform to study **pressure-based reward functions**, **starvation-aware constraint handling**, and **real-time RL inference** in traffic domains.
+FlowSync is a full-stack, real-time traffic simulation system that demonstrates how **Dueling Double DQN with Prioritized Experience Replay (PER)** can optimize traffic signal control at both **single 4-way intersections** and **2×2 multi-intersection city grids**. It serves as a **proof-of-concept Digital Twin** for smart-city infrastructure modernization, replacing traditional fixed-timer traffic signals with an autonomous, learning AI agent — plus **Manual (MNL) control mode** for human-in-the-loop operation, and a new **Greedy mode** for rule-based benchmarking. The system is designed as a research platform to study **pressure-based reward functions**, **starvation-aware constraint handling**, **multi-intersection coordination**, and **real-time RL inference** in traffic domains.
 
 **Mission:** Show that Reinforcement Learning can significantly outperform static traffic systems, reducing urban congestion, wait times, and vehicle emissions.
 
 **Core Research Contributions:**
 - **Dueling Double DQN** with separate value (V) and advantage (A) streams for better state-value estimation under high-density traffic
 - **Prioritized Experience Replay** with SumTree data structure, priority annealing (α=0.6), and importance-sampling bias correction (β: 0.4→1.0)
-- **Max-Pressure Formulation** (PressLight/MPLight-style): pressure computed per **movement** (12 total movements mapped to destination directions) with phase-level aggregation via `_get_phase_pressure()` — Phase 0 (NS straight+left), Phase 1 (EW straight+left), Phase 2 (NS right), Phase 3 (EW right)
+- **Max-Pressure Formulation** (PressLight/MPLight-style): pressure computed per **movement** (12 total movements mapped to destination directions) with phase-level aggregation via `_get_phase_pressure()` — Phase 0 (NS straight), Phase 1 (EW straight), Phase 2 (NS left), Phase 3 (EW left)
 - **20-dimensional pressure-based observation space** encoding 12 lane-level movement queues, phase one-hot, signal context, and starvation metrics
 - **Multi-component pressure reward** combining pressure differential (PressLight-style), throughput bonus, switch penalty (evaluated against **previous** phase's pressure, not current), starvation penalty (-2.0 per starved direction), max-green violation penalty (-1.0), and balance bonus (computed over **phase-level** pressures) — all with hard constraint enforcement
 - **Two-agent decoupling**: separate inference agent (live simulation) and training agent (background training) with periodic weight synchronization
 - **Starvation-aware signal control**: per-direction wait timers trigger automatic phase overrides at 45s threshold, independent of RL policy; **starvation bleed fix**: timers also reset for directions in the pending/next phase
 - **Destination-aware outgoing counts**: `get_outgoing_counts()` maps each lane to its actual destination direction (e.g., south_straight→north, west_left→north) for accurate pressure calculation
+- **Multi-Intersection City Grid**: 2×2 grid of 4 coordinated intersections with vehicle routing between intersections, shared-policy AI control, and automated benchmark comparison (Fixed vs Greedy vs AI)
+- **Greedy Rule-Based Controller**: deterministic highest-queue phase selector for baseline comparison against learned policies
+- **Async Environment Stepping**: offloaded to thread pool via `asyncio.to_thread()` to prevent event-loop blocking during training
 
 **Problem It Solves:**
 - Traditional fixed-timer traffic signals waste time by ignoring real-time demand
@@ -71,7 +74,9 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 
 ### Current Status
 
-**Active Development / MVP — Research Platform.** The project is fully functional with a landing page, 3D simulation dashboard, live training, manual control, **Dueling Double DQN with PER**, **starvation-aware constraint handling**, **pressure-based observations**, and data persistence. Designed as a **research tool** for studying pressure-based RL in traffic signal control.
+**Active Development / MVP — Research Platform.** The project is fully functional with a landing page, **two simulation dashboards** (single-intersection `/simulation` and multi-intersection `/city`), live training, manual control, **Dueling Double DQN with PER**, **starvation-aware constraint handling**, **pressure-based observations**, multi-intersection vehicle routing, automated benchmark comparison, and data persistence. Designed as a **research tool** for studying pressure-based RL in traffic signal control.
+
+**Recent Major Milestone (July 2026):** Implemented 2×2 multi-intersection city grid with shared-policy AI, greedy rule-based baseline, automated comparison benchmark, and new `/city` route with dedicated 3D visualization.
 
 ---
 
@@ -82,12 +87,14 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | Area | Status | Details |
 |---|---|---|
 | **Frontend Build** | ✅ Working | `pnpm dev` compiles, Next.js 16 App Router loads, TypeScript strict mode passes |
-| **Backend Server** | ✅ Working | `uvicorn app.main:app --reload` starts on :8000, lifespan initializes 2 envs + 2 agents + Trainer |
+| **Backend Server** | ✅ Working | `uvicorn app.main:app --reload` starts on :8000, lifespan initializes 2 envs + 2 agents + Trainer + CityNetwork |
 | **WebSocket Simulation** | ✅ Working | `/ws/simulation` connects, 10 Hz frames broadcast, 3D scene renders vehicles, AI mode computes reward via `training_env.compute_reward()` |
+| **WebSocket City** | ✅ Working | `/ws/city` connects, 10 Hz frames for 2×2 grid, 4 intersections + road vehicles, Fixed/Greedy/AI modes, comparison benchmark |
 | **WebSocket Training** | ✅ Working | `/ws/training` connects, per-episode metrics stream, checkpoint notifications, `is_training` flag on last episode |
-| **Fixed-Timer Control** | ✅ Working | 4-phase cycle with smart queue-based switching, yellow (2s) → red (3s) → green (min 4s, default 8s), early switch if current phase empty |
+| **Fixed-Timer Control** | ✅ Working | 4-phase cycle with smart queue-based switching, yellow (2s) → red (3s) → green (min 4s, default 8s), early switch if current phase empty, **hard 40s green cap** |
 | **AI (Dueling Double DQN) Control** | ✅ Working | Dueling architecture (V + A streams), PER buffer (SumTree, α=0.6, β annealing), 20-dim pressure obs, `select_action(ε=0)` for inference |
 | **Manual (MNL) Control** | ✅ Working | 4 phase buttons, holds green indefinitely, phase changes go through yellow→red→green clearance |
+| **Greedy Baseline (City)** | ✅ Working | Rule-based max-queue phase selector per intersection, respects min-green guard, shared across 4 intersections |
 | **Yield-on-Left Logic** | ✅ Working | Left-turners at stop line during phases 0/1 yield to oncoming straight/right traffic |
 | **Max-Pressure Reward Formulation** | ✅ Working | Per-movement pressure with destination mapping (12 movements, each mapped to downstream direction); `_get_phase_pressure()` aggregates to phase level; switch penalty evaluates **previous phase** pressure |
 | **Starvation Bleed Fix** | ✅ Working | `starvation_timer` resets for BOTH current green AND pending phase directions — no false accumulation during yellow-red transitions |
@@ -102,14 +109,16 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **Vehicle Interpolation** | ✅ Working | Smooth 60 fps between 10 Hz WS updates, wheel rotation, emergency siren lights |
 | **Day/Night 3D Toggle** | ✅ Working | State-driven lighting: emissive sun (intensity 8) + bright ambient (day) vs moody directional (night) |
 | **MeshPhysicalMaterial Environment** | ✅ Working | Ground plane, skyscrapers with clearcoat 1.0 + metalness 0.9 + neon corner stripes emissive 3.5 |
+| **City Grid Environment** | ✅ Working | 2×2 grid (A/B/C/D), connecting roads, 8 external entry points, inter-intersection vehicle routing, world-space coordinates |
 | **Side-by-Side Layout** | ✅ Working | Canvas left (flex-1), controls sidebar right (420px, scrollable) |
 | **Live Training Dashboard** | ✅ Working | Reward/Wait/Epsilon/Loss sparklines, trend arrows, phase description, ETA, ep/min |
 | **Model Checkpointing** | ✅ Working | Every 50 eps: saves to Supabase Storage + local disk, metadata upsert to `rl_models` |
 | **Model Loading** | ✅ Working | Dropdown fetches `/training/models`, loads state dict into both sim_agent + training_agent |
 | **Emergency Preemption** | ✅ Working | 4 directional buttons, spawns ambulance, forces priority phase, clears on exit |
 | **Performance Comparison** | ✅ Working | Compare tab aggregates Fixed/AI/Manual wait time + throughput, improvement %, 3-bar chart (#475569/#38bdf8/#f59e0b) |
+| **City Comparison Benchmark** | ✅ Working | Automated 3-mode (Fixed/Greedy/AI) sequential run with 30s per mode, live progress, results chart with improvement % |
 | **Episode History** | ✅ Working | Paginated table (10/page), auto-refresh 10s during training, best episode highlighted |
-| **Real-Time Metrics** | ✅ Working | MetricsPanel (2×2 animated cards), LiveSnapshot (draggable framer-motion overlay) |
+| **Real-Time Metrics** | ✅ Working | MetricsPanel (2×2 animated cards), LiveSnapshot (draggable framer-motion overlay), QValuePanel (AI reasoning) |
 | **Supabase Persistence** | ✅ Working | Simulations, Episodes, TrafficLogs, SignalStates, PerformanceMetrics, RLModels |
 | **Keep-Alive Ping** | ✅ Working | Frontend pings `/api/keep-alive` → FastAPI `/health` on mount |
 | **Docker Backend** | ✅ Working | `docker-compose up` builds CPU-only PyTorch image, runs on :8000 |
@@ -127,6 +136,8 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **WS Reconnection Storm** | ⚠️ Rare | Exponential backoff (max 5) works, but rapid reconnects can occur if backend restarts mid-session |
 | **Prisma Migrations** | ⚠️ Manual | No CI migration step — `prisma db push` required after schema changes |
 | **Hardcoded Render URL** | ⚠️ Config | `flowsync-gelt.onrender.com` removed from `utils.ts`/`next.config.ts` but may persist in docs |
+| **City Vehicle Routing Latency** | ⚠️ Minor | Vehicles waiting at full destination lane queue are held at road end; visual "bunching" at city boundaries during high throughput |
+| **Greedy Policy Myopia** | ⚠️ Design | Greedy mode maximizes local queue per intersection; no coordination for green-wave or downstream pressure |
 
 ### Not Implemented / Missing (❌)
 
@@ -135,12 +146,14 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | **Authentication/Authorization** | ❌ None | No user accounts, no WS auth, no API keys — single-user demo only |
 | **Rate Limiting** | ❌ None | No protection on REST or WS endpoints |
 | **CI/CD Pipeline** | ❌ None | No GitHub Actions, no automated test/lint/deploy |
-| **Multi-Intersection** | ❌ Not started | Single 4-way intersection only; env would need major refactor |
 | **GPU Training** | ❌ Blocked | Render free tier CPU-only; no CUDA in Dockerfile |
 | **GraphQL / Webhooks** | ❌ Not planned | REST + WS covers all current needs |
 | **Data Retention Policy** | ❌ None | Data persists indefinitely on Supabase free tier |
 | **Automated Security Scanning** | ❌ None | No Dependabot, Snyk, or SAST in CI |
 | **WebSocket Message Schema Validation** | ❌ None | Commands validated by if-else chains only |
+| **Multi-Agent Coordination** | ❌ Not started | Each intersection uses shared single-intersection policy; no explicit communication or joint reward |
+| **Pedestrian / Cyclist Models** | ❌ Not planned | Vehicle-only simulation |
+| **Weather / Incident Simulation** | ❌ Not planned | Static traffic demand only |
 
 ### Deployment Status
 
@@ -163,25 +176,26 @@ FlowSync is a full-stack, real-time traffic simulation system that demonstrates 
 | `tests/simulation/test_traffic_signal.py` | 6 | Phase transitions, yellow/red/green, green permission |
 | **Total** | **27** | Core logic paths; no integration/E2E tests |
 
-### Recent Commits Impact (Last 15)
+### Recent Commits Impact (Last 30)
 
 | Commit | Date | Impact |
-|---|---|---|---|
+|---|---|---|
+| `7b73d8b` | 2026-07-21 | **Project Documentation**: Added `docs/Project-Objectives.md` with comprehensive project objectives and research goals |
+| `79df942` | 2026-07-21 | **City Grid Visuals**: Smooth lateral lane transitions, fixed visual teleportation during lane changes, improved vehicle interpolation on road segments |
+| `e9cd8e7` | 2026-07-21 | **Backend-Frontend Routing Sync**: Synced road vehicle offsets, pass routing intent (`prev_turn`/`next_turn`) to frontend for correct lane visualization |
+| `7d4a34a` | 2026-07-21 | **City Vehicle Lifecycle**: Fixed vehicle routing and injection in multi-intersection grid; correct spawning at 8 entry points, proper inter-intersection transfers |
+| `15f9e4d` | 2026-07-21 | **City Route & Navigation**: Added `/city` page route, updated global header navigation with City Grid Experiment link |
+| `f643a1b` | 2026-07-21 | **City 3D Components**: Built CityCanvas, CityGrid, CityRoads, CityVehicle, CityControls, CityMetricsPanel, CityComparisonPanel with full visual fidelity |
+| `71fb774` | 2026-07-21 | **City Types & State**: Added `types/city.ts`, `useCitySocket.ts` hook, updated Zustand store for city simulation state |
+| `b3fe488` | 2026-07-21 | **City WebSocket Controller**: `/ws/city` handler with Fixed/Greedy/AI modes, automated comparison benchmark (Fixed→Greedy→AI, 30s each), shared-policy DQN inference |
+| `562d85d` | 2026-07-21 | **City Network Models**: `CityNetwork` (2×2 grid, 4 Intersections, ROAD_CONNECTIONS, RoadVehicle routing), `CitySpawner` (8 external entry points, Poisson spawn), schemas, frame builder |
+| `74c6415` | 2026-07-19 | **Greedy Mode + Q-Value Tracking**: Added greedy rule-based controller (max-queue phase selector) for `/simulation` and `/city`; `QValuePanel` shows per-phase Q-values, confidence %, explore/exploit badge |
+| `f93788c` | 2026-07-19 | **UI Polish**: Training warmup indicator, resolved TypeScript/ESLint warnings |
+| `22768d4` | 2026-07-19 | **RL Hyperparam Tuning**: `MIN_REPLAY_SIZE` 2000→500 (faster warmup), `EPSILON_DECAY` 0.998→0.994 (reaches 0.05 by ~550 eps), added training speed & buffer-ready metrics to WS |
+| `5c8dd03` | 2026-07-19 | **Fixed Signal Upgrade**: Queue-based phase selection with `_pick_highest_queue_phase()`, hard 40s green cap (`MAX_GREEN_TIME`), left turns restricted to dedicated left phases (2,3) |
+| `41066da` | 2026-07-19 | **RL Phase Pressure Fix**: `_compute_movement_pressures()` now takes explicit `intersection` arg; `_get_phase_pressure()` corrected (Phase 0/1 = straight only, Phase 2/3 = left only); `phase_changed` uses pre-tick action vs current phase; switch penalty iterates movement keys (`d_turn`) |
+| `2f00cc1` | 2026-07-18 | **Lint & Build Fixes**: Resolved all TypeScript/ESLint warnings, clean build |
 | `f3bcd9f` | 2026-07-16 | **Algorithm Fixes** (code-level deep-dive): **(a) Per-movement max-pressure formulation** — `_compute_movement_pressures()` changed from direction-level (4 entries summing straight+left) to movement-level (12 entries with `dest_map` lookup), enabling destination-aware pressure (e.g. `north_straight→south`, `north_left→east`). **(b) Switch penalty evaluated against previous phase** — `step()` now captures `prev_phase` pre-tick and passes it to `compute_reward()`; penalty checks `prev_pressures[PHASE_GREEN_LANES[prev_phase]]` instead of post-switch `curr_pressures[PHASE_GREEN_LANES[current_phase]]`. **(c) Starvation bleed fix** — `traffic_signal.tick()` now checks BOTH `green_dirs` (current) AND `pending_dirs` (pending_phase) before resetting starvation timers; prevents false accumulation when a direction has a pending green but is still in yellow→red→green transition. **(d) Destination-aware outgoing counts** — `get_outgoing_counts()` replaced naive `lane_key.split("_")[0]` with full `dest_mapping` dict (12 entries mapping each lane key to its physical destination). **(e) Phase-level balance bonus** — balance bonus `imbalance` now computed over 4 phase-level pressures (via `_get_phase_pressure()`) instead of 12 raw movement pressures. **(f) `_get_best_alternative_phase()`** — now uses `_get_phase_pressure()` instead of direction-level `PHASE_GREEN_DIRS_MAP`. **(g) New helper** `_get_phase_pressure(pressures, phase)` aggregates 12 movement pressures into 4 phase groups. |
-| `d5a22ec` | 2026-07-15 | Disable camera auto-rotation (manual orbit only) |
-| `2d074b3` | 2026-07-13 | Upgrade environment: MeshPhysicalMaterial, neon skyscrapers, LowPolyTree, Day/Night sun emissive 8.0 |
-| `8d7536d` | 2026-07-13 | 3-mode comparison chart, draggable LiveSnapshot framer-motion widget |
-| `d009830` | 2026-07-13 | Fix reward inflation: reduce throughput bonus 0.5→0.2, remove empty-intersection balance bonus, fix phase change detection (pre-tick vs post-tick) |
-| `0efed2d` | 2026-07-12 | **Two-agent decoupling**: separate sim_agent + training_agent, weight sync at checkpoints, fix DB timestamp errors |
-| `ade47fe` | 2026-07-12 | **Dueling DQN + PER**: V/A streams, SumTree, importance sampling, α=0.6, β=0.4→1.0 |
-| `e6be1b7` | 2026-07-12 | Starvation overrides (45s), right-turn always-allowed, pressure-based 20-dim obs, max green 40s cap |
-| `5e2aff3` | 2026-07-12 | Correct traffic light direction, holographic queue labels, arrow display polish |
-| `87a4f92` | 2026-07-12 | WS frame flattening: QueueState dict → queue_lengths, signal_color from per-lane colors |
-| `2a3b393` | 2026-07-12 | Datetime parsing for fallback storage, consistent model naming |
-| `482cbec` | 2026-07-12 | Model naming: date + time + episodes + efficiency rating |
-| `a3d650c` | 2026-07-12 | Cleanup: remove hardcoded URLs, delete dead metrics.py, update pytest |
-| `e694309` | 2026-07-12 | Schema v2: world coordinates, Q-values, performance metrics DB refactor |
-| `134c411` | 2026-07-12 | Double DQN + LayerNorm, replay buffer 50K→100K, Huber loss, gradient clipping |
 
 ---
 
@@ -502,18 +516,19 @@ Frontend reads:
 **Phase Configuration:**
 | Phase | ID | Green Directions | Allowed Turns | Default Duration |
 |-------|-----|-----------------|---------------|------------------|
-| NS_GREEN | 0 | North, South | straight, left, right | 8s |
-| EW_GREEN | 1 | East, West | straight, left, right | 8s |
+| NS_GREEN | 0 | North, South | straight, right | 8s |
+| EW_GREEN | 1 | East, West | straight, right | 8s |
 | NS_LEFT | 2 | North, South | left only | 8s |
 | EW_LEFT | 3 | East, West | left only | 8s |
 
 **Timing Sequence:** GREEN (min 4s, default 8s) → YELLOW (2s) → RED (3s clearance) → GREEN for next phase
 
-**Smart Phase Selection Logic:**
+**Smart Phase Selection Logic (Upgraded):**
 1. After `min_green_duration` (4s), check if current phase has 0 vehicles AND another phase has >0 → switch early
-2. At `fixed_duration` (8s) timeout: iterate through candidate phases in sequential order, select first phase with waiting vehicles
-3. If no candidate has vehicles: fall back to next sequential phase
+2. At `fixed_duration` (8s) timeout OR if **hard green cap** (40s) is exceeded: select the phase with the **highest total queue count** (excluding current phase) via `_pick_highest_queue_phase()` — no longer sequential fallback
+3. If all other phases have 0 vehicles: fall back to next sequential phase
 4. **Minimum green guard:** `can_switch_phase` returns False if `time_in_phase < MIN_GREEN_TIME` (8s) unless in transition
+5. **Hard green cap (NEW):** In `tick()`, if `color == GREEN` and `time_in_phase >= MAX_GREEN_TIME` (40s), immediately force switch to highest-queue phase — prevents starvation from operator error or logic bugs in both fixed and AI modes
 
 **Phase Transition Safety (Yellow-Red Clearance):**
 - `set_phase(target)`: immediately sets `pending_phase = target`, color → YELLOW, timer resets
@@ -553,6 +568,206 @@ Frontend reads:
 
 **Priority:** ★★★★★ (baseline for comparison)
 
+---
+
+### 2.2.1 Vehicle Movement & Intersection Physics — Core Algorithms
+
+This section documents the low-level vehicle dynamics and intersection control algorithms that form the simulation engine's foundation.
+
+#### 2.2.1.1 Vehicle Kinematics (`server/app/simulation/vehicle.py`)
+
+Each vehicle follows a deterministic kinematic model updated at 10 Hz (dt = 0.1s):
+
+```
+DEFAULT_SPEED = 0.12  # position units per second (normalized 0→1 over road length)
+MIN_DIST = 0.08       # minimum following distance (normalized)
+STOP_LINE = 0.42      # normalized position of stop line
+```
+
+**State Machine:**
+```
+State ∈ {waiting, moving, braking, passed}
+```
+
+**Per-Tick Update (`tick(dt, can_move)`):**
+```
+if can_move:
+    # Accelerate toward target speed
+    position += DEFAULT_SPEED * dt
+    state = "moving"
+else:
+    # Hold at stop line or behind vehicle
+    if position + DEFAULT_SPEED * dt >= STOP_LINE:
+        position = STOP_LINE
+    state = "waiting"
+
+# Track wait time while not passed
+if state != "passed":
+    wait_time += dt
+
+# Transition to passed when clearing intersection
+if position >= 1.0:
+    state = "passed"
+```
+
+#### 2.2.1.2 Car-Following & Collision Avoidance (`intersection.py`)
+
+Vehicles maintain safe spacing using a leader-follower model:
+
+```
+for each lane:
+    for i, vehicle in enumerate(lane_queue):
+        if i > 0:  # has leader
+            leader = lane_queue[i-1]
+            if leader.position < 1.0:  # leader still in system
+                max_position = max(0.0, leader.position - MIN_DIST)
+                if vehicle.position + DEFAULT_SPEED * dt >= max_position:
+                    vehicle.position = max_position
+                    # Only move if leader is also moving
+                    can_move = can_move and (leader.speed > 0)
+```
+
+**Key properties:**
+- **MIN_DIST = 0.08** (8% of road length) prevents rear-end collisions
+- **Speed coupling**: follower only moves if leader.speed > 0, preventing "phantom" traffic waves
+- **Stop-line enforcement**: vehicles cap at `STOP_LINE = 0.42` when signal is red
+
+#### 2.2.1.3 Intersection Reservation System (`intersection.py`)
+
+Prevents perpendicular collisions using a **direction-group locking** mechanism:
+
+```
+# Direction groups: NS (phases 0,2) and EW (phases 1,3)
+current_group = 0 if signal.current_phase in (0, 2) else 1
+reserved_group = 0 if intersection_reserved_phase in (0, 2) else 1
+
+# Vehicle attempts to enter intersection
+entering = vehicle.position + DEFAULT_SPEED * dt >= STOP_LINE
+if entering:
+    if intersection_reserved_phase is None or current_group == reserved_group:
+        vehicles_in_intersection.add(vehicle.id)
+        intersection_reserved_phase = signal.current_phase
+    else:
+        # Perpendicular traffic still clearing
+        vehicle.position = STOP_LINE
+        can_move = False
+
+# Release lock when last vehicle exits
+if vehicle.state == "passed" and vehicle.id in vehicles_in_intersection:
+    vehicles_in_intersection.remove(vehicle.id)
+    if not vehicles_in_intersection:
+        intersection_reserved_phase = None
+```
+
+**Invariants:**
+- Only one direction group (NS or EW) occupies intersection at a time
+- Vehicles entering set the reservation; it clears only when **all** vehicles from that group have passed
+- Prevents gridlock without full collision detection
+
+#### 2.2.1.4 Yield-on-Left Logic
+
+Applied during phases 0 (NS_GREEN) and 1 (EW_GREEN) where left-turners cross oncoming traffic:
+
+```
+if vehicle.position <= STOP_LINE and vehicle.turn == "left" and signal.current_phase in (0, 1):
+    oncoming_dir = {"north": "south", "south": "north", "east": "west", "west": "east"}[dir_name]
+    for oncoming_turn in ["straight", "right"]:
+        oncoming_queue = lanes.get(f"{oncoming_dir}_{oncoming_turn}", [])
+        for oncoming_veh in oncoming_queue:
+            if 0.15 <= oncoming_veh.position < 1.0:  # in approach or intersection
+                can_move = False
+                break
+```
+
+**Thresholds:**
+- **Yield trigger**: left-turner at or behind stop line (position ≤ 0.42)
+- **Oncoming detection range**: position ∈ [0.15, 1.0) — from approach through intersection
+
+#### 2.2.1.5 Right-Turn Priority
+
+Right-turning vehicles (`is_right_turn = True`) **completely bypass signal control**:
+
+```
+if vehicle.is_right_turn:
+    is_green_for_movement = True  # unconditionally
+else:
+    is_green_for_movement = signal.is_green_for(direction, turn)
+```
+
+- Not subject to stop-line enforcement
+- Not counted in pressure calculations
+- Not affected by yield-on-left
+
+---
+
+### 2.2.2 Phase Definitions & Signal Logic
+
+**Phase Definitions (updated — left turns separated):**
+| Phase | ID | Label | Directions | Turns Allowed | Min Green | Max Green |
+|-------|-----|-------|------------|---------------|-----------|-----------|
+| NS_GREEN | 0 | NS Straight/Right | North, South | straight, right | 4s | 40s |
+| EW_GREEN | 1 | EW Straight/Right | East, West | straight, right | 4s | 40s |
+| NS_LEFT | 2 | NS Left Only | North, South | left | 8s | 40s |
+| EW_LEFT | 3 | EW Left Only | East, West | left | 8s | 40s |
+
+**Phase Transition (Yellow-Red Clearance):**
+```
+set_phase(target):
+    pending_phase = target
+    color = YELLOW
+    time_in_phase = 0
+    
+# In tick():
+if color == YELLOW and time_in_phase >= 2.0:
+    color = RED
+    time_in_phase = 0
+if color == RED and time_in_phase >= red_duration (3.0s):
+    current_phase = pending_phase
+    pending_phase = None
+    color = GREEN
+    time_in_phase = 0
+```
+
+**Total clearance: 5s (2s yellow + 3s all-red)**
+
+---
+
+### 2.2.3 Smart Fixed-Timer Phase Selection (`traffic_signal.py`)
+
+The upgraded fixed-timer uses **queue-based priority selection** instead of sequential cycling:
+
+```
+def _pick_highest_queue_phase(current_phase, lanes):
+    if lanes is None:
+        return (current_phase + 1) % 4
+    
+    best_phase = None
+    best_count = -1
+    
+    for phase in range(4):
+        if phase == current_phase:
+            continue
+        count = 0
+        for lane_dir in PHASE_GREEN_LANES[phase]:  # e.g., ["north", "south"]
+            for turn in ["straight", "left", "right"]:
+                count += len(lanes.get(f"{lane_dir}_{turn}", []))
+        if count > best_count:
+            best_count = count
+            best_phase = phase
+    
+    if best_phase is None or best_count == 0:
+        return (current_phase + 1) % 4  # fallback sequential
+    return best_phase
+```
+
+**Decision Logic (in `tick()`):**
+1. **Hard max-green cap (NEW)**: If `color == GREEN and time_in_phase >= MAX_GREEN_TIME (40s)` → force switch to `_pick_highest_queue_phase()`
+2. **Early switch**: If `time_in_phase >= min_green_duration (4s)` AND current queue empty AND another phase has vehicles → switch
+3. **Fixed-duration rollover**: At `fixed_duration (8s)` → switch to highest-queue phase
+4. **Fallback**: Sequential if all other phases empty
+
+---
+
 ### 2.3 AI (Dueling Double DQN + PER) Signal Control
 
 **What:** A Dueling Double Deep Q-Network agent with Prioritized Experience Replay (PER) that learns optimal signal timing through trial and error, using pressure-based observations and multi-component reward.
@@ -589,7 +804,109 @@ Normalized to [0,1] range for stable neural network training:
 4. **Pressure Context** (1 dim): `min(total_pressure / 20.0, 1.0)` — aggregate congestion signal
 5. **Starvation Context** (1 dim): `min(max(starvation_timer) / STARVATION_THRESHOLD, 1.0)` — worst-case wait across all directions
 
-#### 2.3.3 Action Space (Discrete 4)
+#### 2.3.2.1 Observation Builder — Detailed Implementation
+
+Two separate observation builders exist: one for **training** (`TrafficEnv._get_obs()`) and one for **inference** (`simulation_ws._build_obs_from_intersection()`). They must produce **identical** 20-dim vectors.
+
+**Training Observation Builder** (`TrafficEnv._get_obs()` in `environment.py`):
+
+```python
+def _get_obs(self) -> np.ndarray:
+    movement_queues = self.intersection.get_movement_queues()
+    signal = self.intersection.signal
+    pressures = self._compute_movement_pressures()  # Full pressure computation
+    
+    # 1. 12 Movement Queues (normalized by MAX_CAP = 10.0)
+    movements = [
+        movement_queues.get("north_straight", 0) / 10.0,
+        movement_queues.get("north_left", 0) / 10.0,
+        movement_queues.get("north_right", 0) / 10.0,
+        movement_queues.get("south_straight", 0) / 10.0,
+        movement_queues.get("south_left", 0) / 10.0,
+        movement_queues.get("south_right", 0) / 10.0,
+        movement_queues.get("east_straight", 0) / 10.0,
+        movement_queues.get("east_left", 0) / 10.0,
+        movement_queues.get("east_right", 0) / 10.0,
+        movement_queues.get("west_straight", 0) / 10.0,
+        movement_queues.get("west_left", 0) / 10.0,
+        movement_queues.get("west_right", 0) / 10.0,
+    ]
+    
+    # 2. Phase One-Hot (4 dims)
+    phase_onehot = [0.0, 0.0, 0.0, 0.0]
+    phase_onehot[signal.current_phase] = 1.0
+    
+    # 3. Signal Context (2 dims)
+    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
+    
+    # 4. Pressure Context (1 dim) — FULL computation
+    dest_map = { ... }  # 12-entry destination mapping
+    outgoing = self.intersection.get_outgoing_counts()
+    total_pressure = 0.0
+    for movement, dest in dest_map.items():
+        incoming = movement_queues.get(movement, 0) / 10.0
+        out = outgoing.get(dest, 0) / 10.0
+        total_pressure += max(0.0, incoming - out)
+    pressure_norm = min(total_pressure / 20.0, 1.0)
+    
+    # 5. Starvation Context (1 dim)
+    max_starv = max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD
+    max_starv_norm = min(max_starv, 1.0)
+    
+    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+    return np.array(obs, dtype=np.float32)
+```
+
+**Inference Observation Builder** (`_build_obs_from_intersection()` in `simulation_ws.py`):
+
+```python
+def _build_obs_from_intersection(intersection) -> np.ndarray:
+    movement_queues = intersection.get_movement_queues()
+    signal = intersection.signal
+    MAX_CAP = 10.0
+    
+    movements = [ ... ]  # Same 12 movements as above
+    
+    phase_onehot = [0.0, 0.0, 0.0, 0.0]
+    phase_onehot[signal.current_phase] = 1.0
+    
+    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
+    
+    # CRITICAL DIFFERENCE: Simplified pressure for inference
+    pressure_norm = 0.0  # Not computed in inference — avoids extra computation
+    
+    max_starv_norm = min(
+        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
+    )
+    
+    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+    return np.array(obs, dtype=np.float32)
+```
+
+**Critical Difference:**
+| Component | Training (`_get_obs`) | Inference (`_build_obs_from_intersection`) |
+|-----------|----------------------|--------------------------------------------|
+| Pressure | Full `dest_map` + `outgoing` | **Hardcoded to 0.0** |
+| Computation | ~200 ops | ~20 ops |
+| Accuracy | Exact | Approximate (pressure context = 0) |
+
+**Why?** Inference runs at 10 Hz in the simulation loop; computing full pressure (dest_map lookup, outgoing counts) adds latency. The agent learns to operate with pressure_norm=0.0 during inference, and the reward signal during training provides sufficient pressure information through the reward components.
+
+#### 2.3.2.2 Normalization Constants
+
+| Component | Normalization | Range |
+|-----------|--------------|-------|
+| Movement queues | `count / 10.0` | [0, 1] |
+| Phase one-hot | Exact 1.0 | {0, 1} |
+| Time in phase | `time / 40.0` | [0, 1] |
+| Pressure | `total / 20.0` | [0, 1] (theoretical max = 12 × 1.0 = 12, but capped) |
+| Starvation | `max_timer / 45.0` | [0, 1] |
+
+---
+
+### 2.3.3 Action Space (Discrete 4)
 | Action | Phase | Description |
 |--------|-------|-------------|
 | 0 | NS_GREEN | North + South straight, left, right (left allowed) |
@@ -611,6 +928,306 @@ Based on Schaul et al. 2016 ("Prioritized Experience Replay"):
 - **Beta annealing:** β starts at 0.4 and linearly anneals to 1.0 over the course of training (Schaul et al. recommend β_start ≈ 0.4 for stability)
 - **Priority updates:** After each train step, TD errors update the corresponding tree leaves; `max_priority` tracks the running maximum
 
+
+
+---
+
+### 2.3.4.1 SumTree Data Structure — Detailed Algorithm
+
+The **SumTree** is a complete binary tree stored as a flat array where each parent node stores the sum of its children's priorities. This enables O(log n) priority-based sampling and O(log n) priority updates.
+
+**Tree Structure:**
+```
+Tree array size = 2 * capacity - 1
+Leaves start at index = capacity - 1
+Data array (transitions) size = capacity
+
+Example (capacity=8, tree size=15):
+  Indices:  0       1     2     3    4    5    6    7  8  9 10 11 12 13 14
+           root    L     R    LL  LR  RL  RR   leaves...
+```
+
+**Core Operations:**
+
+```python
+class SumTree:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.tree = np.zeros(2 * capacity - 1, dtype=np.float64)
+        self.data = [None] * capacity
+        self.write_ptr = 0
+        self.n_entries = 0
+    
+    def _propagate(self, idx, change):
+        parent = (idx - 1) // 2
+        self.tree[parent] += change
+        if parent != 0:
+            self._propagate(parent, change)
+    
+    def _retrieve(self, idx, s):
+        left = 2 * idx + 1
+        right = left + 1
+        if left >= len(self.tree):
+            return idx
+        if s <= self.tree[left]:
+            return self._retrieve(left, s)
+        else:
+            return self._retrieve(right, s - self.tree[left])
+    
+    @property
+    def total_priority(self):
+        return self.tree[0]
+    
+    def add(self, priority, data):
+        idx = self.write_ptr + self.capacity - 1
+        self.data[self.write_ptr] = data
+        self.update(idx, priority)
+        self.write_ptr = (self.write_ptr + 1) % self.capacity
+        self.n_entries = min(self.n_entries + 1, self.capacity)
+    
+    def update(self, idx, priority):
+        change = priority - self.tree[idx]
+        self.tree[idx] = priority
+        self._propagate(idx, change)
+    
+    def get(self, s):
+        idx = self._retrieve(0, s)
+        data_idx = idx - self.capacity + 1
+        return idx, self.tree[idx], self.data[data_idx]
+```
+
+**Complexity Analysis:**
+| Operation | Time | Notes |
+|-----------|------|-------|
+| `add` | O(log n) | Single path to root |
+| `update` | O(log n) | Single path to root |
+| `get` (sample) | O(log n) | Root to leaf traversal |
+| Space | O(n) | 2n array |
+
+---
+
+### 2.3.4.2 PrioritizedReplayBuffer — Complete Algorithm
+
+```python
+class PrioritizedReplayBuffer:
+    def __init__(self, capacity=100_000):
+        self.capacity = capacity
+        self.tree = SumTree(capacity)
+        self.alpha = 0.6           # Priority exponent (0=uniform, 1=full prioritization)
+        self.beta = 0.4            # IS weight start
+        self.beta_end = 1.0        # IS weight end
+        self.epsilon = 1e-6        # Prevents zero priority
+        self.max_priority = 1.0
+    
+    def push(self, state, action, reward, next_state, done):
+        """Store transition with maximum priority (guarantees sampling)."""
+        transition = (
+            np.array(state, dtype=np.float32),
+            int(action),
+            float(reward),
+            np.array(next_state, dtype=np.float32),
+            float(done),
+        )
+        priority = self.max_priority ** self.alpha
+        self.tree.add(priority, transition)
+    
+    def sample(self, batch_size):
+        """
+        Stratified sampling over priority segments.
+        Returns: (states, actions, rewards, next_states, dones, weights, indices)
+        """
+        indices = []
+        priorities = []
+        transitions = []
+        
+        segment = self.tree.total_priority / batch_size
+        
+        for i in range(batch_size):
+            a = segment * i
+            b = segment * (i + 1)
+            s = np.random.uniform(a, b)
+            idx, priority, transition = self.tree.get(s)
+            
+            if transition is None:
+                s = np.random.uniform(0, self.tree.total_priority)
+                idx, priority, transition = self.tree.get(s)
+            
+            indices.append(idx)
+            priorities.append(priority)
+            transitions.append(transition)
+        
+        # Importance Sampling weights to correct for priority bias
+        sampling_probs = np.array(priorities) / self.tree.total_priority
+        weights = (self.tree.n_entries * sampling_probs) ** (-self.beta)
+        weights /= weights.max()  # Normalize
+        
+        states, actions, rewards, next_states, dones = zip(*transitions)
+        
+        return (
+            torch.FloatTensor(np.array(states)),
+            torch.LongTensor(np.array(actions)),
+            torch.FloatTensor(np.array(rewards)),
+            torch.FloatTensor(np.array(next_states)),
+            torch.FloatTensor(np.array(dones)),
+            torch.FloatTensor(weights),
+            indices,
+        )
+    
+    def update_priorities(self, indices, td_errors):
+        """Update priorities after training step using new TD errors."""
+        for idx, td_error in zip(indices, td_errors):
+            priority = (abs(float(td_error)) + self.epsilon) ** self.alpha
+            self.tree.update(idx, priority)
+            self.max_priority = max(self.max_priority, priority)
+    
+    def anneal_beta(self, episode, total_episodes):
+        """Linear annealing from 0.4 to 1.0 over training."""
+        self.beta = min(
+            self.beta_end,
+            0.4 + (self.beta_end - 0.4) * (episode / total_episodes)
+        )
+    
+    def __len__(self):
+        return self.tree.n_entries
+    
+    @property
+    def is_ready(self):
+        return len(self) >= 2000  # MIN_REPLAY_SIZE
+```
+
+**Design Rationale:**
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| α = 0.6 | Priority exponent | Moderate prioritization (α=1=full, α=0=uniform) |
+| β = 0.4→1.0 | IS annealing | Starts biased for learning speed, ends unbiased |
+| ε = 1e-6 | Priority floor | Prevents zero priority for zero TD-error |
+| New at max_priority | Priority initialization | Guarantees new transitions sampled quickly |
+| Stratified sampling | Segment-based | Ensures batch covers full priority range |
+
+---
+
+### 2.3.4.3 PER in Training Loop — Complete Flow
+
+```
+Episode Loop (1000 episodes):
+    β = 0.4 + 0.6 × (episode / 1000)          # Anneal PER β
+    state = env.reset()                        # 20-dim observation
+    total_reward = 0
+    
+    for step in 0..999:
+        # 1. Action Selection (ε-greedy)
+        if random() < ε:
+            action = random(0..3)
+        else:
+            q = online_net(state)
+            action = argmax(q)
+        
+        # 2. Pre-tick Capture (for switch penalty)
+        prev_phase = signal.current_phase
+        prev_pressures = _compute_movement_pressures()
+        
+        # 3. Hard Constraints (override agent)
+        if signal.is_max_green_exceeded and action == current_phase:
+            action = _get_best_alternative_phase()
+        if signal.get_starved_directions():
+            action = _get_phase_for_direction(starved[0])
+        
+        # 4. Environment Step
+        next_state, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        
+        # 5. Store Transition
+        buffer.push(state, action, reward, next_state, terminated)
+        
+        # 6. Training (if warm)
+        if buffer.is_ready and step % 2 == 0:
+            batch = buffer.sample(128)
+            loss, td_errors = train_step(batch)    # See Double DQN below
+            buffer.update_priorities(indices, |td_errors|)
+        
+        # 7. Target Network Sync
+        if step_count % 300 == 0:
+            target_net.load_state_dict(online_net.state_dict())
+        
+        total_reward += reward
+        state = next_state
+        if done: break
+    
+    ε = max(0.05, ε × 0.998)  # Decay
+    log_metrics(total_reward, avg_wait, throughput, ε, loss)
+    
+    if episode % 50 == 0:
+        save_checkpoint()      # Online + Target + Optimizer + Step + obs_version
+        sync_sim_agent()       # training_agent → sim_agent
+        broadcast_checkpoint()
+```
+
+---
+
+### 2.3.4.4 Double DQN Train Step with PER — Full Algorithm
+
+```python
+def train_step(batch):
+    states, actions, rewards, next_states, dones, weights, indices = batch
+    
+    # Current Q-values (online net)
+    current_q_all = online_net(states)                    # [B, 4]
+    current_q = current_q_all.gather(1, actions.unsqueeze(1)).squeeze(1)  # [B]
+    
+    with torch.no_grad():
+        # Double DQN: online net SELECTS action, target net EVALUATES it
+        next_actions = online_net(next_states).argmax(1)  # [B]
+        next_q = target_net(next_states).gather(
+            1, next_actions.unsqueeze(1)
+        ).squeeze(1)  # [B]
+        
+        # Bellman target
+        target_q = rewards + GAMMA * next_q * (1 - dones)
+    
+    # Per-sample TD errors (needed for PER priority update)
+    td_errors = (target_q - current_q).detach().cpu().numpy()  # [B]
+    per_sample_loss = loss_fn(current_q, target_q)              # [B]
+    
+    # Weight loss by importance sampling weights (PER bias correction)
+    weighted_loss = (per_sample_loss * weights).mean()
+    
+    optimizer.zero_grad()
+    weighted_loss.backward()
+    torch.nn.utils.clip_grad_norm_(online_net.parameters(), max_norm=10.0)
+    optimizer.step()
+    
+    step_count += 1
+    
+    # Update PER priorities with new TD errors
+    replay_buffer.update_priorities(indices, np.abs(td_errors))
+    
+    return float(weighted_loss.item()), td_errors
+```
+
+**Key Components Explained:**
+
+| Component | Formula | Purpose |
+|-----------|---------|---------|
+| **Double DQN Action Selection** | `next_actions = online_net(next_states).argmax(1)` | Online net chooses best action |
+| **Double DQN Evaluation** | `next_q = target_net(next_states).gather(1, next_actions)` | Target net evaluates that action |
+| **Bellman Target** | `target_q = r + γ × next_q × (1 - done)` | No next_q for terminal states |
+| **TD Error (PER)** | `td_error = target_q - current_q` | Drives priority updates |
+| **PER-Weighted Loss** | `loss = mean(weights × SmoothL1(current_q, target_q))` | Corrects sampling bias |
+| **Gradient Clipping** | `clip_grad_norm(max_norm=10.0)` | Stability for high-TD-error samples |
+
+**Why Double DQN?** Standard DQN uses `max_a Q_target(s', a)` which overestimates because the same network selects and evaluates. Double DQN decouples: online selects `argmax`, target evaluates `Q(s', argmax_online)`.
+
+**Why SmoothL1 (Huber)?** 
+```
+L1 for |x| > 1: L = |x| - 0.5
+L2 for |x| ≤ 1: L = 0.5 × x²
+```
+Quadratic near 0 (stable), linear beyond (robust to outliers from PER sampling).
+
+---
+
+### 2.3.5
 #### 2.3.5 Reward Function — Pressure-Based
 Based on PressLight (Wei et al. 2019), MPLight, and FPA-DQN (Wang et al. 2025):
 
@@ -760,7 +1377,295 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★★ (core differentiator)
 
-### 2.4 Manual (MNL) Signal Control — **NEW**
+### 2.4 Greedy Baseline Control — **NEW**
+
+**What:** A deterministic rule-based controller that selects the phase with the highest total queued vehicles at each decision point. Serves as an interpretable baseline between Fixed-Timer and learned AI policies.
+
+**How It Works — Technical Details:**
+- Available in both single-intersection (`/simulation`) and city grid (`/city`) modes via `"greedy"` mode string
+- At each tick (when `signal.can_switch_phase` is true):
+  1. Compute total queue count per phase: sum of vehicles across phase's green directions × allowed turns
+  2. Phase 0/1 (straight+right): sum straight+right queues for NS/EW directions
+  3. Phase 2/3 (left): sum left queues for NS/EW directions
+  4. Select `best_phase = argmax(phase_counts)`
+  5. If `signal.can_switch_phase` is false (min-green not met), hold current phase
+- No learning, no exploration, no reward function — purely myopic queue-maximization
+- Respects the same hard constraints as AI mode: min-green (8s), yellow-red clearance (5s), max-green (40s), starvation tracking
+
+**Phase Mapping (matches updated Fixed-Timer):**
+| Phase | Directions | Turns Counted |
+|-------|------------|---------------|
+| 0 (NS_GREEN) | north, south | straight, right |
+| 1 (EW_GREEN) | east, west | straight, right |
+| 2 (NS_LEFT) | north, south | left |
+| 3 (EW_LEFT) | east, west | left |
+
+**Why It Matters:**
+- Provides a strong, interpretable baseline that often beats Fixed-Timer
+- Exposes the value of learned coordination: Greedy is locally optimal but globally myopic (no green-wave, no downstream pressure awareness)
+- In city grid, Greedy runs **independently per intersection** — same logic applied at each of 4 intersections simultaneously
+- Shared-policy AI can learn coordination patterns Greedy cannot
+
+**User Flow:** Select "Greedy" mode → watch rule-based decisions → compare with AI on Comparison Benchmark.
+
+**Priority:** ★★★★☆ (essential baseline for research)
+
+### 2.5 Multi-Intersection City Grid (2×2) — **NEW MAJOR FEATURE**
+
+**What:** A 2×2 grid of 4 coordinated intersections (A, B, C, D) with inter-intersection vehicle routing, shared-policy DQN control, and automated benchmark comparison. Extends the single-intersection architecture to a network level.
+
+```
+Layout:     [A] ═══ [B]
+             ║         ║
+            [C] ═══ [D]
+
+A = top-left,  B = top-right
+C = bot-left,  D = bot-right
+```
+
+**Architecture — Backend (`server/app/simulation/`):**
+
+| Component | Responsibility |
+|-----------|----------------|
+| `city_network.py` | `CityNetwork` class: 4 `Intersection` instances, `RoadVehicle` transfer logic, `ROAD_CONNECTIONS` (A↔B, C↔D E-W; A↔C, B↔D N-S), `EXIT_DIR_MAP` (12 movement→destination), `build_obs()` (20-dim per intersection, matches single-intersection exactly), `get_greedy_action()` (same logic as single), `tick()` (orchestrates intersection ticks → collect passed vehicles → route to roads/destination → inject into destination lanes), `get_city_metrics()` (city-wide avg wait, throughput, congestion level, per-intersection breakdown) |
+| `city_spawner.py` | `CitySpawner`: 8 external entry points (N/S/E/W of each corner intersection), Poisson spawn divided across entries, 50/25/25 straight/left/right, max 12/lane, carries accumulated wait time across intersections |
+| `city_schema.py` | Pydantic models for `/ws/city` frames: `CityFrame` (timestep, mode, city_metrics, intersections dict, road_vehicles), `CityIntersectionState` (signal, queues, vehicles, Q-values, world coords), `RoadVehicleState` (progress, world coords), `build_city_frame()` with world-position helpers (`INTERSECTION_WORLD_POS`, `_lane_to_world()`, `_road_vehicle_world()`) |
+| `city_ws.py` | `/ws/city` handler: `CityConnectionManager`, `_city_simulation_loop()` at 10 Hz, supports Fixed/Greedy/AI modes + **automated comparison test** (`ComparisonTestState`: runs Fixed→Greedy→AI sequentially, 30s each, broadcasts phase progress, final results), command validation (`set_mode`, `set_spawn_rate`, `run_comparison`) |
+
+**Vehicle Routing Between Intersections:**
+1. Vehicle passes intersection (state → "passed") → `_route_passed_vehicles()` looks up `ROAD_CONNECTIONS[(from_iid, exit_dir)]`
+2. If connects to another intersection: creates `RoadVehicle` with `from_intersection`, `to_intersection`, `entry_dir`, `next_turn` (random 50/25/25), adds to `road_vehicles` list
+3. If exits city boundary: increments `total_city_throughput`
+4. Road vehicles advance `progress` each tick (30 ticks = 3s travel time at 10 Hz); on arrival (`progress >= 1.0`), `_inject_vehicle()` attempts to insert into destination intersection's entry lane (respects `MAX_QUEUE=12`); if full, vehicle waits at road end
+
+**Shared-Policy AI Control:**
+- Single `sim_agent` (DQNAgent, ε=0) used for **all 4 intersections**
+- At each tick: `build_obs(iid)` → `agent.select_action(obs, ε=0)` → `intersection.tick(action)` — same as single-intersection but looped over A,B,C,D
+- Policy learns to coordinate implicitly through shared weights and pressure observations that include downstream congestion
+- Greedy mode also runs independently per intersection using local queues
+
+**Automated Comparison Benchmark (`run_comparison` command):**
+- Resets city, enables spawner, runs Fixed → Greedy → AI sequentially (30s each by default)
+- Samples city metrics every 10 ticks, computes per-mode avg wait & throughput
+- Broadcasts `comparison_progress` (current mode, elapsed, phase index) and final `comparison_results` (per-mode avg_wait_time, throughput)
+- Frontend `CityComparisonPanel` renders grouped bar chart with improvement % vs Fixed
+
+**Frontend Components (`client/src/components/city/`):**
+| Component | Purpose |
+|-----------|---------|
+| `CityCanvas` | Three.js canvas: 4 intersection nodes, road vehicles, congestion heatmap overlay, queue labels, TrafficLight reuse |
+| `CityGrid` | 9 city blocks (parks + skyscrapers with neon stripes), MeshPhysicalMaterial ground |
+| `CityRoads` | Continuous asphalt roads (56 units), double yellow lines, stop bars, directional labels |
+| `CityVehicle` | Reuses single-intersection `CurvePath` logic + **road-vehicle linear interpolation** (world_x/z from frame) with lateral offset based on `prev_turn`/`next_turn` |
+| `CityControls` | Fixed/Greedy/AI mode toggle, Start/Stop/Reset, spawn rate slider (0.05–1.5), congestion heatmap toggle, Run Comparison button |
+| `CityMetricsPanel` | 2×2 global metric cards (Avg Wait, Throughput, Active, Road Vehicles) + per-intersection rows with signal dots, queue bars, phase |
+| `CityComparisonPanel` | Recharts bar chart (Fixed/Greedy/AI), improvement badge, live progress during benchmark |
+
+**Data Flow (`/ws/city` at 10 Hz):**
+```
+CitySpawner.spawn() → CityNetwork.tick(mode, shared_agent)
+  → each Intersection.tick() → passed vehicles routed to RoadVehicle or city exit
+  → RoadVehicle.tick() advances progress
+  → arrived RoadVehicles injected into destination Intersection
+  → build_city_frame() → broadcast CityFrame JSON
+```
+
+**User Flow:** Navigate to `/city` → select Fixed/Greedy/AI → Start → watch 4-intersection coordination → Run Comparison → view benchmark results.
+
+**Priority:** ★★★★★ (major architectural milestone)
+
+
+---
+
+### 2.5.1 City Grid Routing & Vehicle Transfer — Core Algorithms
+
+This section documents the core vehicle routing and inter-intersection transfer logic that enables multi-intersection simulation.
+
+#### 2.5.1.1 Grid Topology & Road Connections (`city_network.py`)
+
+```python
+# Grid layout:
+#     [A] ==== [B]
+#      ||           ||
+#     [C] ==== [D]
+
+ROAD_CONNECTIONS: Dict[Tuple[str, str], Tuple[str, str]] = {
+    # A's exits
+    ("A", "east"):  ("B", "west"),
+    ("A", "south"): ("C", "north"),
+    # B's exits
+    ("B", "west"):  ("A", "east"),
+    ("B", "south"): ("D", "north"),
+    # C's exits
+    ("C", "north"): ("A", "south"),
+    ("C", "east"):  ("D", "west"),
+    # D's exits
+    ("D", "north"): ("B", "south"),
+    ("D", "west"):  ("C", "east"),
+}
+
+# External exits (vehicles leaving the city)
+EXTERNAL_EXITS: Dict[Tuple[str, str], str] = {
+    ("A", "north"): "north_exit", ("A", "west"):  "west_exit",
+    ("B", "north"): "north_exit", ("B", "east"):  "east_exit",
+    ("C", "south"): "south_exit", ("C", "west"):  "west_exit",
+    ("D", "south"): "south_exit", ("D", "east"):  "east_exit",
+}
+
+# Movement => Exit Direction mapping
+EXIT_DIR_MAP: Dict[str, str] = {
+    "north_straight": "south", "north_left": "east",  "north_right": "west",
+    "south_straight": "north", "south_left": "west",  "south_right": "east",
+    "east_straight":  "west",  "east_left":  "south", "east_right":  "north",
+    "west_straight":  "east",  "west_left":  "north", "west_right":  "south",
+}
+```
+
+#### 2.5.1.2 Vehicle Routing Pipeline (`_route_passed_vehicles`)
+
+```python
+def _route_passed_vehicles(self, dt, passed_vehicles):
+    """
+    For each just-passed vehicle, determine its destination:
+    - Another intersection (create RoadVehicle)
+    - City boundary (increment throughput)
+    """
+    for iid, vehicle in passed_vehicles:
+        lane_key = f"{vehicle.lane}_{vehicle.turn}"
+        exit_dir = EXIT_DIR_MAP.get(lane_key)
+        if exit_dir is None:
+            continue
+        
+        connection_key = (iid, exit_dir)
+        
+        if connection_key in ROAD_CONNECTIONS:
+            # Route to adjacent intersection
+            to_inter, entry_dir = ROAD_CONNECTIONS[connection_key]
+            next_turn = np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25])
+            
+            rv = RoadVehicle(
+                vehicle_id=vehicle.id,
+                from_intersection=iid,
+                to_intersection=to_inter,
+                entry_dir=entry_dir,
+                wait_time=vehicle.wait_time,  # Carry accumulated wait time
+                prev_turn=vehicle.turn,
+                next_turn=next_turn,
+            )
+            self.road_vehicles.append(rv)
+        else:
+            # Exits city boundary
+            self.total_city_throughput += 1
+```
+
+**Key Design Decisions:**
+- **Wait time carryover**: `wait_time` accumulates across intersections (critical for pressure calculation)
+- **Random next turn**: 50/25/25 straight/left/right for realism
+- **Max queue per lane**: `MAX_QUEUE = 12` prevents gridlock
+
+#### 2.5.1.3 Road Vehicle Dynamics (`RoadVehicle.tick`)
+
+```python
+class RoadVehicle:
+    def __init__(self, vehicle_id, from_intersection, to_intersection, 
+                 entry_dir, wait_time, prev_turn, next_turn):
+        self.id = vehicle_id
+        self.from_intersection = from_intersection
+        self.to_intersection = to_intersection
+        self.entry_dir = entry_dir        # Direction entering destination intersection
+        self.progress = 0.0               # 0.0 to 1.0 along road segment
+        self.wait_time = wait_time
+        self.ticks_traveled = 0
+        self.prev_turn = prev_turn
+        self.next_turn = next_turn
+    
+    def tick(self, dt):
+        """Returns True when vehicle has reached destination intersection."""
+        self.progress = min(1.0, self.progress + dt / ROAD_TRAVEL_TIME)
+        self.ticks_traveled += 1
+        return self.progress >= 1.0
+```
+
+**Parameters:**
+- `ROAD_TRAVEL_TIME = 3.0s` = 30 ticks at 10 Hz
+- Progress advances linearly from 0.0 (departure) to 1.0 (arrival)
+
+#### 2.5.1.4 Vehicle Injection at Destination (`_inject_vehicle`)
+
+```python
+def _inject_vehicle(self, intersection, rv):
+    """Insert arriving road vehicle into destination intersection's lane."""
+    turn = rv.next_turn
+    lane_key = f"{rv.entry_dir}_{turn}"
+    lane_queue = intersection.lanes.get(lane_key, [])
+    
+    if len(lane_queue) < MAX_QUEUE:  # MAX_QUEUE = 12
+        vehicle = Vehicle(
+            id=rv.id,
+            lane=rv.entry_dir,
+            turn=turn,
+            position=0.0,
+            wait_time=rv.wait_time,   # Carry accumulated wait
+            speed=DEFAULT_SPEED,
+            state="waiting",
+        )
+        lane_queue.append(vehicle)
+        intersection._spawned_this_interval += 1
+        return True
+    return False  # Lane full - vehicle waits at road end
+```
+
+**Queue Management:**
+- **MAX_QUEUE = 12** per lane (vs 10 for single intersection)
+- If lane full: vehicle **stalls at road end** (`progress = 1.0`), re-checked next tick
+- **Wait time preservation**: `wait_time` accumulates across intersections - pressure calculation reflects total journey delay
+
+#### 2.5.1.5 World Coordinate Mapping (Frontend Visualization)
+
+```python
+INTERSECTION_WORLD_POS = {
+    "A": (-10.0, -10.0),   # (world_x, world_z) top-left
+    "B": ( 10.0, -10.0),   # top-right
+    "C": (-10.0,  10.0),   # bottom-left
+    "D": ( 10.0,  10.0),   # bottom-right
+}
+
+# Road vehicle world position (linear interpolation):
+def _road_vehicle_world(rv):
+    ax, az = INTERSECTION_WORLD_POS[rv.from_intersection]
+    bx, bz = INTERSECTION_WORLD_POS[rv.to_intersection]
+    dx, dz = bx - ax, bz - az
+    dist = sqrt(dx**2 + dz**2)
+    nx, nz = dx / dist, dz / dist
+    offset = 6.0  # 6 units from center
+    start_x, start_z = ax + nx * offset, az + nz * offset
+    end_x, end_z = bx - nx * offset, bz - nz * offset
+    wx = start_x + (end_x - start_x) * rv.progress
+    wz = start_z + (end_z - start_z) * rv.progress
+    return wx, wz
+```
+
+**Intersection Lane World Position:**
+```python
+def _lane_to_world(iid, lane, position):
+    cx, cz = INTERSECTION_WORLD_POS[iid]
+    road_len = 6.0
+    lateral = 1.0  # lane offset
+    
+    if lane == "north":
+        wx, wz = cx - lateral, cz - road_len + position * road_len
+    elif lane == "south":
+        wx, wz = cx + lateral, cz + road_len - position * road_len
+    elif lane == "east":
+        wx, wz = cx + road_len - position * road_len, cz - lateral
+    elif lane == "west":
+        wx, wz = cx - road_len + position * road_len, cz + lateral
+    return wx, wz
+```
+
+---
+
+### 2.6 Manual (MNL) Signal Control
 
 **What:** Human-in-the-loop control mode where the operator directly sets signal phases.
 
@@ -776,7 +1681,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★☆ (educational/human-factors evaluation)
 
-### 2.5 Live Training Dashboard
+### 2.7 Live Training Dashboard
 
 **What:** Watch the Dueling DQN + PER agent learn in real-time with streaming metrics.
 
@@ -811,9 +1716,9 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★★ (key educational feature)
 
-### 2.6 Performance Comparison (AI vs Fixed vs Manual)
+### 2.8 Performance Comparison (AI vs Fixed vs Manual)
 
-**What:** Side-by-side bar charts comparing all three control modes with live improvement metrics.
+**What:** Side-by-side bar charts comparing all three single-intersection control modes with live improvement metrics.
 
 **How It Works — Technical Details:**
 
@@ -839,9 +1744,207 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★☆ (proves value)
 
-### 2.7 Episode History
+### 2.9 City Grid Comparison Benchmark — **NEW**
 
-**What:** Paginated table of all training episodes with color-coded rewards.
+**What:** Automated 3-mode benchmark (Fixed → Greedy → AI) on the 2×2 city grid with live progress tracking and results visualization.
+
+**How It Works:**
+- Triggered via `run_comparison` WebSocket command on `/ws/city`
+- `ComparisonTestState` orchestrates: resets city, enables spawner, runs each mode for `duration_per_mode` (default 30s)
+- Every 10 ticks (1s): samples `get_city_metrics()` → records avg_wait & throughput per mode
+- Broadcasts `comparison_progress` frame with current mode, elapsed, phase index
+- On completion: broadcasts `comparison_results` with per-mode aggregates
+- Frontend `CityComparisonPanel` renders grouped bar chart (Avg Wait / Throughput) with improvement % vs Fixed
+
+**Rendering:**
+- `Recharts` `<BarChart>` with Fixed/Greedy/AI series (#475569 / #f59e0b / #38bdf8)
+- Live progress overlay during benchmark run
+- Results persist only in-memory (not saved to DB) — intended for live demo sessions
+
+**User Flow:** Navigate to `/city` → Analytics tab → Compare → click "Run Comparison" → watch 90s benchmark → view results.
+
+**Priority:** ★★★★☆ (proves multi-intersection value)
+
+**Rendering:**
+- `Recharts` `<BarChart>` with Fixed/Greedy/AI series (#475569 / #f59e0b / #38bdf8)
+- Live progress overlay during benchmark run
+- Results persist only in-memory (not saved to DB) — intended for live demo sessions
+
+**User Flow:** Navigate to `/city` → Analytics tab → Compare → click "Run Comparison" → watch 90s benchmark → view results.
+
+**Priority:** ★★★★☆ (proves multi-intersection value)
+
+---
+
+### 2.9.1 Automated Comparison Benchmark — Detailed Algorithm
+
+This section documents the complete algorithm for the automated 3-mode comparison benchmark that runs Fixed → Greedy → AI sequentially on the city grid.
+
+#### 2.9.1.1 ComparisonTestState Machine (`city_ws.py`)
+
+```python
+class ComparisonTestState:
+    def __init__(self):
+        self.running = False
+        self.current_mode_idx = 0
+        self.modes = ["fixed", "greedy", "ai"]
+        self.duration_per_mode = 30   # seconds per mode
+        self.results = {}
+        self.snapshots = {}
+        self.started_at = 0.0
+    
+    def start(self):
+        self.running = True
+        self.current_mode_idx = 0
+        self.results = {}
+        self.snapshots = {}
+        self.started_at = time.time()
+    
+    def current_mode(self):
+        return self.modes[self.current_mode_idx]
+    
+    def elapsed(self):
+        return time.time() - self.started_at
+    
+    def should_advance(self):
+        return self.elapsed() >= self.duration_per_mode
+    
+    def record_snapshot(self, city_metrics):
+        mode = self.current_mode()
+        if mode not in self.snapshots:
+            self.snapshots[mode] = []
+        self.snapshots[mode].append({
+            "avg_wait": city_metrics["avg_wait_time"],
+            "throughput": city_metrics["total_throughput"],
+        })
+    
+    def advance(self):
+        """Move to next mode. Returns True if all modes done."""
+        mode = self.current_mode()
+        snaps = self.snapshots.get(mode, [])
+        if snaps:
+            avg_waits = [s["avg_wait"] for s in snaps]
+            throughputs = [s["throughput"] for s in snaps]
+            self.results[mode] = {
+                "avg_wait_time": round(sum(avg_waits) / len(avg_waits), 2),
+                "throughput": throughputs[-1] if throughputs else 0,
+            }
+        self.current_mode_idx += 1
+        self.started_at = time.time()
+        return self.current_mode_idx >= len(self.modes)
+    
+    def finish(self):
+        self.running = False
+        return self.results
+```
+
+#### 2.9.1.2 Benchmark Execution Loop (`_city_simulation_loop`)
+
+```python
+async def _city_simulation_loop(app):
+    comparison_state = ComparisonTestState()
+    
+    while True:
+        if not app.state.city_running:
+            await asyncio.sleep(0.1)
+            continue
+        
+        city_net = app.state.city_network
+        city_spawner = app.state.city_spawner
+        agent = app.state.sim_agent
+        
+        # Determine current mode
+        if comparison_state.running:
+            mode = comparison_state.current_mode()
+            # Sample metrics every 10 ticks (1s)
+            if city_net.timestep % 10 == 0:
+                raw = city_net.get_city_metrics()
+                comparison_state.record_snapshot(raw)
+            # Check if mode duration elapsed
+            if comparison_state.should_advance():
+                done = comparison_state.advance()
+                if done:
+                    results = comparison_state.finish()
+                    await city_manager.broadcast({
+                        "frame_type": "comparison_results",
+                        "results": results,
+                    })
+                    app.state.city_mode = "fixed"
+                    city_net.reset()
+                    city_spawner.set_enabled(True)
+                    continue
+                else:
+                    # Reset for next mode
+                    city_net.reset()
+                    city_spawner.set_enabled(True)
+                    await city_manager.broadcast({
+                        "frame_type": "comparison_phase",
+                        "current_mode": comparison_state.current_mode(),
+                        "elapsed": 0,
+                        "total": comparison_state.duration_per_mode,
+                    })
+        else:
+            mode = getattr(app.state, "city_mode", "fixed")
+        
+        # Spawn & tick
+        city_spawner.spawn(dt=0.1, intersections=city_net.intersections)
+        city_net.tick(dt=0.1, mode=mode, shared_agent=agent if mode == "ai" else None)
+        
+        # Build & broadcast frame
+        frame = build_city_frame(city_net, mode, shared_agent=agent if mode == "ai" else None)
+        payload = frame.model_dump()
+        
+        if comparison_state.running:
+            payload["comparison_progress"] = {
+                "running": True,
+                "current_mode": comparison_state.current_mode(),
+                "elapsed": round(comparison_state.elapsed(), 1),
+                "total": comparison_state.duration_per_mode,
+                "mode_index": comparison_state.current_mode_idx,
+                "total_modes": len(comparison_state.modes),
+            }
+        else:
+            payload["comparison_progress"] = {"running": False}
+        
+        await city_manager.broadcast(payload)
+        await asyncio.sleep(0.1)
+```
+
+#### 2.9.1.3 Metrics Aggregation
+
+Each mode runs for **30 seconds (300 ticks at 10 Hz)**. Metrics are sampled every **10 ticks (1 second)**.
+
+**Per-Snapshot Metrics:**
+```python
+{
+    "avg_wait": city_metrics["avg_wait_time"],      # Mean wait across all intersections
+    "throughput": city_metrics["total_throughput"], # Cumulative vehicles exited city
+}
+```
+
+**Final Per-Mode Aggregation:**
+```python
+avg_wait_time = round(sum(avg_waits) / len(avg_waits), 2)
+throughput = throughputs[-1] if throughputs else 0  # Final cumulative count
+```
+
+**Improvement Calculation (Frontend):**
+```python
+improvement = ((fixed_avg_wait - ai_avg_wait) / fixed_avg_wait) * 100
+```
+
+#### 2.9.1.4 Frame Types Broadcast
+
+| Frame Type | Trigger | Payload |
+|------------|---------|---------|
+| `comparison_started` | `run_comparison` command | `{modes: [...], duration_per_mode: 30}` |
+| `comparison_phase` | Mode transition | `{current_mode, elapsed, total}` |
+| `city_simulation` (with `comparison_progress`) | Every tick (10 Hz) | Standard frame + `{running, current_mode, elapsed, total, mode_index, total_modes}` |
+| `comparison_results` | Benchmark complete | `{fixed: {avg_wait, throughput}, greedy: {...}, ai: {...}}` |
+
+---
+
+### 2.10 Episode History
 
 **How It Works:**
 - Fetches from `/api/episodes` (Next.js API route → Prisma)
@@ -854,7 +1957,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★☆☆
 
-### 2.8 Real-Time Metrics Panel
+### 2.11 Real-Time Metrics Panel
 
 **What:** Live stats updating during simulation.
 
@@ -868,7 +1971,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★☆
 
-### 2.9 Model Persistence & Loading
+### 2.12 Model Persistence & Loading
 
 **What:** Save and load trained model checkpoints with metadata tracking.
 
@@ -914,7 +2017,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★★☆
 
-### 2.10 Emergency Vehicle Preemption
+### 2.13 Emergency Vehicle Preemption
 
 **What:** Spawn emergency vehicles that force priority green lights.
 
@@ -938,7 +2041,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★☆☆ (showcase feature)
 
-### 2.11 Configurable Traffic Flow
+### 2.14 Configurable Traffic Flow
 
 **What:** Slider to adjust vehicle arrival rate.
 
@@ -953,7 +2056,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★★☆☆
 
-### 2.12 Keep-Alive Ping
+### 2.15 Keep-Alive Ping
 
 **What:** Prevents backend cold-start on free-tier hosting.
 
@@ -964,7 +2067,7 @@ The architecture integrates components from multiple established RL-for-traffic-
 
 **Priority:** ★★☆☆☆ (infrastructure)
 
-### 2.13 Dark Theme UI with Day/Night 3D Mode
+### 2.16 Dark Theme UI with Day/Night 3D Mode
 
 **What:** Comprehensive dark mode with cyberpunk aesthetic + **NEW** Day/Night toggle for 3D scene.
 
@@ -976,6 +2079,166 @@ The architecture integrates components from multiple established RL-for-traffic-
 - Consistent across all pages
 
 **Priority:** ★★★☆☆
+
+**Priority:** ★★★☆☆
+
+---
+
+### 2.17 Frontend 3D Vehicle Interpolation & Path Algorithms
+
+This section documents the core algorithms for smooth 60 FPS vehicle rendering from 10 Hz WebSocket updates, including Three.js `CurvePath` construction, piecewise arclength parameterization, and temporal interpolation.
+
+#### 2.17.1 CurvePath Construction (`Vehicle.tsx` / `CityVehicle.tsx`)
+
+Each vehicle follows a parametric curve composed of straight segments and quadratic Bézier curves for turns:
+
+```typescript
+function buildCurve(lane: string, turn: "straight" | "left" | "right", 
+                    SPAWN_DIST: number, EXIT_DIST: number): CurvePath<Vector3> {
+    const path = new CurvePath<Vector3>();
+    const STOP = 3.5;                    // Distance from intersection center to stop line
+    const off = turn === "left" ? 0.5 :  // Lateral offset per lane
+                turn === "straight" ? 1.5 : 2.5;
+    
+    let start, enter, exit, end, control;
+    
+    switch (lane) {
+        case "north":  // Vehicle traveling South (+Z)
+            start = new Vector3(-off, Y, -SPAWN_DIST);
+            enter = new Vector3(-off, Y, -STOP);
+            if (turn === "straight") {
+                exit = new Vector3(-off, Y, STOP);
+                end = new Vector3(-off, Y, EXIT_DIST);
+                control = new Vector3(-off, Y, 0);
+            } else if (turn === "right") {  // West
+                exit = new Vector3(-STOP, Y, -off);
+                end = new Vector3(-EXIT_DIST, Y, -off);
+                control = new Vector3(-off, Y, -off);
+            } else {  // left -> East
+                exit = new Vector3(STOP, Y, off);
+                end = new Vector3(EXIT_DIST, Y, off);
+                control = new Vector3(-off, Y, off);
+            }
+            break;
+        // ... similar for south, east, west
+    }
+    
+    // Straight: line segment from enter to exit
+    // Turn: quadratic Bézier from enter to exit via control point
+    path.add(new LineCurve3(start, enter));
+    if (turn === "straight") {
+        path.add(new LineCurve3(enter, exit));
+    } else {
+        path.add(new QuadraticBezierCurve3(enter, control, exit));
+    }
+    path.add(new LineCurve3(exit, end));
+    return path;
+}
+```
+
+**Key Parameters:**
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `STOP` | 3.5 | Distance from center to stop line |
+| Lane offsets | 0.5 / 1.5 / 2.5 | Left / Straight / Right lane lateral position |
+| `Y` | 0.12 | Vehicle height above ground |
+
+#### 2.17.2 Piecewise Arclength Parameterization
+
+Backend provides position ∈ [0, 1] (0 = spawn, 1 = passed). Frontend maps this to CurvePath parameter:
+
+```typescript
+// Precompute total curve length and stop parameter
+const t_stop = (SPAWN_DIST - STOP) / curve.getLength();
+
+// In useFrame (runs at display refresh rate, ~60 Hz):
+const elapsed = time - lastUpdateTime;
+const progress = Math.min(1.0, elapsed / updateInterval);
+
+let t = startT + (targetT - startT) * progress;  // Interpolate backend position
+t = Math.min(Math.max(t, 0), 0.999);
+
+let t_visual;
+if (t <= 0.42) {  // Before stop line
+    t_visual = (t / 0.42) * t_stop;
+} else {           // Through intersection
+    t_visual = t_stop + ((t - 0.42) / 0.58) * (1.0 - t_stop);
+}
+t_visual = Math.min(Math.max(t_visual, 0), 0.999);
+
+const targetPos = curve.getPointAt(t_visual);
+const tangent = curve.getPointAt(tAhead).sub(targetPos).normalize();
+const targetRot = Math.atan2(tangent.x, tangent.z);
+```
+
+**Mapping Logic:**
+- Backend [0, 0.42] → approach to stop line → maps to visual [0, t_stop]
+- Backend [0.42, 1.0] → through intersection → maps to visual [t_stop, 1.0]
+- Ensures vehicle stops exactly at visual stop line when backend position = 0.42
+
+#### 2.17.3 Smooth Temporal Interpolation (60 FPS from 10 Hz)
+
+```typescript
+// In useFrame (runs every frame at ~60 Hz):
+if (vehicle.position !== lastTargetTRef.current) {
+    const actualInterval = time - lastUpdateTime.current;
+    updateInterval.current = Math.min(Math.max(actualInterval, 0.05), 2.0);
+    
+    startTRef.current = lastVisualTRef.current;
+    lastTargetTRef.current = vehicle.position;
+    lastUpdateTime.current = time - delta;
+}
+
+const elapsed = time - lastUpdateTime.current;
+const progress = Math.min(1.0, elapsed / updateInterval.current);
+
+let t = startTRef.current + (vehicle.position - startTRef.current) * progress;
+t = Math.min(Math.max(t, 0), 0.999);
+// ... then map to t_visual as above
+```
+
+**Algorithm Details:**
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `min interval` | 0.05s | Prevents jitter from rapid updates |
+| `max interval` | 2.0s | Handles network stalls gracefully |
+| `rotation smoothing` | `dRot * min(1, delta * 15)` | Smooth heading changes |
+
+#### 2.17.4 Road Vehicle Linear Interpolation (`CityVehicle.tsx`)
+
+Road vehicles (between intersections) use simple linear world-space interpolation with lateral lane offset:
+
+```typescript
+// In useFrame for road vehicles:
+const elapsed = time - lastUpdateTime.current;
+const progress = Math.min(1.0, elapsed / updateInterval.current);
+
+const x = startX + (targetX - startX) * progress;
+const z = startZ + (targetZ - startZ) * progress;
+
+// Heading from velocity vector
+const dx = targetX - startX, dz = targetZ - startZ;
+const distance = sqrt(dx*dx + dz*dz);
+if (distance > 0.005) {
+    targetAngle = atan2(dx, dz);
+}
+
+// Smooth rotation
+if (smoothRotRef.current === null) smoothRotRef.current = targetAngle;
+let dRot = targetAngle - smoothRotRef.current;
+while (dRot > PI) dRot -= 2*PI;
+while (dRot < -PI) dRot += 2*PI;
+smoothRotRef.current += dRot * min(1, delta * 12);
+
+// Lateral offset based on turn (smooth transition)
+const offStart = turn === "left" ? 0.5 : turn === "straight" ? 1.5 : 2.5;
+const offEnd = nextTurn === "left" ? 0.5 : nextTurn === "straight" ? 1.5 : 2.5;
+const currentOff = offStart + (offEnd - offStart) * visualProgress;
+const finalX = x + latX * currentOff;
+const finalZ = z + latZ * currentOff;
+```
+
+---
 
 ### Feature Flags / Gated Functionality
 
@@ -1155,7 +2418,7 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
   - `{"command": "start"}`
   - `{"command": "stop"}`
   - `{"command": "reset"}`
-  - `{"command": "set_mode", "mode": "fixed" \| "ai" \| "manual"}`
+  - `{"command": "set_mode", "mode": "fixed" \| "ai" \| "manual" \| "greedy"}`
   - `{"command": "set_spawn_rate", "value": 0.1-1.0}`
   - `{"command": "emergency_override", "lane": "north"\|"south"\|"east"\|"west"}`
   - `{"command": "manual_override", "phase": 0-3}`
@@ -1169,6 +2432,18 @@ User clicks tab ──▶ Next.js API Route ──▶ Prisma ──▶ Supabase 
   }
   ```
   Commands without schema (`start`, `stop`, `reset`) accept no parameters. Type coercions are tried at validation time, and invalid types return a descriptive error message rather than crashing the connection.
+
+**`/ws/city`** — Bidirectional **(NEW: Multi-Intersection City Grid)**
+- **Server → Client (10 Hz):** `CityFrame` JSON — `timestep`, `mode` (fixed/greedy/ai), `city_metrics` (avg_wait_time, total_throughput, active_vehicles, road_vehicles, congestion_level, worst/best_intersection), `intersections` (dict keyed by "A"/"B"/"C"/"D" with signal state, queue lengths, avg_wait, vehicles, Q-values, grid_x/grid_z), `road_vehicles` (id, from_intersection, to_intersection, progress, world_x, world_z, prev_turn, next_turn), `comparison_progress` (running, current_mode, elapsed, total, mode_index, total_modes)
+  - **Comparison Benchmark:** Automated sequential Fixed→Greedy→AI run (30s each); broadcasts `comparison_phase` on mode switch and `comparison_results` (avg_wait_time, throughput per mode) on completion
+- **Client → Server (commands):**
+  - `{"command": "start"}`
+  - `{"command": "stop"}`
+  - `{"command": "reset"}`
+  - `{"command": "set_mode", "mode": "fixed" \| "greedy" \| "ai"}`
+  - `{"command": "set_spawn_rate", "value": 0.05-2.0}` (city-wide rate, distributed across 8 entry points)
+  - `{"command": "run_comparison"}` — triggers automated 3-mode benchmark
+- **Command validation:** `CITY_COMMAND_SCHEMAS` with `set_mode` and `set_spawn_rate` schemas; unknown commands rejected with descriptive error
 
 **`/ws/training`** — Bidirectional
 - **Server → Client (per episode):** `TrainingMetric` JSON — episode, reward, avg wait, throughput, epsilon, loss, is_training
@@ -1564,6 +2839,20 @@ From `ppt.txt`:
 | `src/components/dashboard/MetricsPanel.tsx` | 2×2 card grid: Avg Wait Time, Throughput, Max Queue, Episode. Animated numbers, progress bars, SVG sparklines (20-point rolling) |
 | `src/components/dashboard/EpisodeHistory.tsx` | Paginated table (10/page): Episode #, Reward (color-coded), Wait Time, Throughput, Epsilon, Duration. Best episode highlighted green. Live training indicator. |
 | `src/components/dashboard/ComparisonChart.tsx` | **MAJOR UPDATE** Bar chart comparing Fixed vs AI vs Manual (3 bars): Avg Wait Time and Throughput computed from `/api/metrics` (fetched every 15s), improvement percentage display (green positive, red negative), loading/empty/no-data states, Legend with mode-colored bars (#475569 Fixed, #38bdf8 AI, #f59e0b Manual). |
+| `src/components/dashboard/QValuePanel.tsx` | **NEW** Per-phase Q-value bars with gradient fills, active phase highlight, confidence score (gap between top-2 Q-values as %), explore/exploit badge, ε display — visualizes agent reasoning in real-time |
+
+#### City Grid Components — **NEW**
+
+| File | Purpose |
+|---|---|
+| `src/app/city/page.tsx` | **NEW** City Grid page — lazy-loads `CityCanvas`, header with tick/mode/congestion, mode toggle (Fixed/Greedy/AI), spawn rate, congestion heatmap, Run Comparison, side panel with Controls, Metrics, Analytics tabs |
+| `src/components/city/CityCanvas.tsx` | **NEW** Three.js canvas for 2×2 grid: 4 intersection nodes at world positions, congestion heatmap overlay (green/amber/red based on avg wait), road vehicles, reused TrafficLight, QueueLabel, CityVehicle components |
+| `src/components/city/CityGrid.tsx` | **NEW** 9 city blocks (parks + skyscrapers with neon stripes), MeshPhysicalMaterial ground, center monument, LowPolyTree, Skyscraper components |
+| `src/components/city/CityRoads.tsx` | **NEW** Continuous 56-unit asphalt roads, double yellow centerlines, stop bars at all 4 intersections, directional labels (EASTBOUND/WESTBOUND/NORTHBOUND/SOUTHBOUND) |
+| `src/components/city/CityVehicle.tsx` | **NEW** Reuses single-intersection CurvePath for intersection vehicles; **road vehicles** use linear world_x/z interpolation with lateral offset based on `prev_turn`/`next_turn` |
+| `src/components/city/CityControls.tsx` | **NEW** Fixed/Greedy/AI mode buttons, Start/Stop/Reset, spawn rate slider (0.05–1.5), congestion heatmap toggle, Run Comparison button |
+| `src/components/city/CityMetricsPanel.tsx` | **NEW** 2×2 global metric cards (Avg Wait, Throughput, Active, Road Vehicles) with sparklines + per-intersection rows (signal dot, queue bar, phase, wait time) |
+| `src/components/city/CityComparisonPanel.tsx` | **NEW** Recharts bar chart for Fixed/Greedy/AI comparison, improvement % vs Fixed, live progress overlay during benchmark run |
 
 #### Layout Components
 
@@ -1607,6 +2896,9 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 | `server/app/simulation/traffic_signal.py` | **LATEST: Starvation Bleed Fix** Traffic signal logic: 4 phases (NS_GREEN, EW_GREEN, NS_LEFT, EW_LEFT), 3 colors (GREEN, YELLOW, RED). `red_duration=3.0` all-red clearance. **Starvation tracking**: `starvation_timer` dict per-direction — **FIXED**: timers now reset for directions in BOTH the current green phase AND the **pending phase**, preventing "starvation bleed" where a direction with a pending green still accumulated wait time. `STARVATION_THRESHOLD=45s`, `get_starved_directions()`, `is_max_green_exceeded` (40s cap), `can_switch_phase` (8s min). **Manual mode**: `is_manual` holds green indefinitely. `PHASE_ALLOWED_TURNS`: left-turn phases (2,3) restricted to "left" only. Smart phase selection (highest queue after min green, early switch if current phase empty). AI phase requests go through yellow→red→green transition. `set_phase(phase)` initiates yellow→red→target transition. |
 | `server/app/simulation/spawner.py` | **UPDATED** `PoissonSpawner`: configurable λ (default 0.3), spawns into one random direction per tick, 50% straight / 25% left / 25% right, max 10 vehicles per lane. Lanes now keyed by `{direction}_{turn}`. |
 | `server/app/simulation/metrics.py` | `MetricsTracker`: rolling calculation of avg_wait_time, avg_throughput, avg_queue_length with running totals. (Currently unused but retained) |
+| `server/app/simulation/city_network.py` | **NEW** `CityNetwork`: 2×2 grid of 4 `Intersection` instances (A/B/C/D), `RoadVehicle` inter-intersection transfer logic, `ROAD_CONNECTIONS` (A↔B, C↔D E-W; A↔C, B↔D N-S), `EXIT_DIR_MAP` (12 movement→destination), `ROAD_TRAVEL_TIME=3.0s` (30 ticks), `build_obs()` (20-dim per intersection, matches single-intersection exactly), `get_greedy_action()` (same logic as single), `tick()` orchestrates 4 intersection ticks → collects passed vehicles → routes to roads/exits → advances road vehicles → injects arrivals into destination intersections, `get_city_metrics()` (city-wide avg wait, throughput, congestion level, per-intersection breakdown) |
+| `server/app/simulation/city_spawner.py` | **NEW** `CitySpawner`: 8 external entry points (N/S/E/W of each corner intersection), Poisson spawn divided across entries, 50/25/25 straight/left/right, max 12/lane, carries accumulated wait time across intersections |
+| `server/app/simulation/vehicle.py` | Vehicle dataclass: id, lane (direction), turn, position, wait_time, speed, state, is_emergency. `is_right_turn` property. `tick(dt, can_move)` moves vehicle at DEFAULT_SPEED (0.12) if allowed, tracks wait time, transitions to "passed" at position ≥ 1.0 |
 
 #### Reinforcement Learning
 
@@ -1623,6 +2915,7 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 | File | Purpose |
 |---|---|
 | `server/app/websockets/simulation_ws.py` | **MAJOR UPDATE** Simulation WebSocket: ConnectionManager for multi-client broadcast. Main loop at 10 Hz. **AI mode**: builds 20-dim observation via `_build_obs_from_intersection()`, `agent.select_action(ε=0)`, computes reward via `training_env.compute_reward()` with pressure/throughput/phase_change, `build_frame()` now passes full context (agent Q-values, obs, reward, action, exploration flag). Command validation with `COMMAND_SCHEMAS` dict. Local dev frame logging. Flushes buffer on cancel/crash. |
+| `server/app/websockets/city_ws.py` | **NEW** City Grid WebSocket (`/ws/city`): `CityConnectionManager`, `_city_simulation_loop()` at 10 Hz. Supports Fixed/Greedy/AI modes + **automated comparison test** (`ComparisonTestState`: runs Fixed→Greedy→AI sequentially, 30s each, broadcasts phase progress, final results), command validation (`set_mode`, `set_spawn_rate`, `run_comparison`). Reuses `sim_agent` (shared policy) for AI mode. |
 | `server/app/websockets/training_ws.py` | Training WebSocket: separate ConnectionManager. `broadcast_training_metric()` used by Trainer. Handles start_training/stop_training commands. Creates simulation record if needed. Sends current status immediately on connect. |
 
 ### Server Config Files
@@ -1651,7 +2944,7 @@ Standard Radix-based components: `badge.tsx`, `button.tsx`, `card.tsx`, `chart.t
 
 ---
 
-## Appendix: Git History Summary (40+ Commits)
+## Appendix: Git History Summary (55+ Commits)
 
 The project evolved through numbered phases early on, then shifted to feature-based commits:
 
@@ -1675,7 +2968,12 @@ The project evolved through numbered phases early on, then shifted to feature-ba
 | **Comparison + Draggable UI** | `8d7536d`, `5e2aff3` | 3-mode comparison chart (Fixed/AI/Manual with improvement %), draggable LiveSnapshot (framer-motion drag), left-turn arrow display fix, holographic queue label UI |
 | **Environment Styling II** | `2d074b3`, `d5a22ec` | MeshPhysicalMaterial upgrade (ground clearcoat 0.2/metalness 0.3, skyscraper clearcoat 1.0/metalness 0.9/reflectivity 1.0), neon corner stripes (emissiveIntensity 3.5), LowPolyTree, Day/Night sun sphere (emissiveIntensity 8.0), CCTV cameras with blinking LED, camera auto-rotation disabled |
 | **Algorithm Fixes — Max-Pressure + Starvation Bleed** | `f3bcd9f` | **(a)** Pressure computed per-movement (12 entries with `dest_map`: north_straight→south, north_left→east, etc.) instead of per-direction. **(b)** Switch penalty evaluates `prev_pressures[prev_phase]` via pre-tick capture. **(c)** Starvation timers reset for **both** current `green_dirs` AND `pending_phase` directions. **(d)** `get_outgoing_counts()` uses proper destination mapping (12-entry `dest_mapping`). **(e)** Balance bonus uses phase-level aggregation (`_get_phase_pressure()`) over 4 groups. **(f)** `_get_best_alternative_phase()` uses `_get_phase_pressure()`. **(g)** New `_get_phase_pressure()` helper for phase-level grouping. |
+| **City Grid — Multi-Intersection** | `562d85d`, `b3fe488`, `f643a1b`, `71fb774`, `15f9e4d`, `7d4a34a`, `e9cd8e7`, `79df942` | **NEW MAJOR FEATURE**: 2×2 grid (A/B/C/D), `CityNetwork` (4 intersections + RoadVehicle routing), `CitySpawner` (8 entry points), `CitySpawner` schemas, `/ws/city` with Fixed/Greedy/AI modes + automated comparison benchmark, `/city` page with full 3D viz, CityVehicle with road/intersection path logic, CityGrid/CityRoads/CityControls/CityMetricsPanel/CityComparisonPanel |
+| **Greedy Mode + Q-Value Panel** | `74c6415` | Greedy rule-based controller (max-queue phase selector) for `/simulation` and `/city`; `QValuePanel` shows per-phase Q-values, confidence %, explore/exploit badge |
+| **Hyperparam Tuning + Async Step** | `22768d4`, `5c8dd03`, `41066da` | `MIN_REPLAY_SIZE` 2000→500 (faster warmup), `EPSILON_DECAY` 0.998→0.994 (reaches 0.05 by ~550 eps), `env.step()` offloaded via `asyncio.to_thread()` to prevent event-loop blocking; fixed phase pressure mapping (straight-only for phases 0/1, left-only for 2/3), train/inference obs mismatch resolved |
+| **Fixed Signal Upgrade** | `5c8dd03` | Queue-based phase selection with `_pick_highest_queue_phase()`, hard 40s green cap, left turns restricted to dedicated left phases (2,3), PHASE_ALLOWED_TURNS updated |
+| **Lint/Build Fixes** | `2f00cc1`, `f8f8417`, `1657b71`, `8053133`, `7202593`, `bd7d978`, `8b4ab5c`, `17d55e3`, `f63b92f`, `5fea7a0`, `99b07e4`, `1bc8b10`, `2d4db8b`, `24b3a4b` | ESLint/TypeScript clean, chart data loss fix, training offload to worker, WS dashboard sync, reward/spawner bugs, pause removal, historical stats, LiveSnapshot compact, pause feature, project summary update |
 
 ---
 
-*Generated: 2026-07-16 — Comprehensive project analysis of FlowSync. Architecture: Dueling Double DQN + PER + per-movement max-pressure formulation + two-agent decoupling + starvation-aware constraints + destination-aware outgoing counts. Deep-dive includes: intersection reservation system (direction-group locking), vehicle collision avoidance (MIN_DIST=0.08), emergency override bypass mechanism (direct signal phase mutation), command validation (COMMAND_SCHEMAS with type coercion), inference vs training observation builder distinction (simplified pressure_norm=0.0 for live inference). Updated through commit `f3bcd9f`.*
+*Generated: 2026-07-21 — Comprehensive project analysis of FlowSync. Architecture: Dueling Double DQN + PER + per-movement max-pressure formulation + two-agent decoupling + starvation-aware constraints + destination-aware outgoing counts + 2×2 multi-intersection city grid with shared-policy AI + greedy baseline + automated benchmark. Deep-dive includes: intersection reservation system (direction-group locking), vehicle collision avoidance (MIN_DIST=0.08), emergency override bypass mechanism (direct signal phase mutation), command validation (COMMAND_SCHEMAS with type coercion), inference vs training observation builder distinction (simplified pressure_norm=0.0 for live inference), city network routing (RoadVehicle transfer with wait-time carryover), automated 3-mode comparison benchmark (Fixed→Greedy→AI). Updated through commit `7b73d8b`.*
