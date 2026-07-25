@@ -24,3 +24,4 @@ Thumbs.db
 
 # Docker local overrides (may contain secrets)
 docker-compose.override.yml
+pnpm-workspace.yaml

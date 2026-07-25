@@ -237,10 +237,10 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
               total_waiting: 0,
               signal: {
                 current_phase: 0,
+                phase_label: "NS_GREEN",
                 color: "red",
                 time_in_phase: 0,
-                starvation_timer: {},
-                can_switch_phase: true,
+                is_transitioning: false,
               },
               queue_lengths: { north: 0, south: 0, east: 0, west: 0 },
               vehicles: [],

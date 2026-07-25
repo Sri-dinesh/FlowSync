@@ -85,17 +85,7 @@ function buildCurve(lane: string, turn: Turn, SPAWN_DIST: number, EXIT_DIST: num
   return path;
 }
 
-interface CityVehicleState {
-  id: string;
-  lane: string;      // "north" | "south" | "east" | "west"
-  turn: "straight" | "left" | "right";
-  position: number;
-  state: string;     // "waiting" | "moving" | "braking"
-  wait_time: number;
-  world_x: number;
-  world_z: number;
-  is_emergency?: boolean;
-}
+import { CityVehicleState } from "@/types/city";
 
 // ── Color and Model Picker ───────────────────────────────────────────────────
 function getVehicleProps(id: string, isEmergency?: boolean) {
