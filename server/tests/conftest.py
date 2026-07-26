@@ -34,6 +34,32 @@ def client():
     with TestClient(app) as c:
         yield c
 
+class StateWrapper:
+    def __init__(self, state):
+        self._state = state
+
+    def __getitem__(self, key):
+        if key == "intersection":
+            return self._state.sim_intersection
+        if key == "env":
+            return self._state.training_env
+        return getattr(self._state, key)
+
+    def __setitem__(self, key, value):
+        if key == "intersection":
+            self._state.sim_intersection = value
+        elif key == "env":
+            self._state.training_env = value
+        else:
+            setattr(self._state, key, value)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except (AttributeError, KeyError):
+            return default
+
+
 @pytest.fixture
 def app_state(client):
-    return app.state.app_state
+    return StateWrapper(app.state)

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_service_key: str
     cors_origins: str = Field(default="", alias="CORS_ORIGINS")
+    signal_red_duration: float = Field(default=3.0, alias="SIGNAL_RED_DURATION")
 
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

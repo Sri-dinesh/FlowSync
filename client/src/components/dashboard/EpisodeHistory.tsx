@@ -17,17 +17,7 @@ interface EpisodeHistoryProps {
   simulationId: string | null;
 }
 
-interface EpisodeRecord {
-  id: string;
-  simulationId: string;
-  episodeNumber: number;
-  totalReward: number;
-  avgWaitTime: number;
-  throughput: number;
-  epsilon: number;
-  steps: number;
-}
-
+import { EpisodeRecord } from "@/types/simulation";
 const PAGE_SIZE = 10;
 
 export default function EpisodeHistory({ simulationId }: EpisodeHistoryProps) {

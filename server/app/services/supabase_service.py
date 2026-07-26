@@ -10,7 +10,7 @@ Write strategy:
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
-
+import datetime
 from supabase import Client, create_client
 
 from ..config import settings
@@ -27,12 +27,14 @@ supabase_client: Client = create_client(
 
 def create_simulation(mode: str) -> str:
     simulation_id = str(uuid4())
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     payload = {
         "id": simulation_id,
         "mode": mode,
         "status": "running",
         "totalSteps": 0,
         "durationMs": 0,
+        "updatedAt": now_iso,
     }
     try:
         result = supabase_client.table("simulations").insert(payload).execute()
@@ -49,11 +51,13 @@ def update_simulation(
     total_steps: int,
     duration_ms: int,
 ) -> None:
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
         supabase_client.table("simulations").update({
             "status": status,
             "totalSteps": total_steps,
             "durationMs": duration_ms,
+            "updatedAt": now_iso,
         }).eq("id", simulation_id).execute()
     except Exception:
         logger.exception("update_simulation failed for id=%s", simulation_id)
@@ -167,17 +171,18 @@ def save_performance_metric(
     mode: str,
     avg_wait: float,
     throughput: int,
+    max_queue: int = 0,
+    total_steps: int = 0,
 ) -> None:
-    is_fixed = mode == "fixed"
     try:
         supabase_client.table("performance_metrics").insert({
             "id": str(uuid4()),
             "simulationId": simulation_id,
             "mode": mode,
-            "avgWaitTimeFixed": avg_wait if is_fixed else None,
-            "avgWaitTimeAI": avg_wait if not is_fixed else None,
-            "throughputFixed": throughput if is_fixed else None,
-            "throughputAI": throughput if not is_fixed else None,
+            "avgWaitTime": avg_wait,
+            "throughput": throughput,
+            "maxQueueLength": max_queue,
+            "totalSteps": total_steps,
         }).execute()
     except Exception:
         logger.exception(
@@ -186,6 +191,18 @@ def save_performance_metric(
 
 
 # ─── RL model metadata ────────────────────────────────────────────────────────
+
+def _get_rating(avg_reward: float) -> str:
+    if avg_reward > 10.0:
+        return "Excellent"
+    elif avg_reward > 0.0:
+        return "Efficient"
+    elif avg_reward > -10.0:
+        return "Fair"
+    elif avg_reward > -30.0:
+        return "Poor"
+    else:
+        return "Failing"
 
 def save_model_metadata(
     simulation_id: str,
@@ -201,20 +218,30 @@ def save_model_metadata(
     """
     model_id = simulation_id  # reuse simulation UUID as model identifier
     storage_path = f"models/{simulation_id}/checkpoint_{episode}.pt"
-    name = f"Model {simulation_id[:8]}"
     version = str(episode)
+    rating = _get_rating(avg_reward)
 
     try:
         # Check if a row already exists for this simulation
         existing = (
             supabase_client.table("rl_models")
-            .select("id")
+            .select("id, name")
             .eq("id", model_id)
             .execute()
         )
         if getattr(existing, "data", []):
+            old_name = existing.data[0].get("name", "")
+            # Preserve the date-time part if it exists
+            if old_name.startswith("Model 20"):
+                date_part = old_name.split(" - ")[0]
+            else:
+                date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            
+            new_name = f"{date_part} - {episode}eps - {rating}"
+
             # Update in place
             supabase_client.table("rl_models").update({
+                "name": new_name,
                 "version": version,
                 "storagePath": storage_path,
                 "avgReward": avg_reward,
@@ -222,9 +249,12 @@ def save_model_metadata(
                 "totalEpisodes": total_episodes,
             }).eq("id", model_id).execute()
         else:
+            date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            new_name = f"{date_part} - {episode}eps - {rating}"
+            
             supabase_client.table("rl_models").insert({
                 "id": model_id,
-                "name": name,
+                "name": new_name,
                 "version": version,
                 "storagePath": storage_path,
                 "avgReward": avg_reward,

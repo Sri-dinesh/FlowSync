@@ -11,7 +11,8 @@ datasource db {
 model Simulation {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
-  mode        String   // "fixed" | "ai"
+  updatedAt   DateTime @updatedAt
+  mode        String   // "fixed" | "ai" | "manual"
   status      String   // "running" | "completed" | "stopped"
   totalSteps  Int      @default(0)
   durationMs  Int      @default(0)
@@ -19,6 +20,7 @@ model Simulation {
   episodes    Episode[]
   metrics     PerformanceMetric[]
   trafficLogs TrafficLog[]
+  signalStates SignalState[]
 
   @@map("simulations")
 }
@@ -26,7 +28,7 @@ model Simulation {
 model Episode {
   id            String     @id @default(cuid())
   simulationId  String
-  simulation    Simulation @relation(fields: [simulationId], references: [id])
+  simulation    Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   episodeNumber Int
   totalReward   Float
   avgWaitTime   Float
@@ -41,8 +43,9 @@ model Episode {
 }
 
 model SignalState {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   simulationId String
+  simulation   Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   timestep     Int
   phase        Int      // 0=NS_GREEN, 1=EW_GREEN, 2=NS_LEFT, 3=EW_LEFT
   duration     Int      // seconds this phase was held
@@ -50,7 +53,7 @@ model SignalState {
   queueSouth   Int
   queueEast    Int
   queueWest    Int
-  createdAt    DateTime @default(now())
+  createdAt    DateTime   @default(now())
 
   @@index([simulationId])
   @@map("signal_states")
@@ -59,7 +62,7 @@ model SignalState {
 model TrafficLog {
   id            String     @id @default(cuid())
   simulationId  String
-  simulation    Simulation @relation(fields: [simulationId], references: [id])
+  simulation    Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   timestep      Int
   vehiclesSpawned    Int
   vehiclesPassed     Int
@@ -82,22 +85,23 @@ model RLModel {
   createdAt   DateTime @default(now())
   isActive    Boolean  @default(false)
 
+  @@unique([name, version])
   @@index([isActive])
   @@index([createdAt])
   @@map("rl_models")
 }
 
 model PerformanceMetric {
-  id               String     @id @default(cuid())
-  simulationId     String
-  simulation       Simulation @relation(fields: [simulationId], references: [id])
-  mode             String     // "fixed" | "ai"
-  avgWaitTimeFixed Float?
-  avgWaitTimeAI    Float?
-  throughputFixed  Int?
-  throughputAI     Int?
-  improvementPct   Float?
-  createdAt        DateTime   @default(now())
+  id             String     @id @default(cuid())
+  simulationId   String
+  simulation     Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  mode           String     // "fixed" | "ai" | "manual"
+  avgWaitTime    Float
+  throughput     Int
+  maxQueueLength Int
+  totalSteps     Int
+  improvementPct Float?     // set when comparing to fixed baseline
+  createdAt      DateTime   @default(now())
 
   @@index([simulationId])
   @@map("performance_metrics")

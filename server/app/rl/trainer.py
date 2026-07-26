@@ -22,6 +22,7 @@ class Trainer:
         supabase_service: Any,
         model_service: Any,
         ws_broadcast_fn: Callable[[dict], Awaitable[None]],
+        app_state: Any = None,
         hyperparams: Optional[HyperParams] = None,
     ) -> None:
         self.env = env
@@ -29,6 +30,7 @@ class Trainer:
         self.supabase_service = supabase_service
         self.model_service = model_service
         self.ws_broadcast_fn = ws_broadcast_fn
+        self.app_state = app_state
         self.hyperparams = hyperparams or HyperParams()
         self.is_training = False
         self.current_episode = 0
@@ -56,35 +58,37 @@ class Trainer:
             stopped_early = False
             done = False
 
-            for step in range(self.hyperparams.max_steps_per_episode):
+            # Anneal PER beta over training
+            self.agent.replay_buffer.anneal_beta(episode_index, num_episodes)
+
+            for step in range(self.hyperparams.MAX_STEPS_PER_EPISODE):
                 if not self.is_training:
                     stopped_early = True
                     break
 
                 action = self.agent.select_action(state, self.epsilon)
-                next_state, reward, terminated, truncated, _ = self.env.step(action)
+                next_state, reward, terminated, truncated, _ = await asyncio.to_thread(self.env.step, action)
                 done = terminated or truncated
 
                 self.agent.replay_buffer.push(state, action, reward, next_state, terminated)
 
-                # Only train every N steps and only once the buffer is warm.
+                # Only train once the buffer is warm and on specific step intervals
                 if (
-                    step % _TRAIN_EVERY_N_STEPS == 0
-                    and len(self.agent.replay_buffer) >= self.hyperparams.min_replay_size
+                    self.agent.replay_buffer.is_ready
+                    and step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
                 ):
-                    batch = self.agent.replay_buffer.sample(self.hyperparams.batch_size)
-                    loss_value = await asyncio.to_thread(self.agent.train_step, batch)
+                    batch = self.agent.replay_buffer.sample(self.hyperparams.BATCH_SIZE)
+                    loss_value, td_errors = await asyncio.to_thread(self.agent.train_step, batch)
 
-                if step % self.hyperparams.target_update_freq == 0:
+                if self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0:
                     self.agent.sync_target_network()
 
                 total_reward += reward
                 state = next_state
                 steps = step + 1
 
-                # Yield to the event loop regularly so WebSocket frames
-                # and heartbeats are not starved on single-CPU hosts.
-                if step % _YIELD_EVERY_N_STEPS == 0:
+                # Yield to event loop — more frequently during warmup
+                if not self.agent.replay_buffer.is_ready or step % 4 == 0:
                     await asyncio.sleep(0)
 
                 if done:
@@ -137,6 +141,8 @@ class Trainer:
                     "throughput": throughput,
                     "epsilon": self.epsilon,
                     "loss": loss_value,
+                    "steps": steps,
+                    "buffer_ready": self.agent.replay_buffer.is_ready,
                     "is_training": False if is_last_episode else self.is_training,
                 }
             )
@@ -146,8 +152,20 @@ class Trainer:
                     self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
-                    self.agent.online_net.state_dict(),
+                    self.agent.get_checkpoint_state() if hasattr(self.agent, 'get_checkpoint_state') else {
+                        'online_net': self.agent.online_net.state_dict(),
+                        'target_net': self.agent.target_net.state_dict(),
+                        'optimizer': self.agent.optimizer.state_dict(),
+                        'step_count': self.agent.step_count,
+                        'obs_version': 'v3_20dim_pressure',
+                    },
                 )
+                if self.app_state and hasattr(self.app_state, "sim_agent"):
+                    sim_agent = self.app_state.sim_agent
+                    sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
+                    sim_agent.target_net.load_state_dict(self.agent.target_net.state_dict())
+                    logger.info(f"Synced sim_agent weights from training_agent at episode {episode_num}")
+                
                 # Persist metadata row in rl_models so the model appears in the UI
                 avg_reward = (
                     sum(m["reward"] for m in _recent_rewards) / len(_recent_rewards)

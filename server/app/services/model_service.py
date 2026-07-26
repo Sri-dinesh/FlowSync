@@ -1,3 +1,4 @@
+import datetime
 import io
 from pathlib import Path
 from typing import Any, Dict, List
@@ -46,10 +47,17 @@ def load_checkpoint(model_id: str, episode: int) -> Dict[str, Any]:
     try:
         data = supabase_client.storage.from_(BUCKET_NAME).download(path)
         buffer = io.BytesIO(data)
-        return torch.load(buffer, map_location="cpu")
+        checkpoint = torch.load(buffer, map_location="cpu")
     except Exception:
         local_path = _local_checkpoint_path(model_id, episode)
-        return torch.load(local_path, map_location="cpu")
+        checkpoint = torch.load(local_path, map_location="cpu")
+
+    # Handle old format (raw state dict) vs new format (dict with keys)
+    if isinstance(checkpoint, dict) and 'online_net' in checkpoint:
+        return checkpoint  # new format
+    else:
+        # Old format — wrap it
+        return {'online_net': checkpoint, 'target_net': checkpoint}
 
 
 def list_checkpoints(model_id: str) -> List[str]:
@@ -135,9 +143,21 @@ def list_all_models() -> List[Dict[str, Any]]:
                     if not episodes:
                         continue
                     latest_ep = max(episodes)
+
+                    # Try to parse created_at for date-time
+                    created_at_str = entry.get("created_at")
+                    if created_at_str:
+                        try:
+                            dt = datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                            date_part = dt.strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    else:
+                        date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
                     models[model_id] = {
                         "id": model_id,
-                        "name": f"Model {model_id[:8]}",
+                        "name": f"Model {date_part} - {latest_ep}eps - Remote",
                         "version": str(latest_ep),
                         "source": "remote",
                         "episodes": latest_ep,
@@ -159,10 +179,19 @@ def list_all_models() -> List[Dict[str, Any]]:
             ep_text = latest_name[len("checkpoint_"):-len(".pt")]
             latest_ep = int(ep_text) if ep_text.isdigit() else 0
             model_id = model_dir.name
+
+            # File modification time for local
+            try:
+                mtime = checkpoints[-1].stat().st_mtime
+                dt = datetime.datetime.fromtimestamp(mtime)
+                date_part = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+
             if model_id not in models:
                 models[model_id] = {
                     "id": model_id,
-                    "name": f"Model {model_id[:8]}",
+                    "name": f"Model {date_part} - {latest_ep}eps - Local",
                     "version": str(latest_ep),
                     "source": "local",
                     "episodes": latest_ep,

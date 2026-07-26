@@ -7,6 +7,7 @@ import type {
 } from "@/types/simulation";
 
 interface SimulationStore {
+  isCityConnected: boolean;
   isConnected: boolean;
   isRunning: boolean;
   isTraining: boolean;
@@ -18,6 +19,7 @@ interface SimulationStore {
   addTrainingMetric: (metric: TrainingMetric) => void;
   setMode: (mode: SimulationMode) => void;
   setConnected: (value: boolean) => void;
+  setCityConnected: (value: boolean) => void;
   setRunning: (value: boolean) => void;
   setTraining: (value: boolean) => void;
   resetMetrics: () => void;
@@ -27,6 +29,7 @@ interface SimulationStore {
 const MAX_TRAINING_METRICS = 1000;
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
+  isCityConnected: false,
   isConnected: false,
   isRunning: false,
   isTraining: false,
@@ -40,7 +43,9 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       lastFrameAt: Date.now(),
       isRunning: true,
       mode:
-        frame.mode === "fixed" || frame.mode === "ai" || frame.mode === "manual" ? frame.mode : state.mode,
+        frame.mode === "fixed" || frame.mode === "ai" || frame.mode === "manual" || frame.mode === "greedy"
+          ? (frame.mode as SimulationMode)
+          : state.mode,
     })),
   addTrainingMetric: (metric) =>
     set((state) => {
@@ -53,6 +58,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     }),
   setMode: (mode) => set({ mode }),
   setConnected: (value) => set({ isConnected: value }),
+  setCityConnected: (value) => set({ isCityConnected: value }),
   setRunning: (value) => set({ isRunning: value }),
   setTraining: (value) => set({ isTraining: value }),
   resetMetrics: () => set({ trainingMetrics: [] }),

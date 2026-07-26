@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Play, RotateCcw, Square, Siren } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { SimulationMode, VehicleState } from "@/types/simulation";
 
@@ -29,7 +28,14 @@ export default function SimulationControls({
   const [isSwitching, setIsSwitching] = useState(false);
 
   const modeLabel = useMemo(
-    () => (mode === "ai" ? "AI Agent" : mode === "manual" ? "Manual Control" : "Fixed Timer"),
+    () =>
+      mode === "ai"
+        ? "AI Agent"
+        : mode === "manual"
+        ? "Manual Control"
+        : mode === "greedy"
+        ? "Greedy Controller"
+        : "Fixed Timer",
     [mode],
   );
 
@@ -53,6 +59,11 @@ export default function SimulationControls({
   const handleStop = () => {
     setRunning(false);
     sendCommand({ command: "stop" });
+    // Reset after a short delay so the final frame can be saved/flushed properly
+    setTimeout(() => {
+      sendCommand({ command: "reset" });
+      resetSimulation();
+    }, 200);
   };
 
   const handleReset = () => {
@@ -102,16 +113,25 @@ export default function SimulationControls({
             variant="ghost"
             onClick={() => handleModeChange("fixed")}
             disabled={!isConnected || isSwitching}
-            className={`flex-1 h-7 text-xs ${mode === "fixed" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+            className={`flex-1 h-7 text-xs ${mode === "fixed" ? "bg-white/20 text-white hover:bg-white/30" : "text-white/50 hover:text-white hover:bg-white/10"}`}
           >
             Fixed
           </Button>
           <Button
             size="sm"
             variant="ghost"
+            onClick={() => handleModeChange("greedy")}
+            disabled={!isConnected || isSwitching}
+            className={`flex-1 h-7 text-xs ${mode === "greedy" ? "bg-orange-500/30 text-orange-200 hover:bg-orange-500/40" : "text-white/50 hover:text-white hover:bg-white/10"}`}
+          >
+            Greedy
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={() => handleModeChange("manual")}
             disabled={!isConnected || isSwitching}
-            className={`flex-1 h-7 text-xs ${mode === "manual" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+            className={`flex-1 h-7 text-xs ${mode === "manual" ? "bg-white/20 text-white hover:bg-white/30" : "text-white/50 hover:text-white hover:bg-white/10"}`}
           >
             Manual
           </Button>
@@ -120,7 +140,7 @@ export default function SimulationControls({
             variant="ghost"
             onClick={() => handleModeChange("ai")}
             disabled={!isConnected || isSwitching}
-            className={`flex-1 h-7 text-xs ${mode === "ai" ? "bg-white/20 text-white" : "text-white/50 hover:text-white"}`}
+            className={`flex-1 h-7 text-xs ${mode === "ai" ? "bg-white/20 text-white hover:bg-white/30" : "text-white/50 hover:text-white hover:bg-white/10"}`}
           >
             AI
           </Button>
@@ -164,9 +184,10 @@ export default function SimulationControls({
         ) : (
           <Button
             size="sm"
-            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+            className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
             onClick={handleStop}
             disabled={!isConnected}
+            title="Stop and save simulation, then reset for a new one"
           >
             <Square className="h-3.5 w-3.5 mr-1.5" />
             Stop

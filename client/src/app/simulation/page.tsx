@@ -7,6 +7,7 @@ import ComparisonChart from "@/components/dashboard/ComparisonChart";
 import EpisodeHistory from "@/components/dashboard/EpisodeHistory";
 import LiveSnapshot from "@/components/dashboard/LiveSnapshot";
 import MetricsPanel from "@/components/dashboard/MetricsPanel";
+import QValuePanel from "@/components/dashboard/QValuePanel";
 import TrainingChart from "@/components/dashboard/TrainingChart";
 import SimulationCanvas from "@/components/simulation/SimulationCanvas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,12 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSimulationSocket } from "@/hooks/useSimulationSocket";
 import { useTrainingSocket } from "@/hooks/useTrainingSocket";
 import { useSimulations } from "@/hooks/useSimulations";
+import { useSimulationStore } from "@/store/simulationStore";
 
 export default function SimulationPage() {
   const { sendCommand: sendSimulationCommand } = useSimulationSocket();
   const { sendCommand: sendTrainingCommand } = useTrainingSocket();
   const { data: simulations = [] } = useSimulations();
   const simulationId = simulations[0]?.id ?? null;
+  const mode = useSimulationStore((s) => s.mode);
+  const rl   = useSimulationStore((s) => s.currentFrame?.rl);
 
   return (
     <div className="relative h-screen bg-[#0a0a0a] text-white flex flex-col overflow-hidden">
@@ -28,8 +32,9 @@ export default function SimulationPage() {
       </div>
 
       <div className="flex-1 flex w-full overflow-hidden">
-        {/* Left Side: 3D Canvas */}
+        {/* Left Side: 3D Canvas and Floating UI */}
         <div className="flex-1 relative">
+          <LiveSnapshot />
           <SimulationCanvas />
         </div>
 
@@ -57,12 +62,14 @@ export default function SimulationPage() {
             <MetricsPanel />
           </Card>
 
+          {/* Agent Reasoning — only in AI mode */}
           <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
             <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
-              Live Snapshot
+              Agent Reasoning
             </CardTitle>
-            <LiveSnapshot />
+            <QValuePanel rl={mode === "ai" ? rl : null} />
           </Card>
+
 
           <Card className="rounded-none border-0 bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
             <CardHeader className="pb-3">
@@ -96,7 +103,7 @@ export default function SimulationPage() {
                   value="training"
                   className="mt-4 text-sm text-white/70"
                 >
-                  <TrainingChart />
+                  <TrainingChart simulationId={simulationId} />
                 </TabsContent>
                 <TabsContent
                   value="comparison"

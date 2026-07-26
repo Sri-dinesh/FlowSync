@@ -13,6 +13,7 @@ import logging
 import time
 from typing import Any, Dict, List
 
+import numpy as np
 try:
     import ujson as json
 except ImportError:
@@ -117,32 +118,143 @@ async def _flush_buffer() -> None:
         await asyncio.to_thread(supabase_service.save_signal_states_bulk, signal_rows)
 
 
+# ─── Simulation helper ────────────────────────────────────────────────────────
+
+def _build_obs_from_intersection(intersection) -> np.ndarray:
+    movement_queues = intersection.get_movement_queues()
+    signal = intersection.signal
+    MAX_CAP = 10.0
+
+    movements = [
+        movement_queues.get("north_straight", 0) / MAX_CAP,
+        movement_queues.get("north_left", 0) / MAX_CAP,
+        movement_queues.get("north_right", 0) / MAX_CAP,
+        movement_queues.get("south_straight", 0) / MAX_CAP,
+        movement_queues.get("south_left", 0) / MAX_CAP,
+        movement_queues.get("south_right", 0) / MAX_CAP,
+        movement_queues.get("east_straight", 0) / MAX_CAP,
+        movement_queues.get("east_left", 0) / MAX_CAP,
+        movement_queues.get("east_right", 0) / MAX_CAP,
+        movement_queues.get("west_straight", 0) / MAX_CAP,
+        movement_queues.get("west_left", 0) / MAX_CAP,
+        movement_queues.get("west_right", 0) / MAX_CAP,
+    ]
+
+    phase_onehot = [0.0, 0.0, 0.0, 0.0]
+    phase_onehot[signal.current_phase] = 1.0
+
+    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
+
+    # Compute pressure identically to TrafficEnv._get_obs() — must match training exactly
+    dest_map = {
+        "north_straight": "south", "north_left": "east",   "north_right": "west",
+        "south_straight": "north", "south_left": "west",   "south_right": "east",
+        "east_straight":  "west",  "east_left":  "south",  "east_right":  "north",
+        "west_straight":  "east",  "west_left":  "north",  "west_right":  "south",
+    }
+    outgoing = intersection.get_outgoing_counts()
+    total_pressure = 0.0
+    for movement, dest in dest_map.items():
+        incoming = movement_queues.get(movement, 0) / MAX_CAP
+        out = outgoing.get(dest, 0) / MAX_CAP
+        total_pressure += max(0.0, incoming - out)
+    pressure_norm = min(total_pressure / 20.0, 1.0)
+
+    max_starv_norm = min(
+        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
+    )
+
+    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+    return np.array(obs, dtype=np.float32)
+
+
 # ─── Simulation loop ──────────────────────────────────────────────────────────
 
-async def _simulation_loop(app_state: dict) -> None:
+async def _simulation_loop(app) -> None:
+    cumulative_reward = 0.0
+    last_reward = 0.0
+    last_action = 0
+    was_exploring = False
+    obs = None
+
     try:
         while True:
-            if not app_state.get("sim_running"):
+            if not app.state.sim_running:
                 await asyncio.sleep(0.1)
                 continue
 
-            intersection = app_state["intersection"]
-            mode = app_state["mode"]
-            reward = 0.0
-            trainer = app_state.get("trainer")
+            intersection = app.state.sim_intersection
+            mode = app.state.mode
+            trainer = app.state.trainer
             episode = trainer.current_episode if trainer else 0
+            agent = app.state.sim_agent
 
             if mode in ("fixed", "manual"):
                 intersection.tick(dt=0.1, action=None, is_manual=(mode == "manual"))
+                last_reward = 0.0
+            elif mode == "greedy":
+                # Greedy: always serve the phase with the highest total queue count.
+                # Respects min_green (via signal.can_switch_phase) to prevent flickering.
+                signal = intersection.signal
+                queues = intersection.get_movement_queues()
+                PHASE_DIRS = {
+                    0: ["north", "south"],
+                    1: ["east", "west"],
+                    2: ["north", "south"],
+                    3: ["east", "west"],
+                }
+                PHASE_TURNS = {
+                    0: ["straight", "right"],
+                    1: ["straight", "right"],
+                    2: ["left"],
+                    3: ["left"],
+                }
+                phase_counts = {}
+                for ph in range(4):
+                    count = sum(
+                        queues.get(f"{d}_{t}", 0)
+                        for d in PHASE_DIRS[ph]
+                        for t in PHASE_TURNS[ph]
+                    )
+                    phase_counts[ph] = count
+                best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                # Only inject action if we can switch (respects MIN_GREEN_TIME)
+                greedy_action = best_phase if signal.can_switch_phase else signal.current_phase
+                intersection.tick(dt=0.1, action=greedy_action)
+                last_reward = 0.0
+            elif mode == "ai":
+                obs = _build_obs_from_intersection(intersection)
+                action = agent.select_action(obs, epsilon=0.0)
+                last_action = action
+
+                prev_pressures = app.state.training_env._compute_movement_pressures(intersection)
+                prev_passed = intersection.total_passed
+                prev_phase = intersection.signal.current_phase
+
+                intersection.tick(dt=0.1, action=action)
+
+                curr_pressures = app.state.training_env._compute_movement_pressures(intersection)
+                curr_passed = intersection.total_passed
+                vehicles_passed = curr_passed - prev_passed
+                phase_changed = (action != prev_phase) and (intersection.signal.color.value == "green")
+
+                # Compute reward using the training_env helper
+                last_reward = app.state.training_env.compute_reward(
+                    prev_pressures=prev_pressures,
+                    curr_pressures=curr_pressures,
+                    vehicles_passed=vehicles_passed,
+                    phase_changed=phase_changed,
+                    signal=intersection.signal,
+                    prev_phase=prev_phase,
+                )
+                cumulative_reward += last_reward
             else:
-                env = app_state["env"]
-                agent = app_state["agent"]
-                state = env._get_obs()
-                action = agent.select_action(state, epsilon=0.0)
-                _, reward, _, _, _ = env.step(action)
+                intersection.tick(dt=0.1, action=None)
+                last_reward = 0.0
 
             # ── Sample and buffer telemetry ──────────────────────────────────
-            simulation_id = app_state.get("current_simulation_id")
+            simulation_id = app.state.current_simulation_id
             if (
                 simulation_id
                 and not str(simulation_id).startswith("local-")
@@ -153,67 +265,112 @@ async def _simulation_loop(app_state: dict) -> None:
                 if should_flush:
                     asyncio.create_task(_flush_buffer())
 
-            frame = build_frame(intersection, mode, reward, episode)
+            frame = build_frame(
+                intersection=intersection,
+                mode=mode,
+                episode=episode,
+                simulation_id=simulation_id,
+                agent=agent,
+                last_reward=last_reward,
+                cumulative_reward=cumulative_reward,
+                epsilon=0.0,
+                last_action=last_action,
+                was_exploring=was_exploring,
+                obs=obs,
+            )
             
-            import os
-            # Log frames if in local/development environment
-            if os.getenv("ENV") != "production" and os.getenv("FASTAPI_ENV") != "production":
-                print(f"[SimWS Send Data] Timestep {intersection.timestep}: {frame.model_dump()}")
-                
             await manager.broadcast(frame.model_dump())
             await asyncio.sleep(0.1)
     except asyncio.CancelledError:
         # Flush any remaining buffered rows before exiting
         await _flush_buffer()
     finally:
-        app_state["sim_task"] = None
+        app.state.sim_task = None
+
+
+# ─── WebSocket Command Validation ─────────────────────────────────────────────
+
+VALID_COMMANDS = {
+    "start", "stop", "reset",
+    "set_mode", "set_spawn_rate",
+    "emergency_override", "manual_override"
+}
+
+COMMAND_SCHEMAS = {
+    "set_mode": {"mode": str},
+    "set_spawn_rate": {"value": float},
+    "emergency_override": {"lane": str},
+    "manual_override": {"phase": int},
+}
+
+
+def validate_ws_command(data: dict) -> tuple[bool, str]:
+    command = data.get("command")
+    if command not in VALID_COMMANDS:
+        return False, f"Unknown command: {command}"
+    schema = COMMAND_SCHEMAS.get(command, {})
+    for key, expected_type in schema.items():
+        if key not in data:
+            return False, f"Missing field: {key}"
+        try:
+            expected_type(data[key])
+        except (ValueError, TypeError):
+            return False, f"Invalid type for {key}"
+    return True, ""
 
 
 # ─── WebSocket handler ────────────────────────────────────────────────────────
 
 async def simulation_socket(websocket: WebSocket) -> None:
     await manager.connect(websocket)
-    app_state = websocket.scope["app"].state.app_state
+    app = websocket.app
 
-    if app_state.get("sim_task") is None:
-        app_state["sim_task"] = asyncio.create_task(_simulation_loop(app_state))
+    if not hasattr(app.state, "sim_task") or app.state.sim_task is None:
+        app.state.sim_task = asyncio.create_task(_simulation_loop(app))
 
     try:
         while True:
             message = await websocket.receive_json()
+            
+            # Validate command
+            is_valid, err_msg = validate_ws_command(message)
+            if not is_valid:
+                await websocket.send_json({"error": err_msg})
+                continue
+
             command = message.get("command")
 
             if command == "start":
-                app_state["sim_running"] = True
+                app.state.sim_running = True
                 try:
-                    app_state["intersection"].spawner.set_enabled(True)
+                    app.state.sim_intersection.spawner.set_enabled(True)
                 except Exception:
                     pass
 
-                if not app_state.get("current_simulation_id"):
+                if not app.state.current_simulation_id:
                     try:
                         simulation_id = await asyncio.to_thread(
                             supabase_service.create_simulation,
-                            app_state.get("mode", "fixed"),
+                            app.state.mode,
                         )
                         if simulation_id:
-                            app_state["current_simulation_id"] = simulation_id
+                            app.state.current_simulation_id = simulation_id
                         else:
                             logger.error("create_simulation returned empty id")
                     except Exception:
                         logger.exception("Failed to create simulation record")
-                        app_state["current_simulation_id"] = f"local-{int(time.time())}"
+                        app.state.current_simulation_id = f"local-{int(time.time())}"
 
             elif command == "stop":
-                app_state["sim_running"] = False
+                app.state.sim_running = False
                 try:
-                    app_state["intersection"].spawner.set_enabled(False)
+                    app.state.sim_intersection.spawner.set_enabled(False)
                 except Exception:
                     pass
 
-                simulation_id = app_state.get("current_simulation_id")
+                simulation_id = app.state.current_simulation_id
                 if simulation_id and not str(simulation_id).startswith("local-"):
-                    intersection = app_state["intersection"]
+                    intersection = app.state.sim_intersection
                     total_steps = intersection.timestep
                     duration_ms = int(total_steps * 0.1 * 1000)
 
@@ -232,65 +389,65 @@ async def simulation_socket(websocket: WebSocket) -> None:
                             asyncio.to_thread(
                                 supabase_service.save_performance_metric,
                                 simulation_id,
-                                app_state.get("mode", "fixed"),
+                                app.state.mode,
                                 intersection.get_avg_wait_time(),
                                 intersection.total_passed,
+                                max(intersection.get_queue_lengths().values(), default=0),
+                                total_steps,
                             ),
                         )
                     except Exception:
                         logger.exception("Failed to persist simulation metrics on stop")
 
-                    app_state["current_simulation_id"] = None
+                    app.state.current_simulation_id = None
 
             elif command == "reset":
-                simulation_id = app_state.get("current_simulation_id")
+                simulation_id = app.state.current_simulation_id
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
-                app_state["intersection"].reset()
-                app_state["sim_running"] = False
-                app_state["current_simulation_id"] = None
+                app.state.sim_intersection.reset()
+                app.state.sim_running = False
+                app.state.current_simulation_id = None
                 _buffer.traffic_rows.clear()
                 _buffer.signal_rows.clear()
                 try:
-                    app_state["intersection"].spawner.set_enabled(False)
+                    app.state.sim_intersection.spawner.set_enabled(False)
                 except Exception:
                     pass
 
             elif command == "set_mode":
                 mode = message.get("mode")
-                if mode in ("fixed", "ai", "manual"):
-                    app_state["mode"] = mode
+                if mode in ("fixed", "ai", "manual", "greedy"):
+                    app.state.mode = mode
 
             elif command == "manual_override":
                 phase = message.get("phase")
                 if isinstance(phase, int) and 0 <= phase <= 3:
-                    app_state["intersection"].signal.set_phase(phase)
+                    app.state.sim_intersection.signal.set_phase(phase)
 
             elif command == "set_spawn_rate":
                 value = message.get("value")
-                try:
-                    rate = float(value)
-                except (TypeError, ValueError):
-                    continue
-                app_state["intersection"].set_spawn_rate(rate)
+                # Clamp between 0.1 and 1.0 (Fix 7.5)
+                spawn_rate = max(0.1, min(1.0, float(value)))
+                app.state.sim_intersection.set_spawn_rate(spawn_rate)
 
             elif command == "emergency_override":
                 lane = message.get("lane")
                 if lane in ("north", "south", "east", "west"):
-                    app_state["intersection"].trigger_emergency_override(lane)
+                    app.state.sim_intersection.trigger_emergency_override(lane)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         if not manager.active_connections:
-            app_state["sim_running"] = False
+            app.state.sim_running = False
             try:
-                app_state["intersection"].spawner.set_enabled(False)
+                app.state.sim_intersection.spawner.set_enabled(False)
             except Exception:
                 pass
 
-            simulation_id = app_state.get("current_simulation_id")
+            simulation_id = app.state.current_simulation_id
             if simulation_id and not str(simulation_id).startswith("local-"):
-                intersection = app_state["intersection"]
+                intersection = app.state.sim_intersection
                 total_steps = intersection.timestep
                 duration_ms = int(total_steps * 0.1 * 1000)
 
@@ -309,16 +466,19 @@ async def simulation_socket(websocket: WebSocket) -> None:
                         asyncio.to_thread(
                             supabase_service.save_performance_metric,
                             simulation_id,
-                            app_state.get("mode", "fixed"),
+                            app.state.mode,
                             intersection.get_avg_wait_time(),
                             intersection.total_passed,
+                            max(intersection.get_queue_lengths().values(), default=0),
+                            total_steps,
                         ),
                     )
                 except Exception:
                     logger.exception("Failed to persist simulation metrics on disconnect")
 
-                app_state["current_simulation_id"] = None
+                app.state.current_simulation_id = None
 
-            task = app_state.get("sim_task")
+            task = app.state.sim_task
             if task and not task.done():
                 task.cancel()
+
