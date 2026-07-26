@@ -334,7 +334,7 @@ export default function LandingPage() {
           <div className="space-y-1 text-center sm:text-left">
             <p className="font-semibold tracking-tight">FlowSync</p>
             <p className="text-sm text-muted-foreground">
-              Smart Traffic Control · CSE Summer Project 2024-25
+              Smart AI Traffic Control
             </p>
           </div>
           <p className="text-sm text-muted-foreground">
