@@ -25,3 +25,14 @@ Thumbs.db
 # Docker local overrides (may contain secrets)
 docker-compose.override.yml
 pnpm-workspace.yaml
+
+data/raw/
+data/processed/
+data/uploads/
+data/sessions/
+data/roi_configs/
+data/flow_params.json
+models/yolo/
+validation_samples/
+augmentation_samples/
+runs/
