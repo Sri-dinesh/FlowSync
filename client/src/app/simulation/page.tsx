@@ -9,7 +9,13 @@ import LiveSnapshot from "@/components/dashboard/LiveSnapshot";
 import MetricsPanel from "@/components/dashboard/MetricsPanel";
 import QValuePanel from "@/components/dashboard/QValuePanel";
 import TrainingChart from "@/components/dashboard/TrainingChart";
-import SimulationCanvas from "@/components/simulation/SimulationCanvas";
+import dynamic from 'next/dynamic';
+
+const SimulationCanvas = dynamic(
+  () => import("@/components/simulation/SimulationCanvas"),
+  { ssr: false }
+);
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSimulationSocket } from "@/hooks/useSimulationSocket";

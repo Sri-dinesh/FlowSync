@@ -46,6 +46,19 @@ export function useSimulationSocket() {
           return;
         }
 
+        // Skip non-simulation-frame messages (benchmark_progress, benchmark_results, errors, etc.)
+        const NON_FRAME_TYPES = new Set([
+          "benchmark_progress",
+          "benchmark_results",
+          "error",
+          "pipeline_status",
+          "video_progress",
+          "cctv_frame",
+        ]);
+        if (raw.type && NON_FRAME_TYPES.has(raw.type)) {
+          return;
+        }
+
         // Extract queue lengths from the backend nested QueueState dictionary
         const queue_lengths: Record<string, number> = {};
         if (raw.queues && typeof raw.queues === "object") {
