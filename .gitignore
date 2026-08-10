@@ -36,3 +36,10 @@ models/yolo/
 validation_samples/
 augmentation_samples/
 runs/
+
+FlowSync_YOLO-20260802T121525Z-1-001/
+data/
+# YOLO model weights (large binary, stored in server/models/)
+best.onnx
+*.onnx
+*.pt
