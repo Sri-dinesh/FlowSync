@@ -14,6 +14,10 @@ class ModeUpdate(BaseModel):
     mode: Literal["fixed", "ai", "manual"]
 
 
+class ScenarioPayload(BaseModel):
+    counts: dict[str, int]
+
+
 def _build_snapshot(app) -> MetricsSnapshot:
     intersection = app.state.sim_intersection
     queue_lengths = intersection.get_queue_lengths()
@@ -78,6 +82,35 @@ async def reset_simulation(request: Request) -> dict:
     app.state.sim_running = False
     app.state.sim_intersection.spawner.set_enabled(False)
     return {"status": "reset"}
+
+
+@router.post("/scenario")
+async def inject_scenario(payload: ScenarioPayload, request: Request) -> dict:
+    from ..websockets.simulation_ws import manager
+    from ..schemas.simulation_schema import build_frame
+
+    app = request.app
+    # Reset and inject exact counts
+    app.state.sim_intersection.inject_scenario(payload.counts)
+    app.state.sim_running = False
+
+    # Broadcast static frame to update frontend immediately
+    frame = build_frame(
+        intersection=app.state.sim_intersection,
+        mode=app.state.mode,
+        episode=app.state.trainer.current_episode if app.state.trainer else 0,
+        simulation_id=app.state.current_simulation_id,
+        agent=app.state.sim_agent,
+        last_reward=0.0,
+        cumulative_reward=0.0,
+        epsilon=0.0,
+        last_action=None,
+        was_exploring=False,
+        obs=[],
+    )
+    await manager.broadcast(frame.model_dump())
+
+    return {"status": "scenario_loaded"}
 
 
 @router.put("/mode")

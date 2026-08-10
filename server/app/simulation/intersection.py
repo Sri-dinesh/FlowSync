@@ -47,6 +47,36 @@ class Intersection:
         self.emergency_override_lane = lane
         self._spawned_this_interval += 1
 
+    def inject_scenario(self, lane_counts: Dict[str, int]) -> None:
+        """Inject an exact snapshot of traffic for Digital Twin mode."""
+        from uuid import uuid4
+        self.reset()
+        self.spawner.set_enabled(False)  # Turn off random spawning
+
+        # Average vehicle length + safe distance spacing in [0, 1] relative coordinates
+        SPACING = 0.08
+
+        for lane_id, count in lane_counts.items():
+            if lane_id not in self.lanes:
+                continue
+            
+            dir_name = lane_id.split("_")[0]
+            turn = lane_id.split("_")[1]
+            
+            for i in range(count):
+                # Place first vehicle near stop line (e.g. 0.40), others spaced backwards
+                pos = max(0.0, 0.40 - (i * SPACING))
+                vehicle = Vehicle(
+                    id=f"scenario-{uuid4().hex[:6]}",
+                    lane=dir_name,
+                    turn=turn,
+                    position=pos,
+                    wait_time=0.0,
+                    speed=0.0,  # Starts stopped in the queue
+                    state="waiting"
+                )
+                self.lanes[lane_id].append(vehicle)
+
     def tick(self, dt: float, action: Optional[int] = None, is_manual: bool = False) -> List[Vehicle]:
         # Resolve active emergency override: force signal phase
         if self.emergency_override_lane:
