@@ -10,11 +10,13 @@ from .rl.trainer import Trainer
 from .routers.metrics import router as metrics_router
 from .routers.simulation import router as simulation_router
 from .routers.training import router as training_router
+from .routers.cctv import router as cctv_router
 from .services import model_service, supabase_service
 from .simulation.environment import TrafficEnv
 from .websockets.simulation_ws import simulation_socket
 from .websockets.city_ws import city_socket
 from .websockets.training_ws import broadcast_training_metric, training_socket
+from .websockets.cctv_ws import cctv_socket
 
 from .simulation.intersection import Intersection
 
@@ -62,9 +64,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.sim_task = None
     app.state.training_task = None
 
+    # --- CCTV / Real-World ---
+    try:
+        from .realworld.pipeline.yolo_detector import YOLODetector
+        from .realworld.pipeline.roi_manager import ROIManager
+        yolo_detector = YOLODetector()
+        await yolo_detector.load_model()  # loads best.pt or pretrained fallback
+        warmup_ms = await yolo_detector.warmup()
+        print(f"[CCTV] YOLO detector ready on {yolo_detector.device} (warmup: {warmup_ms:.0f}ms)")
+        app.state.yolo_detector = yolo_detector
+        app.state.roi_manager = ROIManager()
+    except Exception as e:
+        print(f"[CCTV] YOLODetector init skipped (install ultralytics): {e}")
+        app.state.yolo_detector = None
+        app.state.roi_manager = None
+
     yield
 
     trainer.stop()
+
+    # Graceful CCTV shutdown
+    if hasattr(app.state, 'cctv_pipeline') and app.state.cctv_pipeline is not None:
+        await app.state.cctv_pipeline.stop()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -85,10 +106,12 @@ app.add_middleware(
 app.include_router(simulation_router)
 app.include_router(training_router)
 app.include_router(metrics_router)
+app.include_router(cctv_router)
 
 app.add_api_websocket_route("/ws/simulation", simulation_socket)
 app.add_api_websocket_route("/ws/training", training_socket)
 app.add_api_websocket_route("/ws/city", city_socket)
+app.add_api_websocket_route("/ws/cctv", cctv_socket)
 
 
 @app.get("/")

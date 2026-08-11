@@ -7,15 +7,16 @@ import TrafficLight from "@/components/simulation/TrafficLight";
 import Vehicle from "@/components/simulation/Vehicle";
 import { useSimulationStore } from "@/store/simulationStore";
 
-// Color coding based on length of queue for visual accessibility
 function getQueueColor(value: number) {
-  if (value >= 8) {
-    return "#ef4444"; // Dangerous red
-  }
-  if (value >= 5) {
-    return "#eab308"; // Warn yellow
-  }
-  return "#06b6d4"; // Cyan normal
+  if (value >= 8) return "#ef4444";
+  if (value >= 5) return "#eab308";
+  return "#06b6d4";
+}
+
+function getWaitColor(seconds: number) {
+  if (seconds >= 60) return "#ef4444";
+  if (seconds >= 30) return "#eab308";
+  return "#a3e635";
 }
 
 function resolveLightColor(
@@ -25,68 +26,53 @@ function resolveLightColor(
 ): "green" | "yellow" | "red" | "left-green" | "left-yellow" {
   const isNS = direction === "north" || direction === "south";
   const isEW = direction === "east" || direction === "west";
-
   if (isNS) {
-    if (phase === 0) {
-      return signalColor as "green" | "yellow" | "red";
-    } else if (phase === 2) {
-      return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
-    }
+    if (phase === 0) return signalColor as "green" | "yellow" | "red";
+    if (phase === 2) return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
   } else if (isEW) {
-    if (phase === 1) {
-      return signalColor as "green" | "yellow" | "red";
-    } else if (phase === 3) {
-      return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
-    }
+    if (phase === 1) return signalColor as "green" | "yellow" | "red";
+    if (phase === 3) return signalColor === "green" ? "left-green" : signalColor === "yellow" ? "left-yellow" : "red";
   }
   return "red";
 }
 
-// Queue Label holographic overlay
 interface QueueLabelProps {
-  value: number;
+  queueCount: number;
+  avgWait: number;
   position: [number, number, number];
 }
 
-function QueueLabel({ value, position }: QueueLabelProps) {
-  const color = getQueueColor(value);
+function QueueLabel({ queueCount, avgWait, position }: QueueLabelProps) {
+  const queueColor = getQueueColor(queueCount);
+  const waitColor  = getWaitColor(avgWait);
+  const waitStr    = avgWait > 0 ? avgWait.toFixed(0) + "s" : "-";
+
   return (
     <Billboard position={position} follow={true} lockX={false} lockY={false} lockZ={false}>
       <group>
-        {/* Sleek backing plate */}
         <mesh position={[0, 0, 0]}>
-          <planeGeometry args={[1.2, 0.8]} />
-          <meshBasicMaterial color="#111111" opacity={0.85} transparent />
+          <planeGeometry args={[1.6, 1.1]} />
+          <meshBasicMaterial color="#111111" opacity={0.88} transparent />
         </mesh>
-
-        {/* Glowing border accent */}
         <mesh position={[0, 0, -0.01]}>
-          <planeGeometry args={[1.3, 0.9]} />
-          <meshBasicMaterial color={color} opacity={0.6} transparent />
+          <planeGeometry args={[1.7, 1.2]} />
+          <meshBasicMaterial color={queueColor} opacity={0.5} transparent />
         </mesh>
-
-        {/* Label title */}
-        <Text
-          position={[0, 0.2, 0.02]}
-          fontSize={0.15}
-          color="#a1a1aa"
-          anchorX="center"
-          anchorY="middle"
-          letterSpacing={0.1}
-        >
+        <Text position={[0, 0.42, 0.02]} fontSize={0.14} color="#a1a1aa" anchorX="center" anchorY="middle" letterSpacing={0.1}>
           WAITING
         </Text>
-
-        {/* Value Text */}
-        <Text
-          position={[0, -0.1, 0.02]}
-          fontSize={0.5}
-          color={color}
-          anchorX="center"
-          anchorY="middle"
-          fontWeight="bold"
-        >
-          {value}
+        <Text position={[0, 0.1, 0.02]} fontSize={0.44} color={queueColor} anchorX="center" anchorY="middle" fontWeight="bold">
+          {queueCount}
+        </Text>
+        <mesh position={[0, -0.17, 0.02]}>
+          <planeGeometry args={[1.3, 0.012]} />
+          <meshBasicMaterial color="#ffffff" opacity={0.08} transparent />
+        </mesh>
+        <Text position={[-0.35, -0.31, 0.02]} fontSize={0.12} color="#71717a" anchorX="left" anchorY="middle" letterSpacing={0.05}>
+          AVG WAIT
+        </Text>
+        <Text position={[0.45, -0.31, 0.02]} fontSize={0.18} color={waitColor} anchorX="right" anchorY="middle" fontWeight="bold">
+          {waitStr}
         </Text>
       </group>
     </Billboard>
@@ -94,64 +80,40 @@ function QueueLabel({ value, position }: QueueLabelProps) {
 }
 
 export default function IntersectionScene() {
-  const frame = useSimulationStore((state) => state.currentFrame);
-  const isRunning = useSimulationStore((state) => state.isRunning);
-  const vehicles = frame?.vehicles ?? [];
+  const frame        = useSimulationStore((state) => state.currentFrame);
+  const isRunning    = useSimulationStore((state) => state.isRunning);
+  const vehicles     = frame?.vehicles ?? [];
   const queueLengths = frame?.queue_lengths ?? {};
-  const signalPhase = frame?.signal_phase ?? 0;
-  const signalColor = frame?.signal_color ?? "red";
+  const signalPhase  = frame?.signal_phase ?? 0;
+  const signalColor  = frame?.signal_color ?? "red";
 
-  // Always show default state even when no data
   const displayQueueLengths = {
     north: queueLengths.north ?? 0,
     south: queueLengths.south ?? 0,
-    east: queueLengths.east ?? 0,
-    west: queueLengths.west ?? 0,
+    east:  queueLengths.east  ?? 0,
+    west:  queueLengths.west  ?? 0,
+  };
+
+  const avgWaitPerDir = (dir: string): number => {
+    const waiting = vehicles.filter((v) => v.lane === dir && v.state !== "passed" && v.wait_time > 0);
+    if (waiting.length === 0) return 0;
+    return waiting.reduce((sum, v) => sum + v.wait_time, 0) / waiting.length;
   };
 
   return (
     <group>
-      {/* Render cityscape surroundings - this provides the base ground */}
       <IntersectionGrid />
-
-      {/* Render full-length textured asphalt roads */}
       <Road direction="horizontal" />
       <Road direction="vertical" />
-
-      {/* Render detailed Traffic Light cantilever poles - aligned precisely to lanes */}
-      <TrafficLight
-        color={resolveLightColor(signalPhase, signalColor, "north")}
-        position={[-3.2, 0, -3.2]}
-        direction="north"
-      />
-      <TrafficLight
-        color={resolveLightColor(signalPhase, signalColor, "south")}
-        position={[3.2, 0, 3.2]}
-        direction="south"
-      />
-      <TrafficLight
-        color={resolveLightColor(signalPhase, signalColor, "east")}
-        position={[3.2, 0, -3.2]}
-        direction="east"
-      />
-      <TrafficLight
-        color={resolveLightColor(signalPhase, signalColor, "west")}
-        position={[-3.2, 0, 3.2]}
-        direction="west"
-      />
-
-      {/* Floating Holographic Queue Indicators */}
-      <QueueLabel value={displayQueueLengths.north} position={[-1.2, 2.5, -7.2]} />
-      <QueueLabel value={displayQueueLengths.south} position={[1.2, 2.5, 7.2]} />
-      <QueueLabel value={displayQueueLengths.east} position={[7.2, 2.5, -1.2]} />
-      <QueueLabel value={displayQueueLengths.west} position={[-7.2, 2.5, 1.2]} />
-
-      {/* Map active live vehicles to their detailed 3D components */}
-      {isRunning
-        ? vehicles.map((vehicle) => (
-            <Vehicle key={vehicle.id} vehicle={vehicle} />
-          ))
-        : null}
+      <TrafficLight color={resolveLightColor(signalPhase, signalColor, "north")} position={[-3.2, 0, -3.2]} direction="north" />
+      <TrafficLight color={resolveLightColor(signalPhase, signalColor, "south")} position={[ 3.2, 0,  3.2]} direction="south" />
+      <TrafficLight color={resolveLightColor(signalPhase, signalColor, "east")}  position={[ 3.2, 0, -3.2]} direction="east"  />
+      <TrafficLight color={resolveLightColor(signalPhase, signalColor, "west")}  position={[-3.2, 0,  3.2]} direction="west"  />
+      <QueueLabel queueCount={displayQueueLengths.north} avgWait={avgWaitPerDir("north")} position={[-1.2, 2.5, -7.2]} />
+      <QueueLabel queueCount={displayQueueLengths.south} avgWait={avgWaitPerDir("south")} position={[ 1.2, 2.5,  7.2]} />
+      <QueueLabel queueCount={displayQueueLengths.east}  avgWait={avgWaitPerDir("east")}  position={[ 7.2, 2.5, -1.2]} />
+      <QueueLabel queueCount={displayQueueLengths.west}  avgWait={avgWaitPerDir("west")}  position={[-7.2, 2.5,  1.2]} />
+      {isRunning ? vehicles.map((vehicle) => <Vehicle key={vehicle.id} vehicle={vehicle} />) : null}
     </group>
   );
 }

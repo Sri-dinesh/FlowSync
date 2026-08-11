@@ -118,6 +118,185 @@ async def _flush_buffer() -> None:
         await asyncio.to_thread(supabase_service.save_signal_states_bulk, signal_rows)
 
 
+# ─── Timed Benchmark ─────────────────────────────────────────────────────────
+
+async def _run_timed_benchmark(
+    app,
+    websocket: WebSocket,
+    duration_seconds: int,
+    scenario_counts: dict | None,
+    modes: list[str],
+) -> None:
+    """
+    Runs all requested modes sequentially for `duration_seconds` of REAL wall time each.
+
+    Each mode:
+      1. Resets the intersection and injects scenario_counts
+      2. Runs at real-time 10 Hz (0.1 s sleep between ticks) so the 3D canvas
+         receives simulation_frame events and renders vehicles moving
+      3. Records throughput/wait results
+      4. Broadcasts benchmark_progress after mode completes
+
+    After all modes finish, broadcasts benchmark_results with winner.
+    """
+    TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
+    TICK_SLEEP = 0.1       # wall-clock seconds between ticks (real-time 10 Hz)
+    PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
+    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+
+    results: dict = {}
+    prev_mode    = app.state.mode
+    prev_running = app.state.sim_running
+
+    # Pause normal simulation loop so both don't fight over the intersection
+    app.state.sim_running = False
+    if app.state.sim_task is not None:
+        app.state.sim_task.cancel()
+        try:
+            await app.state.sim_task
+        except Exception:
+            pass
+    await asyncio.sleep(0.2)
+
+    try:
+        for mode in modes:
+            intersection = app.state.sim_intersection
+            agent        = app.state.sim_agent
+
+            # ── Setup ──────────────────────────────────────────────────────
+            intersection.reset()
+            if scenario_counts:
+                intersection.inject_scenario(scenario_counts)
+            # Keep spawner disabled — we seeded the intersection with inject_scenario
+            try:
+                intersection.spawner.set_enabled(False)
+            except Exception:
+                pass
+
+            app.state.mode = mode
+
+            # Notify frontend that this mode is starting
+            try:
+                await websocket.send_json({
+                    "type": "benchmark_progress",
+                    "current_mode": mode,
+                    "modes_total": len(modes),
+                    "modes_done": list(results.keys()),
+                })
+            except Exception:
+                pass
+
+            # ── Real-time simulation loop ──────────────────────────────────
+            cumulative_reward = 0.0
+            last_reward       = 0.0
+            last_action       = 0
+            was_exploring     = False
+            obs               = np.zeros(20, dtype=np.float32)
+            episode           = 0
+            deadline          = asyncio.get_event_loop().time() + duration_seconds
+
+            while asyncio.get_event_loop().time() < deadline:
+                tick_start = asyncio.get_event_loop().time()
+
+                # ── Compute action ─────────────────────────────────────────
+                if mode in ("fixed", "manual"):
+                    action = None
+                    intersection.tick(dt=TICK_DT, action=None)
+                elif mode == "greedy":
+                    signal = intersection.signal
+                    queues = intersection.get_movement_queues()
+                    phase_counts = {
+                        ph: sum(
+                            queues.get(f"{d}_{t}", 0)
+                            for d in PHASE_DIRS[ph]
+                            for t in PHASE_TURNS[ph]
+                        )
+                        for ph in range(4)
+                    }
+                    best_phase   = max(phase_counts, key=lambda p: phase_counts[p])
+                    action       = best_phase if signal.can_switch_phase else signal.current_phase
+                    last_action  = action
+                    intersection.tick(dt=TICK_DT, action=action)
+                elif mode == "ai" and agent is not None:
+                    obs    = _build_obs_from_intersection(intersection)
+                    action = agent.select_action(obs, epsilon=0.0)
+                    last_action  = action
+                    was_exploring = False
+                    intersection.tick(dt=TICK_DT, action=action)
+                else:
+                    action = None
+                    intersection.tick(dt=TICK_DT, action=None)
+
+                # ── Build & broadcast frame (drives 3-D canvas) ────────────
+                simulation_id = app.state.current_simulation_id or "benchmark"
+                frame = build_frame(
+                    intersection=intersection,
+                    mode=mode,
+                    episode=episode,
+                    simulation_id=simulation_id,
+                    agent=agent,
+                    last_reward=last_reward,
+                    cumulative_reward=cumulative_reward,
+                    epsilon=0.0,
+                    last_action=last_action,
+                    was_exploring=was_exploring,
+                    obs=obs,
+                )
+                await manager.broadcast(frame.model_dump())
+
+                # ── Real-time pacing ───────────────────────────────────────
+                elapsed = asyncio.get_event_loop().time() - tick_start
+                sleep_t = max(0.0, TICK_SLEEP - elapsed)
+                await asyncio.sleep(sleep_t)
+
+            # ── Collect results ────────────────────────────────────────────
+            queue_lengths = intersection.get_queue_lengths()
+            results[mode] = {
+                "total_passed":    intersection.total_passed,
+                "avg_wait_time":   round(intersection.get_avg_wait_time(), 2),
+                "max_queue":       max(queue_lengths.values(), default=0),
+                "duration_seconds": duration_seconds,
+            }
+
+            # Broadcast intermediate results after each mode completes
+            try:
+                await websocket.send_json({
+                    "type":           "benchmark_progress",
+                    "current_mode":   mode,
+                    "completed_mode": mode,
+                    "result":         results[mode],
+                    "modes_done":     list(results.keys()),
+                    "modes_total":    len(modes),
+                })
+            except Exception:
+                pass
+
+        # ── Final results ──────────────────────────────────────────────────
+        winner = max(results, key=lambda m: results[m]["total_passed"]) if results else None
+        try:
+            await websocket.send_json({
+                "type":             "benchmark_results",
+                "duration_seconds": duration_seconds,
+                "results":          results,
+                "winner":           winner,
+                "modes":            modes,
+            })
+        except Exception as e:
+            logger.warning("Failed to send benchmark_results: %s", e)
+
+    except Exception as e:
+        logger.exception("Benchmark error: %s", e)
+        try:
+            await websocket.send_json({"type": "error", "code": "BENCHMARK_FAILED", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        # Restore previous state — let the normal loop resume if it was running
+        app.state.mode = prev_mode
+        app.state.sim_running = prev_running
+        app.state.sim_intersection.reset()
+
+
 # ─── Simulation helper ────────────────────────────────────────────────────────
 
 def _build_obs_from_intersection(intersection) -> np.ndarray:
@@ -293,7 +472,8 @@ async def _simulation_loop(app) -> None:
 VALID_COMMANDS = {
     "start", "stop", "reset",
     "set_mode", "set_spawn_rate",
-    "emergency_override", "manual_override"
+    "emergency_override", "manual_override",
+    "run_timed_benchmark",
 }
 
 COMMAND_SCHEMAS = {
@@ -342,6 +522,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             if command == "start":
                 app.state.sim_running = True
+                if not hasattr(app.state, "sim_task") or app.state.sim_task is None:
+                    app.state.sim_task = asyncio.create_task(_simulation_loop(app))
+                    
                 try:
                     app.state.sim_intersection.spawner.set_enabled(True)
                 except Exception:
@@ -435,6 +618,17 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 lane = message.get("lane")
                 if lane in ("north", "south", "east", "west"):
                     app.state.sim_intersection.trigger_emergency_override(lane)
+
+            elif command == "run_timed_benchmark":
+                duration_seconds = int(message.get("duration_seconds", 120))
+                scenario_counts = message.get("scenario_counts", None)
+                modes = message.get("modes", ["fixed", "ai", "greedy"])
+                # Clamp duration between 10 and 600 seconds
+                duration_seconds = max(10, min(600, duration_seconds))
+                # Run benchmark as a background task so the WS remains responsive
+                asyncio.create_task(
+                    _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes)
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
