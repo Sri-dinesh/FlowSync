@@ -43,3 +43,5 @@ data/
 best.onnx
 *.onnx
 *.pt
+
+!server/app/realworld/models/
