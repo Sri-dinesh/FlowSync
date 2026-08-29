@@ -58,16 +58,18 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className={
-              isConnected
-                ? "border-emerald-500/40 bg-emerald-900/30 text-emerald-300"
-                : "border-rose-500/40 bg-rose-900/20 text-rose-300"
-            }
-          >
-            {isConnected ? "● Connected" : "○ Disconnected"}
-          </Badge>
+          {pathname !== "/realworld" && (
+            <Badge
+              variant="outline"
+              className={
+                isConnected
+                  ? "border-emerald-500/40 bg-emerald-900/30 text-emerald-300"
+                  : "border-rose-500/40 bg-rose-900/20 text-rose-300"
+              }
+            >
+              {isConnected ? "● Connected" : "○ Disconnected"}
+            </Badge>
+          )}
           <Badge
             variant="outline"
             className="border-blue-500/30 bg-blue-900/20 text-blue-300"
