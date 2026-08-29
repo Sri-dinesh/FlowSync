@@ -61,13 +61,17 @@ class ComparisonTestState:
         self.results: Dict[str, Dict] = {}
         self.started_at: float = 0.0
         self.snapshots: Dict[str, List] = {}
+        self.benchmark_seed: int = 42
 
-    def start(self) -> None:
+    def start(self, duration_seconds: int = 30) -> None:
+        import random
         self.running = True
         self.current_mode_idx = 0
+        self.duration_per_mode = max(10, min(600, int(duration_seconds)))
         self.results = {}
         self.snapshots = {}
         self.started_at = time.time()
+        self.benchmark_seed = random.randint(1, 1_000_000)
 
     def current_mode(self) -> str:
         return self.modes[self.current_mode_idx]
@@ -82,9 +86,20 @@ class ComparisonTestState:
         mode = self.current_mode()
         if mode not in self.snapshots:
             self.snapshots[mode] = []
+        
+        # Calculate max queue across all intersections in this snapshot
+        per_inter = city_metrics.get("per_intersection", {})
+        peak_q = 0
+        for inter_data in per_inter.values():
+            ql = inter_data.get("queue_lengths", {})
+            if isinstance(ql, dict) and ql:
+                peak_q = max(peak_q, max(ql.values(), default=0))
+
         self.snapshots[mode].append({
-            "avg_wait": city_metrics["avg_wait_time"],
-            "throughput": city_metrics["total_throughput"],
+            "avg_wait": city_metrics.get("avg_wait_time", 0.0),
+            "throughput": city_metrics.get("total_throughput", 0),
+            "max_queue": peak_q,
+            "active_vehicles": city_metrics.get("active_vehicles", 0),
         })
 
     def advance(self) -> bool:
@@ -92,19 +107,54 @@ class ComparisonTestState:
         mode = self.current_mode()
         snaps = self.snapshots.get(mode, [])
         if snaps:
-            avg_waits = [s["avg_wait"] for s in snaps]
+            avg_waits = [s["avg_wait"] for s in snaps if s.get("avg_wait", 0) > 0]
             throughputs = [s["throughput"] for s in snaps]
+            max_queues = [s["max_queue"] for s in snaps]
             self.results[mode] = {
-                "avg_wait_time": round(sum(avg_waits) / len(avg_waits), 2),
+                "avg_wait_time": round(sum(avg_waits) / len(avg_waits), 2) if avg_waits else 0.0,
                 "throughput": throughputs[-1] if throughputs else 0,
+                "max_queue": max(max_queues) if max_queues else 0,
+                "duration_seconds": self.duration_per_mode,
             }
+        else:
+            self.results[mode] = {
+                "avg_wait_time": 0.0,
+                "throughput": 0,
+                "max_queue": 0,
+                "duration_seconds": self.duration_per_mode,
+            }
+
         self.current_mode_idx += 1
         self.started_at = time.time()
         return self.current_mode_idx >= len(self.modes)
 
     def finish(self) -> Dict:
         self.running = False
-        return self.results
+        
+        fixed_res = self.results.get("fixed")
+        improvements = {}
+        if fixed_res and fixed_res.get("avg_wait_time", 0) > 0:
+            f_wait = fixed_res["avg_wait_time"]
+            if "ai" in self.results:
+                improvements["ai_wait_pct"] = round(((f_wait - self.results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+            if "greedy" in self.results:
+                improvements["greedy_wait_pct"] = round(((f_wait - self.results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+
+        # Winner: lowest avg wait time, highest throughput
+        def _score_mode(m):
+            r = self.results.get(m, {})
+            return (-r.get("avg_wait_time", 0.0), r.get("throughput", 0))
+
+        winner = max(self.results.keys(), key=_score_mode) if self.results else None
+
+        return {
+            "results": self.results,
+            "winner": winner,
+            "improvements": improvements,
+            "duration_seconds": self.duration_per_mode,
+            "modes": self.modes,
+            "benchmark_seed": self.benchmark_seed,
+        }
 
 
 comparison_state = ComparisonTestState()
@@ -127,32 +177,43 @@ async def _city_simulation_loop(app) -> None:
             if comparison_state.running:
                 mode = comparison_state.current_mode()
                 # Sample metrics for comparison
-                if city_net.timestep % 10 == 0:
+                if city_net.timestep % 5 == 0:
                     raw = city_net.get_city_metrics()
                     comparison_state.record_snapshot(raw)
                 # Advance comparison phases
                 if comparison_state.should_advance():
                     done = comparison_state.advance()
                     if done:
-                        results = comparison_state.finish()
+                        finish_data = comparison_state.finish()
+                        # Restore spawner to unseeded stochastic mode
+                        city_spawner.set_seed(None)
                         # Broadcast comparison results
                         await city_manager.broadcast({
                             "frame_type": "comparison_results",
-                            "results": results,
+                            "results": finish_data["results"],
+                            "winner": finish_data.get("winner"),
+                            "improvements": finish_data.get("improvements", {}),
+                            "duration_seconds": finish_data.get("duration_seconds", 30),
+                            "modes": finish_data.get("modes", ["fixed", "greedy", "ai"]),
+                            "benchmark_seed": finish_data.get("benchmark_seed"),
                         })
                         app.state.city_mode = "fixed"
                         city_net.reset()
                         city_spawner.set_enabled(True)
                         continue
                     else:
-                        # Reset for next mode
+                        # Reset for next mode with exact same seed (Common Random Numbers)
                         city_net.reset()
+                        city_spawner.set_seed(comparison_state.benchmark_seed)
                         city_spawner.set_enabled(True)
                         await city_manager.broadcast({
                             "frame_type": "comparison_phase",
                             "current_mode": comparison_state.current_mode(),
                             "elapsed": 0,
                             "total": comparison_state.duration_per_mode,
+                            "mode_index": comparison_state.current_mode_idx,
+                            "total_modes": len(comparison_state.modes),
+                            "benchmark_seed": comparison_state.benchmark_seed,
                         })
             else:
                 mode = getattr(app.state, "city_mode", "fixed")
@@ -253,13 +314,16 @@ async def city_socket(websocket: WebSocket) -> None:
 
             elif command == "stop":
                 app.state.city_running = False
+                comparison_state.running = False
                 app.state.city_spawner.set_enabled(False)
+                app.state.city_spawner.set_seed(None)
 
             elif command == "reset":
                 app.state.city_running = False
-                app.state.city_spawner.set_enabled(False)
-                app.state.city_network.reset()
                 comparison_state.running = False
+                app.state.city_spawner.set_enabled(False)
+                app.state.city_spawner.set_seed(None)
+                app.state.city_network.reset()
                 # Broadcast the cleared frame immediately
                 frame = build_city_frame(
                     city_network=app.state.city_network,
@@ -282,15 +346,19 @@ async def city_socket(websocket: WebSocket) -> None:
                 app.state.city_network.set_spawn_rate(rate)
 
             elif command == "run_comparison":
+                duration = int(message.get("duration_seconds", 30))
+                duration = max(10, min(600, duration))
                 if not comparison_state.running:
                     app.state.city_network.reset()
+                    comparison_state.start(duration_seconds=duration)
+                    app.state.city_spawner.set_seed(comparison_state.benchmark_seed)
                     app.state.city_spawner.set_enabled(True)
                     app.state.city_running = True
-                    comparison_state.start()
                     await websocket.send_json({
                         "frame_type": "comparison_started",
                         "modes": comparison_state.modes,
                         "duration_per_mode": comparison_state.duration_per_mode,
+                        "benchmark_seed": comparison_state.benchmark_seed,
                     })
 
     except WebSocketDisconnect:

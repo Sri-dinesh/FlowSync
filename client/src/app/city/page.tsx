@@ -27,7 +27,7 @@ const CityCanvas = dynamic(() => import("@/components/city/CityCanvas"), {
 });
 
 export default function CityPage() {
-  const { frame, comparisonResults, comparisonRunning, sendCommand } = useCitySocket();
+  const { frame, comparisonResults, comparisonFullResults, comparisonRunning, sendCommand } = useCitySocket();
 
   const [mode, setMode] = useState<CityMode>("fixed");
   const [running, setRunning] = useState(false);
@@ -65,8 +65,8 @@ export default function CityPage() {
     [sendCommand]
   );
 
-  const handleRunComparison = useCallback(() => {
-    sendCommand({ command: "run_comparison" });
+  const handleRunComparison = useCallback((durationSeconds: number = 30) => {
+    sendCommand({ command: "run_comparison", duration_seconds: durationSeconds });
     setRunning(true);
   }, [sendCommand]);
 
@@ -88,9 +88,10 @@ export default function CityPage() {
               <span className="text-xs font-mono text-white/70">{frame?.timestep ?? 0}</span>
             </div>
             {comparisonRunning && frame?.comparison_progress?.running && (
-              <div className="bg-violet-900/60 backdrop-blur-sm border border-violet-700/50 rounded-lg px-3 py-1.5">
-                <span className="text-[10px] text-violet-300 uppercase tracking-wider">
-                  Comparing: {frame.comparison_progress.current_mode?.toUpperCase()}
+              <div className="bg-violet-900/60 backdrop-blur-sm border border-violet-700/50 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-violet-400 animate-ping" />
+                <span className="text-[10px] text-violet-300 font-bold uppercase tracking-wider">
+                  Comparing: {frame.comparison_progress.current_mode?.toUpperCase()} ({frame.comparison_progress.elapsed?.toFixed(0)}s / {frame.comparison_progress.total}s)
                 </span>
               </div>
             )}
@@ -176,9 +177,11 @@ export default function CityPage() {
                 >
                   <CityComparisonPanel
                     results={comparisonResults}
+                    fullResults={comparisonFullResults}
                     running={comparisonRunning}
                     progress={frame?.comparison_progress?.running ? frame.comparison_progress : undefined}
                     onStart={handleRunComparison}
+                    onStop={handleStop}
                   />
                 </TabsContent>
               </Tabs>

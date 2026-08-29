@@ -1,16 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ComparisonResult, ComparisonProgress, ComparisonResultsFrame } from "@/types/city";
 import {
-  Bar,
   BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
+  Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import {
   Trophy,
@@ -20,18 +19,23 @@ import {
   Clock,
   Target,
   Bot,
+  CheckCircle2,
   SlidersHorizontal,
+  ChevronRight,
+  TrendingUp,
   Activity,
-  Network,
+  Layers,
+  Sparkles,
 } from "lucide-react";
+import type { SimBenchmarkProgress, SimBenchmarkResultsData } from "@/hooks/useSimulationSocket";
 
-interface CityComparisonPanelProps {
-  results: Record<string, ComparisonResult> | null;
-  fullResults?: ComparisonResultsFrame | null;
+interface SimulationBenchmarkPanelProps {
   running: boolean;
-  progress?: ComparisonProgress;
+  progress: SimBenchmarkProgress | null;
+  results: SimBenchmarkResultsData | null;
   onStart: (durationSeconds: number) => void;
-  onStop?: () => void;
+  onStop: () => void;
+  onReset: () => void;
 }
 
 const PRESET_DURATIONS = [15, 30, 60, 120];
@@ -41,7 +45,7 @@ const MODE_CONFIG: Record<
   { label: string; shortLabel: string; icon: any; color: string; barColor: string; accentBg: string; textAccent: string }
 > = {
   fixed: {
-    label: "Fixed Timing",
+    label: "Fixed Timer",
     shortLabel: "FIXED",
     icon: Clock,
     color: "border-slate-700/60 bg-slate-900/40",
@@ -50,7 +54,7 @@ const MODE_CONFIG: Record<
     textAccent: "text-slate-300",
   },
   greedy: {
-    label: "Greedy Decentralized",
+    label: "Greedy Policy",
     shortLabel: "GREEDY",
     icon: Target,
     color: "border-amber-500/40 bg-amber-950/20",
@@ -59,8 +63,8 @@ const MODE_CONFIG: Record<
     textAccent: "text-amber-400",
   },
   ai: {
-    label: "Shared DQN AI Network",
-    shortLabel: "SHARED AI",
+    label: "DQN AI Agent",
+    shortLabel: "DQN AI",
     icon: Bot,
     color: "border-emerald-500/50 bg-emerald-950/20",
     barColor: "#10b981",
@@ -71,74 +75,38 @@ const MODE_CONFIG: Record<
 
 const BENCHMARK_MODES = ["fixed", "greedy", "ai"];
 
-export default function CityComparisonPanel({
-  results,
-  fullResults,
+export default function SimulationBenchmarkPanel({
   running,
   progress,
+  results,
   onStart,
   onStop,
-}: CityComparisonPanelProps) {
+  onReset,
+}: SimulationBenchmarkPanelProps) {
   const [duration, setDuration] = useState<number>(15);
 
-  const modes = useMemo(() => ["fixed", "greedy", "ai"], []);
-
   const chartData = useMemo(() => {
-    if (!results) return [];
-
-    const waitData: Record<string, string | number> = { metric: "Avg Wait (s)" };
-    const thruData: Record<string, string | number> = { metric: "Throughput" };
-    const maxQData: Record<string, string | number> = { metric: "Peak Queue" };
-
-    if (results.fixed) {
-      waitData.fixed = parseFloat(results.fixed.avg_wait_time.toFixed(2));
-      thruData.fixed = results.fixed.throughput;
-      maxQData.fixed = results.fixed.max_queue ?? 0;
-    }
-    if (results.greedy) {
-      waitData.greedy = parseFloat(results.greedy.avg_wait_time.toFixed(2));
-      thruData.greedy = results.greedy.throughput;
-      maxQData.greedy = results.greedy.max_queue ?? 0;
-    }
-    if (results.ai) {
-      waitData.ai = parseFloat(results.ai.avg_wait_time.toFixed(2));
-      thruData.ai = results.ai.throughput;
-      maxQData.ai = results.ai.max_queue ?? 0;
-    }
-
-    return [thruData, waitData, maxQData];
+    if (!results || !results.results) return [];
+    return [
+      {
+        metric: "Vehicles Passed",
+        ...Object.fromEntries(results.modes.map((m) => [m, results.results[m]?.total_passed ?? 0])),
+      },
+      {
+        metric: "Avg Wait (s)",
+        ...Object.fromEntries(results.modes.map((m) => [m, results.results[m]?.avg_wait_time ?? 0])),
+      },
+      {
+        metric: "Max Queue",
+        ...Object.fromEntries(results.modes.map((m) => [m, results.results[m]?.max_queue ?? 0])),
+      },
+    ];
   }, [results]);
 
-  const winner = useMemo(() => {
-    if (fullResults?.winner) return fullResults.winner;
-    if (!results) return null;
-    return Object.keys(results).sort((a, b) => {
-      const wa = results[a]?.avg_wait_time ?? 999;
-      const wb = results[b]?.avg_wait_time ?? 999;
-      if (wa !== wb) return wa - wb;
-      return (results[b]?.throughput ?? 0) - (results[a]?.throughput ?? 0);
-    })[0] ?? null;
-  }, [results, fullResults]);
-
-  const improvements = useMemo(() => {
-    if (fullResults?.improvements) return fullResults.improvements;
-    if (!results?.fixed) return {};
-    const fWait = results.fixed.avg_wait_time;
-    if (fWait <= 0) return {};
-    const imp: Record<string, number> = {};
-    if (results.ai) {
-      imp.ai_wait_pct = Number((((fWait - results.ai.avg_wait_time) / fWait) * 100).toFixed(1));
-    }
-    if (results.greedy) {
-      imp.greedy_wait_pct = Number((((fWait - results.greedy.avg_wait_time) / fWait) * 100).toFixed(1));
-    }
-    return imp;
-  }, [results, fullResults]);
-
   const winnerLabel = useMemo(() => {
-    if (!winner) return null;
-    return MODE_CONFIG[winner]?.label ?? winner.toUpperCase();
-  }, [winner]);
+    if (!results?.winner) return null;
+    return MODE_CONFIG[results.winner]?.label ?? results.winner.toUpperCase();
+  }, [results]);
 
   return (
     <div className="space-y-3.5 text-white">
@@ -152,15 +120,15 @@ export default function CityComparisonPanel({
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
               <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">
-                City Grid Benchmark
+                Benchmark Configuration
               </span>
             </div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-md font-semibold">
-              4 Intersections
+              3 Policies • Sequential
             </span>
           </div>
 
-          {/* Duration Selector */}
+          {/* Duration Selector Segmented Control */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-white/60 font-medium flex items-center gap-1.5">
@@ -211,15 +179,15 @@ export default function CityComparisonPanel({
             </div>
           </div>
 
-          {/* Pipeline node preview */}
+          {/* Sequential Execution Nodes */}
           <div className="rounded-xl border border-white/[0.06] bg-black/40 p-3 space-y-2">
             <div className="text-[9px] uppercase tracking-[0.14em] text-white/40 font-semibold flex items-center justify-between">
-              <span>City Evaluation Sequence</span>
+              <span>Benchmark Pipeline</span>
               <span className="font-mono text-white/60 font-normal">3 × {duration}s = {duration * 3}s</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              {BENCHMARK_MODES.map((m) => {
+              {BENCHMARK_MODES.map((m, idx) => {
                 const cfg = MODE_CONFIG[m];
                 const Icon = cfg.icon;
                 return (
@@ -242,7 +210,7 @@ export default function CityComparisonPanel({
             className="w-full py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-xs uppercase tracking-[0.14em] shadow-[0_0_24px_rgba(52,211,153,0.3)] hover:shadow-[0_0_32px_rgba(52,211,153,0.45)] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
           >
             <Play className="w-3.5 h-3.5 fill-black" />
-            Launch City Benchmark ({duration * 3}s)
+            Launch Benchmark ({duration * 3}s)
           </button>
         </div>
       )}
@@ -250,7 +218,7 @@ export default function CityComparisonPanel({
       {/* ─────────────────────────────────────────────────────────────
           2. LIVE RUNNING TELEMETRY HUD
       ───────────────────────────────────────────────────────────── */}
-      {running && (
+      {running && progress && (
         <div className="rounded-2xl border border-emerald-500/30 bg-[#090d14]/95 backdrop-blur-xl p-4 space-y-4 shadow-[0_0_32px_rgba(16,185,129,0.1)]">
           {/* Status Bar */}
           <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
@@ -260,20 +228,19 @@ export default function CityComparisonPanel({
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
               <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white">
-                City Phase {(progress?.mode_index ?? 0) + 1} of {progress?.total_modes ?? 3}
+                Running Phase {(progress.mode_index ?? 0) + 1} of {progress.modes_total ?? 3}
               </span>
             </div>
             <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md">
-              {progress?.elapsed?.toFixed(1) ?? "0.0"}s / {progress?.total ?? duration}.0s
+              {progress.elapsed?.toFixed(1)}s / {progress.duration_seconds ?? duration}.0s
             </span>
           </div>
 
           {/* 3 Pipeline Step Cards */}
           <div className="grid grid-cols-3 gap-2">
             {BENCHMARK_MODES.map((m, idx) => {
-              const currentIndex = progress?.mode_index ?? 0;
-              const isDone = idx < currentIndex;
-              const isCurrent = idx === currentIndex;
+              const isDone = (progress.modes_done ?? []).includes(m);
+              const isCurrent = progress.current_mode === m;
               const cfg = MODE_CONFIG[m];
               const Icon = cfg.icon;
 
@@ -294,7 +261,7 @@ export default function CityComparisonPanel({
                   </div>
                   <div className="text-[9px] font-mono mt-0.5">
                     {isCurrent ? (
-                      <span className="text-emerald-300 font-bold">{progress?.elapsed?.toFixed(0) ?? 0}s</span>
+                      <span className="text-emerald-300 font-bold">{progress.elapsed?.toFixed(0)}s</span>
                     ) : isDone ? (
                       <span className="text-white/40">✓ Done</span>
                     ) : (
@@ -309,16 +276,16 @@ export default function CityComparisonPanel({
           {/* Active Mode Progress Bar */}
           <div className="space-y-1.5">
             <div className="flex justify-between text-[9px] font-mono uppercase tracking-wider text-white/40">
-              <span>{MODE_CONFIG[progress?.current_mode ?? "fixed"]?.label} Evaluation</span>
+              <span>{MODE_CONFIG[progress.current_mode]?.label} Execution</span>
               <span className="text-white/80 font-bold">
-                {Math.min(Math.round(((progress?.elapsed ?? 0) / (progress?.total ?? duration)) * 100), 100)}%
+                {Math.min(Math.round(((progress.elapsed ?? 0) / (progress.duration_seconds ?? duration)) * 100), 100)}%
               </span>
             </div>
             <div className="h-2 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/[0.06]">
               <div
                 className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300 shadow-[0_0_10px_#10b981]"
                 style={{
-                  width: `${Math.min((((progress?.elapsed ?? 0) / (progress?.total ?? duration))) * 100, 100)}%`,
+                  width: `${Math.min((((progress.elapsed ?? 0) / (progress.duration_seconds ?? duration))) * 100, 100)}%`,
                 }}
               />
             </div>
@@ -326,15 +293,13 @@ export default function CityComparisonPanel({
 
           {/* Abort Control */}
           <div className="pt-1 flex items-center justify-between border-t border-white/[0.06]">
-            <span className="text-[9px] text-white/30 font-mono">2×2 Network Topology</span>
-            {onStop && (
-              <button
-                onClick={onStop}
-                className="px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-950/30 hover:bg-red-950/60 text-red-300 text-[10px] font-bold uppercase tracking-wider transition-all"
-              >
-                Abort Benchmark
-              </button>
-            )}
+            <span className="text-[9px] text-white/30 font-mono">Real-time 10Hz Broadcast</span>
+            <button
+              onClick={onStop}
+              className="px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-950/30 hover:bg-red-950/60 text-red-300 text-[10px] font-bold uppercase tracking-wider transition-all"
+            >
+              Abort Benchmark
+            </button>
           </div>
         </div>
       )}
@@ -345,7 +310,7 @@ export default function CityComparisonPanel({
       {!running && results && (
         <div className="space-y-3.5">
           {/* Victory Card */}
-          {winner && (
+          {results.winner && (
             <div className="relative overflow-hidden rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-[#0a0f16] to-[#080b10] p-4 shadow-[0_0_24px_rgba(16,185,129,0.15)]">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
@@ -361,11 +326,11 @@ export default function CityComparisonPanel({
                     {winnerLabel}
                   </div>
                   <p className="text-[11px] text-white/70 leading-relaxed pt-0.5">
-                    {improvements?.ai_wait_pct && improvements.ai_wait_pct > 0 && winner === "ai"
-                      ? `Achieved ${improvements.ai_wait_pct}% lower city-wide wait time compared to Fixed Timing.`
-                      : improvements?.greedy_wait_pct && improvements.greedy_wait_pct > 0 && winner === "greedy"
-                      ? `Achieved ${improvements.greedy_wait_pct}% lower city-wide wait time compared to Fixed Timing.`
-                      : `Demonstrated optimal vehicle throughput and flow across all 4 intersections.`}
+                    {results.improvements?.ai_wait_pct && results.improvements.ai_wait_pct > 0 && results.winner === "ai"
+                      ? `Achieved ${results.improvements.ai_wait_pct}% lower average wait time compared to Fixed Timer baseline.`
+                      : results.improvements?.greedy_wait_pct && results.improvements.greedy_wait_pct > 0 && results.winner === "greedy"
+                      ? `Achieved ${results.improvements.greedy_wait_pct}% lower average wait time compared to Fixed Timer baseline.`
+                      : `Demonstrated optimal vehicle flow and minimal congestion throughout the ${results.duration_seconds}s benchmark.`}
                   </p>
                 </div>
               </div>
@@ -375,11 +340,11 @@ export default function CityComparisonPanel({
           {/* Mode Performance Rows */}
           <div className="space-y-2">
             <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/40 px-1">
-              Network Metrics ({fullResults?.duration_seconds || duration}s per mode)
+              Policy Metrics ({results.duration_seconds}s per mode)
             </div>
 
-            {modes.map((mode) => {
-              const res = results[mode];
+            {results.modes.map((mode) => {
+              const res = results.results[mode];
               const cfg = MODE_CONFIG[mode] ?? {
                 label: mode,
                 shortLabel: mode.toUpperCase(),
@@ -389,7 +354,7 @@ export default function CityComparisonPanel({
                 accentBg: "bg-white/10",
                 textAccent: "text-white",
               };
-              const isWinner = mode === winner;
+              const isWinner = mode === results.winner;
               const Icon = cfg.icon;
 
               return (
@@ -419,9 +384,9 @@ export default function CityComparisonPanel({
 
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t border-white/[0.04]">
                     <div className="bg-black/30 rounded-lg p-2 text-center border border-white/[0.03]">
-                      <div className="text-[8px] uppercase tracking-wider text-white/40 font-semibold">Throughput</div>
+                      <div className="text-[8px] uppercase tracking-wider text-white/40 font-semibold">Passed</div>
                       <div className={`text-xs font-mono font-bold mt-0.5 ${isWinner ? "text-emerald-400" : "text-white/90"}`}>
-                        {res?.throughput ?? 0} <span className="text-[8px] font-normal text-white/40">veh</span>
+                        {res?.total_passed ?? 0} <span className="text-[8px] font-normal text-white/40">veh</span>
                       </div>
                     </div>
 
@@ -433,7 +398,7 @@ export default function CityComparisonPanel({
                     </div>
 
                     <div className="bg-black/30 rounded-lg p-2 text-center border border-white/[0.03]">
-                      <div className="text-[8px] uppercase tracking-wider text-white/40 font-semibold">Peak Queue</div>
+                      <div className="text-[8px] uppercase tracking-wider text-white/40 font-semibold">Max Queue</div>
                       <div className={`text-xs font-mono font-bold mt-0.5 ${isWinner ? "text-emerald-400" : "text-white/90"}`}>
                         {res?.max_queue ?? 0}
                       </div>
@@ -447,7 +412,7 @@ export default function CityComparisonPanel({
           {/* Comparison Bar Chart */}
           <div className="rounded-xl border border-white/[0.08] bg-[#090d14]/90 p-3.5">
             <p className="text-[9px] uppercase tracking-[0.16em] text-white/40 font-bold mb-3">
-              City Network Comparison
+              Comparative Analysis
             </p>
             <ResponsiveContainer width="100%" height={140}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, left: -22, bottom: 0 }}>
@@ -464,7 +429,7 @@ export default function CityComparisonPanel({
                   itemStyle={{ color: "rgba(255,255,255,0.8)" }}
                 />
                 <Legend wrapperStyle={{ fontSize: "10px", color: "rgba(255,255,255,0.5)" }} />
-                {modes.map((mode) => (
+                {results.modes.map((mode) => (
                   <Bar
                     key={mode}
                     dataKey={mode}
@@ -480,14 +445,14 @@ export default function CityComparisonPanel({
           {/* Action Row */}
           <div className="flex gap-2 pt-1">
             <button
-              onClick={() => onStart(fullResults?.duration_seconds || duration)}
+              onClick={() => onStart(results.duration_seconds || duration)}
               className="flex-1 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs uppercase tracking-wider hover:bg-white/90 transition-all flex items-center justify-center gap-1.5 shadow-md"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Rerun ({fullResults?.duration_seconds || duration}s each)
+              Rerun ({results.duration_seconds}s each)
             </button>
             <button
-              onClick={() => onStart(duration)}
+              onClick={onReset}
               className="px-4 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] text-xs font-semibold text-white/70 hover:text-white transition-all flex items-center gap-1.5"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />

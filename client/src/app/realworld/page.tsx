@@ -196,18 +196,6 @@ export default function RealWorldPage() {
                 )}
               </button>
             ))}
-
-            {/* WS status indicator */}
-            <div className="ml-auto flex items-center gap-2 text-[10px] text-white/30 pr-1">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isConnected
-                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]"
-                    : "bg-rose-500"
-                }`}
-              />
-              {isConnected ? "WS Connected" : "Disconnected"}
-            </div>
           </div>
 
           {/* Tab content area */}

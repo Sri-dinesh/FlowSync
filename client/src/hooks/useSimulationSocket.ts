@@ -1,8 +1,34 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSimulationStore } from "@/store/simulationStore";
 import type { SimulationFrame } from "@/types/simulation";
 import { getFastApiUrls } from "@/lib/utils";
+
+export interface SimBenchmarkResult {
+  total_passed: number;
+  avg_wait_time: number;
+  max_queue: number;
+  duration_seconds: number;
+}
+
+export interface SimBenchmarkResultsData {
+  duration_seconds: number;
+  results: Record<string, SimBenchmarkResult>;
+  winner: string | null;
+  modes: string[];
+  improvements?: Record<string, number>;
+}
+
+export interface SimBenchmarkProgress {
+  current_mode: string;
+  elapsed?: number;
+  duration_seconds?: number;
+  mode_index?: number;
+  modes_total?: number;
+  modes_done?: string[];
+  completed_mode?: string;
+  result?: SimBenchmarkResult;
+}
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 500;
@@ -10,6 +36,10 @@ const BASE_DELAY_MS = 500;
 export function useSimulationSocket() {
   const setFrame = useSimulationStore((state) => state.setFrame);
   const setConnected = useSimulationStore((state) => state.setConnected);
+
+  const [benchmarkRunning, setBenchmarkRunning] = useState(false);
+  const [benchmarkProgress, setBenchmarkProgress] = useState<SimBenchmarkProgress | null>(null);
+  const [benchmarkResults, setBenchmarkResults] = useState<SimBenchmarkResultsData | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -46,16 +76,41 @@ export function useSimulationSocket() {
           return;
         }
 
-        // Skip non-simulation-frame messages (benchmark_progress, benchmark_results, errors, etc.)
+        // Handle benchmark messages
+        if (raw.type === "benchmark_progress") {
+          setBenchmarkRunning(true);
+          setBenchmarkProgress({
+            current_mode: raw.current_mode,
+            elapsed: raw.elapsed ?? 0,
+            duration_seconds: raw.duration_seconds ?? 30,
+            mode_index: raw.mode_index ?? 0,
+            modes_total: raw.modes_total ?? 3,
+            modes_done: raw.modes_done ?? [],
+            completed_mode: raw.completed_mode,
+            result: raw.result,
+          });
+          return;
+        }
+
+        if (raw.type === "benchmark_results") {
+          setBenchmarkRunning(false);
+          setBenchmarkProgress(null);
+          setBenchmarkResults(raw as SimBenchmarkResultsData);
+          return;
+        }
+
+        // Skip non-simulation-frame messages (errors, pipeline_status, etc.)
         const NON_FRAME_TYPES = new Set([
-          "benchmark_progress",
-          "benchmark_results",
           "error",
           "pipeline_status",
           "video_progress",
           "cctv_frame",
         ]);
         if (raw.type && NON_FRAME_TYPES.has(raw.type)) {
+          if (raw.code === "BENCHMARK_FAILED") {
+            setBenchmarkRunning(false);
+            setBenchmarkProgress(null);
+          }
           return;
         }
 
@@ -196,5 +251,36 @@ export function useSimulationSocket() {
     }
   }, []);
 
-  return { sendCommand };
+  const startBenchmark = useCallback((durationSeconds: number = 30) => {
+    setBenchmarkResults(null);
+    setBenchmarkProgress(null);
+    setBenchmarkRunning(true);
+    sendCommand({
+      command: "run_timed_benchmark",
+      duration_seconds: durationSeconds,
+      modes: ["fixed", "greedy", "ai"],
+    });
+  }, [sendCommand]);
+
+  const stopBenchmark = useCallback(() => {
+    setBenchmarkRunning(false);
+    setBenchmarkProgress(null);
+    sendCommand({ command: "stop" });
+  }, [sendCommand]);
+
+  const resetBenchmark = useCallback(() => {
+    setBenchmarkResults(null);
+    setBenchmarkProgress(null);
+    setBenchmarkRunning(false);
+  }, []);
+
+  return {
+    sendCommand,
+    benchmarkRunning,
+    benchmarkProgress,
+    benchmarkResults,
+    startBenchmark,
+    stopBenchmark,
+    resetBenchmark,
+  };
 }

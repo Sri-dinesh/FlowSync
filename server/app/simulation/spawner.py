@@ -12,12 +12,23 @@ class PoissonSpawner:
     def __init__(self, lambda_rate: float = 0.3) -> None:
         self.lambda_rate = lambda_rate
         self.enabled = False
+        self._rng = np.random.default_rng()
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
 
     def set_enabled(self, enabled: bool) -> None:
         self.enabled = bool(enabled)
+
+    def set_seed(self, seed: int | None = None) -> None:
+        """
+        Set seed for deterministic benchmark testing (CRN).
+        Pass None to restore natural unseeded stochastic generation.
+        """
+        if seed is not None:
+            self._rng = np.random.default_rng(int(seed))
+        else:
+            self._rng = np.random.default_rng()
 
     def spawn(self, dt: float, lanes: Dict[str, List[Vehicle]]) -> List[Vehicle]:
         spawned: List[Vehicle] = []
@@ -33,12 +44,12 @@ class PoissonSpawner:
         dir_names = ["north", "south", "east", "west"]
         
         # Only spawn into one approach direction per tick so the intersection reads more clearly.
-        dir_name = str(np.random.choice(dir_names))
+        dir_name = str(self._rng.choice(dir_names))
         
-        num_to_spawn = int(np.random.poisson(self.lambda_rate * dt))
+        num_to_spawn = int(self._rng.poisson(self.lambda_rate * dt))
         for _ in range(num_to_spawn):
             # Decide turn: 50% straight, 25% left, 25% right
-            turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+            turn = str(self._rng.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
             lane_id = f"{dir_name}_{turn}"
             lane_queue = lanes.get(lane_id, [])
             

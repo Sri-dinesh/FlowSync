@@ -76,6 +76,8 @@ export interface ComparisonProgress {
 export interface ComparisonResult {
   avg_wait_time: number;
   throughput: number;
+  max_queue?: number;
+  duration_seconds?: number;
 }
 
 export interface CityFrame {
@@ -91,4 +93,8 @@ export interface CityFrame {
 export interface ComparisonResultsFrame {
   frame_type: "comparison_results";
   results: Record<string, ComparisonResult>;
+  winner?: string | null;
+  duration_seconds?: number;
+  modes?: string[];
+  improvements?: Record<string, number>;
 }

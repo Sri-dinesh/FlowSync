@@ -128,15 +128,12 @@ async def _run_timed_benchmark(
     modes: list[str],
 ) -> None:
     """
-    Runs all requested modes sequentially for `duration_seconds` of REAL wall time each.
-
+    Runs all requested modes sequentially for the same wall-time duration.
     Each mode:
-      1. Resets the intersection and injects scenario_counts
-      2. Runs at real-time 10 Hz (0.1 s sleep between ticks) so the 3D canvas
-         receives simulation_frame events and renders vehicles moving
-      3. Records throughput/wait results
-      4. Broadcasts benchmark_progress after mode completes
-
+      1. Resets the intersection
+      2. Injects scenario_counts (if provided) or enables spawner for dynamic traffic
+      3. Runs for duration_seconds at real-time 10 Hz (broadcasts frames driving 3-D canvas)
+      4. Records results
     After all modes finish, broadcasts benchmark_results with winner.
     """
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
@@ -145,12 +142,12 @@ async def _run_timed_benchmark(
     PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
 
     results: dict = {}
-    prev_mode    = app.state.mode
-    prev_running = app.state.sim_running
+    prev_mode    = getattr(app.state, "mode", "fixed")
+    prev_running = getattr(app.state, "sim_running", False)
 
     # Pause normal simulation loop so both don't fight over the intersection
     app.state.sim_running = False
-    if app.state.sim_task is not None:
+    if getattr(app.state, "sim_task", None) is not None:
         app.state.sim_task.cancel()
         try:
             await app.state.sim_task
@@ -158,8 +155,12 @@ async def _run_timed_benchmark(
             pass
     await asyncio.sleep(0.2)
 
+    # Generate a synchronized CRN seed for this benchmark session
+    import random
+    benchmark_seed = random.randint(1, 1_000_000)
+
     try:
-        for mode in modes:
+        for mode_idx, mode in enumerate(modes):
             intersection = app.state.sim_intersection
             agent        = app.state.sim_agent
 
@@ -167,11 +168,18 @@ async def _run_timed_benchmark(
             intersection.reset()
             if scenario_counts:
                 intersection.inject_scenario(scenario_counts)
-            # Keep spawner disabled — we seeded the intersection with inject_scenario
-            try:
-                intersection.spawner.set_enabled(False)
-            except Exception:
-                pass
+                try:
+                    intersection.spawner.set_enabled(False)
+                except Exception:
+                    pass
+            else:
+                # Dynamic traffic generation with Common Random Numbers (CRN)
+                # Guarantees Fixed, Greedy, and AI face 100% IDENTICAL arrival schedules
+                try:
+                    intersection.spawner.set_seed(benchmark_seed)
+                    intersection.spawner.set_enabled(True)
+                except Exception:
+                    pass
 
             app.state.mode = mode
 
@@ -180,8 +188,12 @@ async def _run_timed_benchmark(
                 await websocket.send_json({
                     "type": "benchmark_progress",
                     "current_mode": mode,
+                    "mode_index": mode_idx,
                     "modes_total": len(modes),
                     "modes_done": list(results.keys()),
+                    "elapsed": 0.0,
+                    "duration_seconds": duration_seconds,
+                    "benchmark_seed": benchmark_seed,
                 })
             except Exception:
                 pass
@@ -194,9 +206,11 @@ async def _run_timed_benchmark(
             obs               = np.zeros(20, dtype=np.float32)
             episode           = 0
             deadline          = asyncio.get_event_loop().time() + duration_seconds
+            tick_count        = 0
 
             while asyncio.get_event_loop().time() < deadline:
                 tick_start = asyncio.get_event_loop().time()
+                tick_count += 1
 
                 # ── Compute action ─────────────────────────────────────────
                 if mode in ("fixed", "manual"):
@@ -244,6 +258,23 @@ async def _run_timed_benchmark(
                 )
                 await manager.broadcast(frame.model_dump())
 
+                # Send progress updates every 5 ticks (~0.5s)
+                if tick_count % 5 == 0:
+                    mode_elapsed = max(0.0, duration_seconds - (deadline - asyncio.get_event_loop().time()))
+                    try:
+                        await websocket.send_json({
+                            "type": "benchmark_progress",
+                            "current_mode": mode,
+                            "mode_index": mode_idx,
+                            "modes_total": len(modes),
+                            "modes_done": list(results.keys()),
+                            "elapsed": round(mode_elapsed, 1),
+                            "duration_seconds": duration_seconds,
+                            "benchmark_seed": benchmark_seed,
+                        })
+                    except Exception:
+                        pass
+
                 # ── Real-time pacing ───────────────────────────────────────
                 elapsed = asyncio.get_event_loop().time() - tick_start
                 sleep_t = max(0.0, TICK_SLEEP - elapsed)
@@ -263,16 +294,36 @@ async def _run_timed_benchmark(
                 await websocket.send_json({
                     "type":           "benchmark_progress",
                     "current_mode":   mode,
+                    "mode_index":     mode_idx,
                     "completed_mode": mode,
                     "result":         results[mode],
                     "modes_done":     list(results.keys()),
                     "modes_total":    len(modes),
+                    "elapsed":        duration_seconds,
+                    "duration_seconds": duration_seconds,
+                    "benchmark_seed": benchmark_seed,
                 })
             except Exception:
                 pass
 
-        # ── Final results ──────────────────────────────────────────────────
-        winner = max(results, key=lambda m: results[m]["total_passed"]) if results else None
+        # ── Winner & Improvements Calculation ──────────────────────────────
+        fixed_res = results.get("fixed")
+        improvements = {}
+        if fixed_res and fixed_res.get("avg_wait_time", 0) > 0:
+            f_wait = fixed_res["avg_wait_time"]
+            if "ai" in results:
+                improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+            if "greedy" in results:
+                improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+
+        # Winner: lowest avg wait time, highest total passed as tiebreaker
+        def _score_mode(m):
+            r = results[m]
+            return (-r["avg_wait_time"], r["total_passed"])
+
+        winner = max(results.keys(), key=_score_mode) if results else None
+
+        # Final broadcast
         try:
             await websocket.send_json({
                 "type":             "benchmark_results",
@@ -280,10 +331,14 @@ async def _run_timed_benchmark(
                 "results":          results,
                 "winner":           winner,
                 "modes":            modes,
+                "improvements":     improvements,
+                "benchmark_seed":   benchmark_seed,
             })
         except Exception as e:
             logger.warning("Failed to send benchmark_results: %s", e)
 
+    except asyncio.CancelledError:
+        logger.info("Benchmark cancelled by user")
     except Exception as e:
         logger.exception("Benchmark error: %s", e)
         try:
@@ -291,10 +346,14 @@ async def _run_timed_benchmark(
         except Exception:
             pass
     finally:
-        # Restore previous state — let the normal loop resume if it was running
+        # Restore previous state — restore spawner back to natural stochastic randomness for manual simulation
         app.state.mode = prev_mode
         app.state.sim_running = prev_running
         app.state.sim_intersection.reset()
+        try:
+            app.state.sim_intersection.spawner.set_seed(None)
+        except Exception:
+            pass
 
 
 # ─── Simulation helper ────────────────────────────────────────────────────────
@@ -545,6 +604,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                         app.state.current_simulation_id = f"local-{int(time.time())}"
 
             elif command == "stop":
+                if getattr(app.state, "benchmark_task", None) is not None:
+                    app.state.benchmark_task.cancel()
+                    app.state.benchmark_task = None
                 app.state.sim_running = False
                 try:
                     app.state.sim_intersection.spawner.set_enabled(False)
@@ -585,6 +647,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     app.state.current_simulation_id = None
 
             elif command == "reset":
+                if getattr(app.state, "benchmark_task", None) is not None:
+                    app.state.benchmark_task.cancel()
+                    app.state.benchmark_task = None
                 simulation_id = app.state.current_simulation_id
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
@@ -620,13 +685,14 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     app.state.sim_intersection.trigger_emergency_override(lane)
 
             elif command == "run_timed_benchmark":
-                duration_seconds = int(message.get("duration_seconds", 120))
+                duration_seconds = int(message.get("duration_seconds", 30))
                 scenario_counts = message.get("scenario_counts", None)
-                modes = message.get("modes", ["fixed", "ai", "greedy"])
+                modes = message.get("modes", ["fixed", "greedy", "ai"])
                 # Clamp duration between 10 and 600 seconds
                 duration_seconds = max(10, min(600, duration_seconds))
-                # Run benchmark as a background task so the WS remains responsive
-                asyncio.create_task(
+                if getattr(app.state, "benchmark_task", None) is not None:
+                    app.state.benchmark_task.cancel()
+                app.state.benchmark_task = asyncio.create_task(
                     _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes)
                 )
 

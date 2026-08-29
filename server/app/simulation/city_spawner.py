@@ -42,12 +42,23 @@ class CitySpawner:
     def __init__(self, lambda_rate: float = 0.3) -> None:
         self.lambda_rate = lambda_rate
         self.enabled = False
+        self._rng = np.random.default_rng()
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
 
     def set_enabled(self, enabled: bool) -> None:
         self.enabled = bool(enabled)
+
+    def set_seed(self, seed: int | None = None) -> None:
+        """
+        Set seed for deterministic benchmark testing (CRN).
+        Pass None to restore natural unseeded stochastic generation.
+        """
+        if seed is not None:
+            self._rng = np.random.default_rng(int(seed))
+        else:
+            self._rng = np.random.default_rng()
 
     def spawn(self, dt: float, intersections: Dict[str, Intersection]) -> int:
         """
@@ -68,10 +79,10 @@ class CitySpawner:
             if intersection is None:
                 continue
 
-            num_to_spawn = int(np.random.poisson(per_entry_rate * dt))
+            num_to_spawn = int(self._rng.poisson(per_entry_rate * dt))
             for _ in range(num_to_spawn):
                 # 50% straight, 25% left, 25% right
-                turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                turn = str(self._rng.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
                 lane_key = f"{approach_dir}_{turn}"
                 lane_queue = intersection.lanes.get(lane_key, [])
 

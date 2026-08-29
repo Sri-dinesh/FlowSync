@@ -15,6 +15,7 @@ interface UseCitySocketReturn {
   frame: CityFrame | null;
   connected: boolean;
   comparisonResults: Record<string, ComparisonResult> | null;
+  comparisonFullResults: ComparisonResultsFrame | null;
   comparisonRunning: boolean;
   sendCommand: (cmd: Record<string, unknown>) => void;
 }
@@ -26,6 +27,7 @@ export function useCitySocket(): UseCitySocketReturn {
   const [frame, setFrame] = useState<CityFrame | null>(null);
   const [connected, setConnected] = useState(false);
   const [comparisonResults, setComparisonResults] = useState<Record<string, ComparisonResult> | null>(null);
+  const [comparisonFullResults, setComparisonFullResults] = useState<ComparisonResultsFrame | null>(null);
   const [comparisonRunning, setComparisonRunning] = useState(false);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -62,6 +64,7 @@ export function useCitySocket(): UseCitySocketReturn {
         if (raw.frame_type === "comparison_results") {
           const rf = raw as ComparisonResultsFrame;
           setComparisonResults(rf.results);
+          setComparisonFullResults(rf);
           setComparisonRunning(false);
           return;
         }
@@ -69,6 +72,7 @@ export function useCitySocket(): UseCitySocketReturn {
         if (raw.frame_type === "comparison_started") {
           setComparisonRunning(true);
           setComparisonResults(null);
+          setComparisonFullResults(null);
           return;
         }
 
@@ -131,5 +135,5 @@ export function useCitySocket(): UseCitySocketReturn {
     }
   }, []);
 
-  return { frame, connected, comparisonResults, comparisonRunning, sendCommand };
+  return { frame, connected, comparisonResults, comparisonFullResults, comparisonRunning, sendCommand };
 }
