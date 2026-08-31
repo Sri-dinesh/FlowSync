@@ -40,6 +40,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Training agent — used exclusively by Trainer
     training_agent = DQNAgent()
 
+    # Attempt to auto-load the latest trained model checkpoint into agents
+    try:
+        models = model_service.list_all_models()
+        if models:
+            first_model = models[0]
+            m_id = first_model.get("id")
+            cps = model_service.list_checkpoints(m_id)
+            episodes = [
+                int(p.split("checkpoint_")[1].split(".")[0])
+                for p in cps
+                if "checkpoint_" in p and p.split("checkpoint_")[1].split(".")[0].isdigit()
+            ]
+            if episodes:
+                best_ep = max(episodes)
+                cp_data = model_service.load_checkpoint(m_id, best_ep)
+                if isinstance(cp_data, dict) and "online_net" in cp_data:
+                    sim_agent.online_net.load_state_dict(cp_data["online_net"])
+                    sim_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
+                    training_agent.online_net.load_state_dict(cp_data["online_net"])
+                    training_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
+                    print(f"[ModelService] Auto-loaded trained model checkpoint: {m_id} (ep {best_ep})")
+    except Exception as e:
+        print(f"[ModelService] Default checkpoint load skipped: {e}")
+
     trainer = Trainer(
         env=training_env,
         agent=training_agent,

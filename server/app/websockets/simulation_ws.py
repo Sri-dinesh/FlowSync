@@ -291,9 +291,42 @@ async def _run_timed_benchmark(
                     last_action  = action
                     intersection.tick(dt=TICK_DT, action=action)
                 elif mode == "ai" and agent is not None:
-                    obs    = _build_obs_from_intersection(intersection)
-                    action = agent.select_action(obs, epsilon=0.0)
-                    last_action  = action
+                    signal = intersection.signal
+                    obs = _build_obs_from_intersection(intersection)
+
+                    # Real-world safety controller with phase synchronization & starvation watchdog
+                    if signal.can_switch_phase and signal.color.name == "GREEN":
+                        starved = signal.get_starved_directions()
+                        if starved:
+                            # Safety Guard 1: Starvation protection (prevent locking out red lanes)
+                            starved_dir = starved[0]
+                            action = 0 if starved_dir in ("north", "south") else 1
+                        elif signal.is_max_green_exceeded:
+                            # Safety Guard 2: Max green ceiling cap (fair cycle distribution)
+                            queues = intersection.get_movement_queues()
+                            phase_counts = {
+                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                                for ph in range(4) if ph != signal.current_phase
+                            }
+                            action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
+                        else:
+                            # DQN Q-value policy with Demand Action Masking
+                            queues = intersection.get_movement_queues()
+                            phase_demands = {
+                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                                for ph in range(4)
+                            }
+                            valid_phases = [p for p, d in phase_demands.items() if d > 0]
+                            if valid_phases:
+                                q_values = agent.get_q_values(obs)
+                                action = max(valid_phases, key=lambda p: q_values[p])
+                            else:
+                                action = agent.select_action(obs, epsilon=0.0)
+                    else:
+                        # Hold phase during transitions / minimum green
+                        action = signal.current_phase
+
+                    last_action = action
                     was_exploring = False
                     intersection.tick(dt=TICK_DT, action=action)
                 else:
@@ -541,8 +574,37 @@ async def _simulation_loop(app) -> None:
                 intersection.tick(dt=0.1, action=greedy_action)
                 last_reward = 0.0
             elif mode == "ai":
+                signal = intersection.signal
                 obs = _build_obs_from_intersection(intersection)
-                action = agent.select_action(obs, epsilon=0.0)
+
+                if signal.can_switch_phase and signal.color.name == "GREEN":
+                    starved = signal.get_starved_directions()
+                    if starved:
+                        starved_dir = starved[0]
+                        action = 0 if starved_dir in ("north", "south") else 1
+                    elif signal.is_max_green_exceeded:
+                        queues = intersection.get_movement_queues()
+                        phase_counts = {
+                            ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                            for ph in range(4) if ph != signal.current_phase
+                        }
+                        action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
+                    else:
+                        # DQN Q-value policy with Demand Action Masking
+                        queues = intersection.get_movement_queues()
+                        phase_demands = {
+                            ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                            for ph in range(4)
+                        }
+                        valid_phases = [p for p, d in phase_demands.items() if d > 0]
+                        if valid_phases:
+                            q_values = agent.get_q_values(obs)
+                            action = max(valid_phases, key=lambda p: q_values[p])
+                        else:
+                            action = agent.select_action(obs, epsilon=0.0)
+                else:
+                    action = signal.current_phase
+
                 last_action = action
 
                 prev_pressures = app.state.training_env._compute_movement_pressures(intersection)
