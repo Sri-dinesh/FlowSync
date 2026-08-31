@@ -303,3 +303,30 @@ class TrackState(BaseModel):
     is_moving: bool = True
     wait_time_seconds: float = 0.0
     centroid_history: List[Tuple[float, float]] = Field(default_factory=list)
+
+
+class VehicleArrivalEvent(BaseModel):
+    """A timestamped vehicle arrival for chronological digital twin replay."""
+    model_config = ConfigDict(frozen=False)
+
+    vehicle_id: str
+    time_s: float                    # Time offset from video start in seconds
+    lane: str                        # "north", "south", "east", "west"
+    turn: str = "straight"           # "straight", "left", "right"
+    vehicle_type: str = "car"        # "car", "bus", "truck", "motorcycle", "auto_rickshaw"
+    initial_speed: float = 0.15
+
+
+class TwinData(BaseModel):
+    """Complete dataset for seeding/replaying the digital twin simulation."""
+    model_config = ConfigDict(frozen=False)
+
+    session_id: str
+    total_frames_processed: int = 0
+    total_vehicles_detected: int = 0
+    video_duration_s: float = 0.0
+    arrivals: List[VehicleArrivalEvent] = Field(default_factory=list)
+    aggregate_counts: Dict[str, int] = Field(default_factory=dict)
+    peak_counts: Dict[str, int] = Field(default_factory=dict)
+    avg_counts: Dict[str, int] = Field(default_factory=dict)
+

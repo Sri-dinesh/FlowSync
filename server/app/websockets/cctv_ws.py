@@ -77,6 +77,8 @@ async def cctv_socket(websocket: WebSocket) -> None:
 
         # When the video finishes, attach twin_data to the status message
         if frame.status == "video_ended" and recorder:
+            if pipeline:
+                recorder.set_arrivals(pipeline.arrival_events)
             recorder.save()
             twin_data = recorder.get_twin_data()
             await cctv_manager.send(websocket, {
@@ -156,6 +158,8 @@ async def cctv_socket(websocket: WebSocket) -> None:
                 })
 
             elif cmd == "stop_processing":
+                if pipeline and recorder:
+                    recorder.set_arrivals(pipeline.arrival_events)
                 if pipeline:
                     await pipeline.stop()
                     pipeline = None

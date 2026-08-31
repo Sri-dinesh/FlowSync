@@ -25,6 +25,7 @@ from ..models.schemas import (
 )
 from .frame_annotator import FrameAnnotator
 from .quadrant_counter import QuadrantCounter
+from .vehicle_tracker import VehicleTracker
 from .video_processor import VideoProcessor
 from .yolo_detector import YOLODetector
 from ..utils.temporal_smoother import TemporalSmoother
@@ -38,11 +39,12 @@ class CCTVPipeline:
     Pipeline steps per tick:
     1. Extract frame from video source (VideoProcessor)
     2. Run YOLO detection (YOLODetector) via asyncio.to_thread()
-    3. Count vehicles per direction (QuadrantCounter) — no ROI needed
-    4. Apply temporal smoothing (TemporalSmoother)
-    5. Annotate frame with bboxes (FrameAnnotator) — base64 encode
-    6. Emit CCTVFrame via callback (for WebSocket broadcast)
-    7. Log metrics (MetricsLogger)
+    3. Update persistent vehicle tracks (VehicleTracker) & log timestamped arrival events
+    4. Count vehicles per direction (QuadrantCounter)
+    5. Apply temporal smoothing (TemporalSmoother)
+    6. Annotate frame with bboxes (FrameAnnotator) — base64 encode
+    7. Emit CCTVFrame via callback (for WebSocket broadcast)
+    8. Log metrics (MetricsLogger)
     """
 
     def __init__(
@@ -61,6 +63,7 @@ class CCTVPipeline:
         self.session_id = session_id
         self.annotate_frames = annotate_frames
 
+        self._tracker = VehicleTracker()
         self._quadrant_counter = QuadrantCounter()
         self._smoother = TemporalSmoother()
         self._annotator = FrameAnnotator()
@@ -69,6 +72,10 @@ class CCTVPipeline:
         self._running = False
         self._frame_id = 0
         self._task: Optional[asyncio.Task] = None
+
+        # Chronological vehicle arrival event log (for natural digital twin replay)
+        self._arrival_events: List[Dict[str, Any]] = []
+        self._recorded_track_ids: Set[int] = set()
 
         # Aggregate counts accumulated across all frames
         self._aggregate_counts: Dict[str, int] = {
@@ -131,7 +138,36 @@ class CCTVPipeline:
         detection.frame_id = self._frame_id
         detection.timestamp_ms = time.time() * 1000
 
-        # 3. Count vehicles per lane using quadrant heuristic
+        # 3. Track vehicles across frames & log chronological arrival events
+        detection = self._tracker.update(detection)
+        fw = detection.frame_width or 1
+        fh = detection.frame_height or 1
+        time_s = round((self._frame_id - 1) / PIPELINE_FPS, 2)
+
+        for bbox in detection.bboxes:
+            if bbox.track_id is not None and bbox.track_id not in self._recorded_track_ids:
+                cx = ((bbox.x1 + bbox.x2) / 2) / fw
+                cy = bbox.y2 / fh
+
+                # Determine dominant entrance approach
+                if abs(cy - 0.5) >= abs(cx - 0.5):
+                    direction = "north" if cy < 0.5 else "south"
+                else:
+                    direction = "west" if cx < 0.5 else "east"
+
+                turn_options = ["straight", "straight", "straight", "left", "right"]
+                turn = turn_options[bbox.track_id % len(turn_options)]
+
+                self._arrival_events.append({
+                    "vehicle_id": f"cctv_{bbox.track_id}",
+                    "time_s": time_s,
+                    "lane": direction,
+                    "turn": turn,
+                    "vehicle_type": bbox.class_name if bbox.class_name in ("car", "bus", "truck", "motorcycle", "auto_rickshaw") else "car",
+                })
+                self._recorded_track_ids.add(bbox.track_id)
+
+        # 4. Count vehicles per lane using quadrant heuristic
         raw_counts_dict = self._quadrant_counter.count(detection)
         raw_counts = LaneCounts(**raw_counts_dict)
 
@@ -143,11 +179,11 @@ class CCTVPipeline:
         weighted_dict = {k: float(v) for k, v in raw_counts_dict.items()}
         weighted_counts = WeightedLaneCounts(**weighted_dict)
 
-        # 4. Temporal smoothing
+        # 5. Temporal smoothing
         smoothed_dict = self._smoother.update(weighted_dict)
         smoothed_weighted = WeightedLaneCounts.from_dict(smoothed_dict)
 
-        # 5. Congestion metrics
+        # 6. Congestion metrics
         total_pressure = sum(smoothed_dict.values())
         estimated_wait = min(120.0, total_pressure * 2.5)
         pressure_ratio = total_pressure / (4 * 10.0)  # 4 main directions * max ~10 vehicles
@@ -162,17 +198,17 @@ class CCTVPipeline:
 
         model_status = "model_not_loaded" if detection.model_not_loaded else "ok"
 
-        # 6. Annotate frame
+        # 7. Annotate frame
         annotated_b64 = None
         if self.annotate_frames:
             annotated_b64 = self._annotator.encode_frame_b64(
                 self._annotator.annotate_simple(frame, detection)
             )
 
-        # 7. Log metrics
+        # 8. Log metrics
         self._metrics.log_frame(detection, raw_counts)
 
-        # 8. Emit progress to WebSocket (every frame)
+        # 9. Emit progress to WebSocket (every frame)
         if self.on_progress is not None:
             meta = self.video_processor.metadata
             total_frames = meta.total_frames if meta else None
@@ -186,10 +222,10 @@ class CCTVPipeline:
                 "frame_id": self._frame_id,
                 "total_frames": total_frames,
                 "pct_complete": pct,
-                "vehicles_detected_so_far": sum(self._aggregate_counts.values()),
+                "vehicles_detected_so_far": len(self._recorded_track_ids) if self._recorded_track_ids else sum(self._aggregate_counts.values()),
             })
 
-        # 9. Build and emit complete CCTVFrame
+        # 10. Build and emit complete CCTVFrame
         cctv_frame = CCTVFrame(
             frame_id=self._frame_id,
             timestamp_ms=time.time() * 1000,
@@ -209,6 +245,11 @@ class CCTVPipeline:
         return self._running
 
     @property
+    def arrival_events(self) -> List[Dict[str, Any]]:
+        """Chronological vehicle arrivals detected across video frames."""
+        return list(self._arrival_events)
+
+    @property
     def aggregate_counts(self) -> Dict[str, int]:
         """Accumulated per-lane vehicle counts across all processed frames."""
         return dict(self._aggregate_counts)
@@ -216,3 +257,4 @@ class CCTVPipeline:
     @property
     def session_metrics(self) -> Dict:
         return self._metrics.get_session_summary()
+
