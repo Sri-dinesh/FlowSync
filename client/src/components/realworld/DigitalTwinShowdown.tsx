@@ -30,6 +30,14 @@ export interface TwinData {
   avg_counts: Record<string, number>;
 }
 
+export interface RLModel {
+  id: string;
+  name: string;
+  version: string;
+  source?: string;
+  episodes?: number;
+}
+
 interface DigitalTwinShowdownProps {
   twinData?: TwinData | null;
   initialCounts?: Record<string, number> | null;
@@ -62,6 +70,64 @@ export default function DigitalTwinShowdown({
   } | null>(null);
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResultsData | null>(null);
   const [scenarioCounts, setScenarioCounts] = useState<Record<string, number> | null>(null);
+
+  // Model selection states
+  const [models, setModels] = useState<RLModel[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [isLoadingModel, setIsLoadingModel] = useState<boolean>(false);
+  const [loadedModelName, setLoadedModelName] = useState<string | null>(null);
+  const [loadSuccess, setLoadSuccess] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Fetch models list on mount
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const res = await fetch(`${API_BASE}/training/models`);
+        if (res.ok) {
+          const payload = await res.json();
+          const list: RLModel[] = payload.models ?? [];
+          setModels(list);
+          if (list.length > 0) {
+            setSelectedModelId(list[0].id);
+            setLoadedModelName(`${list[0].name} (ep ${list[0].version})`);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchModels();
+  }, []);
+
+  const handleLoadModel = async (modelId: string) => {
+    if (!modelId || modelId === "__none") return;
+    setIsLoadingModel(true);
+    setLoadError(null);
+    setLoadSuccess(false);
+    try {
+      const res = await fetch(`${API_BASE}/training/load`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_id: modelId }),
+      });
+      if (res.ok) {
+        const target = models.find((m) => m.id === modelId);
+        if (target) {
+          setLoadedModelName(`${target.name} (ep ${target.version})`);
+        }
+        setLoadSuccess(true);
+        setTimeout(() => setLoadSuccess(false), 3000);
+      } else {
+        const p = await res.json().catch(() => null);
+        setLoadError(p?.detail ?? "Failed to load model.");
+      }
+    } catch {
+      setLoadError("Unable to reach backend server.");
+    } finally {
+      setIsLoadingModel(false);
+    }
+  };
 
   // Access simulation store so this page feeds the 3-D canvas during benchmark
   const setStoreFrame = useSimulationStore((s) => s.setFrame);
@@ -262,6 +328,55 @@ export default function DigitalTwinShowdown({
             <p className="text-[9.5px] text-white/40 leading-relaxed bg-white/[0.01] border border-white/[0.04] rounded-lg p-2">
               ℹ Replays vehicles dynamically at their exact recorded video timestamps. Simulation runs until <strong className="text-white/80">all {totalVehicles} vehicles clear the intersection</strong>.
             </p>
+          </div>
+
+          {/* Model Selector Card */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">DQN AI Controller</span>
+              {loadedModelName ? (
+                <span className="text-[9px] text-indigo-400 font-mono font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                  Loaded
+                </span>
+              ) : (
+                <span className="text-[9px] text-amber-400 font-mono">Random Weights</span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5 pt-1 border-t border-white/[0.04]">
+              <label className="text-[8.5px] text-white/30 uppercase tracking-wider">Select Checkpoint</label>
+              <select
+                value={selectedModelId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedModelId(id);
+                  void handleLoadModel(id);
+                }}
+                disabled={benchmarkState === "running" || isLoadingModel}
+                className="w-full bg-black/60 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white/90 focus:outline-none focus:border-indigo-500 transition-colors"
+              >
+                {models.length === 0 ? (
+                  <option value="">No trained models available</option>
+                ) : (
+                  models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} — ep {m.version} {m.source === "remote" ? "☁" : "💾"}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {isLoadingModel && (
+              <span className="text-[9px] text-indigo-300 animate-pulse">Loading model checkpoint…</span>
+            )}
+            {loadSuccess && (
+              <span className="text-[9px] text-emerald-400">✓ Model weights loaded successfully</span>
+            )}
+            {loadError && (
+              <span className="text-[9px] text-rose-400">{loadError}</span>
+            )}
           </div>
 
           {benchmarkState === "done" && benchmarkResults ? (

@@ -247,22 +247,24 @@ export default function RealWorldPage() {
           </div>
         </div>
 
-        {/* ── Right sidebar ─────────────────────────────────────────────── */}
-        <aside className="w-[400px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl z-10">
-          <div className="p-3 flex flex-col gap-3">
-            <CCTVControls
-              isConnected={isConnected}
-              pipelineStatus={pipelineStatus}
-              onStartProcessing={handleStartProcessing}
-              onStop={handleStop}
-              processingProgress={processingProgress}
-              totalVehiclesDetected={totalVehiclesDetected}
-            />
-            <SignalDecisionPanel frame={currentFrame} />
-            <LaneQueuePanel frame={currentFrame} />
-            <CCTVMetrics frame={currentFrame} />
-          </div>
-        </aside>
+        {/* ── Right sidebar (Live View only) ─────────────────────────── */}
+        {activeTab === "live" && (
+          <aside className="w-[400px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl z-10">
+            <div className="p-3 flex flex-col gap-3">
+              <CCTVControls
+                isConnected={isConnected}
+                pipelineStatus={pipelineStatus}
+                onStartProcessing={handleStartProcessing}
+                onStop={handleStop}
+                processingProgress={processingProgress}
+                totalVehiclesDetected={totalVehiclesDetected}
+              />
+              <SignalDecisionPanel frame={currentFrame} />
+              <LaneQueuePanel frame={currentFrame} />
+              <CCTVMetrics frame={currentFrame} />
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

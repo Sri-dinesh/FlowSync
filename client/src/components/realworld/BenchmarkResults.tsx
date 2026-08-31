@@ -128,17 +128,17 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
                     {cfg.label}
                   </span>
                 </div>
-                <div className="flex gap-1.5 flex-1">
+                <div className="flex gap-1.5 flex-1 min-w-0">
                   {isRealworld ? (
                     <>
                       <Pill label="Clear" value={clearTime} unit="s" winner={isWinner} />
                       <Pill label="Wait"  value={result?.avg_wait_time ?? 0} unit="s" winner={isWinner} />
-                      <Pill label="Passed" value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
+                      <Pill label="Pass"  value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
                       <Pill label="Max Q" value={result?.max_queue ?? 0} unit="" winner={isWinner} />
                     </>
                   ) : (
                     <>
-                      <Pill label="Passed" value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
+                      <Pill label="Pass"  value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
                       <Pill label="Wait"   value={result?.avg_wait_time ?? 0} unit="s"   winner={isWinner} />
                       <Pill label="Max Q"  value={result?.max_queue ?? 0}     unit=""    winner={isWinner} />
                     </>
@@ -151,24 +151,26 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
       </div>
 
       {/* Chart */}
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 min-w-0 overflow-hidden">
         <p className="text-[9px] text-white/25 uppercase tracking-widest font-medium mb-2">Performance Comparison</p>
-        <ResponsiveContainer width="100%" height={120}>
-          <BarChart data={chartData} margin={{ top: 0, right: 0, left: -22, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-            <XAxis dataKey="metric" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 8 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 8 }} axisLine={false} tickLine={false} />
-            <Tooltip
-              contentStyle={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 10 }}
-              labelStyle={{ color: "rgba(255,255,255,0.6)" }}
-              itemStyle={{ color: "rgba(255,255,255,0.5)" }}
-            />
-            <Legend wrapperStyle={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }} />
-            {data.modes.map((mode) => (
-              <Bar key={mode} dataKey={mode} name={MODE_CONFIG[mode]?.label ?? mode} fill={MODE_CONFIG[mode]?.barColor ?? "#fff"} radius={[3, 3, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="w-full h-[120px] min-w-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 0, right: 4, left: -22, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <XAxis dataKey="metric" tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 8 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 8 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 10 }}
+                labelStyle={{ color: "rgba(255,255,255,0.6)" }}
+                itemStyle={{ color: "rgba(255,255,255,0.5)" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }} />
+              {data.modes.map((mode) => (
+                <Bar key={mode} dataKey={mode} name={MODE_CONFIG[mode]?.label ?? mode} fill={MODE_CONFIG[mode]?.barColor ?? "#fff"} radius={[3, 3, 0, 0]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -176,12 +178,12 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
 
 function Pill({ label, value, unit, winner }: { label: string; value: number; unit: string; winner: boolean }) {
   return (
-    <div className="flex flex-col items-center px-1.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] flex-1 min-w-0">
+    <div className="flex flex-col items-center px-1 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] flex-1 min-w-0">
       <span className="text-[7.5px] text-white/30 uppercase tracking-wider leading-none mb-0.5 w-full text-center truncate">{label}</span>
-      <span className="text-[10px] font-bold font-mono leading-none" style={{ color: winner ? "#fbbf24" : "#94a3b8" }}>
+      <span className={`text-[10px] font-mono font-bold leading-none ${winner ? "text-yellow-300" : "text-white/80"}`}>
         {typeof value === "number" ? value.toFixed(1) : value}
-        {unit && <span className="text-[7.5px] font-normal ml-0.5 opacity-60">{unit}</span>}
+        {unit && <span className="text-[7px] text-white/30 font-normal ml-0.5">{unit}</span>}
       </span>
     </div>
   );
-}
+}
