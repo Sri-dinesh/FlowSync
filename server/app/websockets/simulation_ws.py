@@ -126,15 +126,20 @@ async def _run_timed_benchmark(
     duration_seconds: int,
     scenario_counts: dict | None,
     modes: list[str],
+    arrivals: list[dict] | None = None,
 ) -> None:
     """
-    Runs all requested modes sequentially for the same wall-time duration.
-    Each mode:
-      1. Resets the intersection
-      2. Injects scenario_counts (if provided) or enables spawner for dynamic traffic
-      3. Runs for duration_seconds at real-time 10 Hz (broadcasts frames driving 3-D canvas)
-      4. Records results
-    After all modes finish, broadcasts benchmark_results with winner.
+    Runs all requested modes sequentially for comparison.
+
+    Two execution modes:
+    1. REAL-WORLD DIGITAL TWIN REPLAY (when arrivals list is provided):
+       - Chronologically injects real-world vehicle arrivals at their exact recorded video timestamps (time_s).
+       - Runs each mode until 100% of vehicles have cleared the intersection (total_passed >= total_vehicles).
+       - Measures clearance_time (seconds to clear all vehicles) and avg_wait_time.
+    2. STANDARD MULTI-MODE BENCHMARK (when arrivals is None):
+       - Uses Common Random Numbers (CRN) with a synchronized seed.
+       - Runs each mode for duration_seconds of simulation time.
+       - Broadcasts real-time 10Hz frames driving the 3-D canvas.
     """
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
     TICK_SLEEP = 0.1       # wall-clock seconds between ticks (real-time 10 Hz)
@@ -158,6 +163,9 @@ async def _run_timed_benchmark(
     # Generate a synchronized CRN seed for this benchmark session
     import random
     benchmark_seed = random.randint(1, 1_000_000)
+    is_realworld = bool(arrivals and len(arrivals) > 0)
+    total_vehicles_to_clear = len(arrivals) if is_realworld else 0
+    sorted_arrivals = sorted(arrivals, key=lambda a: a.get("time_s", 0.0)) if is_realworld else []
 
     try:
         for mode_idx, mode in enumerate(modes):
@@ -166,20 +174,28 @@ async def _run_timed_benchmark(
 
             # ── Setup ──────────────────────────────────────────────────────
             intersection.reset()
-            if scenario_counts:
+            if is_realworld:
+                # Digital Twin Real-World Replay
+                intersection.spawner.set_enabled(False)
+                pending_arrivals = [dict(a) for a in sorted_arrivals]
+                spawned_count = 0
+            elif scenario_counts:
                 intersection.inject_scenario(scenario_counts)
                 try:
                     intersection.spawner.set_enabled(False)
                 except Exception:
                     pass
+                pending_arrivals = []
+                spawned_count = sum(scenario_counts.values())
             else:
-                # Dynamic traffic generation with Common Random Numbers (CRN)
-                # Guarantees Fixed, Greedy, and AI face 100% IDENTICAL arrival schedules
+                # Standard Benchmark with Common Random Numbers (CRN)
                 try:
                     intersection.spawner.set_seed(benchmark_seed)
                     intersection.spawner.set_enabled(True)
                 except Exception:
                     pass
+                pending_arrivals = []
+                spawned_count = 0
 
             app.state.mode = mode
 
@@ -194,6 +210,10 @@ async def _run_timed_benchmark(
                     "elapsed": 0.0,
                     "duration_seconds": duration_seconds,
                     "benchmark_seed": benchmark_seed,
+                    "is_realworld": is_realworld,
+                    "total_vehicles": total_vehicles_to_clear,
+                    "spawned_count": 0,
+                    "passed_count": 0,
                 })
             except Exception:
                 pass
@@ -205,12 +225,51 @@ async def _run_timed_benchmark(
             was_exploring     = False
             obs               = np.zeros(20, dtype=np.float32)
             episode           = 0
-            deadline          = asyncio.get_event_loop().time() + duration_seconds
+            sim_time          = 0.0
             tick_count        = 0
 
-            while asyncio.get_event_loop().time() < deadline:
-                tick_start = asyncio.get_event_loop().time()
+            if is_realworld:
+                # Real-world mode runs until all vehicles clear (or safety timeout e.g. 300s)
+                max_timeout = max(90.0, total_vehicles_to_clear * 6.0)
+                deadline = asyncio.get_event_loop().time() + max_timeout
+            else:
+                deadline = asyncio.get_event_loop().time() + duration_seconds
+
+            while True:
+                # Check exit condition
+                now = asyncio.get_event_loop().time()
+                if now >= deadline:
+                    break
+                if is_realworld and len(pending_arrivals) == 0 and intersection.total_passed >= total_vehicles_to_clear:
+                    # All recorded vehicles have cleared the intersection!
+                    break
+
+                tick_start = now
                 tick_count += 1
+                sim_time += TICK_DT
+
+                # ── Chronological vehicle arrivals (Real-World Replay) ───────
+                if is_realworld:
+                    while pending_arrivals and pending_arrivals[0].get("time_s", 0.0) <= sim_time:
+                        arr = pending_arrivals.pop(0)
+                        dir_name = arr.get("lane", "north")
+                        turn = arr.get("turn", "straight")
+                        lane_key = f"{dir_name}_{turn}"
+                        if lane_key in intersection.lanes and len(intersection.lanes[lane_key]) < 12:
+                            from app.simulation.vehicle import Vehicle, DEFAULT_SPEED
+                            from uuid import uuid4
+                            v = Vehicle(
+                                id=arr.get("vehicle_id", f"cctv_{uuid4().hex[:6]}"),
+                                lane=dir_name,
+                                turn=turn,
+                                position=0.0,
+                                wait_time=0.0,
+                                speed=DEFAULT_SPEED,
+                                state="waiting",
+                            )
+                            intersection.lanes[lane_key].append(v)
+                            spawned_count += 1
+                            intersection._spawned_this_interval += 1
 
                 # ── Compute action ─────────────────────────────────────────
                 if mode in ("fixed", "manual"):
@@ -260,7 +319,7 @@ async def _run_timed_benchmark(
 
                 # Send progress updates every 5 ticks (~0.5s)
                 if tick_count % 5 == 0:
-                    mode_elapsed = max(0.0, duration_seconds - (deadline - asyncio.get_event_loop().time()))
+                    mode_elapsed = round(sim_time, 1)
                     try:
                         await websocket.send_json({
                             "type": "benchmark_progress",
@@ -268,9 +327,13 @@ async def _run_timed_benchmark(
                             "mode_index": mode_idx,
                             "modes_total": len(modes),
                             "modes_done": list(results.keys()),
-                            "elapsed": round(mode_elapsed, 1),
-                            "duration_seconds": duration_seconds,
+                            "elapsed": mode_elapsed,
+                            "duration_seconds": duration_seconds if not is_realworld else mode_elapsed,
                             "benchmark_seed": benchmark_seed,
+                            "is_realworld": is_realworld,
+                            "total_vehicles": total_vehicles_to_clear,
+                            "spawned_count": spawned_count,
+                            "passed_count": intersection.total_passed,
                         })
                     except Exception:
                         pass
@@ -282,11 +345,14 @@ async def _run_timed_benchmark(
 
             # ── Collect results ────────────────────────────────────────────
             queue_lengths = intersection.get_queue_lengths()
+            final_time = round(sim_time, 1)
             results[mode] = {
                 "total_passed":    intersection.total_passed,
+                "total_vehicles":  total_vehicles_to_clear if is_realworld else intersection.total_passed,
                 "avg_wait_time":   round(intersection.get_avg_wait_time(), 2),
                 "max_queue":       max(queue_lengths.values(), default=0),
-                "duration_seconds": duration_seconds,
+                "duration_seconds": final_time if is_realworld else duration_seconds,
+                "clearance_time":  final_time,
             }
 
             # Broadcast intermediate results after each mode completes
@@ -299,9 +365,13 @@ async def _run_timed_benchmark(
                     "result":         results[mode],
                     "modes_done":     list(results.keys()),
                     "modes_total":    len(modes),
-                    "elapsed":        duration_seconds,
-                    "duration_seconds": duration_seconds,
+                    "elapsed":        final_time if is_realworld else duration_seconds,
+                    "duration_seconds": final_time if is_realworld else duration_seconds,
                     "benchmark_seed": benchmark_seed,
+                    "is_realworld":   is_realworld,
+                    "total_vehicles": total_vehicles_to_clear,
+                    "spawned_count":  spawned_count,
+                    "passed_count":   intersection.total_passed,
                 })
             except Exception:
                 pass
@@ -309,17 +379,24 @@ async def _run_timed_benchmark(
         # ── Winner & Improvements Calculation ──────────────────────────────
         fixed_res = results.get("fixed")
         improvements = {}
-        if fixed_res and fixed_res.get("avg_wait_time", 0) > 0:
-            f_wait = fixed_res["avg_wait_time"]
+        if fixed_res:
+            f_wait = fixed_res.get("avg_wait_time", 0.0)
+            f_clear = fixed_res.get("clearance_time", 0.0)
             if "ai" in results:
-                improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if f_wait > 0:
+                    improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if f_clear > 0:
+                    improvements["ai_clearance_pct"] = round(((f_clear - results["ai"]["clearance_time"]) / f_clear) * 100, 1)
             if "greedy" in results:
-                improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if f_wait > 0:
+                    improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if f_clear > 0:
+                    improvements["greedy_clearance_pct"] = round(((f_clear - results["greedy"]["clearance_time"]) / f_clear) * 100, 1)
 
-        # Winner: lowest avg wait time, highest total passed as tiebreaker
+        # Winner: lowest avg wait time, fastest clearance time as tiebreaker
         def _score_mode(m):
             r = results[m]
-            return (-r["avg_wait_time"], r["total_passed"])
+            return (-r.get("avg_wait_time", 0.0), -r.get("clearance_time", 0.0), r.get("total_passed", 0))
 
         winner = max(results.keys(), key=_score_mode) if results else None
 
@@ -327,12 +404,14 @@ async def _run_timed_benchmark(
         try:
             await websocket.send_json({
                 "type":             "benchmark_results",
-                "duration_seconds": duration_seconds,
+                "duration_seconds": results.get(winner, {}).get("clearance_time", duration_seconds) if is_realworld else duration_seconds,
                 "results":          results,
                 "winner":           winner,
                 "modes":            modes,
                 "improvements":     improvements,
                 "benchmark_seed":   benchmark_seed,
+                "is_realworld":     is_realworld,
+                "total_vehicles":   total_vehicles_to_clear,
             })
         except Exception as e:
             logger.warning("Failed to send benchmark_results: %s", e)
@@ -687,13 +766,14 @@ async def simulation_socket(websocket: WebSocket) -> None:
             elif command == "run_timed_benchmark":
                 duration_seconds = int(message.get("duration_seconds", 30))
                 scenario_counts = message.get("scenario_counts", None)
+                arrivals = message.get("arrivals", None)
                 modes = message.get("modes", ["fixed", "greedy", "ai"])
                 # Clamp duration between 10 and 600 seconds
                 duration_seconds = max(10, min(600, duration_seconds))
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                 app.state.benchmark_task = asyncio.create_task(
-                    _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes)
+                    _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes, arrivals)
                 )
 
     except WebSocketDisconnect:
