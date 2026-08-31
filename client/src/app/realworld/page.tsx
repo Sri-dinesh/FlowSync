@@ -45,10 +45,20 @@ interface ProcessingProgress {
   vehicles_detected_so_far: number;
 }
 
-interface TwinData {
+export interface VehicleArrivalEvent {
+  vehicle_id: string;
+  time_s: number;
+  lane: string;
+  turn: string;
+  vehicle_type: string;
+}
+
+export interface TwinData {
   session_id: string;
   total_frames_processed: number;
   total_vehicles_detected: number;
+  video_duration_s?: number;
+  arrivals?: VehicleArrivalEvent[];
   aggregate_counts: Record<string, number>;
   peak_counts: Record<string, number>;
   avg_counts: Record<string, number>;
@@ -68,7 +78,7 @@ export default function RealWorldPage() {
   // New states for redesigned flow
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
   const [twinData, setTwinData] = useState<TwinData | null>(null);
-  const [totalVehiclesDetected, setTotalVehiclesDetected] = useState(0);
+  const [totalVehiclesDetected, setTotalVehiclesDetected] = useState<number>(0);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -157,7 +167,7 @@ export default function RealWorldPage() {
     { id: "twin", label: "Digital Twin", icon: "🌍" },
   ];
 
-  // Use peak_counts for twin seeding (best single-frame snapshot)
+  // Use peak_counts for twin seeding fallback
   const twinCounts = twinData?.peak_counts
     ? Object.values(twinData.peak_counts).some((v) => v > 0)
       ? twinData.peak_counts
@@ -228,6 +238,7 @@ export default function RealWorldPage() {
             ) : (
               <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex flex-col">
                 <DigitalTwinShowdown
+                  twinData={twinData}
                   initialCounts={twinCounts}
                   sessionId={twinData?.session_id}
                 />

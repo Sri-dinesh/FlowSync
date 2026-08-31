@@ -11,8 +11,28 @@ const SimulationCanvas = dynamic(
   { ssr: false }
 );
 
+export interface VehicleArrivalEvent {
+  vehicle_id: string;
+  time_s: number;
+  lane: string;
+  turn: string;
+  vehicle_type: string;
+}
+
+export interface TwinData {
+  session_id: string;
+  total_frames_processed: number;
+  total_vehicles_detected: number;
+  video_duration_s?: number;
+  arrivals?: VehicleArrivalEvent[];
+  aggregate_counts: Record<string, number>;
+  peak_counts: Record<string, number>;
+  avg_counts: Record<string, number>;
+}
+
 interface DigitalTwinShowdownProps {
-  initialCounts: Record<string, number> | null;
+  twinData?: TwinData | null;
+  initialCounts?: Record<string, number> | null;
   sessionId?: string | null;
 }
 
@@ -22,18 +42,23 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
 type BenchmarkState = "idle" | "running" | "done";
 
 export default function DigitalTwinShowdown({
+  twinData,
   initialCounts,
   sessionId,
 }: DigitalTwinShowdownProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [injecting, setInjecting] = useState(false);
-  const [durationSeconds, setDurationSeconds] = useState(120);
   const [benchmarkState, setBenchmarkState] = useState<BenchmarkState>("idle");
   const [benchmarkProgress, setBenchmarkProgress] = useState<{
     current_mode: string;
     modes_done: string[];
     modes_total: number;
+    elapsed?: number;
+    spawned_count?: number;
+    total_vehicles?: number;
+    passed_count?: number;
+    is_realworld?: boolean;
   } | null>(null);
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResultsData | null>(null);
   const [scenarioCounts, setScenarioCounts] = useState<Record<string, number> | null>(null);
@@ -69,6 +94,11 @@ export default function DigitalTwinShowdown({
             current_mode: data.current_mode,
             modes_done: data.modes_done ?? [],
             modes_total: data.modes_total ?? 3,
+            elapsed: data.elapsed ?? 0,
+            spawned_count: data.spawned_count ?? 0,
+            total_vehicles: data.total_vehicles ?? 0,
+            passed_count: data.passed_count ?? 0,
+            is_realworld: data.is_realworld ?? false,
           });
         } else if (data.type === "benchmark_results") {
           setBenchmarkResults(data as BenchmarkResultsData);
@@ -116,7 +146,7 @@ export default function DigitalTwinShowdown({
     };
   }, [setStoreFrame, setStoreConnected, setStoreRunning]);
 
-  // Inject scenario when counts change
+  // Inject initial scenario when counts change
   useEffect(() => {
     if (!initialCounts) return;
     setScenarioCounts(initialCounts);
@@ -145,27 +175,42 @@ export default function DigitalTwinShowdown({
   }, []);
 
   const handleRunBenchmark = useCallback(() => {
-    if (!scenarioCounts || benchmarkState === "running" || !isWsConnected) return;
+    if (benchmarkState === "running" || !isWsConnected) return;
     setBenchmarkState("running");
     setBenchmarkResults(null);
     setBenchmarkProgress(null);
+    setStoreRunning(true);
+
+    const arrivals = twinData?.arrivals && twinData.arrivals.length > 0 ? twinData.arrivals : null;
+
     sendWsCommand({
       command: "run_timed_benchmark",
-      duration_seconds: durationSeconds,
-      scenario_counts: scenarioCounts,
-      modes: ["fixed", "ai", "greedy"],
+      arrivals: arrivals,
+      scenario_counts: !arrivals ? scenarioCounts : null,
+      modes: ["fixed", "greedy", "ai"],
     });
-  }, [scenarioCounts, benchmarkState, isWsConnected, durationSeconds, sendWsCommand]);
+  }, [twinData, scenarioCounts, benchmarkState, isWsConnected, sendWsCommand, setStoreRunning]);
 
   const handleRerun = useCallback(async () => {
     setBenchmarkState("idle");
     setBenchmarkResults(null);
+    setBenchmarkProgress(null);
     if (scenarioCounts) {
       await injectScenario(scenarioCounts);
     }
   }, [scenarioCounts]);
 
-  if (!initialCounts) {
+  const arrivalsList = twinData?.arrivals ?? [];
+  const hasArrivals = arrivalsList.length > 0;
+  const totalVehicles = hasArrivals
+    ? arrivalsList.length
+    : Object.values(scenarioCounts ?? {}).reduce((a, b) => a + b, 0);
+
+  const durationSpan = hasArrivals && arrivalsList.length > 0
+    ? arrivalsList[arrivalsList.length - 1].time_s
+    : twinData?.video_duration_s ?? 0;
+
+  if (!initialCounts && !twinData) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center text-center gap-3 p-8">
         <div className="text-4xl mb-2">🎬</div>
@@ -178,77 +223,89 @@ export default function DigitalTwinShowdown({
     );
   }
 
-  const totalVehicles = Object.values(scenarioCounts ?? {}).reduce((a, b) => a + b, 0);
   const MODE_LABELS: Record<string, string> = { fixed: "Fixed Timer", ai: "DQN AI", greedy: "Greedy" };
-  const MODES_ORDER = ["fixed", "ai", "greedy"];
+  const MODES_ORDER = ["fixed", "greedy", "ai"];
 
   return (
     <div className="flex flex-1 w-full h-full bg-[#0a0a0a] overflow-hidden">
       {/* ── Left Sidebar ── */}
-      <div className="w-72 flex-shrink-0 border-r border-white/10 bg-black/40 flex flex-col overflow-y-auto">
-        <div className="p-4 border-b border-white/[0.06]">
-          <h2 className="text-[11px] uppercase tracking-[0.14em] text-white/35 font-semibold">Digital Twin</h2>
+      <div className="w-80 flex-shrink-0 border-r border-white/10 bg-black/40 flex flex-col overflow-y-auto">
+        <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+          <h2 className="text-[11px] uppercase tracking-[0.14em] text-white/40 font-semibold">Digital Twin Replay</h2>
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono">
+            {sessionId || twinData?.session_id || "Session"}
+          </span>
         </div>
 
-        <div className="p-4 flex flex-col gap-4 flex-1">
-          {/* Scenario summary */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] text-white/35 uppercase tracking-wider font-medium">Loaded Scenario</span>
-              {injecting && <span className="text-[9px] text-blue-400 animate-pulse">Injecting…</span>}
+        <div className="p-4 flex flex-col gap-3.5 flex-1">
+          {/* Traffic Profile Card */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Traffic Profile</span>
+              <span className="text-[9px] text-emerald-400 font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Chronological Influx
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-1">
-              {Object.entries(scenarioCounts ?? {})
-                .filter(([, v]) => v > 0)
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 8)
-                .map(([lane, count]) => (
-                  <div key={lane} className="flex justify-between text-[10px]">
-                    <span className="text-white/30 truncate">{lane.replace("_", " ")}</span>
-                    <span className="text-white/60 font-mono ml-1">{count}</span>
-                  </div>
-                ))}
+
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/[0.04]">
+              <div className="bg-white/[0.03] border border-white/[0.05] rounded-lg p-2 flex flex-col">
+                <span className="text-[8px] text-white/30 uppercase tracking-wider">Vehicles Logged</span>
+                <span className="text-base font-bold font-mono text-white mt-0.5">{totalVehicles}</span>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.05] rounded-lg p-2 flex flex-col">
+                <span className="text-[8px] text-white/30 uppercase tracking-wider">Arrival Span</span>
+                <span className="text-base font-bold font-mono text-indigo-300 mt-0.5">{durationSpan.toFixed(1)}s</span>
+              </div>
             </div>
-            <div className="mt-2 pt-2 border-t border-white/[0.06] flex justify-between text-[10px]">
-              <span className="text-white/30">Total vehicles</span>
-              <span className="text-white/80 font-bold font-mono">{totalVehicles}</span>
-            </div>
+
+            <p className="text-[9.5px] text-white/40 leading-relaxed bg-white/[0.01] border border-white/[0.04] rounded-lg p-2">
+              ℹ Replays vehicles dynamically at their exact recorded video timestamps. Simulation runs until <strong className="text-white/80">all {totalVehicles} vehicles clear the intersection</strong>.
+            </p>
           </div>
 
           {benchmarkState === "done" && benchmarkResults ? (
             <BenchmarkResults data={benchmarkResults} onRerun={handleRerun} />
           ) : (
             <>
-              {/* Timer input */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium block mb-2">
-                  Simulation Duration
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={30}
-                    max={300}
-                    step={10}
-                    value={durationSeconds}
-                    onChange={(e) => setDurationSeconds(Number(e.target.value))}
-                    className="flex-1 accent-indigo-500 h-1"
-                    disabled={benchmarkState === "running"}
-                  />
-                  <span className="text-white/70 text-sm font-bold font-mono w-12 text-right">
-                    {durationSeconds}s
-                  </span>
-                </div>
-                <p className="text-[9px] text-white/20 mt-1">All 3 modes will run for this duration</p>
-              </div>
-
               {/* Benchmark progress */}
               {benchmarkState === "running" && benchmarkProgress && (
-                <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-3">
-                  <p className="text-[10px] text-indigo-300 font-semibold mb-2">
-                    Running: {MODE_LABELS[benchmarkProgress.current_mode] ?? benchmarkProgress.current_mode}
-                  </p>
-                  <div className="space-y-1">
+                <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/[0.06] p-3.5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider">
+                      Replaying: {MODE_LABELS[benchmarkProgress.current_mode] ?? benchmarkProgress.current_mode}
+                    </span>
+                    <span className="text-[10px] text-white/60 font-mono font-bold">
+                      {benchmarkProgress.elapsed?.toFixed(1)}s
+                    </span>
+                  </div>
+
+                  {/* Real-time clearance progress bar */}
+                  {benchmarkProgress.total_vehicles && benchmarkProgress.total_vehicles > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[9px] text-white/50">
+                        <span>Cleared: {benchmarkProgress.passed_count ?? 0} / {benchmarkProgress.total_vehicles}</span>
+                        <span className="font-mono text-indigo-300">
+                          {Math.round(((benchmarkProgress.passed_count ?? 0) / benchmarkProgress.total_vehicles) * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-300 rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.round(((benchmarkProgress.passed_count ?? 0) / benchmarkProgress.total_vehicles) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[8px] text-white/30">
+                        <span>Spawned: {benchmarkProgress.spawned_count ?? 0}</span>
+                        <span>Waiting in queue: {Math.max(0, (benchmarkProgress.spawned_count ?? 0) - (benchmarkProgress.passed_count ?? 0))}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Mode Step indicators */}
+                  <div className="space-y-1.5 pt-1 border-t border-white/[0.04]">
                     {MODES_ORDER.map((m) => {
                       const done = benchmarkProgress.modes_done.includes(m);
                       const active = m === benchmarkProgress.current_mode;
@@ -265,12 +322,13 @@ export default function DigitalTwinShowdown({
                           />
                           <span
                             className={`text-[10px] ${
-                              done ? "text-emerald-400" : active ? "text-white/80" : "text-white/25"
+                              done ? "text-emerald-400" : active ? "text-white/90 font-semibold" : "text-white/30"
                             }`}
                           >
                             {MODE_LABELS[m] ?? m}
                           </span>
                           {done && <span className="text-emerald-400 text-[10px] ml-auto">✓</span>}
+                          {active && <span className="text-indigo-400 text-[9px] ml-auto animate-pulse">Running…</span>}
                         </div>
                       );
                     })}
@@ -281,17 +339,17 @@ export default function DigitalTwinShowdown({
               {/* Run benchmark button */}
               <button
                 onClick={handleRunBenchmark}
-                disabled={injecting || benchmarkState === "running" || !isWsConnected || !scenarioCounts}
-                className={`w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+                disabled={injecting || benchmarkState === "running" || !isWsConnected}
+                className={`w-full py-3 rounded-xl text-xs uppercase tracking-wider font-bold transition-all duration-200 ${
                   benchmarkState === "running"
                     ? "bg-indigo-600/40 text-indigo-300 cursor-not-allowed animate-pulse"
-                    : isWsConnected && scenarioCounts && !injecting
-                    ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"
+                    : isWsConnected && !injecting
+                    ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
                     : "bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]"
                 }`}
               >
                 {benchmarkState === "running"
-                  ? "⏳ Running benchmark…"
+                  ? "⏳ Replaying & Evaluating…"
                   : "▶ Run Full Comparison"}
               </button>
 
@@ -309,7 +367,7 @@ export default function DigitalTwinShowdown({
       <div className="flex-1 relative bg-[#111622]">
         {injecting && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <span className="text-white/70 text-sm animate-pulse">Injecting traffic snapshot…</span>
+            <span className="text-white/70 text-sm animate-pulse">Synchronizing digital twin scenario…</span>
           </div>
         )}
         <SimulationCanvas />
@@ -317,3 +375,4 @@ export default function DigitalTwinShowdown({
     </div>
   );
 }
+

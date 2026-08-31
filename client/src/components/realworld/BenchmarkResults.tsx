@@ -8,9 +8,11 @@ import {
 
 export interface ModeResult {
   total_passed: number;
+  total_vehicles?: number;
   avg_wait_time: number;
   max_queue: number;
   duration_seconds: number;
+  clearance_time?: number;
 }
 
 export interface BenchmarkResultsData {
@@ -18,6 +20,14 @@ export interface BenchmarkResultsData {
   results: Record<string, ModeResult>;
   winner: string | null;
   modes: string[];
+  improvements?: {
+    ai_wait_pct?: number;
+    ai_clearance_pct?: number;
+    greedy_wait_pct?: number;
+    greedy_clearance_pct?: number;
+  };
+  is_realworld?: boolean;
+  total_vehicles?: number;
 }
 
 interface Props {
@@ -31,8 +41,6 @@ const MODE_CONFIG: Record<string, { label: string; icon: string; accent: string;
   greedy: { label: "Greedy",      icon: "G",  accent: "border-emerald-500/40 bg-emerald-500/[0.07]", barColor: "#10b981", glow: "rgba(16,185,129,0.12)"  },
 };
 
-const MODE_ICONS: Record<string, string> = { fixed: "Timer", ai: "AI", greedy: "Greedy" };
-
 export default function BenchmarkResults({ data, onRerun }: Props) {
   const [visible, setVisible] = useState(false);
 
@@ -41,11 +49,22 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
     return () => clearTimeout(t);
   }, []);
 
-  const chartData = [
-    { metric: "Vehicles Passed", ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.total_passed ?? 0])) },
-    { metric: "Avg Wait (s)",    ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.avg_wait_time ?? 0])) },
-    { metric: "Max Queue",       ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.max_queue ?? 0])) },
-  ];
+  const isRealworld = Boolean(data.is_realworld);
+
+  const chartData = isRealworld
+    ? [
+        { metric: "Clear Time (s)", ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.clearance_time ?? data.results[m]?.duration_seconds ?? 0])) },
+        { metric: "Avg Wait (s)",   ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.avg_wait_time ?? 0])) },
+        { metric: "Max Queue",      ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.max_queue ?? 0])) },
+      ]
+    : [
+        { metric: "Vehicles Passed", ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.total_passed ?? 0])) },
+        { metric: "Avg Wait (s)",    ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.avg_wait_time ?? 0])) },
+        { metric: "Max Queue",       ...Object.fromEntries(data.modes.map((m) => [m, data.results[m]?.max_queue ?? 0])) },
+      ];
+
+  const aiImprovement = data.improvements?.ai_wait_pct ?? 0;
+  const aiClearanceImprovement = data.improvements?.ai_clearance_pct ?? 0;
 
   return (
     <div className={`flex flex-col gap-3 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}>
@@ -53,8 +72,14 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-[11px] font-bold text-white tracking-wide uppercase">Benchmark Results</h3>
-          <p className="text-[10px] text-white/35 mt-0.5">{data.duration_seconds}s per mode</p>
+          <h3 className="text-[11px] font-bold text-white tracking-wide uppercase">
+            {isRealworld ? "Replay Showdown Results" : "Benchmark Results"}
+          </h3>
+          <p className="text-[10px] text-white/35 mt-0.5">
+            {isRealworld
+              ? `Cleared all ${data.total_vehicles ?? "recorded"} vehicles`
+              : `${data.duration_seconds}s per mode`}
+          </p>
         </div>
         <button
           onClick={onRerun}
@@ -64,12 +89,28 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
         </button>
       </div>
 
+      {/* AI Improvement Badge */}
+      {isRealworld && (aiImprovement > 0 || aiClearanceImprovement > 0) && (
+        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-2.5 flex items-center gap-2">
+          <span className="text-base">⚡</span>
+          <div className="text-[10px] leading-tight">
+            <span className="font-bold text-indigo-300">DQN AI Efficiency Gain:</span>{" "}
+            <span className="text-white/80">
+              {aiClearanceImprovement > 0 && `${aiClearanceImprovement}% faster clearance`}
+              {aiClearanceImprovement > 0 && aiImprovement > 0 && " • "}
+              {aiImprovement > 0 && `${aiImprovement}% lower wait time`} vs Fixed Timer.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Vertical mode rows */}
       <div className="flex flex-col gap-2">
         {data.modes.map((mode, i) => {
           const result = data.results[mode];
           const cfg = MODE_CONFIG[mode] ?? { label: mode, icon: "?", accent: "border-white/15 bg-white/[0.03]", barColor: "#fff", glow: "rgba(255,255,255,0.05)" };
           const isWinner = mode === data.winner;
+          const clearTime = result?.clearance_time ?? result?.duration_seconds ?? 0;
           return (
             <div
               key={mode}
@@ -88,9 +129,20 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
                   </span>
                 </div>
                 <div className="flex gap-1.5 flex-1">
-                  <Pill label="Passed" value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
-                  <Pill label="Wait"   value={result?.avg_wait_time ?? 0} unit="s"   winner={isWinner} />
-                  <Pill label="Max Q"  value={result?.max_queue ?? 0}     unit=""    winner={isWinner} />
+                  {isRealworld ? (
+                    <>
+                      <Pill label="Clear" value={clearTime} unit="s" winner={isWinner} />
+                      <Pill label="Wait"  value={result?.avg_wait_time ?? 0} unit="s" winner={isWinner} />
+                      <Pill label="Passed" value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
+                      <Pill label="Max Q" value={result?.max_queue ?? 0} unit="" winner={isWinner} />
+                    </>
+                  ) : (
+                    <>
+                      <Pill label="Passed" value={result?.total_passed ?? 0} unit="veh" winner={isWinner} />
+                      <Pill label="Wait"   value={result?.avg_wait_time ?? 0} unit="s"   winner={isWinner} />
+                      <Pill label="Max Q"  value={result?.max_queue ?? 0}     unit=""    winner={isWinner} />
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -100,7 +152,7 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
 
       {/* Chart */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-        <p className="text-[9px] text-white/25 uppercase tracking-widest font-medium mb-2">Comparison Chart</p>
+        <p className="text-[9px] text-white/25 uppercase tracking-widest font-medium mb-2">Performance Comparison</p>
         <ResponsiveContainer width="100%" height={120}>
           <BarChart data={chartData} margin={{ top: 0, right: 0, left: -22, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -124,12 +176,12 @@ export default function BenchmarkResults({ data, onRerun }: Props) {
 
 function Pill({ label, value, unit, winner }: { label: string; value: number; unit: string; winner: boolean }) {
   return (
-    <div className="flex flex-col items-center px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] flex-1 min-w-0">
-      <span className="text-[8px] text-white/30 uppercase tracking-wider leading-none mb-0.5 w-full text-center truncate">{label}</span>
-      <span className="text-[11px] font-bold font-mono leading-none" style={{ color: winner ? "#fbbf24" : "#94a3b8" }}>
+    <div className="flex flex-col items-center px-1.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] flex-1 min-w-0">
+      <span className="text-[7.5px] text-white/30 uppercase tracking-wider leading-none mb-0.5 w-full text-center truncate">{label}</span>
+      <span className="text-[10px] font-bold font-mono leading-none" style={{ color: winner ? "#fbbf24" : "#94a3b8" }}>
         {typeof value === "number" ? value.toFixed(1) : value}
-        {unit && <span className="text-[8px] font-normal ml-0.5 opacity-60">{unit}</span>}
+        {unit && <span className="text-[7.5px] font-normal ml-0.5 opacity-60">{unit}</span>}
       </span>
     </div>
   );
-}
+}
