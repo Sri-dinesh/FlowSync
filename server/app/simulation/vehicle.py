@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 
 
 DEFAULT_SPEED = 0.12
@@ -14,6 +15,7 @@ class Vehicle:
     speed: float
     state: str
     is_emergency: bool = False
+    planned_turns: List[str] = field(default_factory=list)
 
     @property
     def is_right_turn(self) -> bool:
