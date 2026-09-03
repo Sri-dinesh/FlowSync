@@ -52,6 +52,7 @@ export interface RoadVehicleState {
   world_z: number;
   prev_turn: "straight" | "left" | "right";
   next_turn: "straight" | "left" | "right";
+  direction?: string;
 }
 
 export interface CityMetrics {

@@ -78,33 +78,39 @@ EXIT_DIR_MAP: Dict[str, str] = {
 
 
 class RoadVehicle:
-    """A vehicle currently traveling between two intersections on a road segment."""
+    """A vehicle currently traveling between two intersections on a road segment or towards a city exit."""
 
     def __init__(
         self,
         vehicle_id: str,
         from_intersection: str,
         to_intersection: str,
-        entry_dir: str,     # direction it will enter the destination intersection from
+        entry_dir: str,     # direction it will enter destination intersection from
         wait_time: float = 0.0,
         prev_turn: str = "straight",
         next_turn: str = "straight",
+        planned_turns: Optional[List[str]] = None,
+        is_exit: bool = False,
     ) -> None:
         self.id = vehicle_id
         self.from_intersection = from_intersection
         self.to_intersection = to_intersection
-        self.entry_dir = entry_dir      # e.g. "west" → enters B from the west
+        self.entry_dir = entry_dir
         self.progress: float = 0.0      # 0.0 → 1.0
         self.wait_time = wait_time
         self.ticks_traveled = 0
         self.prev_turn = prev_turn
         self.next_turn = next_turn
+        self.planned_turns = planned_turns or []
+        self.is_exit = is_exit
 
-    def tick(self, dt: float) -> bool:
-        """Returns True when the vehicle has reached the destination intersection."""
-        self.progress = min(1.0, self.progress + dt / ROAD_TRAVEL_TIME)
+    def tick(self, dt: float, max_progress: float = 1.0) -> bool:
+        """Advance vehicle along road segment with car-following constraint."""
+        travel_time = 3.5 if self.is_exit else ROAD_TRAVEL_TIME
+        desired_progress = self.progress + dt / travel_time
+        self.progress = min(max_progress, desired_progress)
         self.ticks_traveled += 1
-        return self.progress >= 1.0
+        return self.progress >= 0.999
 
 
 class CityNetwork:
@@ -229,24 +235,45 @@ class CityNetwork:
         # --- Step 2: Collect passed vehicles and route them ---
         self._route_passed_vehicles(dt, all_passed_vehicles)
 
-        # --- Step 3: Advance road vehicles ---
+        # --- Step 3: Advance road vehicles with Car-Following model ---
         arrived: List[RoadVehicle] = []
         still_traveling: List[RoadVehicle] = []
 
+        # Group road vehicles by corridor segment
+        corridors: Dict[Tuple[str, str], List[RoadVehicle]] = {}
         for rv in self.road_vehicles:
-            reached = rv.tick(dt)
-            if reached:
-                arrived.append(rv)
-            else:
-                still_traveling.append(rv)
+            corridors.setdefault((rv.from_intersection, rv.to_intersection), []).append(rv)
+
+        for segment_key, group in corridors.items():
+            # Sort vehicles by progress descending (lead vehicle first)
+            group.sort(key=lambda v: v.progress, reverse=True)
+            for idx, rv in enumerate(group):
+                if idx == 0:
+                    max_p = 1.0
+                else:
+                    leader = group[idx - 1]
+                    # Enforce safe physical headway (~2.0m on a 13m road segment -> 0.16 normalized headway)
+                    safe_headway = 0.16
+                    max_p = max(0.0, leader.progress - safe_headway)
+
+                reached = rv.tick(dt, max_progress=max_p)
+                if reached:
+                    arrived.append(rv)
+                else:
+                    still_traveling.append(rv)
 
         # --- Step 4: Inject arrived vehicles into destination intersections ---
         for rv in arrived:
+            if rv.is_exit:
+                # Reached the city boundary! Count in total throughput and despawn
+                self.total_city_throughput += 1
+                continue
+
             dest = self.intersections.get(rv.to_intersection)
             injected = False
             if dest:
                 injected = self._inject_vehicle(dest, rv)
-            
+
             if not injected and dest is not None:
                 # Keep it waiting at the end of the road
                 rv.progress = 1.0
@@ -259,7 +286,7 @@ class CityNetwork:
         """
         For each intersection, find all just-passed vehicles and route them:
         - To an adjacent intersection (via a road segment)
-        - Or out of the city (city throughput++)
+        - Or out of the city (smooth visual departure to city boundary)
         """
         for iid, vehicle in passed_vehicles:
             lane_key = f"{vehicle.lane}_{vehicle.turn}"
@@ -271,7 +298,14 @@ class CityNetwork:
 
             if connection_key in ROAD_CONNECTIONS:
                 to_inter, entry_dir = ROAD_CONNECTIONS[connection_key]
-                next_turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                planned = getattr(vehicle, "planned_turns", [])
+                if planned:
+                    next_turn = planned[0]
+                    remaining_planned = planned[1:]
+                else:
+                    next_turn = str(np.random.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                    remaining_planned = []
+
                 rv = RoadVehicle(
                     vehicle_id=vehicle.id,
                     from_intersection=iid,
@@ -280,31 +314,54 @@ class CityNetwork:
                     wait_time=vehicle.wait_time,
                     prev_turn=getattr(vehicle, "turn", "straight"),
                     next_turn=next_turn,
+                    planned_turns=remaining_planned,
+                    is_exit=False,
                 )
                 self.road_vehicles.append(rv)
             else:
-                # Exits the city boundary
-                self.total_city_throughput += 1
+                # Exits the city boundary: create an exiting road vehicle that smoothly departs to map edge
+                exit_target = f"exit_{exit_dir}_{iid}"
+                rv = RoadVehicle(
+                    vehicle_id=vehicle.id,
+                    from_intersection=iid,
+                    to_intersection=exit_target,
+                    entry_dir=exit_dir,
+                    wait_time=vehicle.wait_time,
+                    prev_turn=getattr(vehicle, "turn", "straight"),
+                    next_turn="straight",
+                    is_exit=True,
+                )
+                self.road_vehicles.append(rv)
 
     def _inject_vehicle(self, intersection: Intersection, rv: RoadVehicle) -> bool:
-        """Insert an arriving road vehicle into the destination intersection's lane."""
+        """Insert an arriving road vehicle into destination intersection with anti-overlap check."""
         turn = rv.next_turn
         lane_key = f"{rv.entry_dir}_{turn}"
         lane_queue = intersection.lanes.get(lane_key, [])
 
-        if len(lane_queue) < MAX_QUEUE:
-            vehicle = Vehicle(
-                id=rv.id,
-                lane=rv.entry_dir,
-                turn=turn,
-                position=0.0,
-                wait_time=rv.wait_time,   # carries accumulated wait time
-                speed=DEFAULT_SPEED,
-                state="waiting",
-            )
-            lane_queue.append(vehicle)
-            intersection._spawned_this_interval += 1
-            return True
+        if len(lane_queue) >= MAX_QUEUE:
+            return False
+
+        # Anti-overlap clearance: if there is already a vehicle in this approach lane,
+        # the tail vehicle must have moved forward (position >= 0.18) before a new vehicle can enter at 0.0
+        if lane_queue:
+            tail_vehicle = lane_queue[-1]
+            if tail_vehicle.position < 0.18:
+                return False
+
+        vehicle = Vehicle(
+            id=rv.id,
+            lane=rv.entry_dir,
+            turn=turn,
+            position=0.0,
+            wait_time=rv.wait_time,   # carries accumulated wait time
+            speed=DEFAULT_SPEED,
+            state="waiting",
+            planned_turns=rv.planned_turns,
+        )
+        lane_queue.append(vehicle)
+        intersection._spawned_this_interval += 1
+        return True
         return False
 
     # ── Metrics ────────────────────────────────────────────────────────────────

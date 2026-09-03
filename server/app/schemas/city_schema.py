@@ -54,6 +54,7 @@ class RoadVehicleState(BaseModel):
     world_z: float
     prev_turn: str
     next_turn: str
+    direction: str = "north"
 
 class CityMetrics(BaseModel):
     avg_wait_time: float
@@ -86,19 +87,28 @@ PHASE_GREEN_DIRS = {
 }
 
 # World positions of the 4 intersection centers in Three.js coords
-# Grid spacing = 20 units
+# Grid spacing = 20 units; perimeter road stubs extend to +/- 28
 INTERSECTION_WORLD_POS = {
     "A": (-10.0, -10.0),   # (world_x, world_z)  top-left
     "B": ( 10.0, -10.0),   # top-right
     "C": (-10.0,  10.0),   # bottom-left
     "D": ( 10.0,  10.0),   # bottom-right
+    # External exit targets (at the clean boundary of CityRoads at +/- 27.0)
+    "exit_north_A": (-10.0, -27.0),
+    "exit_north_B": ( 10.0, -27.0),
+    "exit_south_C": (-10.0,  27.0),
+    "exit_south_D": ( 10.0,  27.0),
+    "exit_west_A":  (-27.0, -10.0),
+    "exit_west_C":  (-27.0,  10.0),
+    "exit_east_B":  ( 27.0, -10.0),
+    "exit_east_D":  ( 27.0,  10.0),
 }
 
 LANE_LOCAL_OFFSETS = {
-    "north": (-1.0,  8.0),
-    "south": ( 1.0, -8.0),
-    "east":  ( 8.0, -1.0),
-    "west":  (-8.0,  1.0),
+    "north": (-1.5,  8.0),
+    "south": ( 1.5, -8.0),
+    "east":  ( 8.0, -1.5),
+    "west":  (-8.0,  1.5),
 }
 
 
@@ -110,7 +120,7 @@ def _lane_to_world(iid: str, lane: str, position: float):
     """
     cx, cz = INTERSECTION_WORLD_POS[iid]
     road_len = 6.0   # half-road length from center
-    lateral = 1.0    # lane offset from road center
+    lateral = 1.5    # standard lane offset from road center
 
     if lane == "north":
         wx = cx - lateral
@@ -131,29 +141,39 @@ def _lane_to_world(iid: str, lane: str, position: float):
 
 
 def _road_vehicle_world(rv) -> tuple:
-    """Compute the world position of a road vehicle traveling between intersections.
-    Starts 8 units away from the source intersection and ends 8 units away from destination.
-    """
-    ax, az = INTERSECTION_WORLD_POS[rv.from_intersection]
-    bx, bz = INTERSECTION_WORLD_POS[rv.to_intersection]
-    
-    # Vector from A to B
+    """Compute the world position with physical lateral lane offset and direction for a road vehicle."""
+    ax, az = INTERSECTION_WORLD_POS.get(rv.from_intersection, (0.0, 0.0))
+    bx, bz = INTERSECTION_WORLD_POS.get(rv.to_intersection, (0.0, 0.0))
+
     dx, dz = bx - ax, bz - az
     dist = (dx**2 + dz**2)**0.5
     if dist == 0:
-        return ax, az
-    
-    # Normalized direction
+        return ax, az, "north"
+
+    # Normalized forward direction along road axis
     nx, nz = dx / dist, dz / dist
-    
-    # Start and end points (6 units from center)
-    offset = 6.0
-    start_x, start_z = ax + nx * offset, az + nz * offset
-    end_x, end_z = bx - nx * offset, bz - nz * offset
-    
-    wx = start_x + (end_x - start_x) * rv.progress
-    wz = start_z + (end_z - start_z) * rv.progress
-    return round(wx, 3), round(wz, 3)
+
+    if abs(nx) > abs(nz):
+        direction = "east" if nx > 0 else "west"
+    else:
+        direction = "south" if nz > 0 else "north"
+
+    is_exit = str(rv.to_intersection).startswith("exit_")
+    start_offset = 3.5
+    end_offset = 0.0 if is_exit else 3.5
+
+    start_x, start_z = ax + nx * start_offset, az + nz * start_offset
+    end_x, end_z = bx - nx * end_offset, bz - nz * end_offset
+
+    # Centerline position along segment
+    cx = start_x + (end_x - start_x) * rv.progress
+    cz = start_z + (end_z - start_z) * rv.progress
+
+    # Right-hand traffic lateral offset: +1.5m to the right of travel vector (nx, nz)
+    # Right normal vector: lat_x = -nz * 1.5, lat_z = nx * 1.5
+    wx = cx - nz * 1.5
+    wz = cz + nx * 1.5
+    return round(wx, 3), round(wz, 3), direction
 
 
 def build_city_frame(city_network, mode: str, shared_agent=None) -> CityFrame:
@@ -237,7 +257,7 @@ def build_city_frame(city_network, mode: str, shared_agent=None) -> CityFrame:
     # Road vehicles
     road_veh_states: list[RoadVehicleState] = []
     for rv in city_network.road_vehicles:
-        wx, wz = _road_vehicle_world(rv)
+        wx, wz, direction = _road_vehicle_world(rv)
         road_veh_states.append(RoadVehicleState(
             id=rv.id,
             from_intersection=rv.from_intersection,
@@ -247,6 +267,7 @@ def build_city_frame(city_network, mode: str, shared_agent=None) -> CityFrame:
             world_z=wz,
             prev_turn=rv.prev_turn,
             next_turn=rv.next_turn,
+            direction=direction,
         ))
 
     return CityFrame(
