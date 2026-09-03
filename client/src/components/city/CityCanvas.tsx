@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import React, { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Text, Billboard } from "@react-three/drei";
 import type {
   CityFrame,
   CityIntersectionState,
+  CityVehicleState,
 } from "@/types/city";
 import CityGrid from "@/components/city/CityGrid";
 import CityRoads from "@/components/city/CityRoads";
@@ -100,7 +101,7 @@ function resolveLightColor(
 }
 
 // ── Single Intersection Component ──
-function IntersectionNode({
+const IntersectionNode = React.memo(function IntersectionNode({
   data,
   showCongestion,
 }: {
@@ -182,38 +183,81 @@ function IntersectionNode({
       <QueueLabel value={data.queue_lengths.west} position={[-6.5, 2.5, 1.2]} />
     </group>
   );
-}
+});
 
 // ── Main Canvas ──
 interface CityCanvasProps {
   frame: CityFrame | null;
-  showCongestion: boolean; // Keep prop to maintain component signature
+  showCongestion: boolean;
 }
 
 export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
   const intersectionData = frame?.intersections ?? {};
   const roadVehicles = frame?.road_vehicles ?? [];
 
+  const allVehicles = useMemo(() => {
+    const list: Array<{
+      vehicle: CityVehicleState;
+      iid?: string;
+      cx?: number;
+      cz?: number;
+    }> = [];
+
+    for (const inter of Object.values(intersectionData)) {
+      for (const v of inter.vehicles) {
+        list.push({
+          vehicle: v,
+          iid: inter.id,
+          cx: inter.grid_x,
+          cz: inter.grid_z,
+        });
+      }
+    }
+
+    for (const rv of roadVehicles) {
+      list.push({
+        vehicle: {
+          id: rv.id,
+          lane: rv.direction ?? "north",
+          turn: "straight",
+          position: rv.progress,
+          state: "moving",
+          wait_time: 0,
+          world_x: rv.world_x,
+          world_z: rv.world_z,
+          prev_turn: rv.prev_turn,
+          next_turn: rv.next_turn,
+        },
+        iid: undefined,
+        cx: undefined,
+        cz: undefined,
+      });
+    }
+
+    return list;
+  }, [intersectionData, roadVehicles]);
+
   return (
     <Canvas
       camera={{ position: [0, 32, 36], fov: 45 }}
       shadows
-      gl={{ antialias: true, alpha: false }}
+      dpr={[1, 1.5]}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       style={{ background: "#0a0a0f" }}
     >
       {/* Lighting & Environment */}
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[20, 40, 20]}
-        intensity={1.5}
+        intensity={1.4}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-bias={-0.0001}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-bias={-0.0005}
       />
       <directionalLight
         position={[-20, 30, -20]}
-        intensity={0.6}
+        intensity={0.5}
         color="#6b9bd1"
       />
 
@@ -251,29 +295,14 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
           );
         })}
 
-        {/* Render all intersection vehicles (with detailed models & paints) */}
-        {Object.values(intersectionData)
-          .flatMap((inter) => inter.vehicles.map(v => ({ v, cx: inter.grid_x, cz: inter.grid_z, iid: inter.id })))
-          .map(({ v, cx, cz, iid }) => (
-            <CityVehicle key={v.id} vehicle={v} intersectionId={iid} cx={cx} cz={cz} />
-          ))}
-
-        {/* Render all road vehicles */}
-        {roadVehicles.map((rv) => (
+        {/* Render all city vehicles continuously through single unified pool */}
+        {allVehicles.map(({ vehicle, iid, cx, cz }) => (
           <CityVehicle
-            key={rv.id}
-            vehicle={{
-              id: rv.id,
-              lane: "north", // placeholder
-              turn: "straight",
-              position: rv.progress,
-              state: "moving",
-              wait_time: 0,
-              world_x: rv.world_x,
-              world_z: rv.world_z,
-              prev_turn: rv.prev_turn,
-              next_turn: rv.next_turn,
-            }}
+            key={vehicle.id}
+            vehicle={vehicle}
+            intersectionId={iid}
+            cx={cx}
+            cz={cz}
           />
         ))}
       </Suspense>

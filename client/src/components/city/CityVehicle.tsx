@@ -24,6 +24,7 @@ function buildCurve(lane: string, turn: Turn, SPAWN_DIST: number, EXIT_DIST: num
   const path = new CurvePath<Vector3>();
   const STOP = 3.5;
   const off = turn === "left" ? 0.5 : turn === "straight" ? 1.5 : 2.5;
+  const exitOff = 1.5; // All vehicles exit into standard receiving travel lane
   let start: Vector3, enter: Vector3, exit: Vector3, end: Vector3, control: Vector3;
 
   switch (lane) {
@@ -31,44 +32,44 @@ function buildCurve(lane: string, turn: Turn, SPAWN_DIST: number, EXIT_DIST: num
       start = new Vector3(-off, Y, -SPAWN_DIST);
       enter = new Vector3(-off, Y, -STOP);
       if (turn === "straight") {
-        exit = new Vector3(-off, Y, STOP); end = new Vector3(-off, Y, EXIT_DIST); control = new Vector3(-off, Y, 0);
+        exit = new Vector3(-exitOff, Y, STOP); end = new Vector3(-exitOff, Y, EXIT_DIST); control = new Vector3(-exitOff, Y, 0);
       } else if (turn === "right") {
-        exit = new Vector3(-STOP, Y, -off); end = new Vector3(-EXIT_DIST, Y, -off); control = new Vector3(-off, Y, -off);
+        exit = new Vector3(-STOP, Y, -exitOff); end = new Vector3(-EXIT_DIST, Y, -exitOff); control = new Vector3(-off, Y, -exitOff);
       } else {
-        exit = new Vector3(STOP, Y, off); end = new Vector3(EXIT_DIST, Y, off); control = new Vector3(-off, Y, off);
+        exit = new Vector3(STOP, Y, exitOff); end = new Vector3(EXIT_DIST, Y, exitOff); control = new Vector3(-off, Y, exitOff);
       }
       break;
     case "south":
       start = new Vector3(off, Y, SPAWN_DIST);
       enter = new Vector3(off, Y, STOP);
       if (turn === "straight") {
-        exit = new Vector3(off, Y, -STOP); end = new Vector3(off, Y, -EXIT_DIST); control = new Vector3(off, Y, 0);
+        exit = new Vector3(exitOff, Y, -STOP); end = new Vector3(exitOff, Y, -EXIT_DIST); control = new Vector3(exitOff, Y, 0);
       } else if (turn === "right") {
-        exit = new Vector3(STOP, Y, off); end = new Vector3(EXIT_DIST, Y, off); control = new Vector3(off, Y, off);
+        exit = new Vector3(STOP, Y, exitOff); end = new Vector3(EXIT_DIST, Y, exitOff); control = new Vector3(off, Y, exitOff);
       } else {
-        exit = new Vector3(-STOP, Y, -off); end = new Vector3(-EXIT_DIST, Y, -off); control = new Vector3(off, Y, -off);
+        exit = new Vector3(-STOP, Y, -exitOff); end = new Vector3(-EXIT_DIST, Y, -exitOff); control = new Vector3(off, Y, -exitOff);
       }
       break;
     case "east":
       start = new Vector3(SPAWN_DIST, Y, -off);
       enter = new Vector3(STOP, Y, -off);
       if (turn === "straight") {
-        exit = new Vector3(-STOP, Y, -off); end = new Vector3(-EXIT_DIST, Y, -off); control = new Vector3(0, Y, -off);
+        exit = new Vector3(-STOP, Y, -exitOff); end = new Vector3(-EXIT_DIST, Y, -exitOff); control = new Vector3(0, Y, -exitOff);
       } else if (turn === "right") {
-        exit = new Vector3(off, Y, -STOP); end = new Vector3(off, Y, -EXIT_DIST); control = new Vector3(off, Y, -off);
+        exit = new Vector3(exitOff, Y, -STOP); end = new Vector3(exitOff, Y, -EXIT_DIST); control = new Vector3(exitOff, Y, -off);
       } else {
-        exit = new Vector3(-off, Y, STOP); end = new Vector3(-off, Y, EXIT_DIST); control = new Vector3(-off, Y, -off);
+        exit = new Vector3(-exitOff, Y, STOP); end = new Vector3(-exitOff, Y, EXIT_DIST); control = new Vector3(-exitOff, Y, -off);
       }
       break;
     case "west":
       start = new Vector3(-SPAWN_DIST, Y, off);
       enter = new Vector3(-STOP, Y, off);
       if (turn === "straight") {
-        exit = new Vector3(STOP, Y, off); end = new Vector3(EXIT_DIST, Y, off); control = new Vector3(0, Y, off);
+        exit = new Vector3(STOP, Y, exitOff); end = new Vector3(EXIT_DIST, Y, exitOff); control = new Vector3(0, Y, exitOff);
       } else if (turn === "right") {
-        exit = new Vector3(-off, Y, STOP); end = new Vector3(-off, Y, EXIT_DIST); control = new Vector3(-off, Y, off);
+        exit = new Vector3(-exitOff, Y, STOP); end = new Vector3(-exitOff, Y, EXIT_DIST); control = new Vector3(-exitOff, Y, off);
       } else {
-        exit = new Vector3(off, Y, -STOP); end = new Vector3(off, Y, -EXIT_DIST); control = new Vector3(off, Y, off);
+        exit = new Vector3(exitOff, Y, -STOP); end = new Vector3(exitOff, Y, -EXIT_DIST); control = new Vector3(exitOff, Y, off);
       }
       break;
     default:
@@ -111,35 +112,52 @@ function getVehicleProps(id: string, isEmergency?: boolean) {
   };
 }
 
-// ── Materials Cache ──────────────────────────────────────────────────────────
+// ── Global Vehicle Materials & Geometry Singletons (0 GC Churn) ──────────────
+const SHARED_WHEEL_GEO = new CylinderGeometry(0.09, 0.09, 0.07, 8);
+const MAT_CACHE = new Map<string, {
+  paint: MeshStandardMaterial;
+  window: MeshStandardMaterial;
+  wheel: MeshStandardMaterial;
+  headlight: MeshStandardMaterial;
+  brakelight: MeshStandardMaterial;
+}>();
+
 function useMaterials(paintColor: string, isWaiting: boolean) {
-  return useMemo(() => ({
-    paint: new MeshStandardMaterial({
-      color: paintColor,
-      roughness: 0.25,
-      metalness: 0.75,
-      emissive: paintColor,
-      emissiveIntensity: 0.08,
-    }),
-    window: new MeshStandardMaterial({
-      color: "#0a0a14",
-      roughness: 0.02,
-      metalness: 0.97,
-      transparent: true,
-      opacity: 0.88,
-    }),
-    wheel: new MeshStandardMaterial({ color: "#0f0f0f", roughness: 0.7, metalness: 0.3 }),
-    headlight: new MeshStandardMaterial({
-      color: "#fffde7",
-      emissive: "#fffde7",
-      emissiveIntensity: 2.2,
-    }),
-    brakelight: new MeshStandardMaterial({
-      color: "#ff0000",
-      emissive: "#ff0000",
-      emissiveIntensity: isWaiting ? 3.5 : 0.25,
-    }),
-  }), [paintColor, isWaiting]);
+  return useMemo(() => {
+    const key = `${paintColor}_${isWaiting}`;
+    let m = MAT_CACHE.get(key);
+    if (!m) {
+      m = {
+        paint: new MeshStandardMaterial({
+          color: paintColor,
+          roughness: 0.25,
+          metalness: 0.75,
+          emissive: paintColor,
+          emissiveIntensity: 0.08,
+        }),
+        window: new MeshStandardMaterial({
+          color: "#0a0a14",
+          roughness: 0.02,
+          metalness: 0.97,
+          transparent: true,
+          opacity: 0.88,
+        }),
+        wheel: new MeshStandardMaterial({ color: "#0f0f0f", roughness: 0.7, metalness: 0.3 }),
+        headlight: new MeshStandardMaterial({
+          color: "#fffde7",
+          emissive: "#fffde7",
+          emissiveIntensity: 2.2,
+        }),
+        brakelight: new MeshStandardMaterial({
+          color: "#ff0000",
+          emissive: "#ff0000",
+          emissiveIntensity: isWaiting ? 3.5 : 0.25,
+        }),
+      };
+      MAT_CACHE.set(key, m);
+    }
+    return m;
+  }, [paintColor, isWaiting]);
 }
 
 // ── 3D Geometry Composers ────────────────────────────────────────────────────
@@ -268,7 +286,7 @@ interface CityVehicleProps {
   cz?: number;
 }
 
-export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVehicleProps) {
+function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehicleProps) {
   const { paintColor, type } = useMemo(
     () => "is_emergency" in vehicle
       ? getVehicleProps(vehicle.id, vehicle.is_emergency)
@@ -303,7 +321,12 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
     if (id === "C" && (exitDir === "south" || exitDir === "west")) isExtExit = true;
     if (id === "D" && (exitDir === "south" || exitDir === "east")) isExtExit = true;
 
-    return { spawnDist: isExtSpawn ? 28 : 6.0, exitDist: isExtExit ? 28 : 6.0 };
+    // Road perimeter is at +/- 27.0, center is at +/- 10.0 -> distance is 17.0
+    // Internal road connection boundary is at 6.5 from intersection center
+    return {
+      spawnDist: isExtSpawn ? 17.0 : 6.5,
+      exitDist: isExtExit ? 17.0 : 6.5,
+    };
   }, [intersectionId, vehicle.lane, vehicle.turn]);
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn, spawnDist, exitDist), [vehicle.lane, turn, spawnDist, exitDist]);
@@ -336,23 +359,13 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
   const lastUpdateTime = useRef<number | null>(null);
   const updateInterval = useRef(0.1);
 
-  // Keep track of active wheels
-  const wheelGeo = useMemo(() => new CylinderGeometry(0.09, 0.09, 0.07, 10), []);
-
-  useEffect(() => {
-    return () => {
-      wheelGeo.dispose();
-      Object.values(mats).forEach((m) => m.dispose());
-    };
-  }, [wheelGeo, mats]);
-
-  // Set default heading based on lane
-  const getDefaultHeading = (lane: string) => {
-    switch (lane) {
-      case "north": return 0;          // Southbound (+Z)
-      case "south": return Math.PI;    // Northbound (-Z)
-      case "east": return Math.PI / 2; // Westbound (-X)
-      case "west": return -Math.PI / 2;// Eastbound (+X)
+  // Set default heading based on compass travel direction
+  const getDefaultHeading = (dir: string) => {
+    switch (dir) {
+      case "north": return Math.PI;    // Northbound (-Z)
+      case "south": return 0;          // Southbound (+Z)
+      case "east":  return Math.PI / 2;// Eastbound (+X)
+      case "west":  return -Math.PI / 2;// Westbound (-X)
       default: return 0;
     }
   };
@@ -383,13 +396,23 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
       t = Math.min(Math.max(t, 0), 0.999);
       lastVisualTRef.current = t;
 
-      let t_visual = 0;
+      const L_approach = spawnDist - 3.5;
+      const totalLen = curve.getLength();
+      // Cruising speed factor: meters per unit of backend simulation progress
+      const C_speed = L_approach / 0.42;
+
+      let s = 0;
       if (t <= 0.42) {
-        t_visual = (t / 0.42) * t_stop;
+        if (vehicle.state === "waiting") {
+          s = L_approach;
+        } else {
+          s = Math.max(0, L_approach - (0.42 - t) * C_speed);
+        }
       } else {
-        t_visual = t_stop + ((t - 0.42) / 0.58) * (1.0 - t_stop);
+        // Uniform physical cruising speed through the turn and exit
+        s = L_approach + (t - 0.42) * C_speed;
       }
-      t_visual = Math.min(Math.max(t_visual, 0), 0.999);
+      const t_visual = Math.min(Math.max(s / totalLen, 0), 0.999);
 
       const targetPos = curve.getPointAt(t_visual);
       const tAhead = Math.min(t_visual + 0.01, 1.0);
@@ -407,11 +430,15 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
       const nextRot = currentRot + dRot * Math.min(1, delta * 15);
       smoothRotRef.current = nextRot;
 
-      groupRef.current.position.set(cx + targetPos.x, targetPos.y, cz + targetPos.z);
+      const worldPosX = cx + targetPos.x;
+      const worldPosZ = cz + targetPos.z;
+      currentVisualPos.current = { x: worldPosX, z: worldPosZ };
+
+      groupRef.current.position.set(worldPosX, targetPos.y, worldPosZ);
       groupRef.current.rotation.set(0, nextRot, 0);
 
     } else {
-      // ROAD VEHICLE LOGIC (Linear interpolation of world_x / world_z)
+      // ROAD VEHICLE LOGIC (Linear interpolation of world_x / world_z with physical lateral lane offset)
       if (
         vehicle.world_x !== lastTargetPos.current.x ||
         vehicle.world_z !== lastTargetPos.current.z
@@ -421,8 +448,6 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
 
         startVisualPos.current = { ...currentVisualPos.current };
         lastTargetPos.current = { x: vehicle.world_x, z: vehicle.world_z };
-        startTRef.current = lastVisualTRef.current; // reusing startTRef for road progress
-        lastTargetTRef.current = vehicle.position;  // reusing lastTargetTRef
         lastUpdateTime.current = time;
       }
 
@@ -431,20 +456,10 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
 
       const x = startVisualPos.current.x + (lastTargetPos.current.x - startVisualPos.current.x) * progress;
       const z = startVisualPos.current.z + (lastTargetPos.current.z - startVisualPos.current.z) * progress;
-      
-      const visual_progress = startTRef.current + (lastTargetTRef.current - startTRef.current) * progress;
-      lastVisualTRef.current = visual_progress;
+      currentVisualPos.current = { x, z };
 
-      const dx = x - currentVisualPos.current.x;
-      const dz = z - currentVisualPos.current.z;
-      const distanceMoved = Math.sqrt(dx * dx + dz * dz);
-
-      let targetAngle = smoothRotRef.current ?? getDefaultHeading(vehicle.lane);
-      if (distanceMoved > 0.005) {
-        targetAngle = Math.atan2(dx, dz);
-      } else if (vehicle.state === "waiting") {
-        targetAngle = getDefaultHeading(vehicle.lane);
-      }
+      // Exact heading based on compass travel direction
+      const targetAngle = getDefaultHeading(vehicle.lane);
 
       if (smoothRotRef.current === null) {
         smoothRotRef.current = targetAngle;
@@ -452,32 +467,11 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
         let diff = targetAngle - smoothRotRef.current;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        smoothRotRef.current += diff * Math.min(1, delta * 12);
+        smoothRotRef.current += diff * Math.min(1.0, delta * 14.0);
       }
 
-      const getOff = (t?: string) => t === "left" ? 0.5 : t === "straight" ? 1.5 : 2.5;
-      const offStart = getOff(vehicle.prev_turn);
-      const offEnd = getOff(vehicle.next_turn);
-      const currentOff = offStart + (offEnd - offStart) * visual_progress;
-
-      const path_dx = lastTargetPos.current.x - startVisualPos.current.x;
-      const path_dz = lastTargetPos.current.z - startVisualPos.current.z;
-      const path_dist = Math.sqrt(path_dx * path_dx + path_dz * path_dz);
-      let nx = 0, nz = 1;
-      if (path_dist > 0.001) {
-        nx = path_dx / path_dist;
-        nz = path_dz / path_dist;
-      }
-      
-      const lat_x = -nz;
-      const lat_z = nx;
-      
-      const final_x = x + lat_x * currentOff;
-      const final_z = z + lat_z * currentOff;
-
-      currentVisualPos.current = { x, z };
-      groupRef.current.position.set(final_x, 0.08, final_z);
-      groupRef.current.rotation.y = smoothRotRef.current;
+      groupRef.current.position.set(x, 0.08, z);
+      groupRef.current.rotation.set(0, smoothRotRef.current, 0);
     }
 
     if (vehicle.state !== "waiting" && vehicle.state !== "passed") {
@@ -566,7 +560,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
         <>
           <mesh
             ref={rfRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[0, wy, 0.25]}
             rotation={[0, 0, Math.PI / 2]}
@@ -574,7 +568,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
           />
           <mesh
             ref={rrRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[0, wy, -0.25]}
             rotation={[0, 0, Math.PI / 2]}
@@ -585,7 +579,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
         <>
           <mesh
             ref={rfRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[0.22, wy, wz]}
             rotation={[0, 0, Math.PI / 2]}
@@ -593,7 +587,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
           />
           <mesh
             ref={lfRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[-0.22, wy, wz]}
             rotation={[0, 0, Math.PI / 2]}
@@ -601,7 +595,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
           />
           <mesh
             ref={rrRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[0.22, wy, -wz]}
             rotation={[0, 0, Math.PI / 2]}
@@ -609,7 +603,7 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
           />
           <mesh
             ref={lrRef}
-            geometry={wheelGeo}
+            geometry={SHARED_WHEEL_GEO}
             material={mats.wheel}
             position={[-0.22, wy, -wz]}
             rotation={[0, 0, Math.PI / 2]}
@@ -620,3 +614,5 @@ export default function CityVehicle({ vehicle, intersectionId, cx, cz }: CityVeh
     </group>
   );
 }
+
+export default React.memo(CityVehicleComponent);
