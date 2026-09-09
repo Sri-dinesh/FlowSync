@@ -19,6 +19,7 @@ export default function Header() {
       : isSimulationConnected;
 
   const navLinks = [
+    { href: "/dashboard", label: "📊 Dashboard", key: "dashboard" },
     { href: "/simulation", label: "🚦 Simulation", key: "simulation" },
     { href: "/city", label: "🏙️ City Grid", key: "city" },
     { href: "/realworld", label: "📡 Real World", key: "realworld" },
