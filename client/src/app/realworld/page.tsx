@@ -135,6 +135,31 @@ export default function RealWorldPage() {
     return () => wsRef.current?.close();
   }, [connect]);
 
+  // Preload session if ?session= query parameter is passed (e.g. from Dashboard)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sessionParam = params.get("session");
+    if (!sessionParam) return;
+
+    async function loadPreselectedSession(sid: string) {
+      try {
+        const res = await fetch(`${API_BASE}/cctv/sessions/${sid}/twin-data`);
+        if (res.ok) {
+          const data = await res.json();
+          setTwinData(data);
+          setSessionId(sid);
+          setTotalVehiclesDetected(data.total_vehicles_detected ?? 0);
+          setActiveTab("twin");
+        }
+      } catch (err) {
+        console.error("Failed to preload session from URL", err);
+      }
+    }
+
+    loadPreselectedSession(sessionParam);
+  }, []);
+
   const sendCommand = useCallback(
     (command: string, payload: Record<string, unknown> = {}) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
