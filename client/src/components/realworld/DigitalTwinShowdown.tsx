@@ -266,6 +266,13 @@ export default function DigitalTwinShowdown({
     }
   }, [scenarioCounts]);
 
+  const handleStopBenchmark = useCallback(() => {
+    sendWsCommand({ command: "stop" });
+    setBenchmarkState("idle");
+    setBenchmarkProgress(null);
+    setStoreRunning(false);
+  }, [sendWsCommand, setStoreRunning]);
+
   const arrivalsList = twinData?.arrivals ?? [];
   const hasArrivals = arrivalsList.length > 0;
   const totalVehicles = hasArrivals
@@ -451,22 +458,34 @@ export default function DigitalTwinShowdown({
                 </div>
               )}
 
-              {/* Run benchmark button */}
-              <button
-                onClick={handleRunBenchmark}
-                disabled={injecting || benchmarkState === "running" || !isWsConnected}
-                className={`w-full py-3 rounded-xl text-xs uppercase tracking-wider font-bold transition-all duration-200 ${
-                  benchmarkState === "running"
-                    ? "bg-indigo-600/40 text-indigo-300 cursor-not-allowed animate-pulse"
-                    : isWsConnected && !injecting
-                    ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
-                    : "bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]"
-                }`}
-              >
-                {benchmarkState === "running"
-                  ? "⏳ Replaying & Evaluating…"
-                  : "▶ Run Full Comparison"}
-              </button>
+              {/* Run/Cancel benchmark button */}
+              {benchmarkState === "running" ? (
+                <div className="flex gap-2">
+                  <div className="flex-1 py-2.5 px-3 rounded-xl text-xs uppercase tracking-wider font-bold bg-indigo-600/25 text-indigo-300 border border-indigo-500/30 flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+                    <span>Replaying…</span>
+                  </div>
+                  <button
+                    onClick={handleStopBenchmark}
+                    className="px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-all hover:scale-105 active:scale-95"
+                    title="Stop and cancel replay"
+                  >
+                    ⏹ Stop
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleRunBenchmark}
+                  disabled={injecting || !isWsConnected}
+                  className={`w-full py-3 rounded-xl text-xs uppercase tracking-wider font-bold transition-all duration-200 ${
+                    isWsConnected && !injecting
+                      ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
+                      : "bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]"
+                  }`}
+                >
+                  ▶ Run Full Comparison
+                </button>
+              )}
 
               {!isWsConnected && (
                 <p className="text-[10px] text-rose-400/70 text-center">

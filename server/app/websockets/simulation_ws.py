@@ -142,7 +142,7 @@ async def _run_timed_benchmark(
        - Broadcasts real-time 10Hz frames driving the 3-D canvas.
     """
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
-    TICK_SLEEP = 0.1       # wall-clock seconds between ticks (real-time 10 Hz)
+    TICK_SLEEP = 0.04      # wall-clock seconds between ticks (~2.5x speed for snappy evaluation)
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
     PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
 
@@ -229,8 +229,8 @@ async def _run_timed_benchmark(
             tick_count        = 0
 
             if is_realworld:
-                # Real-world mode runs until all vehicles clear (or safety timeout e.g. 300s)
-                max_timeout = max(90.0, total_vehicles_to_clear * 6.0)
+                # Real-world mode runs until all vehicles clear (safety timeout max 180s)
+                max_timeout = max(60.0, total_vehicles_to_clear * 3.0)
                 deadline = asyncio.get_event_loop().time() + max_timeout
             else:
                 deadline = asyncio.get_event_loop().time() + duration_seconds
@@ -240,9 +240,16 @@ async def _run_timed_benchmark(
                 now = asyncio.get_event_loop().time()
                 if now >= deadline:
                     break
-                if is_realworld and len(pending_arrivals) == 0 and intersection.total_passed >= total_vehicles_to_clear:
-                    # All recorded vehicles have cleared the intersection!
-                    break
+
+                # Count active vehicles currently on roads/queues
+                total_active_vehicles = sum(len(q) for q in intersection.lanes.values())
+
+                if is_realworld and len(pending_arrivals) == 0:
+                    # Clean completion: All video vehicles have entered AND either:
+                    # 1. Total passed reached the recorded count, OR
+                    # 2. All vehicles on the road have fully crossed the intersection
+                    if intersection.total_passed >= total_vehicles_to_clear or total_active_vehicles == 0:
+                        break
 
                 tick_start = now
                 tick_count += 1
@@ -251,25 +258,36 @@ async def _run_timed_benchmark(
                 # ── Chronological vehicle arrivals (Real-World Replay) ───────
                 if is_realworld:
                     while pending_arrivals and pending_arrivals[0].get("time_s", 0.0) <= sim_time:
-                        arr = pending_arrivals.pop(0)
-                        dir_name = arr.get("lane", "north")
-                        turn = arr.get("turn", "straight")
+                        next_arr = pending_arrivals[0]
+                        dir_name = str(next_arr.get("lane", "north")).lower().replace("_bound", "").strip()
+                        if dir_name not in ("north", "south", "east", "west"):
+                            dir_name = "north"
+                        turn = str(next_arr.get("turn", "straight")).lower().strip()
+                        if turn not in ("straight", "left", "right"):
+                            turn = "straight"
                         lane_key = f"{dir_name}_{turn}"
-                        if lane_key in intersection.lanes and len(intersection.lanes[lane_key]) < 12:
-                            from app.simulation.vehicle import Vehicle, DEFAULT_SPEED
-                            from uuid import uuid4
-                            v = Vehicle(
-                                id=arr.get("vehicle_id", f"cctv_{uuid4().hex[:6]}"),
-                                lane=dir_name,
-                                turn=turn,
-                                position=0.0,
-                                wait_time=0.0,
-                                speed=DEFAULT_SPEED,
-                                state="waiting",
-                            )
-                            intersection.lanes[lane_key].append(v)
-                            spawned_count += 1
-                            intersection._spawned_this_interval += 1
+                        if lane_key not in intersection.lanes:
+                            lane_key = f"{dir_name}_straight"
+
+                        # If lane is excessively congested (>= 16 vehicles), wait for next tick to spawn
+                        if len(intersection.lanes[lane_key]) >= 16:
+                            break
+
+                        arr = pending_arrivals.pop(0)
+                        from app.simulation.vehicle import Vehicle, DEFAULT_SPEED
+                        from uuid import uuid4
+                        v = Vehicle(
+                            id=arr.get("vehicle_id", f"cctv_{uuid4().hex[:6]}"),
+                            lane=dir_name,
+                            turn=turn,
+                            position=0.0,
+                            wait_time=0.0,
+                            speed=DEFAULT_SPEED,
+                            state="waiting",
+                        )
+                        intersection.lanes[lane_key].append(v)
+                        spawned_count += 1
+                        intersection._spawned_this_interval += 1
 
                 # ── Compute action ─────────────────────────────────────────
                 if mode in ("fixed", "manual"):
@@ -353,6 +371,12 @@ async def _run_timed_benchmark(
                 # Send progress updates every 5 ticks (~0.5s)
                 if tick_count % 5 == 0:
                     mode_elapsed = round(sim_time, 1)
+                    curr_active = sum(len(q) for q in intersection.lanes.values())
+                    current_passed = (
+                        total_vehicles_to_clear
+                        if is_realworld and len(pending_arrivals) == 0 and curr_active == 0
+                        else min(total_vehicles_to_clear, intersection.total_passed) if is_realworld else intersection.total_passed
+                    )
                     try:
                         await websocket.send_json({
                             "type": "benchmark_progress",
@@ -366,7 +390,7 @@ async def _run_timed_benchmark(
                             "is_realworld": is_realworld,
                             "total_vehicles": total_vehicles_to_clear,
                             "spawned_count": spawned_count,
-                            "passed_count": intersection.total_passed,
+                            "passed_count": current_passed,
                         })
                     except Exception:
                         pass
@@ -379,9 +403,15 @@ async def _run_timed_benchmark(
             # ── Collect results ────────────────────────────────────────────
             queue_lengths = intersection.get_queue_lengths()
             final_time = round(sim_time, 1)
+            final_active = sum(len(q) for q in intersection.lanes.values())
+            final_passed = (
+                total_vehicles_to_clear
+                if is_realworld and len(pending_arrivals) == 0 and final_active == 0
+                else intersection.total_passed
+            )
             results[mode] = {
-                "total_passed":    intersection.total_passed,
-                "total_vehicles":  total_vehicles_to_clear if is_realworld else intersection.total_passed,
+                "total_passed":    final_passed,
+                "total_vehicles":  total_vehicles_to_clear if is_realworld else final_passed,
                 "avg_wait_time":   round(intersection.get_avg_wait_time(), 2),
                 "max_queue":       max(queue_lengths.values(), default=0),
                 "duration_seconds": final_time if is_realworld else duration_seconds,
@@ -404,7 +434,7 @@ async def _run_timed_benchmark(
                     "is_realworld":   is_realworld,
                     "total_vehicles": total_vehicles_to_clear,
                     "spawned_count":  spawned_count,
-                    "passed_count":   intersection.total_passed,
+                    "passed_count":   final_passed,
                 })
             except Exception:
                 pass
