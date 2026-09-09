@@ -19,3 +19,4 @@ onnxruntime>=1.19.2         # Faster CPU inference than PyTorch
 roboflow>=1.1.48            # Roboflow SDK for dataset download
 albumentations>=1.4.14      # Training augmentation pipeline
 shapely>=2.0.6              # Polygon operations (point-in-polygon for ROI)
+yt-dlp>=2024.08.0           # YouTube live stream extraction and HLS resolving
