@@ -11,6 +11,7 @@ from .routers.metrics import router as metrics_router
 from .routers.simulation import router as simulation_router
 from .routers.training import router as training_router
 from .routers.cctv import router as cctv_router
+from .routers.analytics import router as analytics_router
 from .services import model_service, supabase_service
 from .simulation.environment import TrafficEnv
 from .websockets.simulation_ws import simulation_socket
@@ -131,6 +132,7 @@ app.include_router(simulation_router)
 app.include_router(training_router)
 app.include_router(metrics_router)
 app.include_router(cctv_router)
+app.include_router(analytics_router)
 
 app.add_api_websocket_route("/ws/simulation", simulation_socket)
 app.add_api_websocket_route("/ws/training", training_socket)
