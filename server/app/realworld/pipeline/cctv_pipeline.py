@@ -53,6 +53,7 @@ class CCTVPipeline:
         yolo_detector: YOLODetector,
         on_frame: Callable[[CCTVFrame], Awaitable[None]],
         on_progress: Optional[Callable[[Dict], Awaitable[None]]] = None,
+        on_arrival: Optional[Callable[[Dict], Awaitable[None]]] = None,
         session_id: str = "session_001",
         annotate_frames: bool = True,
     ) -> None:
@@ -60,6 +61,7 @@ class CCTVPipeline:
         self.yolo_detector = yolo_detector
         self.on_frame = on_frame
         self.on_progress = on_progress
+        self.on_arrival = on_arrival
         self.session_id = session_id
         self.annotate_frames = annotate_frames
 
@@ -121,7 +123,11 @@ class CCTVPipeline:
         # 1. Extract frame
         frame = await self.video_processor.read_frame()
         if frame is None:
-            # End of video — emit completion frame
+            if self.video_processor.is_live:
+                # Live stream transient buffer drop: yield control and retry next tick
+                await asyncio.sleep(0.05)
+                return
+            # End of video file — emit completion frame
             eof_frame = CCTVFrame(
                 frame_id=self._frame_id,
                 timestamp_ms=time.time() * 1000,
@@ -158,14 +164,24 @@ class CCTVPipeline:
                 turn_options = ["straight", "straight", "straight", "left", "right"]
                 turn = turn_options[bbox.track_id % len(turn_options)]
 
-                self._arrival_events.append({
+                event = {
+                    "type": "vehicle_arrival",
                     "vehicle_id": f"cctv_{bbox.track_id}",
                     "time_s": time_s,
                     "lane": direction,
                     "turn": turn,
                     "vehicle_type": bbox.class_name if bbox.class_name in ("car", "bus", "truck", "motorcycle", "auto_rickshaw") else "car",
-                })
+                    "timestamp_ms": time.time() * 1000,
+                }
+                self._arrival_events.append(event)
                 self._recorded_track_ids.add(bbox.track_id)
+
+                # Emit immediate zero-latency telemetry arrival event
+                if self.on_arrival is not None:
+                    try:
+                        await self.on_arrival(event)
+                    except Exception as err:
+                        print(f"[CCTVPipeline] on_arrival error: {err}")
 
         # 4. Count vehicles per lane using quadrant heuristic
         raw_counts_dict = self._quadrant_counter.count(detection)

@@ -22,6 +22,9 @@ from ..realworld.pipeline.yolo_detector import YOLODetector
 from ..realworld.digital_twin.session_recorder import SessionRecorder
 
 
+from ..realworld.pipeline.stream_resolver import StreamResolver
+
+
 class CCTVConnectionManager:
     """Manages WebSocket connections for /ws/cctv."""
 
@@ -95,6 +98,10 @@ async def cctv_socket(websocket: WebSocket) -> None:
         """Callback: pipeline emits progress → forward to client."""
         await cctv_manager.send(websocket, progress)
 
+    async def on_arrival(arrival: dict) -> None:
+        """Callback: instant telemetry event when vehicle enters camera view."""
+        await cctv_manager.send(websocket, arrival)
+
     try:
         while True:
             raw = await websocket.receive_text()
@@ -110,13 +117,14 @@ async def cctv_socket(websocket: WebSocket) -> None:
             payload = msg.get("payload", {})
 
             if cmd == "start_processing":
-                video_path = payload.get("video_path", "")
+                video_path = payload.get("video_path", "").strip()
 
-                if not os.path.exists(video_path):
+                is_stream = StreamResolver.is_stream_url(video_path)
+                if not is_stream and not os.path.exists(video_path):
                     await cctv_manager.send(websocket, {
                         "type": "error",
-                        "code": "VIDEO_NOT_FOUND",
-                        "message": f"Video not found: {video_path}",
+                        "code": "SOURCE_NOT_FOUND",
+                        "message": f"Video source not found: {video_path}",
                     })
                     continue
 
@@ -137,25 +145,37 @@ async def cctv_socket(websocket: WebSocket) -> None:
                 session_id = f"session_{conn_id[:8]}"
                 recorder = SessionRecorder(session_id, SESSION_DIR)
 
-                video_proc = VideoProcessor(video_path)
-                await video_proc.open()
+                try:
+                    video_proc = VideoProcessor(video_path)
+                    await video_proc.open()
 
-                pipeline = CCTVPipeline(
-                    video_processor=video_proc,
-                    yolo_detector=yolo_detector,
-                    on_frame=on_frame,
-                    on_progress=on_progress,
-                    session_id=session_id,
-                )
-                _pipelines[conn_id] = pipeline
-                _recorders[conn_id] = recorder
+                    pipeline = CCTVPipeline(
+                        video_processor=video_proc,
+                        yolo_detector=yolo_detector,
+                        on_frame=on_frame,
+                        on_progress=on_progress,
+                        on_arrival=on_arrival,
+                        session_id=session_id,
+                    )
+                    _pipelines[conn_id] = pipeline
+                    _recorders[conn_id] = recorder
 
-                await pipeline.start()
-                await cctv_manager.send(websocket, {
-                    "type": "pipeline_status",
-                    "status": "started",
-                    "session_id": session_id,
-                })
+                    await pipeline.start()
+                    await cctv_manager.send(websocket, {
+                        "type": "pipeline_status",
+                        "status": "started",
+                        "session_id": session_id,
+                        "is_live": is_stream,
+                        "source_type": video_proc.metadata.source_type if video_proc.metadata else "file",
+                    })
+                except Exception as err:
+                    print(f"[cctv_ws] Stream open failed: {err}")
+                    await cctv_manager.send(websocket, {
+                        "type": "error",
+                        "code": "STREAM_OPEN_FAILED",
+                        "message": f"Failed to open video source: {err}",
+                    })
+                    continue
 
             elif cmd == "stop_processing":
                 if pipeline and recorder:
