@@ -185,10 +185,12 @@ graph TB
     end
 
     UI --> Zustand
-    Zustand <-->|WebSockets (10Hz)| WS_Router
-    UI <-->|HTTP REST| REST_Router
-    Canvas <-- Zustand
-    Charts <-- Zustand
+    Zustand -->|"WebSockets (10 Hz)"| WS_Router
+    WS_Router --> Zustand
+    UI -->|"HTTP REST"| REST_Router
+    REST_Router --> UI
+    Zustand --> Canvas
+    Zustand --> Charts
 
     WS_Router --> Engine
     WS_Router --> SimAgent
@@ -202,16 +204,19 @@ graph TB
     Tracker --> Quadrant
     Quadrant --> Recorder
 
-    Engine <--> SimAgent
-    Trainer <--> TrainAgent
-    TrainAgent <--> PER
-    Trainer -->|Periodic Sync| SimAgent
-    Trainer -->|Save Checkpoint| Storage
+    Engine --> SimAgent
+    SimAgent --> Engine
+    Trainer --> TrainAgent
+    TrainAgent --> Trainer
+    TrainAgent --> PER
+    PER --> TrainAgent
+    Trainer -->|"Periodic Sync"| SimAgent
+    Trainer -->|"Save Checkpoint"| Storage
 
-    Recorder -->|Twin Data JSON| Engine
+    Recorder -->|"Twin Data JSON"| Engine
 
-    Backend -->|Async Telemetry Logs| Postgres
-    Prisma -->|Read Analytics| Postgres
+    Backend -->|"Async Telemetry Logs"| Postgres
+    Prisma -->|"Read Analytics"| Postgres
 ```
 
 ---
@@ -238,8 +243,8 @@ flowchart LR
     A["YouTube Live URL / RTSP Feed"] --> B["StreamResolver<br/>(yt-dlp + PO-Token Solver)"]
     B --> C["Direct HLS (.m3u8) Stream"]
     C --> D["RealtimeFrameGrabber<br/>(Daemon Background Thread)"]
-    D -->|Continuous cap.grab()| E["Atomic Single Frame Slot<br/>(0.0ms Queue Delay)"]
-    E -->|Latest Frame Only| F["YOLOv8 Object Detection"]
+    D -->|"Continuous Frame Grab"| E["Atomic Single Frame Slot<br/>(0.0ms Queue Delay)"]
+    E -->|"Latest Frame Only"| F["YOLOv8 Object Detection"]
     F --> G["ByteTrack Trajectory Filter"]
     G --> H["ROI / Quadrant Counting"]
     H --> I["Arrival Scheduler & Telemetry"]
@@ -261,22 +266,22 @@ sequenceDiagram
     participant DB as Supabase Storage / DB
 
     loop Every Decision Step (when min-green elapsed)
-        Sim->>Sim: Compute 12-movement queues & pressure
-        Sim->>Watchdog: Check Starvation (>45s) & Max Green (>40s)
+        Sim->>Sim: Compute 12-movement queues and pressure
+        Sim->>Watchdog: Check Starvation (over 45s) and Max Green (over 40s)
         alt Starvation or Max Green Triggered
             Watchdog-->>Sim: Enforce Override Action
         else Safe Condition
             Sim->>Mask: Extract Active Lane Demands
-            Mask->>Agent: Feed 20-D State Vector + Valid Phase Mask
+            Mask->>Agent: Feed 20-D State Vector and Valid Phase Mask
             Agent->>Agent: Evaluate Dueling Network Q(s, a)
             Agent-->>Sim: Dispatch argmax Q(s, a)
         end
-        Sim->>Sim: Execute Yellow (2s) → All-Red (3s) → Green
+        Sim->>Sim: Execute Yellow (2s), All-Red (3s), Green
         Sim->>Sim: Advance vehicle kinematics (10 Hz)
         Sim->>Sim: Calculate Max-Pressure Reward R
         Sim->>PER: Store Transition (s, a, R, s', Priority)
-        PER->>Agent: Sample Batch via SumTree (alpha=0.6, beta annealing)
-        Agent->>Agent: Compute Double DQN Loss & Backprop
+        PER->>Agent: Sample Batch via SumTree (alpha 0.6, beta annealing)
+        Agent->>Agent: Compute Double DQN Loss and Backprop
     end
     Note over Agent,DB: Every 50 episodes: Save weights to Supabase Storage
 ```
@@ -289,7 +294,9 @@ sequenceDiagram
 
 The agent receives a normalized 20-dimensional continuous state vector at every decision step:
 
-$$\mathbf{s} = [q_1, q_2, \dots, q_{12}, p_0, p_1, p_2, p_3, \tau_{\text{phase}}, \mathbf{1}_{\text{trans}}, \bar{P}_{\text{net}}, \sigma_{\text{starv}}]^T \in \mathbb{R}^{20}$$
+$$
+\mathbf{s} = [q_1, q_2, \dots, q_{12}, p_0, p_1, p_2, p_3, \tau_{\text{phase}}, \mathbf{1}_{\text{trans}}, \bar{P}_{\text{net}}, \sigma_{\text{starv}}]^T \in \mathbb{R}^{20}
+$$
 
 | Indices | Component | Range | Description |
 | :---: | :--- | :---: | :--- |
@@ -319,25 +326,41 @@ The discrete action space controls the signal phase:
 
 Based on PressLight and MPLight formulations, the reward function maximizes network throughput while penalizing pressure accumulation, unnecessary phase switching, and direction starvation:
 
-$$R = R_{\text{pressure}} + R_{\text{throughput}} + R_{\text{switch}} + R_{\text{starv}} + R_{\text{max\_green}} + R_{\text{balance}}$$
+$$
+R = R_{\text{pressure}} + R_{\text{throughput}} + R_{\text{switch}} + R_{\text{starv}} + R_{\text{max-green}} + R_{\text{balance}}
+$$
 
 1. **Pressure Differential ($R_{\text{pressure}}$)**:
    Rewards reduction in total intersection pressure between successive time steps:
-   $$R_{\text{pressure}} = 1.5 \times \left( \sum_{m} P_{\text{prev}}(m) - \sum_{m} P_{\text{curr}}(m) \right)$$
+   $$
+   R_{\text{pressure}} = 1.5 \times \left( \sum_{m} P_{\text{prev}}(m) - \sum_{m} P_{\text{curr}}(m) \right)
+   $$
    Where movement pressure is destination-aware:
-   $$P(m) = \max\left(0, \frac{\text{incoming}(m)}{C} - \frac{\text{outgoing}(\text{dest}(m))}{C}\right)$$
+   $$
+   P(m) = \max\left(0, \frac{\text{incoming}(m)}{C} - \frac{\text{outgoing}(\text{dest}(m))}{C}\right)
+   $$
 2. **Throughput Bonus ($R_{\text{throughput}}$)**:
-   $$R_{\text{throughput}} = 0.2 \times N_{\text{passed}}$$
+   $$
+   R_{\text{throughput}} = 0.2 \times N_{\text{passed}}
+   $$
 3. **Switch Penalty ($R_{\text{switch}}$)**:
    Penalizes abandoning a phase that still had active traffic demand:
-   $$R_{\text{switch}} = -0.3 \quad \text{if phase changed and } P_{\text{prev\_phase}} > 0.3 \text{, else } 0.0$$
+   $$
+   R_{\text{switch}} = -0.3 \quad \text{if phase changed and } P_{\text{prev-phase}} > 0.3 \text{, else } 0.0
+   $$
 4. **Starvation Penalty ($R_{\text{starv}}$)**:
-   $$R_{\text{starv}} = -2.0 \times |\mathcal{D}_{\text{starved}}| \quad \text{where } \mathcal{D}_{\text{starved}} = \{d \mid t_{\text{wait}}(d) \ge 45.0\,\text{s}\}$$
-5. **Max Green Penalty ($R_{\text{max\_green}}$)**:
-   $$R_{\text{max\_green}} = -1.0 \quad \text{if } \tau_{\text{green}} \ge 40.0\,\text{s}\text{, else } 0.0$$
+   $$
+   R_{\text{starv}} = -2.0 \times |\mathcal{D}_{\text{starv}}| \quad \text{where } \mathcal{D}_{\text{starv}} = \{d \mid t_{\text{wait}}(d) \ge 45.0\text{ s}\}
+   $$
+5. **Max Green Penalty ($R_{\text{max-green}}$)**:
+   $$
+   R_{\text{max-green}} = -1.0 \quad \text{if } \tau_{\text{green}} \ge 40.0\text{ s, else } 0.0
+   $$
 6. **Traffic Balance Bonus ($R_{\text{balance}}$)**:
    Rewards balanced queue dissipation across phases when the intersection is populated:
-   $$R_{\text{balance}} = 0.2 \quad \text{if } (\max(P_{\text{phase}}) - \min(P_{\text{phase}})) < 0.2 \text{ and } \sum P > 0.05$$
+   $$
+   R_{\text{balance}} = 0.2 \quad \text{if } (\max(P_{\text{phase}}) - \min(P_{\text{phase}})) < 0.2 \text{ and } \sum P > 0.05
+   $$
 
 ---
 
@@ -361,7 +384,9 @@ graph LR
     Combine --> Output["Q-Values for Actions {0, 1, 2, 3}"]
 ```
 
-$$\mathcal{Q}(s, a; \theta, \alpha, \beta) = \mathcal{V}(s; \theta, \beta) + \left( \mathcal{A}(s, a; \theta, \alpha) - \frac{1}{|\mathcal{A}|} \sum_{a' \in \mathcal{A}} \mathcal{A}(s, a'; \theta, \alpha) \right)$$
+$$
+\mathcal{Q}(s, a; \theta, \alpha, \beta) = \mathcal{V}(s; \theta, \beta) + \left( \mathcal{A}(s, a; \theta, \alpha) - \frac{1}{|\mathcal{A}|} \sum_{a' \in \mathcal{A}} \mathcal{A}(s, a'; \theta, \alpha) \right)
+$$
 
 ---
 
@@ -369,11 +394,15 @@ $$\mathcal{Q}(s, a; \theta, \alpha, \beta) = \mathcal{V}(s; \theta, \beta) + \le
 
 Transitions $(s, a, r, s', d)$ are stored in a binary SumTree with capacity $N = 100{,}000$. Transitions are sampled according to their temporal-difference (TD) error magnitude:
 
-$$P(i) = \frac{p_i^\alpha}{\sum_k p_k^\alpha}, \quad p_i = |\delta_i| + \epsilon_{\text{per}}$$
+$$
+P(i) = \frac{p_i^\alpha}{\sum_k p_k^\alpha}, \quad p_i = |\delta_i| + \epsilon_{\text{per}}
+$$
 
 Importance-sampling weights correct for estimation bias:
 
-$$w_i = \left( \frac{1}{N} \cdot \frac{1}{P(i)} \right)^\beta, \quad \beta \text{ annealed linearly from } 0.4 \to 1.0$$
+$$
+w_i = \left( \frac{1}{N} \cdot \frac{1}{P(i)} \right)^\beta, \quad \beta \text{ annealed linearly from } 0.4 \to 1.0
+$$
 
 Hyperparameter specifications:
 - **$\alpha$**: `0.6`
@@ -391,11 +420,15 @@ Hyperparameter specifications:
 
 To ensure zero signal phase conflicts and eliminate dead-green states:
 1. **Demand Action Masking**:
-   $$\mathcal{A}_{\text{valid}} = \left\{ p \in \{0, 1, 2, 3\} \mid \sum_{d \in \text{dirs}(p)} \sum_{t \in \text{turns}(p)} \text{queue}_{d,t} > 0 \right\}$$
-   $$a^* = \arg\max_{a \in \mathcal{A}_{\text{valid}}} \mathcal{Q}(s, a)$$
+   $$
+   \mathcal{A}_{\text{valid}} = \left\{ p \in \{0, 1, 2, 3\} \;\middle|\; \sum_{d \in \text{dirs}(p)} \sum_{t \in \text{turns}(p)} q_{d,t} > 0 \right\}
+   $$
+   $$
+   a^* = \arg\max_{a \in \mathcal{A}_{\text{valid}}} \mathcal{Q}(s, a)
+   $$
    If no approach has queued vehicles, the agent falls back to greedy unmasked exploration.
-2. **Clearance Enforcer**: Minimum green duration ($8.0\text{s}$) is strictly enforced before any switch. Every phase switch passes through Yellow ($2.0\text{s}$) followed by All-Red ($3.0\text{s}$).
-3. **Starvation Watchdog**: An independent timer tracks elapsed wait time per approach direction. When any approach exceeds $45.0\text{s}$, the watchdog preempts the agent and forces the signal to service the starved approach.
+2. **Clearance Enforcer**: Minimum green duration (8.0s) is strictly enforced before any switch. Every phase switch passes through Yellow (2.0s) followed by All-Red (3.0s).
+3. **Starvation Watchdog**: An independent timer tracks elapsed wait time per approach direction. When any approach exceeds 45.0s, the watchdog preempts the agent and forces the signal to service the starved approach.
 
 ---
 
