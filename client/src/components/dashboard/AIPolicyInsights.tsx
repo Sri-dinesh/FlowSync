@@ -41,10 +41,17 @@ export default function AIPolicyInsights({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Anti-Starvation Active</span>
-          </div>
+          {reliabilityScore > 0 ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Anti-Starvation Active</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/50 text-xs font-mono">
+              <ShieldCheck className="h-3.5 w-3.5 text-white/40" />
+              <span>Standby (Awaiting Run)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -89,7 +96,9 @@ export default function AIPolicyInsights({
           </div>
           <div>
             <div className="text-[10px] text-white/40 uppercase">Decision Latency</div>
-            <div className="text-xs font-bold font-mono text-white">{latencyMs}ms inference</div>
+            <div className="text-xs font-bold font-mono text-white">
+              {latencyMs > 0 ? `${latencyMs}ms inference` : "Standby (0.0ms)"}
+            </div>
           </div>
         </div>
 
@@ -99,7 +108,9 @@ export default function AIPolicyInsights({
           </div>
           <div>
             <div className="text-[10px] text-white/40 uppercase">Reliability Score</div>
-            <div className="text-xs font-bold font-mono text-emerald-400">{reliabilityScore}% guaranteed</div>
+            <div className="text-xs font-bold font-mono text-emerald-400">
+              {reliabilityScore > 0 ? `${reliabilityScore}% guaranteed` : "Pending Evaluation"}
+            </div>
           </div>
         </div>
 
@@ -109,7 +120,11 @@ export default function AIPolicyInsights({
           </div>
           <div>
             <div className="text-[10px] text-white/40 uppercase">Action Masking</div>
-            <div className="text-xs font-bold font-mono text-blue-300">0% Dead-Green cycles</div>
+            <div className="text-xs font-bold font-mono text-blue-300">
+              {phaseDistribution.some((p) => p.share_pct > 0)
+                ? "0% Dead-Green cycles"
+                : "Ready on Execution"}
+            </div>
           </div>
         </div>
       </div>

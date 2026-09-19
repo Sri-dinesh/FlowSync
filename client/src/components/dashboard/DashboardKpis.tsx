@@ -78,50 +78,82 @@ export default function DashboardKpis({ data }: Props) {
     return () => ctx.revert();
   }, [data]);
 
+  const isFresh = data.total_sessions === 0;
+
   const cards = [
     {
       title: "Total Vehicles Analyzed",
-      ref: vehRef,
+      ref: isFresh ? null : vehRef,
       fallback: data.total_vehicles_processed.toLocaleString(),
-      subtitle: `${data.total_sessions} simulation runs (${data.total_movement_occurrences.toLocaleString()} passages)`,
-      badge: "+100% Real Tracking",
-      badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+      subtitle: isFresh
+        ? "0 simulation runs (0 passages)"
+        : `${data.total_sessions} simulation runs (${data.total_movement_occurrences.toLocaleString()} passages)`,
+      badge: isFresh ? "Awaiting Ingest" : "+100% Real Tracking",
+      badgeColor: isFresh
+        ? "bg-white/5 text-white/40 border-white/10"
+        : "bg-blue-500/10 text-blue-400 border-blue-500/20",
       icon: Car,
-      gradient: "from-blue-500/20 via-indigo-500/10 to-transparent",
-      borderColor: "border-blue-500/30",
+      gradient: isFresh
+        ? "from-white/5 to-transparent"
+        : "from-blue-500/20 via-indigo-500/10 to-transparent",
+      borderColor: isFresh ? "border-white/10" : "border-blue-500/30",
     },
     {
       title: "Avg Wait-Time Reduction",
-      ref: waitRef,
-      fallback: `-${data.avg_wait_reduction_pct.toFixed(1)}%`,
-      subtitle: "DQN AI Policy vs Standard Fixed Baseline",
-      badge: "Peak Efficiency",
-      badgeColor: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+      ref: isFresh ? null : waitRef,
+      fallback: isFresh
+        ? "--"
+        : `${data.avg_wait_reduction_pct > 0 ? "-" : ""}${Math.abs(data.avg_wait_reduction_pct).toFixed(1)}%`,
+      subtitle: isFresh
+        ? "Run benchmark to evaluate AI vs Baseline"
+        : "DQN AI Policy vs Standard Fixed Baseline",
+      badge: isFresh
+        ? "Uncalibrated"
+        : data.avg_wait_reduction_pct > 30
+        ? "Peak Efficiency"
+        : "Live Benchmarked",
+      badgeColor: isFresh
+        ? "bg-white/5 text-white/40 border-white/10"
+        : "bg-amber-500/10 text-amber-300 border-amber-500/20",
       icon: TrendingDown,
-      gradient: "from-amber-500/20 via-orange-500/10 to-transparent",
-      borderColor: "border-amber-500/30",
+      gradient: isFresh
+        ? "from-white/5 to-transparent"
+        : "from-amber-500/20 via-orange-500/10 to-transparent",
+      borderColor: isFresh ? "border-white/10" : "border-amber-500/30",
     },
     {
       title: "Average Vehicle Delay",
-      ref: delayRef,
+      ref: isFresh ? null : delayRef,
       fallback: `${data.avg_intersection_wait_s.toFixed(1)} s`,
-      subtitle: `Mean queue delay across ${data.total_frames_processed.toLocaleString()} frames (Peak: ${data.peak_queue_observed} veh)`,
-      badge: "Telemetry Mean",
-      badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      subtitle: isFresh
+        ? "No queue delay recorded yet"
+        : `Mean queue delay across ${data.total_frames_processed.toLocaleString()} frames (Peak: ${data.peak_queue_observed} veh)`,
+      badge: isFresh ? "No Telemetry" : "Telemetry Mean",
+      badgeColor: isFresh
+        ? "bg-white/5 text-white/40 border-white/10"
+        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
       icon: Clock,
-      gradient: "from-emerald-500/20 via-teal-500/10 to-transparent",
-      borderColor: "border-emerald-500/30",
+      gradient: isFresh
+        ? "from-white/5 to-transparent"
+        : "from-emerald-500/20 via-teal-500/10 to-transparent",
+      borderColor: isFresh ? "border-white/10" : "border-emerald-500/30",
     },
     {
       title: "AI Policy Decision Speed",
       ref: null,
-      customValue: `${data.inference_latency_ms}ms`,
-      subtitle: `${data.total_footage_hours}h footage evaluated at ${data.avg_detection_fps} FPS`,
-      badge: "Real-time Edge",
-      badgeColor: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+      customValue: isFresh || data.inference_latency_ms === 0 ? "--" : `${data.inference_latency_ms}ms`,
+      subtitle: isFresh
+        ? "Awaiting model execution in simulation"
+        : `${data.total_footage_hours}h footage evaluated at ${data.avg_detection_fps} FPS`,
+      badge: isFresh ? "Standby" : "Real-time Edge",
+      badgeColor: isFresh
+        ? "bg-white/5 text-white/40 border-white/10"
+        : "bg-purple-500/10 text-purple-400 border-purple-500/20",
       icon: Zap,
-      gradient: "from-purple-500/20 via-pink-500/10 to-transparent",
-      borderColor: "border-purple-500/30",
+      gradient: isFresh
+        ? "from-white/5 to-transparent"
+        : "from-purple-500/20 via-pink-500/10 to-transparent",
+      borderColor: isFresh ? "border-white/10" : "border-purple-500/30",
     },
   ];
 
