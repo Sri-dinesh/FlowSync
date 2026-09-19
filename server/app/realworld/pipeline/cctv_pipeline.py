@@ -5,12 +5,20 @@ vehicle counting, temporal smoothing, annotation, and WebSocket broadcast.
 
 ROI polygons are NOT required. The QuadrantCounter assigns vehicles to directions
 based on where their bounding-box bottom-center falls within the frame.
+
+Task 7.1: Added detection confidence monitoring and automated fallback safeguard.
+When rolling average detection confidence drops below CONFIDENCE_FALLBACK_THRESHOLD
+the pipeline falls back to last-known-good lane counts and logs a warning.
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
-from typing import Awaitable, Callable, Dict, Optional
+from collections import deque
+from typing import Any, Awaitable, Callable, Deque, Dict, List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 from ..models.config import (
     MAX_GREEN_TIME,
@@ -74,6 +82,14 @@ class CCTVPipeline:
         self._running = False
         self._frame_id = 0
         self._task: Optional[asyncio.Task] = None
+
+        # Task 7.1: Detection confidence monitoring
+        # Rolling window of per-frame mean detection confidence scores
+        self._confidence_window: Deque[float] = deque(maxlen=10)
+        self._CONFIDENCE_FALLBACK_THRESHOLD: float = 0.30   # < 30% avg conf triggers fallback
+        self._confidence_fallback_active: bool = False
+        self._last_good_weighted_counts: Optional[Dict[str, float]] = None
+        self._fallback_frame_count: int = 0
 
         # Chronological vehicle arrival event log (for natural digital twin replay)
         self._arrival_events: List[Dict[str, Any]] = []
@@ -195,6 +211,37 @@ class CCTVPipeline:
         weighted_dict = {k: float(v) for k, v in raw_counts_dict.items()}
         weighted_counts = WeightedLaneCounts(**weighted_dict)
 
+        # Task 7.1: Update confidence monitoring
+        if detection.bboxes:
+            avg_conf = sum(b.confidence for b in detection.bboxes if b.confidence is not None) / max(len(detection.bboxes), 1)
+        else:
+            avg_conf = 0.0  # no detections → treat as low confidence
+        self._confidence_window.append(avg_conf)
+
+        rolling_conf = sum(self._confidence_window) / max(len(self._confidence_window), 1)
+
+        if rolling_conf < self._CONFIDENCE_FALLBACK_THRESHOLD:
+            if not self._confidence_fallback_active:
+                logger.warning(
+                    "[CCTVPipeline] Low confidence (%.2f < %.2f) — activating fallback to last-known-good counts.",
+                    rolling_conf, self._CONFIDENCE_FALLBACK_THRESHOLD,
+                )
+                self._confidence_fallback_active = True
+            self._fallback_frame_count += 1
+            # Use last-known-good counts instead of unreliable detections
+            if self._last_good_weighted_counts is not None:
+                weighted_dict = self._last_good_weighted_counts
+                weighted_counts = WeightedLaneCounts.from_dict(weighted_dict)
+        else:
+            if self._confidence_fallback_active:
+                logger.info(
+                    "[CCTVPipeline] Confidence recovered (%.2f) — exiting fallback mode.",
+                    rolling_conf,
+                )
+                self._confidence_fallback_active = False
+            # Record as last-known-good
+            self._last_good_weighted_counts = dict(weighted_dict)
+
         # 5. Temporal smoothing
         smoothed_dict = self._smoother.update(weighted_dict)
         smoothed_weighted = WeightedLaneCounts.from_dict(smoothed_dict)
@@ -254,6 +301,10 @@ class CCTVPipeline:
             status=model_status,
         )
 
+        # Task 7.1: Embed confidence health in emitted frame metadata (via status field)
+        if self._confidence_fallback_active:
+            cctv_frame.status = f"confidence_fallback_active | {model_status}"
+
         await self.on_frame(cctv_frame)
 
     @property
@@ -274,3 +325,16 @@ class CCTVPipeline:
     def session_metrics(self) -> Dict:
         return self._metrics.get_session_summary()
 
+    @property
+    def confidence_health(self) -> Dict[str, Any]:
+        """Task 7.1: Returns detection confidence health metrics for monitoring."""
+        rolling_conf = (
+            sum(self._confidence_window) / max(len(self._confidence_window), 1)
+            if self._confidence_window else 0.0
+        )
+        return {
+            "rolling_avg_confidence":    round(rolling_conf, 3),
+            "fallback_active":           self._confidence_fallback_active,
+            "fallback_frames_triggered": self._fallback_frame_count,
+            "fallback_threshold":        self._CONFIDENCE_FALLBACK_THRESHOLD,
+        }
