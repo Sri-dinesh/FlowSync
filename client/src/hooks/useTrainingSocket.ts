@@ -45,9 +45,9 @@ export function useTrainingSocket() {
       try {
         const payload = JSON.parse(event.data);
 
-        // Filter out checkpoint notification payloads
-        if (payload && typeof payload === "object" && "type" in payload && payload.type === "checkpoint_saved") {
-          console.log("[TrainWS] Checkpoint saved:", payload);
+        // Filter out event/notification payloads (checkpoint_saved, warmup_complete, etc.)
+        if (payload && typeof payload === "object" && "type" in payload) {
+          console.log("[TrainWS] Notification:", payload);
           return;
         }
 
@@ -57,14 +57,15 @@ export function useTrainingSocket() {
           return;
         }
 
-        // Log every training message — they arrive only once per episode
-        console.log(
-          "%c[TrainWS] message",
-          "color:#a78bfa;font-weight:bold",
-          payload,
-        );
-
-        addTrainingMetric(payload as TrainingMetric);
+        // Only add valid training metrics
+        if (payload && typeof payload === "object" && ("episode" in payload || "total_reward" in payload)) {
+          console.log(
+            "%c[TrainWS] metric",
+            "color:#a78bfa;font-weight:bold",
+            payload,
+          );
+          addTrainingMetric(payload as TrainingMetric);
+        }
       } catch (err) {
         console.warn("[TrainWS] Failed to parse message:", event.data, err);
       }

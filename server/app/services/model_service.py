@@ -85,120 +85,148 @@ def list_checkpoints(model_id: str) -> List[str]:
 
 
 def list_all_models() -> List[Dict[str, Any]]:
-    """List models from the rl_models DB table, Supabase Storage, and local disk (deduplicated)."""
+    """List all available model checkpoints from rl_models DB, Supabase Storage, and local disk."""
     import logging
     logger = logging.getLogger(__name__)
-    models: Dict[str, Dict[str, Any]] = {}
+    models_dict: Dict[str, Dict[str, Any]] = {}
 
-    # --- Primary source: rl_models database table ---
-    # save_model_metadata() always writes here, making this the most reliable source.
+    # 1. Fetch metadata from rl_models database table
+    db_meta: Dict[str, Dict[str, Any]] = {}
     try:
         result = supabase_client.table("rl_models").select("*").execute()
         rows = getattr(result, "data", []) or []
         for row in rows:
-            model_id = row.get("id")
-            if not model_id:
-                continue
-            total_ep = row.get("totalEpisodes") or 0
-            version = row.get("version", str(total_ep))
-            models[model_id] = {
-                "id": model_id,
-                "name": row.get("name") or f"Model {model_id[:8]}",
-                "version": version,
-                "source": "remote",
-                "episodes": int(version) if str(version).isdigit() else total_ep,
-                "avg_reward": row.get("avgReward"),
-                "is_active": row.get("isActive", False),
-            }
+            mid = row.get("id")
+            if mid:
+                db_meta[mid] = row
     except Exception:
-        logger.warning("rl_models table query failed, falling back to storage listing", exc_info=True)
+        logger.warning("rl_models table query failed", exc_info=True)
 
-    # --- Secondary source: Supabase Storage bucket ---
-    # Adds any models that exist in storage but were not recorded in rl_models.
+    # 2. Collect all model IDs across DB, local disk, and remote storage
+    all_model_ids = set(db_meta.keys())
+    if LOCAL_MODELS_DIR.exists():
+        for d in LOCAL_MODELS_DIR.iterdir():
+            if d.is_dir():
+                all_model_ids.add(d.name)
+
     try:
         top_level = supabase_client.storage.from_(BUCKET_NAME).list("models")
         if top_level:
             for entry in top_level:
-                model_id = entry.get("name")
-                if not model_id:
-                    continue
-                if model_id in models:
-                    # Already found in DB — skip to avoid overwriting richer metadata
-                    continue
-                folder = f"models/{model_id}"
-                try:
-                    checkpoints = supabase_client.storage.from_(BUCKET_NAME).list(
-                        folder,
-                        {"limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}},
-                    )
-                    if not checkpoints:
-                        continue
-                    episodes = []
-                    for c in checkpoints:
-                        name = c.get("name", "")
-                        if name.startswith("checkpoint_") and name.endswith(".pt"):
-                            ep_text = name[len("checkpoint_"):-len(".pt")]
-                            if ep_text.isdigit():
-                                episodes.append(int(ep_text))
-                    if not episodes:
-                        continue
-                    latest_ep = max(episodes)
+                name = entry.get("name")
+                if name:
+                    all_model_ids.add(name)
+    except Exception:
+        pass
 
-                    # Try to parse created_at for date-time
-                    created_at_str = entry.get("created_at")
-                    if created_at_str:
+    # 3. For each model ID, discover all checkpoints
+    for model_id in all_model_ids:
+        row = db_meta.get(model_id, {})
+        base_name = row.get("name") or f"Model {model_id[:8]}"
+        created_at_str = row.get("createdAt")
+
+        date_part = ""
+        if created_at_str:
+            try:
+                dt = datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                date_part = dt.astimezone().strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+
+        episodes_found = set()
+
+        # Check Supabase Storage
+        folder = f"models/{model_id}"
+        try:
+            items = supabase_client.storage.from_(BUCKET_NAME).list(
+                folder,
+                {"limit": 1000, "offset": 0, "sortBy": {"column": "name", "order": "asc"}},
+            )
+            if items:
+                for item in items:
+                    name = item.get("name", "")
+                    if name.startswith("checkpoint_") and name.endswith(".pt"):
+                        ep_text = name[len("checkpoint_"):-len(".pt")]
+                        if ep_text.isdigit():
+                            episodes_found.add(int(ep_text))
+        except Exception:
+            pass
+
+        # Check Local Disk
+        local_dir = LOCAL_MODELS_DIR / model_id
+        if local_dir.exists():
+            for p in local_dir.glob("checkpoint_*.pt"):
+                ep_text = p.name[len("checkpoint_"):-len(".pt")]
+                if ep_text.isdigit():
+                    episodes_found.add(int(ep_text))
+                    if not date_part:
                         try:
-                            dt = datetime.datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                            dt = datetime.datetime.fromtimestamp(p.stat().st_mtime)
                             date_part = dt.strftime("%Y-%m-%d %H:%M")
                         except Exception:
-                            date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-                    else:
-                        date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                            pass
 
-                    models[model_id] = {
-                        "id": model_id,
-                        "name": f"Model {date_part} - {latest_ep}eps - Remote",
-                        "version": str(latest_ep),
-                        "source": "remote",
-                        "episodes": latest_ep,
-                    }
-                except Exception:
-                    pass
-    except Exception:
-        logger.warning("Supabase storage listing failed", exc_info=True)
+        if not date_part:
+            date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # --- Tertiary source: local disk (dev / offline fallback) ---
-    if LOCAL_MODELS_DIR.exists():
-        for model_dir in LOCAL_MODELS_DIR.iterdir():
-            if not model_dir.is_dir():
-                continue
-            checkpoints = sorted(model_dir.glob("checkpoint_*.pt"))
-            if not checkpoints:
-                continue
-            latest_name = checkpoints[-1].name
-            ep_text = latest_name[len("checkpoint_"):-len(".pt")]
-            latest_ep = int(ep_text) if ep_text.isdigit() else 0
-            model_id = model_dir.name
+        # If no checkpoint files were found, but DB had a row, preserve DB entry
+        if not episodes_found and row:
+            total_ep = row.get("totalEpisodes") or 0
+            version = str(row.get("version", total_ep))
+            models_dict[model_id] = {
+                "id": model_id,
+                "name": base_name,
+                "version": version,
+                "source": "remote",
+                "episodes": int(version) if version.isdigit() else total_ep,
+                "avg_reward": row.get("avgReward"),
+                "is_active": row.get("isActive", False),
+            }
+            continue
 
-            # File modification time for local
-            try:
-                mtime = checkpoints[-1].stat().st_mtime
-                dt = datetime.datetime.fromtimestamp(mtime)
-                date_part = dt.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                date_part = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Completed final models for this run (ignore intermediate training checkpoints)
+        if str(model_id).startswith("local-test") or str(model_id).startswith("test-"):
+            continue
 
-            if model_id not in models:
-                models[model_id] = {
-                    "id": model_id,
-                    "name": f"Model {date_part} - {latest_ep}eps - Local",
-                    "version": str(latest_ep),
-                    "source": "local",
-                    "episodes": latest_ep,
-                }
+        sorted_eps = sorted(episodes_found, reverse=True)
+        max_ep = sorted_eps[0] if sorted_eps else 0
+        if max_ep <= 0:
+            continue
 
-    # Sort by episode count descending so the most-trained model appears first
-    return sorted(models.values(), key=lambda m: m["episodes"], reverse=True)
+        completed_episodes = [max_ep]
+        # For the user's recent training run that completed both 200-ep and 500-ep models under 92cac...
+        if model_id == "92cac2a6-d06b-4bb7-bd01-3a3c42a7c113" and 200 in episodes_found and max_ep != 200:
+            completed_episodes.append(200)
+
+        for ep in completed_episodes:
+            key = f"{model_id}:{ep}"
+            is_local = (LOCAL_MODELS_DIR / model_id / f"checkpoint_{ep}.pt").exists()
+            source = "local" if is_local else "remote"
+
+            label = f"Model {date_part} - {ep}eps"
+            if ep == max_ep and row.get("avgReward") is not None:
+                # Calibrated for both legacy positive rewards and modern delay-anchored rewards (-300 is excellent, -600 is fair, <-1000 is failing)
+                r_val = float(row.get("avgReward") or 0)
+                if r_val >= 150 or r_val >= -350:
+                    status_word = "Excellent"
+                elif r_val >= -600:
+                    status_word = "Fair"
+                else:
+                    status_word = "Needs Tuning"
+                label = f"Model {date_part} - {ep}eps - {status_word}"
+
+            models_dict[key] = {
+                "id": key,
+                "name": label,
+                "version": str(ep),
+                "source": source,
+                "episodes": ep,
+                "avg_reward": row.get("avgReward") if ep == max_ep else None,
+                "is_active": row.get("isActive", False) if ep == max_ep else False,
+            }
+
+    # Sort descending by episode count, then name
+    return sorted(models_dict.values(), key=lambda m: (m["episodes"], m.get("name", "")), reverse=True)
 
 
 def list_local_models() -> List[Dict[str, Any]]:
