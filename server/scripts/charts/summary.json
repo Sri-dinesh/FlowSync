@@ -1,0 +1,302 @@
+{
+  "50eps-907153": {
+    "q_mean": 3.143951654434204,
+    "q_std": 4.706559181213379,
+    "action_pref": [
+      0.544,
+      0.13,
+      0.095,
+      0.231
+    ],
+    "episode_reward": -14.639999999999969,
+    "vehicles_passed": 13,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 36751,
+    "total_train_steps": "?"
+  },
+  "50eps-92cac2": {
+    "q_mean": 0.28966739773750305,
+    "q_std": 0.7514447569847107,
+    "action_pref": [
+      0.114,
+      0.0,
+      0.827,
+      0.059
+    ],
+    "episode_reward": -18.239999999999956,
+    "vehicles_passed": 13,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "50eps-d1ba85": {
+    "q_mean": 29.265941619873047,
+    "q_std": 8.29171085357666,
+    "action_pref": [
+      0.212,
+      0.314,
+      0.365,
+      0.109
+    ],
+    "episode_reward": -6.879999999999993,
+    "vehicles_passed": 18,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 26687,
+    "total_train_steps": 26687
+  },
+  "100eps-907153": {
+    "q_mean": 2.62300443649292,
+    "q_std": 4.802810192108154,
+    "action_pref": [
+      0.458,
+      0.211,
+      0.179,
+      0.152
+    ],
+    "episode_reward": -28.169999999999956,
+    "vehicles_passed": 9,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 61751,
+    "total_train_steps": "?"
+  },
+  "100eps-92cac2": {
+    "q_mean": 0.28858765959739685,
+    "q_std": 0.7534160017967224,
+    "action_pref": [
+      0.1,
+      0.0,
+      0.841,
+      0.059
+    ],
+    "episode_reward": -22.889999999999937,
+    "vehicles_passed": 8,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "100eps-d1ba85": {
+    "q_mean": 39.37382888793945,
+    "q_std": 12.285416603088379,
+    "action_pref": [
+      0.569,
+      0.145,
+      0.238,
+      0.048
+    ],
+    "episode_reward": -24.019999999999943,
+    "vehicles_passed": 15,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 51687,
+    "total_train_steps": 51687
+  },
+  "150eps-907153": {
+    "q_mean": 1.9412413835525513,
+    "q_std": 5.570647716522217,
+    "action_pref": [
+      0.195,
+      0.594,
+      0.098,
+      0.113
+    ],
+    "episode_reward": -13.499999999999972,
+    "vehicles_passed": 14,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 86751,
+    "total_train_steps": "?"
+  },
+  "150eps-92cac2": {
+    "q_mean": 0.31265684962272644,
+    "q_std": 0.7482141256332397,
+    "action_pref": [
+      0.11,
+      0.001,
+      0.843,
+      0.046
+    ],
+    "episode_reward": -15.48999999999995,
+    "vehicles_passed": 22,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "150eps-d1ba85": {
+    "q_mean": 40.69684982299805,
+    "q_std": 12.554024696350098,
+    "action_pref": [
+      0.416,
+      0.346,
+      0.182,
+      0.056
+    ],
+    "episode_reward": -20.789999999999967,
+    "vehicles_passed": 9,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 76687,
+    "total_train_steps": 76687
+  },
+  "200eps-907153": {
+    "q_mean": 3.059520959854126,
+    "q_std": 7.707302093505859,
+    "action_pref": [
+      0.259,
+      0.469,
+      0.13,
+      0.142
+    ],
+    "episode_reward": -12.419999999999975,
+    "vehicles_passed": 17,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 111751,
+    "total_train_steps": "?"
+  },
+  "200eps-92cac2": {
+    "q_mean": 0.276454895734787,
+    "q_std": 0.7638126015663147,
+    "action_pref": [
+      0.087,
+      0.0,
+      0.851,
+      0.062
+    ],
+    "episode_reward": -16.839999999999975,
+    "vehicles_passed": 16,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "200eps-d1ba85": {
+    "q_mean": 40.57714080810547,
+    "q_std": 11.760798454284668,
+    "action_pref": [
+      0.314,
+      0.384,
+      0.082,
+      0.22
+    ],
+    "episode_reward": -29.419999999999956,
+    "vehicles_passed": 15,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 101687,
+    "total_train_steps": 101687
+  },
+  "250eps-92cac2": {
+    "q_mean": 0.30090591311454773,
+    "q_std": 0.7744802236557007,
+    "action_pref": [
+      0.109,
+      0.001,
+      0.812,
+      0.078
+    ],
+    "episode_reward": -19.779999999999962,
+    "vehicles_passed": 13,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "250eps-d1ba85": {
+    "q_mean": 52.42901611328125,
+    "q_std": 14.983674049377441,
+    "action_pref": [
+      0.301,
+      0.304,
+      0.175,
+      0.22
+    ],
+    "episode_reward": -22.729999999999954,
+    "vehicles_passed": 10,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 126687,
+    "total_train_steps": 126687
+  },
+  "300eps-92cac2": {
+    "q_mean": 0.2575409412384033,
+    "q_std": 0.7792198657989502,
+    "action_pref": [
+      0.082,
+      0.001,
+      0.874,
+      0.043
+    ],
+    "episode_reward": -14.769999999999962,
+    "vehicles_passed": 15,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "300eps-d1ba85": {
+    "q_mean": 46.410396575927734,
+    "q_std": 15.685215950012207,
+    "action_pref": [
+      0.326,
+      0.389,
+      0.102,
+      0.183
+    ],
+    "episode_reward": -24.299999999999955,
+    "vehicles_passed": 6,
+    "obs_version": "v5_28dim_forecast",
+    "step_count": 151687,
+    "total_train_steps": 151687
+  },
+  "350eps-92cac2": {
+    "q_mean": 0.2639545798301697,
+    "q_std": 0.7513126730918884,
+    "action_pref": [
+      0.11,
+      0.0,
+      0.829,
+      0.061
+    ],
+    "episode_reward": -21.559999999999956,
+    "vehicles_passed": 12,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "400eps-92cac2": {
+    "q_mean": 0.27187952399253845,
+    "q_std": 0.7376818656921387,
+    "action_pref": [
+      0.118,
+      0.0,
+      0.823,
+      0.059
+    ],
+    "episode_reward": -25.999999999999932,
+    "vehicles_passed": 16,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "450eps-92cac2": {
+    "q_mean": 0.2829676568508148,
+    "q_std": 0.748205840587616,
+    "action_pref": [
+      0.109,
+      0.0,
+      0.824,
+      0.067
+    ],
+    "episode_reward": -28.419999999999938,
+    "vehicles_passed": 17,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  },
+  "500eps-92cac2": {
+    "q_mean": 0.2880476713180542,
+    "q_std": 0.755699634552002,
+    "action_pref": [
+      0.111,
+      0.0,
+      0.832,
+      0.057
+    ],
+    "episode_reward": -18.899999999999974,
+    "vehicles_passed": 15,
+    "obs_version": "v4_20dim_delay_reward",
+    "step_count": 0,
+    "total_train_steps": "?"
+  }
+}
