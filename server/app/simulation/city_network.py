@@ -23,6 +23,14 @@ import numpy as np
 
 from .intersection import Intersection
 from .vehicle import DEFAULT_SPEED, Vehicle
+from .traffic_math import (
+    MAX_CAP,
+    MOVEMENT_KEYS,
+    compute_movement_pressures,
+    compute_total_pressure,
+    normalize_total_pressure,
+)
+from .demand_forecast import ArrivalForecaster
 
 # Road travel time between intersections (seconds at 10 Hz → ticks)
 ROAD_TRAVEL_TIME = 3.0   # seconds to cross a connecting road segment
@@ -137,56 +145,63 @@ class CityNetwork:
         self.timestep: int = 0
         self.total_city_throughput: int = 0   # vehicles that exited the city
         self._spawn_lambda = spawn_lambda
+        self.forecasters: Dict[str, ArrivalForecaster] = {
+            iid: ArrivalForecaster() for iid in self.intersections
+        }
 
     # ── Observation builder (matches existing single-intersection obs exactly) ──
 
-    def build_obs(self, intersection_id: str) -> np.ndarray:
-        """Build the 20-dim observation for one intersection (same format as single-intersection training)."""
+    def build_obs(self, intersection_id: str, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
+        """
+        Build observation for one intersection.
+
+        Task 6.1 / BUG-04 city parity:
+        Uses shared traffic_math functions for consistent pressure computation
+        across single-intersection training and city grid evaluation.
+
+        Returns 28-D obs (matching v5 model architecture with arrival forecasting).
+        """
         intersection = self.intersections[intersection_id]
         movement_queues = intersection.get_movement_queues()
         signal = intersection.signal
-        MAX_CAP = 10.0
+        outgoing = intersection.get_outgoing_counts()
 
+        # Dims 0-11: queues in canonical MOVEMENT_KEYS order
         movements = [
-            movement_queues.get("north_straight", 0) / MAX_CAP,
-            movement_queues.get("north_left",     0) / MAX_CAP,
-            movement_queues.get("north_right",    0) / MAX_CAP,
-            movement_queues.get("south_straight", 0) / MAX_CAP,
-            movement_queues.get("south_left",     0) / MAX_CAP,
-            movement_queues.get("south_right",    0) / MAX_CAP,
-            movement_queues.get("east_straight",  0) / MAX_CAP,
-            movement_queues.get("east_left",      0) / MAX_CAP,
-            movement_queues.get("east_right",     0) / MAX_CAP,
-            movement_queues.get("west_straight",  0) / MAX_CAP,
-            movement_queues.get("west_left",      0) / MAX_CAP,
-            movement_queues.get("west_right",     0) / MAX_CAP,
+            min(1.0, movement_queues.get(k, 0) / MAX_CAP)
+            for k in MOVEMENT_KEYS
         ]
 
+        # Dims 12-15: one-hot phase
         phase_onehot = [0.0, 0.0, 0.0, 0.0]
         phase_onehot[signal.current_phase] = 1.0
 
+        # Dim 16: time in phase
         time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+
+        # Dim 17: transitioning
         is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
 
-        dest_map = {
-            "north_straight": "south", "north_left": "east",  "north_right": "west",
-            "south_straight": "north", "south_left": "west",  "south_right": "east",
-            "east_straight":  "west",  "east_left":  "south", "east_right":  "north",
-            "west_straight":  "east",  "west_left":  "north", "west_right":  "south",
-        }
-        outgoing = intersection.get_outgoing_counts()
-        total_pressure = 0.0
-        for movement, dest in dest_map.items():
-            incoming = movement_queues.get(movement, 0) / MAX_CAP
-            out = outgoing.get(dest, 0) / MAX_CAP
-            total_pressure += max(0.0, incoming - out)
-        pressure_norm = min(total_pressure / 20.0, 1.0)
+        # Dim 18: destination-aware pressure (BUG-04 city parity: shared formula)
+        pressures = compute_movement_pressures(movement_queues, outgoing, MAX_CAP)
+        total_pressure = compute_total_pressure(pressures)
+        pressure_norm = normalize_total_pressure(total_pressure)
 
+        # Dim 19: starvation
         max_starv_norm = min(
             max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
         )
 
-        obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+        base_obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
+
+        if forecaster is not None:
+            forecast_features = forecaster.get_forecast_features().tolist()
+        elif hasattr(self, "forecasters") and intersection_id in self.forecasters:
+            forecast_features = self.forecasters[intersection_id].get_forecast_features().tolist()
+        else:
+            forecast_features = [0.0] * 8
+
+        obs = base_obs + forecast_features
         return np.array(obs, dtype=np.float32)
 
     # ── Greedy action helper ────────────────────────────────────────────────────
@@ -362,7 +377,42 @@ class CityNetwork:
         lane_queue.append(vehicle)
         intersection._spawned_this_interval += 1
         return True
-        return False
+
+    # ── Task 6.1: Spillback awareness ──────────────────────────────────────────
+
+    def get_corridor_occupancy(self) -> Dict[Tuple[str, str], float]:
+        """
+        Compute occupancy (0.0-1.0) of each inter-intersection road segment.
+
+        Occupancy = (number of road vehicles on segment) / MAX_QUEUE
+        High occupancy on a corridor indicates spillback risk from the
+        downstream intersection.
+        """
+        segment_counts: Dict[Tuple[str, str], int] = {}
+        for rv in self.road_vehicles:
+            if not rv.is_exit:
+                key = (rv.from_intersection, rv.to_intersection)
+                segment_counts[key] = segment_counts.get(key, 0) + 1
+        return {
+            k: min(1.0, v / max(MAX_QUEUE, 1))
+            for k, v in segment_counts.items()
+        }
+
+    def get_spillback_penalty(self, intersection_id: str) -> float:
+        """
+        Compute a spillback avoidance penalty for an intersection.
+
+        Returns negative value proportional to how full the outgoing corridors are.
+        Fully blocked corridor (occupancy=1.0) yields penalty -2.0 per corridor.
+        Used by city-mode RL reward shaping (Task 6.1).
+        """
+        occupancy = self.get_corridor_occupancy()
+        penalty = 0.0
+        for (from_inter, to_inter), occ in occupancy.items():
+            if from_inter == intersection_id and occ > 0.7:
+                # Penalize proportionally once corridor is 70%+ full
+                penalty += -2.0 * (occ - 0.7) / 0.3
+        return penalty
 
     # ── Metrics ────────────────────────────────────────────────────────────────
 
@@ -404,15 +454,25 @@ class CityNetwork:
         worst_inter = max(per_inter, key=lambda k: per_inter[k]["avg_wait_time"]) if per_inter else "A"
         best_inter  = min(per_inter, key=lambda k: per_inter[k]["avg_wait_time"]) if per_inter else "A"
 
+        # Task 6.1: corridor spillback occupancy
+        corridor_occ = {
+            f"{frm}→{to}": round(occ, 3)
+            for (frm, to), occ in self.get_corridor_occupancy().items()
+        }
+        spillback_gridlock = any(occ >= 0.95 for occ in self.get_corridor_occupancy().values())
+
         return {
-            "avg_wait_time": city_avg_wait,
-            "total_throughput": self.total_city_throughput,
-            "active_vehicles": total_vehicles + road_vehicles_count,
-            "road_vehicles": road_vehicles_count,
-            "congestion_level": congestion,
+            "avg_wait_time":      city_avg_wait,
+            "total_throughput":   self.total_city_throughput,
+            "active_vehicles":    total_vehicles + road_vehicles_count,
+            "road_vehicles":      road_vehicles_count,
+            "congestion_level":   congestion,
             "worst_intersection": worst_inter,
-            "best_intersection": best_inter,
-            "per_intersection": per_inter,
+            "best_intersection":  best_inter,
+            "per_intersection":   per_inter,
+            # Task 6.1
+            "corridor_occupancy":   corridor_occ,
+            "spillback_gridlock":   spillback_gridlock,
         }
 
     def set_spawn_rate(self, lambda_rate: float) -> None:
@@ -422,6 +482,9 @@ class CityNetwork:
         for inter in self.intersections.values():
             inter.reset()
             inter.spawner.set_enabled(False)
+        if hasattr(self, "forecasters"):
+            for f in self.forecasters.values():
+                f.reset()
         self.road_vehicles.clear()
         self.timestep = 0
         self.total_city_throughput = 0

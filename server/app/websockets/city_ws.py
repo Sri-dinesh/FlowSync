@@ -206,9 +206,10 @@ async def _city_simulation_loop(app) -> None:
                         city_net.reset()
                         city_spawner.set_seed(comparison_state.benchmark_seed)
                         city_spawner.set_enabled(True)
+                        mode = comparison_state.current_mode()
                         await city_manager.broadcast({
                             "frame_type": "comparison_phase",
-                            "current_mode": comparison_state.current_mode(),
+                            "current_mode": mode,
                             "elapsed": 0,
                             "total": comparison_state.duration_per_mode,
                             "mode_index": comparison_state.current_mode_idx,
@@ -218,26 +219,31 @@ async def _city_simulation_loop(app) -> None:
             else:
                 mode = getattr(app.state, "city_mode", "fixed")
 
-            # Spawn new vehicles
-            city_spawner.spawn(dt=0.1, intersections=city_net.intersections)
+            try:
+                # Spawn new vehicles
+                city_spawner.spawn(dt=0.1, intersections=city_net.intersections)
 
-            # Tick city network
-            city_net.tick(dt=0.1, mode=mode, shared_agent=agent if mode == "ai" else None)
+                # Tick city network
+                city_net.tick(dt=0.1, mode=mode, shared_agent=agent if mode == "ai" else None)
 
-            # Build and broadcast frame
-            frame = build_city_frame(
-                city_network=city_net,
-                mode=mode,
-                shared_agent=agent if mode == "ai" else None,
-            )
-            payload = frame.model_dump()
+                # Build and broadcast frame
+                frame = build_city_frame(
+                    city_network=city_net,
+                    mode=mode,
+                    shared_agent=agent if mode == "ai" else None,
+                )
+                payload = frame.model_dump()
+            except Exception as tick_err:
+                logger.exception("Error during city simulation tick: %s", tick_err)
+                await asyncio.sleep(0.1)
+                continue
 
             # Inject comparison progress if running
             if comparison_state.running:
                 payload["comparison_progress"] = {
                     "running": True,
                     "current_mode": comparison_state.current_mode(),
-                    "elapsed": round(comparison_state.elapsed(), 1),
+                    "elapsed": round(min(float(comparison_state.duration_per_mode), comparison_state.elapsed()), 1),
                     "total": comparison_state.duration_per_mode,
                     "mode_index": comparison_state.current_mode_idx,
                     "total_modes": len(comparison_state.modes),
@@ -250,6 +256,8 @@ async def _city_simulation_loop(app) -> None:
 
     except asyncio.CancelledError:
         pass
+    except Exception as exc:
+        logger.exception("Fatal error in _city_simulation_loop: %s", exc)
     finally:
         app.state.city_task = None
 
@@ -348,18 +356,19 @@ async def city_socket(websocket: WebSocket) -> None:
             elif command == "run_comparison":
                 duration = int(message.get("duration_seconds", 30))
                 duration = max(10, min(600, duration))
-                if not comparison_state.running:
-                    app.state.city_network.reset()
-                    comparison_state.start(duration_seconds=duration)
-                    app.state.city_spawner.set_seed(comparison_state.benchmark_seed)
-                    app.state.city_spawner.set_enabled(True)
-                    app.state.city_running = True
-                    await websocket.send_json({
-                        "frame_type": "comparison_started",
-                        "modes": comparison_state.modes,
-                        "duration_per_mode": comparison_state.duration_per_mode,
-                        "benchmark_seed": comparison_state.benchmark_seed,
-                    })
+                if getattr(app.state, "city_task", None) is None or app.state.city_task.done():
+                    app.state.city_task = asyncio.create_task(_city_simulation_loop(app))
+                app.state.city_network.reset()
+                comparison_state.start(duration_seconds=duration)
+                app.state.city_spawner.set_seed(comparison_state.benchmark_seed)
+                app.state.city_spawner.set_enabled(True)
+                app.state.city_running = True
+                await websocket.send_json({
+                    "frame_type": "comparison_started",
+                    "modes": comparison_state.modes,
+                    "duration_per_mode": comparison_state.duration_per_mode,
+                    "benchmark_seed": comparison_state.benchmark_seed,
+                })
 
     except WebSocketDisconnect:
         city_manager.disconnect(websocket)
