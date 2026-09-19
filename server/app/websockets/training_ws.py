@@ -62,7 +62,7 @@ async def training_socket(websocket: WebSocket) -> None:
 
             if command == "start_training":
                 num_episodes = int(message.get("num_episodes", 500))
-                simulation_id = message.get("simulation_id") or app.state.current_simulation_id
+                simulation_id = message.get("simulation_id")
                 if not simulation_id:
                     try:
                         simulation_id = await asyncio.to_thread(
@@ -72,10 +72,12 @@ async def training_socket(websocket: WebSocket) -> None:
                             app.state.current_simulation_id = simulation_id
                         else:
                             logger.error("Supabase create_simulation returned an empty id for training")
+                            simulation_id = f"local-{int(time.time())}"
+                            app.state.current_simulation_id = simulation_id
                     except Exception:
                         logger.exception("Failed to create training simulation record")
                         simulation_id = f"local-{int(time.time())}"
-                trainer = app.state.trainer
+                        app.state.current_simulation_id = simulation_id
 
                 if not trainer.is_training:
                     task = asyncio.create_task(

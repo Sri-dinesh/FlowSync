@@ -15,6 +15,7 @@ router = APIRouter(prefix="/training", tags=["training"])
 
 class LoadModelRequest(BaseModel):
     model_id: str
+    episode: Optional[int] = None
 
     model_config = {"protected_namespaces": ()}
 
@@ -37,9 +38,9 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
     if trainer.is_training:
         return {"status": "already_training"}
 
-    simulation_id = payload.simulation_id or app.state.current_simulation_id
+    simulation_id = payload.simulation_id
 
-    # Always ensure we have a real simulation record before training
+    # Always ensure each new training session gets a fresh simulation record
     if not simulation_id:
         try:
             simulation_id = await asyncio.to_thread(
@@ -48,14 +49,21 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
             if simulation_id:
                 app.state.current_simulation_id = simulation_id
             else:
-                logger.error("create_simulation returned empty id, falling back to local")
+                logger.error("create_simulation returned empty id")
                 simulation_id = f"local-{int(time.time())}"
+                app.state.current_simulation_id = simulation_id
         except Exception:
             logger.exception("Failed to create simulation record for training")
             simulation_id = f"local-{int(time.time())}"
+            app.state.current_simulation_id = simulation_id
 
-    task = asyncio.create_task(trainer.train(simulation_id, payload.num_episodes))
-    app.state.training_task = task
+    # Start training task in background
+    app.state.training_task = asyncio.create_task(
+        trainer.train(
+            num_episodes=payload.num_episodes,
+            simulation_id=simulation_id,
+        )
+    )
 
     return {"status": "started", "simulation_id": simulation_id}
 
@@ -89,20 +97,38 @@ async def list_models() -> dict:
 @router.post("/load")
 async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     app = request.app
+    raw_model_id = payload.model_id
+    target_episode = payload.episode
+
+    if ":" in raw_model_id:
+        base_id, ep_str = raw_model_id.split(":", 1)
+        ep_clean = ep_str.replace("checkpoint_", "").replace(".pt", "")
+        if ep_clean.isdigit():
+            target_episode = int(ep_clean)
+        model_id = base_id
+    else:
+        model_id = raw_model_id
+
     checkpoints = await asyncio.to_thread(
-        model_service.list_checkpoints, payload.model_id
+        model_service.list_checkpoints, model_id
     )
 
     if not checkpoints:
-        raise HTTPException(status_code=404, detail="No checkpoints found")
+        raise HTTPException(status_code=404, detail=f"No checkpoints found for {model_id}")
 
     episodes = [episode for path in checkpoints if (episode := _parse_episode(path))]
     if not episodes:
         raise HTTPException(status_code=404, detail="No valid checkpoints found")
 
-    latest_episode = max(episodes)
+    if target_episode is not None and target_episode in episodes:
+        chosen_episode = target_episode
+    elif target_episode is not None:
+        chosen_episode = min(episodes, key=lambda e: abs(e - target_episode))
+    else:
+        chosen_episode = max(episodes)
+
     checkpoint_data = await asyncio.to_thread(
-        model_service.load_checkpoint, payload.model_id, latest_episode
+        model_service.load_checkpoint, model_id, chosen_episode
     )
 
     sim_agent = app.state.sim_agent
@@ -131,4 +157,4 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     sim_agent.target_net.eval()
     training_agent.target_net.eval()
 
-    return {"status": "loaded", "episode": latest_episode}
+    return {"status": "loaded", "model_id": model_id, "episode": chosen_episode}
