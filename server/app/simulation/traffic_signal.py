@@ -36,7 +36,7 @@ class TrafficSignal:
         self.current_phase: int = SignalPhase.NS_GREEN.value
         self.color: SignalColor = SignalColor.GREEN
         self.time_in_phase: float = 0.0
-        self.min_green_duration: float = 4.0
+        self.min_green_duration: float = 8.0
         self.fixed_duration: float = 8.0
         self.yellow_duration: float = 2.0
         self.red_duration: float = red_duration
