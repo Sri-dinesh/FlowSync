@@ -143,7 +143,17 @@ async def cctv_socket(websocket: WebSocket) -> None:
                         print(f"[cctv_ws] YOLO detector not available: {e}")
 
                 session_id = f"session_{conn_id[:8]}"
-                recorder = SessionRecorder(session_id, SESSION_DIR)
+                app_state = getattr(websocket, "app", None)
+                active_mode = getattr(app_state.state, "mode", "ai") if app_state and hasattr(app_state, "state") else "ai"
+                active_model = getattr(app_state.state, "active_model_id", None) if app_state and hasattr(app_state, "state") else None
+                active_eps = getattr(app_state.state, "active_model_episode", None) if app_state and hasattr(app_state, "state") else None
+                recorder = SessionRecorder(
+                    session_id,
+                    SESSION_DIR,
+                    mode=active_mode,
+                    model_name=active_model,
+                    model_episodes=active_eps,
+                )
 
                 try:
                     video_proc = VideoProcessor(video_path)

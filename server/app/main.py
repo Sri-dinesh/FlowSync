@@ -88,6 +88,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.current_simulation_id = None
     app.state.sim_task = None
     app.state.training_task = None
+    app.state.active_model_id = None
+    app.state.active_model_episode = None
 
     # --- CCTV / Real-World ---
     try:

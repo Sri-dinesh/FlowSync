@@ -157,4 +157,8 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     sim_agent.target_net.eval()
     training_agent.target_net.eval()
 
+    app.state.active_model_id = model_id
+    app.state.active_model_episode = chosen_episode
+
     return {"status": "loaded", "model_id": model_id, "episode": chosen_episode}
+
