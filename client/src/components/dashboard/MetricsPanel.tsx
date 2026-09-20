@@ -68,6 +68,7 @@ function Sparkline({ data }: { data: number[] }) {
 export default function MetricsPanel() {
   const frame = useSimulationStore((state) => state.currentFrame);
   const trainingMetrics = useSimulationStore((state) => state.trainingMetrics);
+  const isRunning = useSimulationStore((state) => state.isRunning);
 
   const [waitHistory, setWaitHistory] = useState<number[]>([]);
   const [throughputHistory, setThroughputHistory] = useState<number[]>([]);
@@ -75,7 +76,8 @@ export default function MetricsPanel() {
   const [episodeHistory, setEpisodeHistory] = useState<number[]>([]);
 
   useEffect(() => {
-    if (!frame) {
+    // Only accumulate telemetry history while simulation is actively running
+    if (!frame || !isRunning) {
       return;
     }
 
@@ -92,9 +94,12 @@ export default function MetricsPanel() {
     ]);
      
     setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
-  }, [frame]);
+  }, [frame, isRunning]);
 
   useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
     const latest = trainingMetrics[trainingMetrics.length - 1];
     if (!latest) {
       return;
@@ -104,7 +109,7 @@ export default function MetricsPanel() {
       ...prev.slice(-HISTORY_LENGTH + 1),
       latest.episode,
     ]);
-  }, [trainingMetrics]);
+  }, [trainingMetrics, isRunning]);
 
   const metrics = useMemo(() => {
     const avgWait = frame?.avg_wait_time ?? 0;
@@ -159,7 +164,33 @@ export default function MetricsPanel() {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-2.5">
+      {/* Real-time streaming status banner */}
+      <div className="flex items-center justify-between px-0.5 text-[10px]">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              isRunning
+                ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"
+                : "bg-white/30"
+            }`}
+          />
+          <span className="font-semibold uppercase tracking-wider text-white/50">
+            {isRunning ? "Live Stream Active" : "Telemetry Frozen"}
+          </span>
+        </div>
+        <span
+          className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+            isRunning
+              ? "text-emerald-400 bg-emerald-950/50 border-emerald-500/30"
+              : "text-amber-300 bg-amber-950/40 border-amber-500/30"
+          }`}
+        >
+          {isRunning ? "STREAMING" : "STOPPED"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
       {cards.map((card) => (
         <Card key={card.title} className="border-white/10 bg-[#161616]">
           <CardHeader className="pb-1">
@@ -181,6 +212,7 @@ export default function MetricsPanel() {
           </CardContent>
         </Card>
       ))}
+      </div>
     </div>
   );
 }

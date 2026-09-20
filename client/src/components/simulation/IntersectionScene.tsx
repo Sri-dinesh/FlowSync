@@ -81,7 +81,6 @@ function QueueLabel({ queueCount, avgWait, position }: QueueLabelProps) {
 
 export default function IntersectionScene() {
   const frame        = useSimulationStore((state) => state.currentFrame);
-  const isRunning    = useSimulationStore((state) => state.isRunning);
   const vehicles     = frame?.vehicles ?? [];
   const queueLengths = frame?.queue_lengths ?? {};
   const signalPhase  = frame?.signal_phase ?? 0;
@@ -112,8 +111,7 @@ export default function IntersectionScene() {
       <QueueLabel queueCount={displayQueueLengths.north} avgWait={avgWaitPerDir("north")} position={[-1.2, 2.5, -7.2]} />
       <QueueLabel queueCount={displayQueueLengths.south} avgWait={avgWaitPerDir("south")} position={[ 1.2, 2.5,  7.2]} />
       <QueueLabel queueCount={displayQueueLengths.east}  avgWait={avgWaitPerDir("east")}  position={[ 7.2, 2.5, -1.2]} />
-      <QueueLabel queueCount={displayQueueLengths.west}  avgWait={avgWaitPerDir("west")}  position={[-7.2, 2.5,  1.2]} />
-      {isRunning ? vehicles.map((vehicle) => <Vehicle key={vehicle.id} vehicle={vehicle} />) : null}
+      {vehicles.map((vehicle) => <Vehicle key={vehicle.id} vehicle={vehicle} />)}
     </group>
   );
 }

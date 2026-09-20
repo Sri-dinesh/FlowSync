@@ -55,7 +55,12 @@ async def start_simulation(request: Request) -> dict:
 
 @router.post("/stop")
 async def stop_simulation(request: Request) -> dict:
+    from ..websockets.simulation_ws import manager
+
     app = request.app
+    if getattr(app.state, "benchmark_task", None) is not None:
+        app.state.benchmark_task.cancel()
+        app.state.benchmark_task = None
     app.state.sim_running = False
     app.state.sim_intersection.spawner.set_enabled(False)
 
@@ -64,23 +69,48 @@ async def stop_simulation(request: Request) -> dict:
         intersection = app.state.sim_intersection
         total_steps = intersection.timestep
         duration_ms = int(total_steps * 0.1 * 1000)
-        await asyncio.to_thread(
-            supabase_service.update_simulation,
-            simulation_id,
-            "stopped",
-            total_steps,
-            duration_ms,
-        )
+        try:
+            await asyncio.to_thread(
+                supabase_service.update_simulation,
+                simulation_id,
+                "stopped",
+                total_steps,
+                duration_ms,
+            )
+        except Exception:
+            pass
+
+    try:
+        await manager.broadcast({
+            "type": "simulation_stopped",
+            "simulation_id": simulation_id,
+        })
+    except Exception:
+        pass
 
     return {"status": "stopped"}
 
 
 @router.post("/reset")
 async def reset_simulation(request: Request) -> dict:
+    from ..websockets.simulation_ws import manager
+
     app = request.app
+    if getattr(app.state, "benchmark_task", None) is not None:
+        app.state.benchmark_task.cancel()
+        app.state.benchmark_task = None
     app.state.sim_intersection.reset()
     app.state.sim_running = False
     app.state.sim_intersection.spawner.set_enabled(False)
+
+    try:
+        await manager.broadcast({
+            "type": "simulation_stopped",
+            "simulation_id": None,
+        })
+    except Exception:
+        pass
+
     return {"status": "reset"}
 
 

@@ -25,9 +25,10 @@ export default function LiveSnapshot() {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    if (!isRunning) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isRunning]);
 
   const snapshot = useMemo(() => {
     const queueLengths = frame?.queue_lengths ?? {};
@@ -41,11 +42,14 @@ export default function LiveSnapshot() {
   }, [frame]);
 
   const lastUpdateText = useMemo(() => {
+    if (!isRunning) {
+      return "Paused";
+    }
     if (!lastFrameAt) {
       return "No frames";
     }
     return formatSeconds((now - lastFrameAt) / 1000);
-  }, [lastFrameAt, now]);
+  }, [lastFrameAt, now, isRunning]);
 
   return (
     <motion.div

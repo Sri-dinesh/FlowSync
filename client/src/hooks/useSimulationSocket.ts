@@ -156,11 +156,6 @@ export function useSimulationSocket() {
           rl: raw.rl ?? null,
         };
 
-        // Log all raw frames in development/local server environment
-        if (process.env.NODE_ENV === "development") {
-          console.log("[SimWS Received Data]:", payload);
-        }
-
         // Log the very first frame received
         if (payload.timestep === 0) {
           console.log("%c[SimWS] First frame received", "color:#38bdf8;font-weight:bold", payload);

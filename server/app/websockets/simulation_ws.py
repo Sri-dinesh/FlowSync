@@ -964,9 +964,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
                 app.state.current_simulation_id = None
 
-                # Broadcast stopped confirmation to client
+                # Broadcast stopped confirmation to all connected clients
                 try:
-                    await websocket.send_json({
+                    await manager.broadcast({
                         "type": "simulation_stopped",
                         "simulation_id": simulation_id,
                         "total_steps": total_steps,

@@ -48,6 +48,8 @@ export default function SimulationControls({
     setTimeout(() => setIsSwitching(false), 2000);
   };
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
   const handleManualPhase = (phase: number) => {
     sendCommand({ command: "manual_override", phase });
   };
@@ -60,11 +62,13 @@ export default function SimulationControls({
   const handleStop = () => {
     setRunning(false);
     sendCommand({ command: "stop" });
+    fetch(`${API_BASE}/simulation/stop`, { method: "POST" }).catch(() => {});
   };
 
   const handleReset = () => {
     // Send reset to backend first — clears intersection state, timestep, all vehicles
     sendCommand({ command: "reset" });
+    fetch(`${API_BASE}/simulation/reset`, { method: "POST" }).catch(() => {});
     // Then clear frontend state so the canvas goes blank immediately
     resetSimulation();
   };
