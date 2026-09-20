@@ -54,7 +54,14 @@ export default function DashboardKpis({ data }: Props) {
           ease: "power2.out",
           onUpdate: () => {
             if (waitRef.current) {
-              waitRef.current.innerText = `-${obj.val.toFixed(1)}%`;
+              const val = obj.val;
+              if (val > 0) {
+                waitRef.current.innerText = `+${val.toFixed(1)}%`;
+              } else if (val < 0) {
+                waitRef.current.innerText = `-${Math.abs(val).toFixed(1)}%`;
+              } else {
+                waitRef.current.innerText = "0.0%";
+              }
             }
           },
         });
@@ -103,7 +110,11 @@ export default function DashboardKpis({ data }: Props) {
       ref: isFresh ? null : waitRef,
       fallback: isFresh
         ? "--"
-        : `${data.avg_wait_reduction_pct > 0 ? "-" : ""}${Math.abs(data.avg_wait_reduction_pct).toFixed(1)}%`,
+        : data.avg_wait_reduction_pct > 0
+        ? `+${data.avg_wait_reduction_pct.toFixed(1)}%`
+        : data.avg_wait_reduction_pct < 0
+        ? `-${Math.abs(data.avg_wait_reduction_pct).toFixed(1)}%`
+        : "0.0%",
       subtitle: isFresh
         ? "Run benchmark to evaluate AI vs Baseline"
         : "DQN AI Policy vs Standard Fixed Baseline",

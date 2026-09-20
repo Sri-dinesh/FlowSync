@@ -155,7 +155,11 @@ export default function ModeComparisonChart({ data }: Props) {
           <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 text-right">
             <div className="text-[9px] text-indigo-300/70 uppercase">Wait Reduction</div>
             <div className="text-xs font-bold font-mono text-indigo-300">
-              -{data.comparison.wait_reduction_pct}%
+              {data.comparison.wait_reduction_pct > 0
+                ? `+${data.comparison.wait_reduction_pct}%`
+                : data.comparison.wait_reduction_pct < 0
+                ? `-${Math.abs(data.comparison.wait_reduction_pct)}%`
+                : "0.0%"}
             </div>
           </div>
           <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-right">
