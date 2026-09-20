@@ -368,7 +368,7 @@ export default function DigitalTwinShowdown({
                 ) : (
                   models.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} — ep {m.version} {m.source === "remote" ? "☁" : "💾"}
+                      {m.name} — ep {m.version} {m.source === "remote" ? "☁ Supabase Cloud" : "💾 Local"}
                     </option>
                   ))
                 )}

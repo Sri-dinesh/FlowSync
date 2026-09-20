@@ -35,6 +35,11 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
             file=raw_bytes,
             file_options={"content-type": "application/octet-stream", "upsert": "true"},
         )
+        import logging
+        logging.getLogger(__name__).info(
+            "Successfully uploaded checkpoint %s (%d bytes) to Supabase Storage bucket '%s'",
+            path, len(raw_bytes), BUCKET_NAME
+        )
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(
@@ -134,6 +139,7 @@ def list_all_models() -> List[Dict[str, Any]]:
                 pass
 
         episodes_found = set()
+        remote_eps = set()
 
         # Check Supabase Storage
         folder = f"models/{model_id}"
@@ -148,7 +154,9 @@ def list_all_models() -> List[Dict[str, Any]]:
                     if name.startswith("checkpoint_") and name.endswith(".pt"):
                         ep_text = name[len("checkpoint_"):-len(".pt")]
                         if ep_text.isdigit():
-                            episodes_found.add(int(ep_text))
+                            ep_num = int(ep_text)
+                            episodes_found.add(ep_num)
+                            remote_eps.add(ep_num)
         except Exception:
             pass
 
@@ -158,7 +166,8 @@ def list_all_models() -> List[Dict[str, Any]]:
             for p in local_dir.glob("checkpoint_*.pt"):
                 ep_text = p.name[len("checkpoint_"):-len(".pt")]
                 if ep_text.isdigit():
-                    episodes_found.add(int(ep_text))
+                    ep_num = int(ep_text)
+                    episodes_found.add(ep_num)
                     if not date_part:
                         try:
                             dt = datetime.datetime.fromtimestamp(p.stat().st_mtime)
@@ -178,6 +187,8 @@ def list_all_models() -> List[Dict[str, Any]]:
                 "name": base_name,
                 "version": version,
                 "source": "remote",
+                "in_cloud": True,
+                "storage_location": "Supabase Cloud",
                 "episodes": int(version) if version.isdigit() else total_ep,
                 "avg_reward": row.get("avgReward"),
                 "is_active": row.get("isActive", False),
@@ -200,8 +211,27 @@ def list_all_models() -> List[Dict[str, Any]]:
 
         for ep in completed_episodes:
             key = f"{model_id}:{ep}"
+            is_remote = ep in remote_eps
             is_local = (LOCAL_MODELS_DIR / model_id / f"checkpoint_{ep}.pt").exists()
-            source = "local" if is_local else "remote"
+
+            # If local exists but not in remote storage, auto-sync to Supabase Cloud Storage bucket
+            if is_local and not is_remote:
+                try:
+                    local_pt = LOCAL_MODELS_DIR / model_id / f"checkpoint_{ep}.pt"
+                    with open(local_pt, "rb") as lf:
+                        raw_bytes = lf.read()
+                    supabase_client.storage.from_(BUCKET_NAME).upload(
+                        path=f"models/{model_id}/checkpoint_{ep}.pt",
+                        file=raw_bytes,
+                        file_options={"content-type": "application/octet-stream", "upsert": "true"},
+                    )
+                    is_remote = True
+                    remote_eps.add(ep)
+                    logger.info("Auto-synced local checkpoint %s to Supabase Cloud Storage bucket", local_pt)
+                except Exception as sync_err:
+                    logger.warning("Failed to auto-sync local checkpoint %s to Supabase: %s", key, sync_err)
+
+            source = "remote" if is_remote else "local"
 
             label = f"Model {date_part} - {ep}eps"
             if ep == max_ep and row.get("avgReward") is not None:
@@ -220,6 +250,8 @@ def list_all_models() -> List[Dict[str, Any]]:
                 "name": label,
                 "version": str(ep),
                 "source": source,
+                "in_cloud": is_remote,
+                "storage_location": "Supabase Cloud" if is_remote else "Local Disk",
                 "episodes": ep,
                 "avg_reward": row.get("avgReward") if ep == max_ep else None,
                 "is_active": row.get("isActive", False) if ep == max_ep else False,

@@ -449,7 +449,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               models.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.name} — ep {m.version}
-                  {m.source === "remote" ? " ☁" : " 💾"}
+                  {m.source === "remote" ? " ☁ Supabase Cloud" : " 💾 Local"}
                 </SelectItem>
               ))
             )}

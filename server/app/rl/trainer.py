@@ -246,7 +246,8 @@ class Trainer:
                 }
             )
 
-            if simulation_id and (episode_num % 50 == 0 or is_last_episode):
+            is_stopping = not self.is_training
+            if simulation_id and (episode_num % 50 == 0 or is_last_episode or is_stopping):
                 await asyncio.to_thread(
                     self.model_service.save_checkpoint,
                     simulation_id,
