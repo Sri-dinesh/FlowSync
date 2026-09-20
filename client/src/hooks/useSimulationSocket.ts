@@ -36,6 +36,7 @@ const BASE_DELAY_MS = 500;
 export function useSimulationSocket() {
   const setFrame = useSimulationStore((state) => state.setFrame);
   const setConnected = useSimulationStore((state) => state.setConnected);
+  const setRunning = useSimulationStore((state) => state.setRunning);
 
   const [benchmarkRunning, setBenchmarkRunning] = useState(false);
   const [benchmarkProgress, setBenchmarkProgress] = useState<SimBenchmarkProgress | null>(null);
@@ -89,6 +90,13 @@ export function useSimulationSocket() {
             completed_mode: raw.completed_mode,
             result: raw.result,
           });
+          return;
+        }
+
+        if (raw.type === "simulation_stopped") {
+          setRunning(false);
+          setBenchmarkRunning(false);
+          setBenchmarkProgress(null);
           return;
         }
 

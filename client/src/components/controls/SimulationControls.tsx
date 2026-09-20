@@ -60,11 +60,6 @@ export default function SimulationControls({
   const handleStop = () => {
     setRunning(false);
     sendCommand({ command: "stop" });
-    // Reset after a short delay so the final frame can be saved/flushed properly
-    setTimeout(() => {
-      sendCommand({ command: "reset" });
-      resetSimulation();
-    }, 200);
   };
 
   const handleReset = () => {
@@ -204,7 +199,7 @@ export default function SimulationControls({
             className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
             onClick={handleStop}
             disabled={!isConnected}
-            title="Stop and save simulation, then reset for a new one"
+            title="Stop simulation and persist metrics"
           >
             <Square className="h-3.5 w-3.5 mr-1.5" />
             Stop

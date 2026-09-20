@@ -9,6 +9,7 @@ Persistence strategy for traffic_logs and signal_states:
 """
 
 import asyncio
+import datetime
 import logging
 import time
 from pathlib import Path
@@ -553,7 +554,7 @@ async def _run_timed_benchmark(
     finally:
         # Restore previous state — restore spawner back to natural stochastic randomness for manual simulation
         app.state.mode = prev_mode
-        app.state.sim_running = prev_running
+        app.state.sim_running = False
         app.state.sim_intersection.reset()
         try:
             app.state.sim_intersection.spawner.set_seed(None)
@@ -875,12 +876,19 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     pass
 
                 simulation_id = app.state.current_simulation_id
-                if simulation_id and not str(simulation_id).startswith("local-"):
-                    intersection = app.state.sim_intersection
-                    total_steps = intersection.timestep
-                    duration_ms = int(total_steps * 0.1 * 1000)
+                intersection = app.state.sim_intersection
+                total_steps = intersection.timestep
+                duration_ms = int(total_steps * 0.1 * 1000)
+                duration_s = round(total_steps * 0.1, 1)
+                avg_wait = round(intersection.get_avg_wait_time(), 2)
+                passed = intersection.total_passed
+                peak_queue = max(intersection.get_queue_lengths().values(), default=0)
+                active_mode = getattr(app.state, "mode", "fixed")
+                active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
+                active_eps = getattr(app.state, "active_model_episode", 300)
 
-                    # Flush buffered rows before closing the simulation
+                # Flush buffered telemetry rows to Supabase before closing
+                if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
 
                     try:
@@ -895,17 +903,78 @@ async def simulation_socket(websocket: WebSocket) -> None:
                             asyncio.to_thread(
                                 supabase_service.save_performance_metric,
                                 simulation_id,
-                                app.state.mode,
-                                intersection.get_avg_wait_time(),
-                                intersection.total_passed,
-                                max(intersection.get_queue_lengths().values(), default=0),
+                                active_mode,
+                                avg_wait,
+                                passed,
+                                peak_queue,
                                 total_steps,
                             ),
                         )
                     except Exception:
                         logger.exception("Failed to persist simulation metrics on stop")
 
-                    app.state.current_simulation_id = None
+                # Auto-persist full session JSON locally for dashboard analytics and instant replay
+                try:
+                    sessions_dir = Path(SESSION_DIR)
+                    sessions_dir.mkdir(parents=True, exist_ok=True)
+                    sess_key = simulation_id or f"sim_{active_mode}_{int(time.time())}"
+                    file_p = sessions_dir / f"{sess_key}.json"
+
+                    movement_queues = intersection.get_movement_queues()
+                    agg_counts = {k: int(v) for k, v in movement_queues.items()}
+                    total_vehs = passed + sum(len(q) for q in intersection.lanes.values())
+
+                    payload = {
+                        "session_id": sess_key,
+                        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "mode": active_mode,
+                        "model_name": active_model if active_mode == "ai" else None,
+                        "model_episodes": active_eps if active_mode == "ai" else None,
+                        "throughput": passed,
+                        "stats": {
+                            "session_id": sess_key,
+                            "mode": active_mode,
+                            "model_name": active_model if active_mode == "ai" else None,
+                            "model_episodes": active_eps if active_mode == "ai" else None,
+                            "frame_count": total_steps,
+                            "duration_s": duration_s,
+                            "avg_fps": 10.0,
+                            "total_detections": max(total_vehs, passed),
+                            "throughput": passed,
+                            "avg_wait_s": avg_wait,
+                            "peak_queue": peak_queue,
+                            "aggregate_counts": agg_counts,
+                        },
+                        "twin_data": {
+                            "session_id": sess_key,
+                            "total_frames_processed": total_steps,
+                            "total_vehicles_detected": max(total_vehs, passed),
+                            "video_duration_s": duration_s,
+                            "total_passed": passed,
+                            "arrivals": [],
+                            "aggregate_counts": agg_counts,
+                        },
+                        "frames": [],
+                    }
+                    with open(file_p, "w", encoding="utf-8") as sf:
+                        json.dump(payload, sf, indent=2)
+                    logger.info("Saved simulation session file %s", file_p)
+                except Exception as se:
+                    logger.warning("Failed to write session file on stop: %s", se)
+
+                app.state.current_simulation_id = None
+
+                # Broadcast stopped confirmation to client
+                try:
+                    await websocket.send_json({
+                        "type": "simulation_stopped",
+                        "simulation_id": simulation_id,
+                        "total_steps": total_steps,
+                        "passed": passed,
+                        "avg_wait": avg_wait,
+                    })
+                except Exception:
+                    pass
 
             elif command == "reset":
                 if getattr(app.state, "benchmark_task", None) is not None:
