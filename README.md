@@ -1,8 +1,8 @@
 # FlowSync — AI-Powered Real-Time Traffic Network Simulation & Digital Twin Platform
 
-> **Optimizing Urban Mobility with Dueling Double Deep Q-Networks (D3QN), Prioritized Experience Replay (PER), Zero-Latency Live Video Ingestion (YOLOv8 + ByteTrack + yt-dlp), and Full-Stack Telemetry Analytics**
+> **Autonomous Urban Mobility Control via Dueling Double Deep Q-Networks (D3QN), Prioritized Experience Replay (PER), Online Short-Horizon EWMA Demand Forecasting, Zero-Latency Live Video Ingestion (YOLOv8 + ByteTrack + yt-dlp), and Full-Stack Telemetry Analytics**
 
-FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and digital twin platform. Powered by Dueling Double Deep Q-Networks (D3QN) with Prioritized Experience Replay (PER), destination-aware Max-Pressure (PressLight/MPLight) reward formulation, and real-world computer vision pipelines, FlowSync dynamically optimizes traffic signal phases to eliminate congestion, minimize vehicle wait times, and maximize throughput across single intersections, multi-intersection 2×2 city grids, and live CCTV / YouTube camera streams.
+FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and digital twin platform. Engineered with a **28-dimensional state space**, **Dueling Double Deep Q-Networks (D3QN)** with **Prioritized Experience Replay (PER)**, destination-aware **Max-Pressure (PressLight/MPLight)** reward formulations, and real-world computer vision ingestion pipelines, FlowSync dynamically optimizes traffic signal phases to eliminate congestion, minimize vehicle delay, and maximize throughput across single 12-movement intersections, multi-intersection 2×2 city grids, and live CCTV / YouTube camera feeds.
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev/)
@@ -14,7 +14,7 @@ FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38BDF8?logo=tailwindcss)](https://tailwindcss.com/)
 [![GSAP](https://img.shields.io/badge/GSAP-3.15-88CE02?logo=greensock)](https://greensock.com/gsap/)
 [![yt-dlp](https://img.shields.io/badge/yt--dlp-2024+-red?logo=youtube)](https://github.com/yt-dlp/yt-dlp)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)](https://supabase.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_%26_Storage-3ECF8E?logo=supabase)](https://supabase.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-6.19-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -23,122 +23,139 @@ FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and
 
 ## Table of Contents
 
-- [Overview & Vision](#overview--vision)
-- [Key Features & Capabilities](#key-features--capabilities)
-  - [1. Single Intersection Diorama (/simulation)](#1-single-intersection-diorama-simulation)
-  - [2. Multi-Intersection 2×2 City Grid (/city)](#2-multi-intersection-22-city-grid-city)
-  - [3. Real-World CCTV & Sim-to-Real Digital Twin (/realworld)](#3-real-world-cctv--sim-to-real-digital-twin-realworld)
-  - [4. Real-Time Live Stream Ingestion & Anti-Bot Bypass](#4-real-time-live-stream-ingestion--anti-bot-bypass)
-  - [5. Full-Stack Analytics & Performance Dashboard (/dashboard)](#5-full-stack-analytics--performance-dashboard-dashboard)
-  - [6. Four Intelligent Control Modes](#6-four-intelligent-control-modes)
-  - [7. AI Safety Watchdog & Demand Action Masking](#7-ai-safety-watchdog--demand-action-masking)
-  - [8. Common Random Numbers (CRN) Benchmarking](#8-common-random-numbers-crn-benchmarking)
-- [System Architecture](#system-architecture)
-  - [1. Full-Stack Architecture](#1-full-stack-architecture)
-  - [2. Persistent Real-Time WebSocket Protocols](#2-persistent-real-time-websocket-protocols)
-  - [3. Zero-Latency Live Video Stream Ingestion Pipeline](#3-zero-latency-live-video-stream-ingestion-pipeline)
-  - [4. Reinforcement Learning Control Loop](#4-reinforcement-learning-control-loop)
-- [Reinforcement Learning Formulation](#reinforcement-learning-formulation)
-  - [1. State Space (20-Dimensional Observation Vector)](#1-state-space-20-dimensional-observation-vector)
-  - [2. Action Space (Phase Controls)](#2-action-space-phase-controls)
-  - [3. Multi-Factor Max-Pressure Reward Function](#3-multi-factor-max-pressure-reward-function)
-  - [4. Neural Network Architecture (Dueling DQN)](#4-neural-network-architecture-dueling-dqn)
-  - [5. Prioritized Experience Replay (PER with SumTree)](#5-prioritized-experience-replay-per-with-sumtree)
-  - [6. Starvation Watchdog & Demand Action Masking](#6-starvation-watchdog--demand-action-masking)
-- [Computer Vision & Live Streaming Pipeline](#computer-vision--live-streaming-pipeline)
-  - [1. YOLOv8 Detection & ByteTrack Multi-Object Tracking](#1-yolov8-detection--bytetrack-multi-object-tracking)
-  - [2. Spatial Counting & Polygonal ROI Editor](#2-spatial-counting--polygonal-roi-editor)
-  - [3. Zero-Latency Frame Grabber & Anti-Bot Stream Resolver](#3-zero-latency-frame-grabber--anti-bot-stream-resolver)
-  - [4. Chronological Arrival Scheduling & Digital Twin Showdown](#4-chronological-arrival-scheduling--digital-twin-showdown)
-- [Analytics & Performance Dashboard](#analytics--performance-dashboard)
-- [Project Directory Structure](#project-directory-structure)
-- [Tech Stack Reference](#tech-stack-reference)
-- [Getting Started & Installation](#getting-started--installation)
-  - [Prerequisites](#prerequisites)
-  - [1. Clone Repository](#1-clone-repository)
-  - [2. Backend Setup (/server)](#2-backend-setup-server)
-  - [3. Frontend Setup (/client)](#3-frontend-setup-client)
-  - [4. Docker Deployment](#4-docker-deployment)
-- [Environment Variables Reference](#environment-variables-reference)
-- [WebSocket & REST API Reference](#websocket--rest-api-reference)
-- [Empirical Performance Benchmarks](#empirical-performance-benchmarks)
-  - [1. Single 4-Way Intersection Benchmark](#1-single-4-way-intersection-benchmark)
-  - [2. Multi-Intersection 2×2 City Grid Benchmark](#2-multi-intersection-22-city-grid-benchmark)
-  - [3. Real-World Digital Twin Showdown](#3-real-world-digital-twin-showdown)
-  - [4. Production Telemetry & Reliability Score](#4-production-telemetry--reliability-score)
-- [License](#license)
+- [1. Executive Overview \& System Engineering](#1-executive-overview--system-engineering)
+  - [1.1 What We Are Doing](#11-what-we-are-doing)
+  - [1.2 How We Are Doing It](#12-how-we-are-doing-it)
+  - [1.3 What Is Happening on the Surface (Top)](#13-what-is-happening-on-the-surface-top)
+  - [1.4 What Is Happening Under the Hood (Bottom)](#14-what-is-happening-under-the-hood-bottom)
+- [2. System Architecture \& Dataflow](#2-system-architecture--dataflow)
+  - [2.1 End-to-End System Architecture](#21-end-to-end-system-architecture)
+  - [2.2 Real-Time WebSocket Protocols (10 Hz Sync)](#22-real-time-websocket-protocols-10-hz-sync)
+  - [2.3 Simulation Lifecycle \& Stop/Pause Semantics](#23-simulation-lifecycle--stoppause-semantics)
+- [3. Reinforcement Learning Mathematical Formulation](#3-reinforcement-learning-mathematical-formulation)
+  - [3.1 Semi-Markov Decision Process (Semi-MDP) Framework](#31-semi-markov-decision-process-semi-mdp-framework)
+  - [3.2 28-Dimensional Continuous State Space Vector](#32-28-dimensional-continuous-state-space-vector)
+  - [3.3 Discrete Action Space \& Demand Action Masking](#33-discrete-action-space--demand-action-masking)
+  - [3.4 Delay-Anchored Max-Pressure Multi-Factor Reward Function](#34-delay-anchored-max-pressure-multi-factor-reward-function)
+  - [3.5 Dueling Double Deep Q-Network (D3QN) Architecture](#35-dueling-double-deep-q-network-d3qn-architecture)
+  - [3.6 Double DQN Target Formulation with Masked Action Selection](#36-double-dqn-target-formulation-with-masked-action-selection)
+  - [3.7 Prioritized Experience Replay (PER with Binary SumTree)](#37-prioritized-experience-replay-per-with-binary-sumtree)
+  - [3.8 Real-Time Online EWMA Demand Forecaster (Dims 20–27)](#38-real-time-online-ewma-demand-forecaster-dims-2027)
+- [4. Safety Watchdogs \& Physical Kinematics](#4-safety-watchdogs--physical-kinematics)
+  - [4.1 Anti-Starvation Watchdog](#41-anti-starvation-watchdog)
+  - [4.2 Signal Clearance \& Transition Machine](#42-signal-clearance--transition-machine)
+  - [4.3 Microscopic Vehicle Kinematics \& Car-Following](#43-microscopic-vehicle-kinematics--car-following)
+  - [4.4 Yield-on-Left Rules \& Cubic Bezier Turn Geometry](#44-yield-on-left-rules--cubic-bezier-turn-geometry)
+  - [4.5 Emergency Vehicle Preemption Priority](#45-emergency-vehicle-preemption-priority)
+- [5. Multi-Intersection 2×2 City Grid Coordination](#5-multi-intersection-22-city-grid-coordination)
+  - [5.1 Network Topology \& Corridor Routing](#51-network-topology--corridor-routing)
+  - [5.2 Arterial Road Transfer Dynamics](#52-arterial-road-transfer-dynamics)
+  - [5.3 Multi-Hop Journey Itineraries \& Entry Portals](#53-multi-hop-journey-itineraries--entry-portals)
+  - [5.4 Decentralized Shared-Policy Coordination](#54-decentralized-shared-policy-coordination)
+- [6. Computer Vision \& Real-World Digital Twin Pipeline](#6-computer-vision--real-world-digital-twin-pipeline)
+  - [6.1 StreamResolver: yt-dlp \& Anti-Bot PO-Token Challenge Solving](#61-streamresolver-yt-dlp--anti-bot-po-token-challenge-solving)
+  - [6.2 RealtimeFrameGrabber: Zero-Latency Socket Flushing](#62-realtimeframegrabber-zero-latency-socket-flushing)
+  - [6.3 YOLOv8 Detection \& ByteTrack Association](#63-yolov8-detection--bytetrack-association)
+  - [6.4 Polygonal ROI Editor \& Perspective Transformation](#64-polygonal-roi-editor--perspective-transformation)
+  - [6.5 Sim-to-Real Digital Twin Showdown](#65-sim-to-real-digital-twin-showdown)
+- [7. Analytics, Evaluation Metrics \& Dashboard Intelligence](#7-analytics-evaluation-metrics--dashboard-intelligence)
+  - [7.1 Highway Capacity Manual (HCM) Level of Service (LOS)](#71-highway-capacity-manual-hcm-level-of-service-los)
+  - [7.2 Benchmark Showdown \& Comparative Equations](#72-benchmark-showdown--comparative-equations)
+  - [7.3 Controller Efficiency Composite Score](#73-controller-efficiency-composite-score)
+  - [7.4 Supabase Cloud Synchronization \& Checkpoint Storage](#74-supabase-cloud-synchronization--checkpoint-storage)
+- [8. Directory Structure \& Tech Stack](#8-directory-structure--tech-stack)
+- [9. Installation \& Environment Setup](#9-installation--environment-setup)
+- [10. REST \& WebSocket API Specifications](#10-rest--websocket-api-specifications)
+- [11. Empirical Benchmarks](#11-empirical-benchmarks)
+- [12. License](#12-license)
 
 ---
 
-## Overview & Vision
+## 1. Executive Overview & System Engineering
 
-Modern urban traffic management still relies heavily on 20th-century logic: static fixed timers and inductive loop vehicle-actuated systems. These controllers are blind to real-time traffic surges, causing billions of dollars in lost productivity, excess fuel consumption, and unnecessary CO₂ emissions worldwide.
+Modern municipal traffic systems depend predominantly on fixed-time cycle plans (Webster's method) or inductive loop vehicle-actuated timers. These legacy paradigms suffer from three structural flaws:
+1. **Inability to anticipate non-stationary surges**: They react only when vehicles are already queued over physical hardware detectors.
+2. **Phase green wastage**: Fixed allocations hold green lights over empty corridors while adjacent approaches experience high delays.
+3. **Network spillback (gridlock)**: In multi-intersection corridors, local optimizations trigger downstream arterial overflow, blocking entire city grids.
 
-**FlowSync** bridges this gap by transforming traffic signal control into an end-to-end, camera-ready, adaptive learning infrastructure:
+**FlowSync** replaces heuristic timers with an autonomous, real-time reinforcement learning control plane and high-fidelity 3D digital twin platform.
 
-1. **Digital Twin Platform**: High-fidelity 3D spatial simulation modeling single intersections and multi-intersection city grids with realistic car-following physics, deceleration curves, and clearance intervals.
-2. **Autonomous Learning Agent**: A Dueling Double DQN (D3QN) agent utilizing a destination-aware Max-Pressure (PressLight/MPLight) formulation with Prioritized Experience Replay (PER), dynamically adapting phase durations to instantaneous demand.
-3. **Sim-to-Real Computer Vision**: A computer vision pipeline combining Ultralytics YOLOv8 and ByteTrack to convert standard video files, RTSP feeds, and live YouTube broadcasts into digitized chronological vehicle arrival schedules (`VehicleArrivalEvent`).
-4. **Digital Twin Showdowns**: Replays identical real-world traffic flows inside 3D physics to conduct deterministic side-by-side performance showdowns between AI and legacy timing plans on actual recorded traffic flows.
-5. **Full-Stack Telemetry Analytics**: A performance dashboard powered by GSAP and FastAPI, tracking aggregate KPIs, mode benchmarks, directional distributions, and enabling one-click replay deep linking.
+```
+       ┌────────────────────────────────────────────────────────┐
+       │                   FlowSync Control Plane               │
+       └───────────────────────────┬────────────────────────────┘
+                                   │
+         ┌─────────────────────────┴─────────────────────────┐
+         ▼                                                   ▼
+┌──────────────────┐                               ┌──────────────────┐
+│  Simulated World │                               │ Real-World Video │
+│ (Three.js WebGL) │                               │ (CCTV / YouTube) │
+└────────┬─────────┘                               └────────┬─────────┘
+         │                                                   │
+         │ 10 Hz State Vector                                │ YOLOv8 + ByteTrack
+         ▼                                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  State Space Formulation s_t ∈ ℝ²⁸                                  │
+│  • 12 Movement Queues          • 4 Signal Context Features          │
+│  • 4 One-Hot Active Phase Bits • 8 EWMA Demand Forecast Features    │
+└──────────────────────────────────┬──────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Safety Watchdog & Demand Action Masking                            │
+│  • Anti-Starvation Timer (t_wait ≥ 45s)                             │
+│  • Minimum Green Guard (8s) & Yellow/Red Clearance (2s + 3s)        │
+│  • Max Green Ceiling (40s)                                          │
+│  • Active Demand Mask: M(s) = {a ∈ A | Queue(a) > 0}                │
+└──────────────────────────────────┬──────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Dueling Double Deep Q-Network (D3QN) Inference (0.45ms Latency)    │
+│  Q(s, a) = V(s) + [ A(s, a) - 1/|A| ∑ A(s, a') ]                    │
+└──────────────────────────────────┬──────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Actuation & Telemetry Sync                                         │
+│  • Single Intersection & 2×2 City Grid Signal Actuation             │
+│  • Real-Time Telemetry over 10 Hz WebSockets                        │
+│  • Supabase PostgreSQL & Cloud Storage Model Sync                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.1 What We Are Doing
+We model urban traffic junctions as continuous-state, discrete-action reinforcement learning environments. FlowSync controls:
+- **Single 4-way intersections**: 12 distinct turning movements (North, South, East, West $\times$ Straight, Left, Right).
+- **2×2 City Grids**: 4 interconnected signalized intersections ($A, B, C, D$) handling internal arterial transfers and 8 external boundary portals.
+- **Sim-to-Real Replay Showdowns**: Live video feeds from YouTube and CCTV streams are transcribed into millisecond-accurate vehicle arrival schedules and replayed in 3D physics to evaluate AI vs. Fixed vs. Greedy policies under identical conditions.
+
+### 1.2 How We Are Doing It
+- **Neural Policy**: Dueling Double DQN (D3QN) separates state value estimation $V(s)$ from movement advantages $A(s, a)$.
+- **Temporal Memory**: Prioritized Experience Replay (PER) using a binary SumTree samples hard, high-error transition states with $O(\log N)$ complexity.
+- **Predictive Horizon**: An online Exponentially Weighted Moving Average (EWMA) arrival forecaster feeds 8 predictive dimensions into the agent's observation vector, enabling the policy to act before physical queues build up.
+- **Destination-Aware Max-Pressure (MPLight/PressLight)**: The reward function rewards queue dissipation while penalizing downstream road occupancy, preventing arterial spillback.
+- **Zero-Latency Ingestion**: A multithreaded frame-grabber flushes socket buffers continuously, bypassing HLS network lags and anti-bot verification challenges via `yt-dlp`.
+
+### 1.3 What Is Happening on the Surface (Top)
+- **High-Fidelity 3D Diorama (`/simulation`)**: WebGL scene rendered via Three.js and React Three Fiber featuring procedural reflective architecture, directional lane markings, dynamic holographic queue counters, animated CCTV cones, and real-time vehicle kinematics.
+- **Multi-Intersection 2×2 City Grid (`/city`)**: A 4-intersection metropolitan grid with arterial corridor traffic, continuous vehicle heading interpolation, and automated 3-mode comparative benchmark runners.
+- **Real-World CCTV & Sim-to-Real Digital Twin (`/realworld`)**: Video upload and live YouTube stream ingestion with an interactive HTML5 Canvas polygonal ROI editor, live bounding-box overlays, and side-by-side 3D arrival replay showdowns.
+- **Executive Analytics Dashboard (`/dashboard`)**: Aggregated metrics across sessions, Highway Capacity Manual (HCM) Level of Service (LOS A–F) classifications, mode showdown graphs, directional distributions, and deep links into 3D replays.
+
+### 1.4 What Is Happening Under the Hood (Bottom)
+- **10 Hz Microscopic Physics Loop**: Discrete time-stepping ($\Delta t = 0.1\text{s}$) modeling vehicle acceleration ($0.12$ units/s), safe distance enforcement ($d_{\min} = 0.08$), yield-on-left rules, and cubic Bezier curve turning paths.
+- **Semi-MDP Decision Gate**: Decisions are executed only on valid decision steps (stable green signals after minimum green clearance), excluding transient yellow/all-red phases.
+- **Synchronized Dual-Path Lifecycle**: Simulation pause and stop commands synchronize across both WebSocket channels and REST HTTP fallbacks. Pausing freezes vehicle movement on the 3D canvas and halts telemetry accumulation without clearing the scene.
+- **Cloud Persistence**: Checkpoint weights are serialized to `.pt` files, upserted to Supabase Storage bucket `model-checkpoints`, and cataloged in PostgreSQL.
 
 ---
 
-## Key Features & Capabilities
+## 2. System Architecture & Dataflow
 
-### 1. Single Intersection Diorama (`/simulation`)
-- High-fidelity 3D WebGL simulation of a 4-way, 12-movement signalized intersection (North, South, East, West with straight, left, and right movements).
-- Smooth cubic Bezier curve turn trajectories, car braking/stopping physics, dynamic holographic queue indicators, animated CCTV scanning cones, and per-lane wait time telemetry.
-- Interactive controls for Poisson vehicle spawn rate, day/night lighting presets, camera angle switching, and emergency vehicle preemption (Ambulance priority).
+### 2.1 End-to-End System Architecture
 
-### 2. Multi-Intersection 2×2 City Grid (`/city`)
-- Coordinated 2×2 network across 4 signalized intersections (A, B, C, D) connected by bidirectional arterial corridors.
-- Multi-hop vehicle routing across 8 external boundary entry/exit portals with travel-time simulation along road segments.
-- High-detail 3D urban environment featuring reflective skyscrapers (`MeshPhysicalMaterial` with clearcoat and neon corner strips), landscaped parks, street trees, streetlights, and flush gantry traffic light models.
-- **Unified Persistent Vehicle Pool**: Continuous heading angular interpolation prevents visual teleportation or jitter during segment transitions.
-- **Road-Segment Car-Following Physics**: Multi-lane lateral offsets (0.5, 1.5, 2.5) with anti-overlap collision avoidance.
-
-### 3. Real-World CCTV & Sim-to-Real Digital Twin (`/realworld`)
-- Ingests uploaded video files (`.mp4`, `.avi`, `.mov`) or camera streams to extract vehicle counts, trajectories, and arrival timestamps.
-- Automatic quadrant partitioning (North, South, East, West) or interactive web-based polygonal Region of Interest (ROI) editor with perspective transformation.
-- **Digital Twin Showdown**: Replays identical chronological arrival sequences in 3D physics to evaluate natural clearance times and wait reductions under Fixed vs. Greedy vs. AI policies.
-- Interactive playback controls with real-time clearance tracking, efficiency gain metrics HUD, and replay pause/resume/stop functionality.
-
-### 4. Real-Time Live Stream Ingestion & Anti-Bot Bypass
-- **YouTube Live & RTSP Resolver (`StreamResolver`)**: Integrates `yt-dlp` to extract direct `.m3u8` HLS manifests from YouTube live streams and network cameras, equipped with anti-bot bypass and PO-token challenge solving.
-- **Zero-Latency Threaded Frame Grabber (`RealtimeFrameGrabber`)**: Dedicated daemon thread drains network and hardware socket buffers at native camera frame rate, maintaining an atomic single-frame slot with **0.0ms queue lag** so YOLOv8 always performs inference on the latest frame.
-- **Active Real-World Presets**: Instant camera connections to live traffic intersections (e.g., 4 Corners Downtown, Jackson Hole Town Square) with automated error recovery and WebSocket telemetry.
-
-### 5. Full-Stack Analytics & Performance Dashboard (`/dashboard`)
-- Comprehensive executive analytics dashboard tracking real session telemetry across all processed videos and digital twin runs.
-- **Real-Time KPI Cards**: Total Sessions, Vehicles Processed, Footage Hours, Average Intersection Wait Time, AI Wait Reduction % (41.8%), Detection FPS, Sub-millisecond RL Inference Latency (0.45ms), and AI Reliability Score (99.4%).
-- **Deep Linking to 3D Replays**: Click any session record in the Historical Sessions Table to immediately launch into `/realworld?session={id}` for instant 3D showdown execution.
-- **Comparative Benchmarks Matrix**: Side-by-side comparative graphs of Fixed-Timer vs. Greedy Controller vs. FlowSync DQN AI across Wait Time (38.5s vs 28.2s vs 22.4s), Throughput (82.4% vs 91.0% vs 97.6%), Queue Length (9.8 vs 6.9 vs 4.5), and Efficiency Score (68.0 vs 83.5 vs 96.2).
-- **Directional & Fleet Analytics**: Directional flow distributions (North, South, East, West), 12-movement turn breakdown, vehicle classifications (cars, trucks, buses, motorcycles), and AI signal phase distribution.
-
-### 6. Four Intelligent Control Modes
-- **Fixed-Timer Mode**: Standard 4-phase cyclic timing plan with yellow (2s), all-red clearance (3s), smart queue skipping, and a hard 40s maximum green ceiling.
-- **Greedy (Max-Queue) Mode**: Deterministic rule-based baseline allocating green to the phase with the highest accumulated queue, respecting minimum green guards.
-- **AI Mode (D3QN + PER)**: Reinforcement learning agent evaluating a 20-dimensional pressure state vector to make real-time phase decisions with sub-second latency.
-- **Manual (MNL) Override Mode**: Interactive user buttons allowing human operators to hold green phases indefinitely or trigger safe Yellow → All-Red → Green phase switches.
-
-### 7. AI Safety Watchdog & Demand Action Masking
-- **Starvation Watchdog**: Hard 45s wait-time threshold overriding agent decisions to guarantee zero approach starvation, featuring starvation bleed prevention during yellow-red transitions.
-- **Demand Action Masking**: Dynamically masks empty phases out of the action space, preventing the AI from allocating green lights to approaches with zero queued vehicles.
-- **Minimum Green Guard (8s)**: Prevents dangerous high-frequency signal flickering.
-- **Maximum Green Ceiling (40s)**: Forces phase progression to prevent indefinite green holds on dense approaches.
-- **Yield-on-Left Kinematics**: Left-turning vehicles yield to oncoming straight and right-turning traffic.
-
-### 8. Common Random Numbers (CRN) Benchmarking
-- Synchronized pseudo-random Poisson seeds across Fixed, Greedy, and AI modes during timed benchmarks, guaranteeing that performance differences are strictly attributable to signal policy and not vehicle generation noise.
-
----
-
-## System Architecture
-
-### 1. Full-Stack Architecture
-
-FlowSync uses a decoupled, asynchronous architecture separating high-frequency physics and neural network inference from client-side WebGL rendering and persistent cloud analytics:
+FlowSync uses an asynchronous, decoupled architecture separating client rendering from server-side physics simulation and neural network inference:
 
 ```mermaid
 graph TB
@@ -165,6 +182,7 @@ graph TB
             SimAgent["Inference Agent (D3QN)<br/>(Demand Action Masking)"]
             TrainAgent["Training Agent (D3QN)"]
             PER["Prioritized Replay Buffer<br/>(SumTree O(log N))"]
+            Forecaster["ArrivalForecaster<br/>(Online 8-D EWMA)"]
             Trainer["Async Trainer Loop"]
         end
 
@@ -206,6 +224,8 @@ graph TB
 
     Engine --> SimAgent
     SimAgent --> Engine
+    Engine --> Forecaster
+    Forecaster --> SimAgent
     Trainer --> TrainAgent
     TrainAgent --> Trainer
     TrainAgent --> PER
@@ -221,534 +241,721 @@ graph TB
 
 ---
 
-### 2. Persistent Real-Time WebSocket Protocols
+### 2.2 Real-Time WebSocket Protocols (10 Hz Sync)
 
-FlowSync maintains four dedicated, low-latency WebSocket communication channels:
+FlowSync uses dedicated WebSocket pipelines operating at 10 Hz ($\Delta t = 100\text{ms}$) to stream low-overhead binary/JSON frames:
 
-| WebSocket Endpoint | Broadcast Rate | Payload Description | Direction |
+| WebSocket Endpoint | Rate | Payload Description | Direction |
 | :--- | :---: | :--- | :---: |
-| `/ws/simulation` | **10 Hz** | Vehicle 3D coordinates, signal phases/colors, queue depths, Q-values, wait times, timed benchmark frames, CRN seeds. | Bidirectional |
-| `/ws/city` | **10 Hz** | Coordinated 2×2 grid frames (Intersections A–D), connecting road vehicles, city throughput, comparison progress. | Bidirectional |
-| `/ws/training` | **Event-driven** | Episode metrics (total reward, average wait time, throughput, loss, epsilon decay), checkpoint notifications. | Bidirectional |
-| `/ws/cctv` | **Stream / 2 Hz** | Annotated video frames (base64 JPEG), bounding boxes, class labels, quadrant counts, live arrival telemetry. | Bidirectional |
+| `/ws/simulation` | **10 Hz** | Vehicle relative coordinates $[0.0, 1.0]$, signal phase/colors, queue depths, Q-value distributions, average wait times, active emergency vehicle states, and timed benchmark frames. | Bidirectional |
+| `/ws/city` | **10 Hz** | Coordinated state for Intersections A, B, C, D, road segment transfer vehicles, total city throughput, arterial corridor travel times, and benchmark runner status. | Bidirectional |
+| `/ws/training` | **Event** | Per-episode RL training metrics: total episode reward, moving average wait time, throughput count, Bellman loss, epsilon decay curve, watchdog override rate, and checkpoint upload alerts. | Bidirectional |
+| `/ws/cctv` | **2 Hz** | Base64-encoded annotated JPEG frames, detected vehicle bounding boxes, tracking IDs, quadrant approach counts, and live vehicle arrival logs. | Bidirectional |
 
 ---
 
-### 3. Zero-Latency Live Video Stream Ingestion Pipeline
+### 2.3 Simulation Lifecycle & Stop/Pause Semantics
 
-To process live YouTube and CCTV camera streams without buffer delay, FlowSync implements a dedicated zero-latency grabber architecture:
+To prevent desynchronization between the frontend Three.js scene and backend physics:
 
-```mermaid
-flowchart LR
-    A["YouTube Live URL / RTSP Feed"] --> B["StreamResolver<br/>(yt-dlp + PO-Token Solver)"]
-    B --> C["Direct HLS (.m3u8) Stream"]
-    C --> D["RealtimeFrameGrabber<br/>(Daemon Background Thread)"]
-    D -->|"Continuous Frame Grab"| E["Atomic Single Frame Slot<br/>(0.0ms Queue Delay)"]
-    E -->|"Latest Frame Only"| F["YOLOv8 Object Detection"]
-    F --> G["ByteTrack Trajectory Filter"]
-    G --> H["ROI / Quadrant Counting"]
-    H --> I["Arrival Scheduler & Telemetry"]
-    I --> J["WebSocket /ws/cctv & 3D Replay"]
+```
+[User Clicks "Stop"]
+         │
+         ├─── 1. WebSocket Send: {"command": "stop"}
+         └─── 2. HTTP Fallback: POST /api/simulation/stop
+                        │
+                        ▼
+         [Backend simulation_ws.py & simulation.py]
+         • Sets is_running = False
+         • Halts physics tick loop (dt = 0.0)
+         • Freezes vehicles at current position x_i
+         • Retains all lane queues in memory
+         • Freezes telemetry accumulation
+         • Broadcasts {"type": "simulation_stopped"}
+                        │
+                        ▼
+         [Frontend IntersectionScene.tsx & Zustand Store]
+         • Receives simulation_stopped
+         • Freezes canvas rendering loop
+         • Retains existing vehicle 3D meshes on canvas (No wipeout)
+         • Updates UI button state to "Start"
 ```
 
+1. **Stop / Pause (`stop`)**: Halts the internal ticker; freezes vehicle positions; retains 3D vehicle meshes in their exact positions on the canvas; halts metric accumulation; leaves the intersection state intact so it can be resumed.
+2. **Start (`start`)**: Sets `is_running = True`; resumes the 10 Hz physics ticker from the current state.
+3. **Reset (`reset`)**: Wipes the vehicle pool; resets the timestep to 0; resets the signal controller to Phase 0 (North-South Green); clears all metrics, queues, and arrival accumulators back to baseline.
+
 ---
 
-### 4. Reinforcement Learning Control Loop
+## 3. Reinforcement Learning Mathematical Formulation
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Sim as Simulation Engine
-    participant Watchdog as Safety Watchdog
-    participant Mask as Demand Action Mask
-    participant Agent as D3QN Inference Agent
-    participant PER as SumTree Replay Buffer
-    participant DB as Supabase Storage / DB
+### 3.1 Semi-Markov Decision Process (Semi-MDP) Framework
 
-    loop Every Decision Step (when min-green elapsed)
-        Sim->>Sim: Compute 12-movement queues and pressure
-        Sim->>Watchdog: Check Starvation (over 45s) and Max Green (over 40s)
-        alt Starvation or Max Green Triggered
-            Watchdog-->>Sim: Enforce Override Action
-        else Safe Condition
-            Sim->>Mask: Extract Active Lane Demands
-            Mask->>Agent: Feed 20-D State Vector and Valid Phase Mask
-            Agent->>Agent: Evaluate Dueling Network Q(s, a)
-            Agent-->>Sim: Dispatch argmax Q(s, a)
-        end
-        Sim->>Sim: Execute Yellow (2s), All-Red (3s), Green
-        Sim->>Sim: Advance vehicle kinematics (10 Hz)
-        Sim->>Sim: Calculate Max-Pressure Reward R
-        Sim->>PER: Store Transition (s, a, R, s', Priority)
-        PER->>Agent: Sample Batch via SumTree (alpha 0.6, beta annealing)
-        Agent->>Agent: Compute Double DQN Loss and Backprop
-    end
-    Note over Agent,DB: Every 50 episodes: Save weights to Supabase Storage
+Traffic signal control with clearance intervals is formalized as a discrete-time Semi-Markov Decision Process (Semi-MDP):
+
+$$\mathcal{M} = \langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma, \tau \rangle$$
+
+- $\mathcal{S} \subset \mathbb{R}^{28}$: Continuous observation space.
+- $\mathcal{A} = \{0, 1, 2, 3\}$: Set of signal phases.
+- $\tau \ge \tau_{\min}$: Phase duration. Once an action $a_t$ is selected, the signal must maintain green for a minimum guard duration $\tau_{\min} = 8.0\text{s}$, followed by yellow ($2.0\text{s}$) and all-red ($3.0\text{s}$) clearance transitions when switching.
+- $\gamma = 0.97$: Discount factor for cumulative future returns.
+
+---
+
+### 3.2 28-Dimensional Continuous State Space Vector
+
+At each decision step, the environment constructs a normalized continuous state vector $\mathbf{s}_t \in \mathbb{R}^{28}$:
+
+$$\mathbf{s}_t = \left[ \mathbf{q}_{12}, \mathbf{p}_4, \tau_{\text{phase}}, \mathbf{1}_{\text{trans}}, P_{\text{net}}, \sigma_{\text{starv}}, \mathbf{f}_8 \right]^T$$
+
+```
+Index:  0                       11 12     15 16 17 18 19 20                      27
+Vector: [   12 Movement Queues    | 4-Phase |  Signal Context  | 8 Demand Forecast  ]
 ```
 
----
+#### Detailed Dimension Breakdown
 
-## Reinforcement Learning Formulation
-
-### 1. State Space (20-Dimensional Observation Vector)
-
-The agent receives a normalized 20-dimensional continuous state vector at every decision step:
-
-$$
-\mathbf{s} = [q_1, q_2, \dots, q_{12}, p_0, p_1, p_2, p_3, \tau_{\text{phase}}, \mathbf{1}_{\text{trans}}, \bar{P}_{\text{net}}, \sigma_{\text{starv}}]^T \in \mathbb{R}^{20}
-$$
-
-| Indices | Component | Range | Description |
-| :---: | :--- | :---: | :--- |
-| `0` – `11` | **12 Movement Queues** | $[0.0, 1.0]$ | Normalized queue counts across 4 approaches (North, South, East, West) $\times$ 3 movements (Straight, Left, Right), normalized by max capacity ($C = 10$). |
-| `12` – `15` | **Phase One-Hot** | $\{0.0, 1.0\}$ | One-hot representation of the currently active green phase ($0$: NS, $1$: EW, $2$: NS Left, $3$: EW Left). |
-| `16` | **Normalized Phase Time** | $[0.0, 1.0]$ | Elapsed green time in current phase divided by maximum green duration: $\min(\tau / 40.0, 1.0)$. |
-| `17` | **Transition Indicator** | $\{0.0, 1.0\}$ | Flag set to $1.0$ during yellow or all-red clearance intervals, $0.0$ during stable green. |
-| `18` | **Normalized Pressure** | $[0.0, 1.0]$ | Sum of movement pressures across the intersection normalized by scale factor ($20.0$). |
-| `19` | **Max Starvation Index** | $[0.0, 1.0]$ | Longest waiting time among non-green directions normalized by threshold: $\min(\max(t_{\text{wait}}) / 45.0, 1.0)$. |
+| Indices | Vector Component | Range | Mathematical Definition | Physical Interpretation |
+| :---: | :--- | :---: | :--- | :--- |
+| `0` – `11` | **12 Movement Queues** | $[0.0, 1.0]$ | $q_m = \min\left(1.0, \frac{N_{\text{queue}}(m)}{C_{\max}}\right), \quad C_{\max} = 10.0$ | Normalized vehicle count waiting in each canonical movement: North, South, East, West $\times$ Straight, Left, Right. |
+| `12` – `15` | **Active Phase One-Hot** | $\{0.0, 1.0\}$ | $p_i = \mathbb{I}(\text{phase} = i), \quad i \in \{0, 1, 2, 3\}$ | One-hot indicator of currently active green phase. |
+| `16` | **Phase Elapsed Time** | $[0.0, 1.0]$ | $\tau_{\text{norm}} = \min\left(1.0, \frac{t_{\text{phase}}}{\tau_{\max}}\right), \quad \tau_{\max} = 40.0\text{s}$ | Proportion of maximum green ceiling consumed. |
+| `17` | **Transition Indicator** | $\{0.0, 1.0\}$ | $\mathbf{1}_{\text{trans}} = \mathbb{I}(\text{color} \in \{\text{YELLOW}, \text{RED}\})$ | Indicates active clearance interval ($1.0$ during yellow/red, $0.0$ during stable green). |
+| `18` | **Normalized Net Pressure** | $[0.0, 1.0]$ | $P_{\text{net}} = \min\left(1.0, \frac{\sum_{m} P(m)}{20.0}\right)$ | Intersection-wide destination-aware pressure. |
+| `19` | **Max Approach Starvation** | $[0.0, 1.0]$ | $\sigma_{\text{starv}} = \min\left(1.0, \frac{\max_{d} t_{\text{wait}}(d)}{45.0\text{s}}\right)$ | Longest approach wait time normalized by the 45s starvation limit. |
+| `20` | **5s EWMA Arrival Rate** | $[0.0, 1.0]$ | $\min\left(1.0, \frac{\text{ewma}_{5\text{s}}}{\lambda_{\max}}\right), \quad \lambda_{\max} = 2.0\text{ veh/s}$ | Short-horizon burst arrival velocity. |
+| `21` | **10s EWMA Arrival Rate** | $[0.0, 1.0]$ | $\min\left(1.0, \frac{\text{ewma}_{10\text{s}}}{\lambda_{\max}}\right)$ | Intermediate-horizon arrival velocity. |
+| `22` | **20s EWMA Arrival Rate** | $[0.0, 1.0]$ | $\min\left(1.0, \frac{\text{ewma}_{20\text{s}}}{\lambda_{\max}}\right)$ | Long-horizon baseline arrival velocity. |
+| `23` | **Demand Growth Rate** | $[-1.0, 1.0]$ | $\text{clip}\left(\frac{\text{ewma}_{5\text{s}} - \text{ewma}_{20\text{s}}}{\lambda_{\max}}, -1.0, 1.0\right)$ | Derivative of demand; positive indicates an incoming vehicle platoon. |
+| `24` | **Platoon Burst Flag** | $\{0.0, 1.0\}$ | $\mathbb{I}(\text{ewma}_{20\text{s}} > 0.05 \land \text{ewma}_{5\text{s}} > 1.5 \times \text{ewma}_{20\text{s}})$ | Triggers when instantaneous flow surges 50%+ over baseline. |
+| `25` | **Queue Dissipation Flag**| $\{0.0, 1.0\}$ | $\mathbb{I}(\text{ewma}_{20\text{s}} > 0.05 \land \text{ewma}_{5\text{s}} < 0.5 \times \text{ewma}_{20\text{s}})$ | Triggers when arrival rate drops below half of baseline. |
+| `26` | **Signed Demand Trend** | $[-1.0, 1.0]$ | $\text{clip}\left(\frac{\text{ewma}_{10\text{s}} - \text{ewma}_{20\text{s}}}{\lambda_{\max}}, -1.0, 1.0\right)$ | Medium-term momentum indicating macro surge vs. drain. |
+| `27` | **Instantaneous Arrival Rate**| $[0.0, 1.0]$ | $\min\left(1.0, \frac{N_{\text{spawned}} / \Delta t}{\lambda_{\max}}\right)$ | Immediate arrival pulse at the current 10 Hz tick. |
 
 ---
 
-### 2. Action Space (Phase Controls)
+### 3.3 Discrete Action Space & Demand Action Masking
 
-The discrete action space controls the signal phase:
+The discrete action space $\mathcal{A} = \{0, 1, 2, 3\}$ maps to 4 signal phases:
 
-| Action ID | Signal Phase | Permitted Movements | Protected Approaches |
+| Action $a$ | Phase Name | Permitted Turning Movements | Protected Approaches |
 | :---: | :--- | :--- | :--- |
 | `0` | **NS_GREEN** | Straight & Right Turns | Northbound & Southbound |
 | `1` | **EW_GREEN** | Straight & Right Turns | Eastbound & Westbound |
 | `2` | **NS_LEFT** | Protected Left Turns | Northbound & Southbound Left Bays |
 | `3` | **EW_LEFT** | Protected Left Turns | Eastbound & Westbound Left Bays |
 
----
+#### Demand Action Masking Equation
+To prevent the agent from assigning green lights to empty corridors:
 
-### 3. Multi-Factor Max-Pressure Reward Function
+$$\mathcal{M}(\mathbf{s}_t) = \left\{ a \in \mathcal{A} \;\middle|\; \sum_{d \in \text{dirs}(a)} \sum_{t \in \text{turns}(a)} q_{d,t} > 0 \right\}$$
 
-Based on PressLight and MPLight formulations, the reward function maximizes network throughput while penalizing pressure accumulation, unnecessary phase switching, and direction starvation:
+During greedy action selection:
 
-$$
-R = R_{\text{pressure}} + R_{\text{throughput}} + R_{\text{switch}} + R_{\text{starv}} + R_{\text{max-green}} + R_{\text{balance}}
-$$
-
-1. **Pressure Differential ($R_{\text{pressure}}$)**:
-   Rewards reduction in total intersection pressure between successive time steps:
-   $$
-   R_{\text{pressure}} = 1.5 \times \left( \sum_{m} P_{\text{prev}}(m) - \sum_{m} P_{\text{curr}}(m) \right)
-   $$
-   Where movement pressure is destination-aware:
-   $$
-   P(m) = \max\left(0, \frac{\text{incoming}(m)}{C} - \frac{\text{outgoing}(\text{dest}(m))}{C}\right)
-   $$
-2. **Throughput Bonus ($R_{\text{throughput}}$)**:
-   $$
-   R_{\text{throughput}} = 0.2 \times N_{\text{passed}}
-   $$
-3. **Switch Penalty ($R_{\text{switch}}$)**:
-   Penalizes abandoning a phase that still had active traffic demand:
-   $$
-   R_{\text{switch}} = -0.3 \quad \text{if phase changed and } P_{\text{prev-phase}} > 0.3 \text{, else } 0.0
-   $$
-4. **Starvation Penalty ($R_{\text{starv}}$)**:
-   $$
-   R_{\text{starv}} = -2.0 \times |\mathcal{D}_{\text{starv}}| \quad \text{where } \mathcal{D}_{\text{starv}} = \{d \mid t_{\text{wait}}(d) \ge 45.0\text{ s}\}
-   $$
-5. **Max Green Penalty ($R_{\text{max-green}}$)**:
-   $$
-   R_{\text{max-green}} = -1.0 \quad \text{if } \tau_{\text{green}} \ge 40.0\text{ s, else } 0.0
-   $$
-6. **Traffic Balance Bonus ($R_{\text{balance}}$)**:
-   Rewards balanced queue dissipation across phases when the intersection is populated:
-   $$
-   R_{\text{balance}} = 0.2 \quad \text{if } (\max(P_{\text{phase}}) - \min(P_{\text{phase}})) < 0.2 \text{ and } \sum P > 0.05
-   $$
+$$a^* = \begin{cases} 
+\arg\max_{a \in \mathcal{M}(\mathbf{s}_t)} Q(\mathbf{s}_t, a; \theta) & \text{if } \mathcal{M}(\mathbf{s}_t) \ne \emptyset \\
+\arg\max_{a \in \mathcal{A}} Q(\mathbf{s}_t, a; \theta) & \text{if all approaches empty}
+\end{cases}$$
 
 ---
 
-### 4. Neural Network Architecture (Dueling DQN)
+### 3.4 Delay-Anchored Max-Pressure Multi-Factor Reward Function
 
-The Dueling DQN decouples state value estimation from action advantages to stabilize Q-value learning in high-density traffic states:
+The reward function combines delay reduction, destination-aware Max-Pressure (MPLight), throughput expansion, switching stability, and anti-starvation penalties:
 
-```mermaid
-graph LR
-    Input["State Vector s ∈ ℝ²⁰"] --> Dense1["Linear(20 → 256) + LayerNorm + ReLU"]
-    Dense1 --> Dense2["Linear(256 → 256) + LayerNorm + ReLU"]
-    
-    Dense2 --> Val1["Linear(256 → 128) + ReLU"]
-    Val1 --> ValOut["Value Stream V(s) ∈ ℝ¹"]
-    
-    Dense2 --> Adv1["Linear(256 → 128) + ReLU"]
-    Adv1 --> AdvOut["Advantage Stream A(s, a) ∈ ℝ⁴"]
-    
-    ValOut --> Combine["Q(s,a) = V(s) + A(s,a) - mean(A)"]
-    AdvOut --> Combine
-    Combine --> Output["Q-Values for Actions {0, 1, 2, 3}"]
+$$R_t = R_{\text{delay}} + R_{\text{pressure}} + R_{\text{throughput}} + R_{\text{switch}} + R_{\text{starv}} + R_{\text{max\_green}} + R_{\text{balance}}$$
+
+```
+Reward Components:
+  R_delay       = -Δ(Total Wait Time) / 10.0
+  R_pressure    = 0.8 × (∑ P_prev - ∑ P_curr)
+  R_throughput  = 0.25 × N_passed
+  R_switch      = -0.2 (if phase changed and P_prev_phase > 0.5)
+  R_starv       = -1.5 × |D_starved| (for t_wait ≥ 45s)
+  R_max_green   = -0.8 (if t_green ≥ 40s)
+  R_balance     = +0.15 (if imbalance < 0.2 and ∑ P > 0.05)
 ```
 
-$$
-\mathcal{Q}(s, a; \theta, \alpha, \beta) = \mathcal{V}(s; \theta, \beta) + \left( \mathcal{A}(s, a; \theta, \alpha) - \frac{1}{|\mathcal{A}|} \sum_{a' \in \mathcal{A}} \mathcal{A}(s, a'; \theta, \alpha) \right)
-$$
+#### 1. Primary Delay-Anchored Term ($R_{\text{delay}}$)
+Penalizes the change in total vehicle waiting time across all 12 movements:
+
+$$R_{\text{delay}} = -\frac{\Delta W_t}{10.0} = -\frac{\sum_{v} w_{t}(v) - \sum_{v} w_{t-1}(v)}{10.0}$$
+
+#### 2. Destination-Aware Pressure Differential ($R_{\text{pressure}}$)
+Based on PressLight and MPLight, traffic pressure $P(m)$ measures the difference between incoming lane occupancy and downstream destination lane occupancy:
+
+$$P(m) = \max\left(0.0, \; \frac{N_{\text{in}}(m)}{C_{\max}} - \frac{N_{\text{out}}(\text{dest}(m))}{C_{\max}}\right)$$
+
+Where $\text{dest}(m)$ maps movements to downstream directions via the canonical mapping:
+- `north_straight` $\to$ `south`, `north_left` $\to$ `east`, `north_right` $\to$ `west`
+- `south_straight` $\to$ `north`, `south_left` $\to$ `west`, `south_right` $\to$ `east`
+- `east_straight` $\to$ `west`, `east_left` $\to$ `south`, `east_right` $\to$ `north`
+- `west_straight` $\to$ `east`, `west_left` $\to$ `north`, `west_right` $\to$ `south`
+
+The pressure reward rewards a net reduction in intersection pressure:
+
+$$R_{\text{pressure}} = 0.8 \times \left( \sum_{m=1}^{12} P_{t-1}(m) - \sum_{m=1}^{12} P_{t}(m) \right)$$
+
+#### 3. Throughput Discharge Bonus ($R_{\text{throughput}}$)
+Direct reward for every vehicle that exits the intersection:
+
+$$R_{\text{throughput}} = 0.25 \times N_{\text{passed}, t}$$
+
+#### 4. Phase Switch Penalty ($R_{\text{switch}}$)
+Penalizes unnecessary phase changes when the current phase still has high pressure ($> 0.5$), preventing loss of green wave momentum:
+
+$$R_{\text{switch}} = \begin{cases} -0.2 & \text{if phase switched and } P(\text{phase}_{\text{prev}}) > 0.5 \\ 0.0 & \text{otherwise} \end{cases}$$
+
+#### 5. Starvation Penalty ($R_{\text{starv}}$)
+Severe penalty for any approach waiting longer than $45.0\text{s}$:
+
+$$R_{\text{starv}} = -1.5 \times |\mathcal{D}_{\text{starved}}|, \quad \mathcal{D}_{\text{starved}} = \{ d \in \{\text{N, S, E, W}\} \mid t_{\text{wait}}(d) \ge 45.0\text{s} \}$$
+
+#### 6. Maximum Green Violation Penalty ($R_{\text{max\_green}}$)
+Penalizes phase hogging beyond the 40s ceiling:
+
+$$R_{\text{max\_green}} = \begin{cases} -0.8 & \text{if } t_{\text{phase}} \ge 40.0\text{s} \\ 0.0 & \text{otherwise} \end{cases}$$
+
+#### 7. Cross-Phase Balance Bonus ($R_{\text{balance}}$)
+Rewards balanced queue clearance when the junction is active:
+
+$$R_{\text{balance}} = \begin{cases} +0.15 & \text{if } \left(\max_{p} P(p) - \min_{p} P(p)\right) < 0.2 \land \sum P > 0.05 \\ 0.0 & \text{otherwise} \end{cases}$$
 
 ---
 
-### 5. Prioritized Experience Replay (PER with SumTree)
+### 3.5 Dueling Double Deep Q-Network (D3QN) Architecture
 
-Transitions $(s, a, r, s', d)$ are stored in a binary SumTree with capacity $N = 100{,}000$. Transitions are sampled according to their temporal-difference (TD) error magnitude:
+Standard DQNs suffer from overestimation bias and struggle to distinguish state value from action advantage when all actions produce similar outcomes. FlowSync uses a **Dueling Double Deep Q-Network**:
 
-$$
-P(i) = \frac{p_i^\alpha}{\sum_k p_k^\alpha}, \quad p_i = |\delta_i| + \epsilon_{\text{per}}
-$$
+```
+State Vector s ∈ ℝ²⁸
+       │
+       ▼
+Linear(28 → 256) + LayerNorm + ReLU
+       │
+       ▼
+Linear(256 → 256) + LayerNorm + ReLU
+       │
+       ├─────────────────────────────────────────┐
+       ▼                                         ▼
+Linear(256 → 128) + ReLU                  Linear(256 → 128) + ReLU
+       │                                         │
+       ▼                                         ▼
+Linear(128 → 1)                           Linear(128 → 4)
+       │                                         │
+       ▼                                         ▼
+State Value V(s) ∈ ℝ¹                     Advantage Stream A(s, a) ∈ ℝ⁴
+       │                                         │
+       └────────────────────┬────────────────────┘
+                            │
+                            ▼
+     Q(s, a) = V(s) + [ A(s, a) - 1/|A| ∑ A(s, a') ]
+                            │
+                            ▼
+                 Q-Values for Actions {0, 1, 2, 3}
+```
 
-Importance-sampling weights correct for estimation bias:
+#### Centered Aggregation Equation
 
-$$
-w_i = \left( \frac{1}{N} \cdot \frac{1}{P(i)} \right)^\beta, \quad \beta \text{ annealed linearly from } 0.4 \to 1.0
-$$
+$$Q(s, a; \theta, \alpha, \beta) = V(s; \theta, \beta) + \left( A(s, a; \theta, \alpha) - \frac{1}{|\mathcal{A}|} \sum_{a' \in \mathcal{A}} A(s, a'; \theta, \alpha) \right)$$
 
-Hyperparameter specifications:
-- **$\alpha$**: `0.6`
-- **$\beta_{\text{start}}$**: `0.4` → **$\beta_{\text{end}}$**: `1.0`
-- **$\epsilon_{\text{per}}$**: `1e-6`
-- **Replay Capacity**: `100,000`
-- **Batch Size**: `128`
-- **Discount Factor ($\gamma$)**: `0.97`
-- **Learning Rate**: `3e-4` (Adam optimizer)
-- **Target Network Update**: Every `300` steps
-
----
-
-### 6. Starvation Watchdog & Demand Action Masking
-
-To ensure zero signal phase conflicts and eliminate dead-green states:
-1. **Demand Action Masking**:
-   $$
-   \mathcal{A}_{\text{valid}} = \left\{ p \in \{0, 1, 2, 3\} \;\middle|\; \sum_{d \in \text{dirs}(p)} \sum_{t \in \text{turns}(p)} q_{d,t} > 0 \right\}
-   $$
-   $$
-   a^* = \arg\max_{a \in \mathcal{A}_{\text{valid}}} \mathcal{Q}(s, a)
-   $$
-   If no approach has queued vehicles, the agent falls back to greedy unmasked exploration.
-2. **Clearance Enforcer**: Minimum green duration (8.0s) is strictly enforced before any switch. Every phase switch passes through Yellow (2.0s) followed by All-Red (3.0s).
-3. **Starvation Watchdog**: An independent timer tracks elapsed wait time per approach direction. When any approach exceeds 45.0s, the watchdog preempts the agent and forces the signal to service the starved approach.
+Subtracting the mean advantage ensures uniqueness: $V(s)$ represents the average value of the traffic state, while $A(s, a)$ represents the relative advantage of choosing phase $a$.
 
 ---
 
-## Computer Vision & Live Streaming Pipeline
+### 3.6 Double DQN Target Formulation with Masked Action Selection
 
-### 1. YOLOv8 Detection & ByteTrack Multi-Object Tracking
+To prevent Q-value overestimation, the online network selects the best valid action, while the frozen target network ($\theta^-$) evaluates its Q-value:
 
-FlowSync runs Ultralytics YOLOv8 (supporting CPU, Apple Silicon MPS, NVIDIA CUDA, and ONNX Runtime) to detect vehicles across CCTV footage and network video streams:
-- **Classes Detected**: Cars, buses, trucks, motorcycles, and auto-rickshaws.
-- **Inference Thresholds**: Detection confidence $\ge 0.35$, NMS IoU $0.45$.
-- **Tracking**: ByteTrack associates spatial bounding boxes across frames, maintaining trajectory IDs and computing vehicle motion vectors to filter stationary artifacts.
+$$y_t = r_t + \gamma \, Q\left(s_{t+1}, \arg\max_{a' \in \mathcal{M}(s_{t+1})} Q(s_{t+1}, a'; \theta_{\text{online}}); \theta_{\text{target}}\right)$$
 
-### 2. Spatial Counting & Polygonal ROI Editor
+The network minimizes the Huber (Smooth L1) loss weighted by PER importance sampling weights $w_i$:
 
-1. **Automatic Quadrant Mode**: Slices the video frame into North, South, East, and West approach zones with automated entry/exit line detection.
-2. **Interactive Polygonal ROI Editor (`ROIEditor.tsx`)**: Web-based canvas editor allowing operators to draw custom polygons over lane approaches. Uses Shapely point-in-polygon math to track approach entries and turning trajectories with perspective transformation.
+$$\mathcal{L}(\theta) = \frac{1}{B} \sum_{i=1}^B w_i \cdot \text{Huber}\left( y_i - Q(s_i, a_i; \theta) \right)$$
 
-### 3. Zero-Latency Frame Grabber & Anti-Bot Stream Resolver
+$$\text{Huber}(\delta) = \begin{cases} 
+0.5 \, \delta^2 & \text{if } |\delta| \le 1.0 \\
+|\delta| - 0.5 & \text{otherwise}
+\end{cases}$$
 
-- **`StreamResolver` (`stream_resolver.py`)**: Uses `yt-dlp` to resolve live YouTube URLs, RTSP, and HLS streams into direct `.m3u8` video endpoints, incorporating automated PO-token challenge solving to bypass anti-bot mechanisms.
-- **`RealtimeFrameGrabber` (`video_processor.py`)**: Spawns an asynchronous daemon thread that drains hardware socket buffers at native camera frame rate. It keeps only the latest retrieved frame in an atomic slot, ensuring **0.0ms buffer lag** during live inference.
+---
 
-### 4. Chronological Arrival Scheduling & Digital Twin Showdown
+### 3.7 Prioritized Experience Replay (PER with Binary SumTree)
 
-Every vehicle identified crossing an entry boundary is recorded with precise metadata:
+Transitions $(s_t, a_t, r_t, s_{t+1}, d_t)$ are stored in a binary **SumTree** with capacity $N = 100{,}000$. The transition priority is proportional to its temporal-difference error $|\delta_i|$:
+
+$$p_i = |\delta_i| + \epsilon_{\text{per}}, \quad \epsilon_{\text{per}} = 0.01$$
+
+> [!NOTE]
+> $\epsilon_{\text{per}} = 0.01$ (Schaul et al. standard) is used instead of smaller values ($10^{-6}$) to prevent priority collapse, ensuring that zero-error transitions maintain a non-zero probability of being sampled.
+
+#### Probability Distribution
+
+$$P(i) = \frac{p_i^\alpha}{\sum_{k=1}^N p_k^\alpha}, \quad \alpha = 0.6$$
+
+#### Importance-Sampling Bias Correction Weights
+
+$$w_i = \left( \frac{1}{N \cdot P(i)} \right)^\beta \Bigg/ \max_k w_k, \quad \beta(e) = \min\left(1.0, \; \beta_{\text{start}} + e \cdot \frac{1.0 - \beta_{\text{start}}}{E_{\text{total}}}\right)$$
+
+- $\alpha = 0.6$ (prioritization exponent)
+- $\beta_{\text{start}} = 0.4 \to \beta_{\text{end}} = 1.0$ (annealed over training)
+- Buffer capacity $N = 100{,}000$
+- Mini-batch size $B = 128$
+- SumTree traversal complexity: $O(\log N)$
+
+---
+
+### 3.8 Real-Time Online EWMA Demand Forecaster (Dims 20–27)
+
+Heuristic controllers react only to vehicles that have already arrived. FlowSync implements an **online Exponentially Weighted Moving Average (EWMA)** arrival tracker that estimates traffic flow across three time horizons ($5\text{s}, 10\text{s}, 20\text{s}$):
+
+$$\text{ewma}_t = (1 - \alpha)\text{ewma}_{t-1} + \alpha \cdot \left( \frac{N_{\text{spawned}, t}}{\Delta t} \right)$$
+
+Smoothing factors:
+- **5-Second Window ($\alpha = 0.18$)**: Captures sudden arrival bursts.
+- **10-Second Window ($\alpha = 0.10$)**: Intermediate trend filter.
+- **20-Second Window ($\alpha = 0.05$)**: Macro demand baseline.
+
+```
+       Platoon Incoming (Burst Flag = 1)
+          ▲
+  Flow    │          ╭─────╮  <-- ewma_5s surges
+ (veh/s)  │         ╱       ╲
+          │  ──────╱─────────╲──────  <-- ewma_20s baseline
+          └──────────────────────────► Time
+```
+
+- **Growth Rate Signal**: $\Delta_{\text{growth}} = \frac{\text{ewma}_{5\text{s}} - \text{ewma}_{20\text{s}}}{\lambda_{\max}}$
+- **Platoon Burst Indicator**: $\mathbf{1}_{\text{burst}} = \mathbb{I}(\text{ewma}_{20\text{s}} > 0.05 \land \text{ewma}_{5\text{s}} > 1.5 \times \text{ewma}_{20\text{s}})$
+- **Queue Dissipation Flag**: $\mathbf{1}_{\text{dissip}} = \mathbb{I}(\text{ewma}_{20\text{s}} > 0.05 \land \text{ewma}_{5\text{s}} < 0.5 \times \text{ewma}_{20\text{s}})$
+
+---
+
+## 4. Safety Watchdogs & Physical Kinematics
+
+### 4.1 Anti-Starvation Watchdog
+
+To prevent high-density corridors from monopolizing the green signal indefinitely, an independent watchdog monitors approach wait times:
+
+$$t_{\text{wait}}(d) = \begin{cases} 
+0.0 & \text{if approach } d \text{ is receiving GREEN or PENDING green} \\
+t_{\text{wait}}(d) + \Delta t & \text{otherwise}
+\end{cases}$$
+
+If $\max_{d} t_{\text{wait}}(d) \ge 45.0\text{s}$, the watchdog overrides the RL agent, forcing a phase switch to service the starved approach.
+
+```mermaid
+stateDiagram-v2
+    [*] --> GreenPhase: Phase Initialized
+    GreenPhase --> GreenPhase: t_phase < 8s (Minimum Green Guard)
+    GreenPhase --> WatchdogCheck: t_phase >= 8s
+    
+    state WatchdogCheck {
+        [*] --> CheckStarvation
+        CheckStarvation --> StarvationOverride: Any approach wait >= 45s
+        CheckStarvation --> CheckMaxGreen: All waits < 45s
+        CheckMaxGreen --> MaxGreenOverride: t_phase >= 40s
+        CheckMaxGreen --> AgentAction: Normal conditions
+    }
+    
+    StarvationOverride --> YellowTransition: Force starved phase
+    MaxGreenOverride --> YellowTransition: Force highest queue phase
+    AgentAction --> YellowTransition: Agent requests phase switch
+    AgentAction --> GreenPhase: Agent holds current phase
+    
+    YellowTransition --> RedClearance: Yellow elapsed (2.0s)
+    RedClearance --> GreenPhase: Red clearance elapsed (3.0s)
+```
+
+---
+
+### 4.2 Signal Clearance & Transition Machine
+
+Phase transitions follow a non-preemptible state sequence:
+
+1. **Active Green Phase**: Minimum duration $\tau_{\min} = 8.0\text{s}$, maximum ceiling $\tau_{\max} = 40.0\text{s}$.
+2. **Yellow Clearance ($\tau_{\text{yellow}} = 2.0\text{s}$)**: Warns approaching vehicles to decelerate.
+3. **All-Red Clearance ($\tau_{\text{red}} = 3.0\text{s}$)**: All signal heads show RED. Allows vehicles within the intersection box to clear before perpendicular traffic moves.
+
+---
+
+### 4.3 Microscopic Vehicle Kinematics & Car-Following
+
+Vehicle movements along lanes are simulated with car-following collision constraints:
+
+$$x_{i}(t + \Delta t) = \min\left( x_{i-1}(t) - d_{\min}, \; x_{i}(t) + v_{i}(t) \cdot \Delta t \right)$$
+
+- Coordinate frame: $x \in [0.0, 1.0]$ ($0.0 = \text{spawn entry}$, $0.42 = \text{stop line}$, $1.0 = \text{exit}$).
+- Free-flow cruise speed: $v_0 = 0.12\text{ units/s}$.
+- Minimum safe bumper-to-bumper distance: $d_{\min} = 0.08\text{ units}$.
+
+---
+
+### 4.4 Yield-on-Left Rules & Cubic Bezier Turn Geometry
+
+1. **Yield-on-Left Mechanics**: A left-turning vehicle stopped at $x = 0.42$ during parallel green phases (Phase 0 or Phase 1) checks oncoming straight and right movements. If an oncoming vehicle is within distance $0.15 \le x < 1.0$, the left-turn vehicle holds at the stop line.
+2. **Right-Turn Priority**: Right-turning vehicles do not wait for green phases; they execute turns continuously, yielding only to cross-traffic already inside the intersection box.
+3. **Cubic Bezier Trajectories**: 3D turning vehicles follow cubic Bezier paths:
+
+$$\mathbf{B}(u) = (1-u)^3 \mathbf{P}_0 + 3(1-u)^2 u \mathbf{P}_1 + 3(1-u) u^2 \mathbf{P}_2 + u^3 \mathbf{P}_3, \quad u \in [0, 1]$$
+
+Where $\mathbf{P}_0$ is the approach lane stop line, $\mathbf{P}_1, \mathbf{P}_2$ are control anchor handles inside the intersection diorama, and $\mathbf{P}_3$ is the exit lane target.
+
+---
+
+### 4.5 Emergency Vehicle Preemption Priority
+
+Operators can dispatch priority emergency vehicles (e.g. ambulances) via `/simulation/emergency`:
+- Bypasses normal queuing at $x = 0.0$.
+- Preempts the signal controller to force an immediate green wave along the emergency corridor.
+- Halts competing approaches until the emergency vehicle clears the intersection.
+
+---
+
+## 5. Multi-Intersection 2×2 City Grid Coordination
+
+### 5.1 Network Topology & Corridor Routing
+
+The `/city` simulation coordinates four interconnected intersections ($A, B, C, D$):
+
+```
+       North_A                      North_B
+          │                            │
+          ▼                            ▼
+West_A ──►[ Intersection A ]══════════[ Intersection B ]──► East_B
+               ║                            ║
+               ║ Arterial A-C               ║ Arterial B-D
+               ║                            ║
+West_C ──►[ Intersection C ]══════════[ Intersection D ]──► East_D
+          ▲                            ▲
+          │                            │
+       South_C                      South_D
+```
+
+- **Corridor Connections**:
+  - $A \leftrightarrow B$ (East-West arterial)
+  - $C \leftrightarrow D$ (East-West arterial)
+  - $A \leftrightarrow C$ (North-South arterial)
+  - $B \leftrightarrow D$ (North-South arterial)
+- **External Portals**: 8 entry portals feed external demand into the grid via Poisson processes.
+
+---
+
+### 5.2 Arterial Road Transfer Dynamics
+
+Vehicles clearing an intersection toward an adjacent junction enter a `RoadVehicle` pipeline:
+
+$$\text{progress}(t + \Delta t) = \text{progress}(t) + \frac{\Delta t}{T_{\text{travel}}}, \quad T_{\text{travel}} = 3.0\text{s}$$
+
+When $\text{progress} \ge 1.0$, the vehicle is injected into the destination intersection's approach queue, provided the queue has not exceeded $C_{\max} = 12$.
+
+---
+
+### 5.3 Multi-Hop Journey Itineraries & Entry Portals
+
+Vehicles spawn with predetermined multi-hop routing itineraries:
+1. **Trans-Metropolitan Arterials (50%)**: Direct pass-through crossing two consecutive intersections (e.g., `North_A` $\to A \to C \to$ `South_Exit`).
+2. **Metropolitan Ring Rotations (25%)**: Circular routes around the inner grid ($A \to B \to D \to C$).
+3. **Turn-Off Exits (25%)**: Turning maneuvers heading to boundary exits.
+
+---
+
+### 5.4 Decentralized Shared-Policy Coordination
+
+Rather than training a centralized agent with an intractable joint action space ($4^4 = 256$ actions), FlowSync uses a **decentralized shared-policy architecture**:
+- A single D3QN neural policy is shared across all four intersections.
+- Each intersection $i \in \{A, B, C, D\}$ constructs its local 28-D observation vector $\mathbf{s}_t^{(i)}$ using local queue depths and downstream arterial pressures.
+- The shared agent executes actions independently for each junction at 10 Hz, facilitating coordinated green waves without exponential parameter growth.
+
+---
+
+## 6. Computer Vision & Real-World Digital Twin Pipeline
+
+### 6.1 StreamResolver: yt-dlp & Anti-Bot PO-Token Challenge Solving
+
+To ingest live YouTube traffic cameras, `StreamResolver` uses `yt-dlp` to extract direct `.m3u8` HLS manifests, incorporating PO-token challenge solving to bypass anti-bot mechanisms:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Client Web App
+    participant SR as StreamResolver (yt-dlp)
+    participant FG as RealtimeFrameGrabber
+    participant YOLO as YOLOv8 + ByteTrack
+    participant DT as Digital Twin Scheduler
+
+    UI->>SR: Submit YouTube Live URL / RTSP Feed
+    SR->>SR: Extract HLS .m3u8 via yt-dlp (PO-Token Solved)
+    SR-->>FG: Direct Stream URL
+    FG->>FG: Spawn Background Thread & Continuously Flush Sockets
+    loop At Detection Frequency (10 FPS)
+        FG->>YOLO: Retrieve Latest Frame (0.0ms Lag)
+        YOLO->>YOLO: Detect Vehicles & Update ByteTrack
+        YOLO->>DT: Log Chronological Arrival Event
+        YOLO-->>UI: Stream Annotated Frame via /ws/cctv
+    end
+    DT->>DT: Serialize twin_data.json
+    UI->>UI: Launch Side-by-Side 3D Showdown Replay
+```
+
+---
+
+### 6.2 RealtimeFrameGrabber: Zero-Latency Socket Flushing
+
+Video streams buffered by OpenCV suffer from frame lag. `RealtimeFrameGrabber` runs a dedicated daemon thread that continually flushes hardware and network socket buffers:
+
+```python
+def _grab_loop(self):
+    while self._running:
+        ret, frame = self._cap.read()
+        if ret:
+            with self._lock:
+                self._latest_frame = frame  # Overwrite slot: 0.0ms latency
+```
+
+This guarantees that whenever YOLOv8 requests a frame, it receives the latest camera frame with **$0.0\text{ms}$ queue delay**.
+
+---
+
+### 6.3 YOLOv8 Detection & ByteTrack Association
+
+- **Object Detection**: Ultralytics YOLOv8 evaluates frames across five vehicle classes: `car`, `bus`, `truck`, `motorcycle`, and `auto-rickshaw`.
+- **Inference Thresholds**: Detection confidence $\tau_{\text{conf}} \ge 0.35$, NMS IoU threshold $\tau_{\text{nms}} = 0.45$.
+- **Tracking**: ByteTrack associates bounding boxes across frames using Kalman filter trajectory prediction and Hungarian matching, assigning persistent tracking IDs.
+
+---
+
+### 6.4 Polygonal ROI Editor & Perspective Transformation
+
+The web UI provides an interactive HTML5 Canvas editor (`ROIEditor.tsx`) allowing operators to define approach boundaries. Polygons are evaluated server-side using Shapely:
+
+$$\text{Inside}(x, y) = \text{Polygon}(\mathcal{V}_{\text{ROI}}).\text{contains}(\text{Point}(x, y))$$
+
+When a vehicle's trajectory vector crosses a boundary, an entry event is triggered, recording lane assignment and turn direction.
+
+---
+
+### 6.5 Sim-to-Real Digital Twin Showdown
+
+Every detection session outputs a deterministic `twin_data.json` schedule:
 
 ```json
 {
-  "vehicle_id": "cctv_veh_42",
-  "time_s": 14.8,
-  "lane": "north",
-  "turn": "straight",
-  "vehicle_type": "car"
+  "session_id": "cctv_session_8f2a1b",
+  "video_duration_s": 60.0,
+  "total_vehicles": 48,
+  "arrivals": [
+    {
+      "time_s": 2.4,
+      "lane": "north",
+      "turn": "straight",
+      "vehicle_type": "car"
+    },
+    {
+      "time_s": 3.1,
+      "lane": "west",
+      "turn": "left",
+      "vehicle_type": "truck"
+    }
+  ]
 }
 ```
 
-The resulting arrival schedule (`twin_data.json`) is replayed 1:1 inside the 3D physics engine, allowing side-by-side **Digital Twin Showdowns** comparing Fixed vs. Greedy vs. AI policies against actual recorded traffic.
+The 3D engine replays this arrival schedule across Fixed-Timer, Greedy, and AI modes to evaluate policy performance on identical traffic flows.
 
 ---
 
-## Analytics & Performance Dashboard
+## 7. Analytics, Evaluation Metrics & Dashboard Intelligence
 
-The Analytics Dashboard (`/dashboard`) surfaces deep operational intelligence from historical and live digital twin sessions:
+### 7.1 Highway Capacity Manual (HCM) Level of Service (LOS)
 
-- **Executive KPI Cards**: Real-time cards displaying Total Sessions, Total Vehicles Processed, Total Footage Duration (hours), Mean Intersection Wait Time, AI Wait Time Reduction (41.8%), Average Detection FPS, RL Inference Latency (0.45ms), and AI Reliability Score (99.4%).
-- **Deep Linking to 3D Replay**: Operators can explore historical session records and click **"Replay in 3D"** to instantly navigate to `/realworld?session={id}`, loading the recorded arrival schedule directly into the digital twin showdown.
-- **Controller Benchmarking Graphs**: Interactive comparative charts contrasting Fixed-Timer vs. Greedy vs. AI policies across Wait Time, Throughput Rate, Max Queue, and Efficiency Scores.
-- **Directional & Fleet Breakdown**: Interactive charts visualizing vehicle distributions across North, South, East, and West corridors, 12-movement turning breakdowns, and vehicle type classifications.
-- **AI Policy Insights**: Dynamic visualization of signal phase allocations across Phase 0 (NS Green), Phase 1 (EW Green), Phase 2 (NS Left), and Phase 3 (EW Left).
+FlowSync evaluates performance using the Highway Capacity Manual (HCM 2010/2016) Level of Service (LOS) standards for signalized intersections:
+
+| LOS Grade | Average Control Delay per Vehicle ($d$) | Operating Condition & Driver Experience |
+| :---: | :---: | :--- |
+| **LOS A** | $d \le 10.0\text{ s}$ | **Free Flow**: Extremely low delay; favorable progression; light traffic. |
+| **LOS B** | $10.0\text{ s} < d \le 20.0\text{ s}$ | **Stable Flow (Minimal Delay)**: Good progression; short cycle lengths. |
+| **LOS C** | $20.0\text{ s} < d \le 35.0\text{ s}$ | **Acceptable Delay**: Stable flow; higher delay on uncoordinated approaches. |
+| **LOS D** | $35.0\text{ s} < d \le 55.0\text{ s}$ | **Tolerable Delay**: Approaching unstable flow; noticeable queue formation. |
+| **LOS E** | $55.0\text{ s} < d \le 80.0\text{ s}$ | **Unstable Flow (Congestion Limit)**: Long queues; poor progression. |
+| **LOS F** | $d > 80.0\text{ s}$ | **Breakdown Flow (Gridlock)**: Demand exceeds capacity; oversaturated. |
 
 ---
 
-## Project Directory Structure
+### 7.2 Benchmark Showdown & Comparative Equations
+
+#### 1. Wait-Time Reduction Percentage
+Calculates the relative delay reduction achieved by FlowSync AI compared to the fixed-time baseline:
+
+$$\text{WaitReduction} = \frac{\bar{W}_{\text{fixed}} - \bar{W}_{\text{ai}}}{\bar{W}_{\text{fixed}}} \times 100\%$$
+
+*When evaluated against empirical sessions where only AI runs are logged, FlowSync compares against the baseline value $\bar{W}_{\text{fixed}} = 38.5\text{s}$.*
+
+#### 2. Throughput Gain Percentage
+Measures the increase in vehicle clearing capacity:
+
+$$\text{ThroughputGain} = \frac{\bar{T}_{\text{ai}} - \bar{T}_{\text{fixed}}}{\max(1.0, \bar{T}_{\text{fixed}})} \times 100\%$$
+
+#### 3. Queue Length Mitigation Percentage
+
+$$\text{QueueReduction} = \frac{\bar{Q}_{\text{fixed}} - \bar{Q}_{\text{ai}}}{\max(1.0, \bar{Q}_{\text{fixed}})} \times 100\%$$
+
+---
+
+### 7.3 Controller Efficiency Composite Score
+
+The composite efficiency rating ($0.0 \to 100.0$) weights throughput discharge and delay minimization:
+
+$$\text{Efficiency} = \min\left(100.0, \; \max\left(0.0, \; (\bar{T}_{\text{pct}} \times 0.6) + \max(0.0, \; 50.0 - \bar{W}) \times 0.8 \right)\right)$$
+
+- $\bar{T}_{\text{pct}}$: Throughput rate ($\%$ of arriving vehicles cleared).
+- $\bar{W}$: Mean delay in seconds.
+
+---
+
+### 7.4 Supabase Cloud Synchronization & Checkpoint Storage
+
+FlowSync integrates Supabase for telemetry persistence and model checkpoint storage:
+
+1. **Relational Database (PostgreSQL)**:
+   - `simulations`: Records session runtimes, modes, step counts, and statuses.
+   - `performance_metrics`: Stores aggregated throughput, mean delay, and peak queues.
+   - `rl_models`: Catalogs model versions, episode counts, average rewards, and storage paths.
+2. **Supabase Cloud Storage (`model-checkpoints`)**:
+   - Neural network weights are serialized to `.pt` files and uploaded to `models/{simulation_id}/checkpoint_{episode}.pt`.
+   - The frontend model picker queries `GET /api/training/models` to list and load checkpoints directly from cloud storage.
+
+---
+
+## 8. Directory Structure & Tech Stack
 
 ```text
 FlowSync/
-├── .github/                               # CI/CD workflows and repository templates
-├── client/                                # Next.js 16 Web Application (Frontend)
-│   ├── prisma/
-│   │   └── schema.prisma                  # PostgreSQL schema (Simulations, Episodes, Metrics)
-│   ├── public/                            # Static assets, textures, and icons
+├── client/                                # Next.js 16 App Router (React 19, TypeScript)
+│   ├── prisma/schema.prisma               # PostgreSQL data models
 │   ├── src/
-│   │   ├── app/                           # Next.js App Router
-│   │   │   ├── api/                       # Next.js API route handlers
-│   │   │   ├── city/page.tsx              # 2×2 Multi-Intersection City Grid view
-│   │   │   ├── dashboard/page.tsx         # Executive Analytics & Telemetry Dashboard
-│   │   │   ├── realworld/page.tsx         # Real-World CCTV & Digital Twin Showdown
-│   │   │   ├── simulation/page.tsx        # Single Intersection diorama view
-│   │   │   ├── layout.tsx                 # Root layout & theme providers
-│   │   │   ├── page.tsx                   # Marketing landing page
-│   │   │   └── providers.tsx              # React Query & state providers
+│   │   ├── app/                           # Web application routes
+│   │   │   ├── city/page.tsx              # 2×2 Multi-Intersection City Grid
+│   │   │   ├── dashboard/page.tsx         # Analytics & Executive Telemetry
+│   │   │   ├── realworld/page.tsx         # CCTV & Digital Twin Showdown
+│   │   │   ├── simulation/page.tsx        # Single Intersection 3D Diorama
 │   │   ├── components/
-│   │   │   ├── city/                      # 2×2 Grid 3D components & comparison panels
-│   │   │   │   ├── CityAnalyticsBar.tsx   # City-wide throughput & speed HUD
-│   │   │   │   ├── CityCanvas.tsx         # Three.js multi-intersection canvas
-│   │   │   │   ├── CityComparisonPanel.tsx# 3-mode automated city benchmark runner
-│   │   │   │   ├── CityControls.tsx       # City simulation controls & mode switches
-│   │   │   │   ├── CityGrid.tsx           # Coordinated 4-intersection layout
-│   │   │   │   ├── CityMetricsPanel.tsx   # Arterial delay & corridor metrics
-│   │   │   │   ├── CityRoads.tsx          # Connecting arterial road meshes
-│   │   │   │   └── CityVehicle.tsx        # Vehicle pool & continuous interpolation
-│   │   │   ├── controls/                  # Simulation & Training control sidebars
-│   │   │   ├── dashboard/                 # Analytics & benchmark visualizations
-│   │   │   │   ├── AIPolicyInsights.tsx   # AI signal phase distribution panel
-│   │   │   │   ├── DashboardKpis.tsx      # Executive KPI telemetry cards
-│   │   │   │   ├── DirectionalFlowChart.tsx# Corridor & turn movement charts
-│   │   │   │   ├── HistoricalSessionsTable.tsx # Session explorer with deep replay links
-│   │   │   │   ├── ModeComparisonChart.tsx# Side-by-side mode benchmark graphs
-│   │   │   │   ├── QValuePanel.tsx        # Live D3QN Q-value distribution
-│   │   │   │   └── SimulationBenchmarkPanel.tsx # CRN benchmark comparison runner
-│   │   │   ├── layout/                    # Header, navigation, and connection status
-│   │   │   ├── realworld/                 # Real-World vision & digital twin
-│   │   │   │   ├── BenchmarkResults.tsx   # Natural clearance & showdown charts
-│   │   │   │   ├── CCTVControls.tsx       # Live camera presets & upload controls
-│   │   │   │   ├── CCTVMetrics.tsx        # Live detection telemetry & quadrant counts
-│   │   │   │   ├── DigitalTwinShowdown.tsx# 3D arrival schedule showdown diorama
-│   │   │   │   ├── ROIEditor.tsx          # Polygonal canvas ROI editor
-│   │   │   │   └── VideoFeed.tsx          # Annotated video streaming canvas
-│   │   │   ├── simulation/                # Single intersection 3D diorama
-│   │   │   │   ├── city/                  # 3D city props, skyscrapers, and parks
-│   │   │   │   │   ├── BuildingModels.tsx # Procedural reflective skyscrapers
-│   │   │   │   │   ├── CityPark.tsx       # Landscaped park with trees
-│   │   │   │   │   └── UrbanProps.tsx     # Street lights, benches, and gantries
-│   │   │   │   ├── IntersectionGrid.tsx   # Road markings, stop lines, crosswalks
-│   │   │   │   ├── SimulationCanvas.tsx   # Single-intersection WebGL scene
-│   │   │   │   ├── TrafficLight.tsx       # 3D signal poles with directional arrows
-│   │   │   │   └── Vehicle.tsx            # Vehicle 3D model with smooth Bezier turns
-│   │   │   └── ui/                        # shadcn/ui components (Radix UI)
-│   │   ├── hooks/                         # WebSocket hooks (useSimulationSocket, useCitySocket)
-│   │   ├── store/                         # Zustand state stores (simulationStore.ts)
-│   │   └── types/                         # TypeScript interfaces (city, simulation, cctv)
-│   ├── package.json
-│   └── tsconfig.json
+│   │   │   ├── city/                      # 2×2 Grid 3D components & road meshes
+│   │   │   ├── dashboard/                 # KPI cards, benchmark graphs, Recharts panels
+│   │   │   ├── realworld/                 # Video feeds, polygonal ROI editor, arrival tables
+│   │   │   ├── simulation/                # Single intersection Three.js diorama scene
+│   │   │   └── ui/                        # Accessible UI components (shadcn/ui)
+│   │   ├── hooks/                         # WebSocket management (useSimulationSocket, useCitySocket)
+│   │   └── store/                         # Zustand 5 reactive telemetry stores
+│   └── package.json
 │
-├── server/                                # FastAPI Backend & RL Engine
+├── server/                                # FastAPI Backend & Reinforcement Learning Core
 │   ├── app/
 │   │   ├── main.py                        # FastAPI entry point, lifespan, CORS, and routers
-│   │   ├── config.py                      # Pydantic BaseSettings & Supabase admin validation
-│   │   ├── realworld/                     # CCTV & Computer Vision Pipeline
-│   │   │   ├── digital_twin/              # Replay spawner, flow calibrator, session recorder
-│   │   │   │   ├── flow_calibrator.py     # Real-world arrival rate estimator
-│   │   │   │   ├── replay_spawner.py      # Chronological arrival schedule injector
-│   │   │   │   └── session_recorder.py    # Detection session serializer
-│   │   │   ├── models/                    # Pydantic schemas, class maps, geometry models
-│   │   │   ├── pipeline/                  # Vision & live streaming pipeline
-│   │   │   │   ├── cctv_pipeline.py       # End-to-end detection & tracking pipeline
-│   │   │   │   ├── frame_annotator.py     # Bounding box & quadrant visualizer
-│   │   │   │   ├── quadrant_counter.py    # 4-quadrant vehicle arrival tracker
-│   │   │   │   ├── roi_manager.py         # Polygonal ROI manager & point-in-polygon
-│   │   │   │   ├── state_builder.py       # Vision-to-simulation state builder
-│   │   │   │   ├── stream_resolver.py     # YouTube Live / RTSP stream resolver via yt-dlp
-│   │   │   │   ├── vehicle_tracker.py     # ByteTrack multi-object tracker wrapper
-│   │   │   │   ├── video_processor.py     # Zero-latency RealtimeFrameGrabber
-│   │   │   │   └── yolo_detector.py       # Ultralytics YOLOv8 inference wrapper
-│   │   │   └── utils/                     # Geometry, smoothing, and logging utilities
-│   │   ├── rl/                            # Deep Reinforcement Learning Core
-│   │   │   ├── dqn_agent.py               # Dueling Double DQN agent with PER support
+│   │   ├── config.py                      # Pydantic settings & Supabase credentials
+│   │   ├── realworld/                     # Computer Vision & Video Ingestion
+│   │   │   ├── digital_twin/              # Replay spawner, arrival scheduler, flow calibrator
+│   │   │   └── pipeline/                  # yt-dlp resolver, frame grabber, YOLOv8 detector
+│   │   ├── rl/                            # Deep Reinforcement Learning
+│   │   │   ├── dqn_agent.py               # D3QN Agent with PER sampling & action masking
 │   │   │   ├── dqn_network.py             # Dueling network architecture (V and A streams)
-│   │   │   ├── hyperparams.py             # Hyperparameters & safety constants
+│   │   │   ├── hyperparams.py             # 28-D observation constants & hyperparameters
 │   │   │   ├── replay_buffer.py           # Prioritized Experience Replay (SumTree)
-│   │   │   └── trainer.py                 # Asynchronous background training loop
-│   │   ├── routers/                       # REST API Routers
-│   │   │   ├── analytics.py               # Session analytics & controller benchmarks
-│   │   │   ├── cctv.py                    # Video uploads, stream management, session data
-│   │   │   ├── metrics.py                 # Telemetry & performance metrics
-│   │   │   ├── simulation.py              # Single intersection state & control
-│   │   │   └── training.py                # RL training loop control & model checkpoints
-│   │   ├── schemas/                       # Request and response schemas
-│   │   ├── services/                      # Supabase database & storage client services
-│   │   ├── simulation/                    # Traffic Physics Engine
-│   │   │   ├── city_network.py            # 2×2 grid topology, corridors, and routing
-│   │   │   ├── city_spawner.py            # Poisson spawner for 8 city entry portals
-│   │   │   ├── environment.py             # Gymnasium TrafficEnv with Max-Pressure reward
-│   │   │   ├── intersection.py            # 4-way 12-movement single intersection kinematics
-│   │   │   ├── spawner.py                 # Poisson spawner with CRN deterministic seeding
-│   │   │   ├── traffic_signal.py          # Traffic signal controller with safety watchdog
-│   │   │   └── vehicle.py                 # Vehicle kinematics, braking, and trajectories
-│   │   └── websockets/                    # WebSocket Handlers
-│   │       ├── cctv_ws.py                 # /ws/cctv annotated frame & arrival streamer
-│   │       ├── city_ws.py                 # /ws/city 2×2 multi-intersection 10 Hz streamer
-│   │       ├── simulation_ws.py           # /ws/simulation single intersection 10 Hz streamer
-│   │       └── training_ws.py             # /ws/training episode telemetry streamer
-│   ├── data/                              # Uploaded videos, session JSONs, ROI configs
-│   ├── models/                            # YOLO weights (yolov8n.pt, best.pt, best.onnx)
-│   ├── tests/                             # Pytest automated test suites
-│   │   ├── api/                           # REST API test cases
-│   │   ├── realworld/                     # Vision, ROI, stream resolver, and replay tests
-│   │   ├── rl/                            # Agent, SumTree, and network tests
-│   │   ├── simulation/                    # Kinematics, signal, and vehicle tests
-│   │   ├── conftest.py                    # Pytest configuration & Supabase mocks
-│   │   └── test_analytics.py              # Analytics router & benchmark tests
-│   ├── Dockerfile                         # Backend containerization
-│   └── requirements.txt                   # Python backend dependencies
+│   │   │   └── trainer.py                 # Async background training loop
+│   │   ├── simulation/                    # Microscopic Traffic Physics Engine
+│   │   │   ├── city_network.py            # 2×2 Grid topology, arterial roads, routing
+│   │   │   ├── city_spawner.py            # 8-portal Poisson generator
+│   │   │   ├── demand_forecast.py         # Online 8-D EWMA short-horizon forecaster
+│   │   │   ├── environment.py             # Gymnasium TrafficEnv (28-D observation space)
+│   │   │   ├── intersection.py            # 12-movement kinematics & yield-on-left rules
+│   │   │   ├── spawner.py                 # Poisson vehicle spawner with CRN seeding
+│   │   │   ├── traffic_math.py            # Canonical DEST_MAP & destination-aware pressure
+│   │   │   ├── traffic_signal.py          # Traffic signal controller with clearance timing
+│   │   │   └── vehicle.py                 # Vehicle dataclass & kinematics
+│   │   ├── routers/                       # REST API Routers (analytics, cctv, simulation, training)
+│   │   ├── services/                      # Supabase DB & Storage services
+│   │   └── websockets/                    # 10 Hz WebSocket handlers (simulation, city, cctv, training)
+│   ├── data/                              # Uploaded videos, session JSONs, local checkpoints
+│   ├── Dockerfile                         # Container build definition
+│   └── requirements.txt                   # Python dependencies
 │
-├── colab/
-│   └── FlowSync_YOLO_Training.ipynb       # Google Colab GPU notebook for YOLOv8 fine-tuning
-├── docs/                                  # Engineering specifications and summaries
-├── research-paper/                        # IEEE conference paper LaTeX source
-├── scripts/                               # CLI tools (train_yolo, export_model, merge_datasets)
-└── docker-compose.yml                     # Multi-container orchestration specification
+├── docker-compose.yml                     # Multi-container orchestration definition
+└── README.md                              # Technical system documentation
 ```
 
 ---
 
-## Tech Stack Reference
-
-| Layer | Technology | Version | Purpose |
-| :--- | :--- | :---: | :--- |
-| **Frontend Framework** | Next.js (App Router) | `16.2.6` | React server components, routing, and SSR |
-| **UI Library** | React | `19.2.4` | Component architecture |
-| **Programming Language** | TypeScript / Python | `5.x` / `3.11+` | Strict static typing across entire stack |
-| **3D Rendering** | Three.js / React Three Fiber | `0.184.0` / `9.6.1` | WebGL hardware-accelerated 3D scene |
-| **3D Helpers** | `@react-three/drei` | `10.7.7` | Camera controls, lighting, and 3D primitives |
-| **Post-Processing** | `@react-three/postprocessing` | `3.0.4` | Bloom, vignette, and ambient lighting passes |
-| **Styling** | Tailwind CSS / shadcn/ui | `v4` / `4.8.0` | Utility-first CSS and accessible UI components |
-| **Animation Engine** | GSAP / Framer Motion | `3.15.0` / `12.40.0` | High-performance dashboard and UI animations |
-| **State Management** | Zustand | `5.0.13` | Client-side reactive stores for 10 Hz frame streaming |
-| **Data Fetching** | TanStack React Query | `5.100.14` | Server-state caching and asynchronous queries |
-| **Data Visualization** | Recharts | `3.8.0` | Real-time training telemetry and benchmark charts |
-| **Backend API** | FastAPI / Uvicorn | `0.115+` / `0.30.0` | High-performance asynchronous ASGI web server |
-| **Deep Learning** | PyTorch (CPU/CUDA/MPS) | `2.3+` | Neural network computation and autograd |
-| **RL Environment** | Gymnasium | `0.29.1` | Standardized environment step/reset interface |
-| **Computer Vision** | Ultralytics YOLOv8 | `8.3.0+` | Real-time object detection and ByteTrack tracking |
-| **Live Stream Resolver** | `yt-dlp` | `2024.08+` | YouTube live stream extraction and anti-bot bypass |
-| **Spatial Geometry** | Shapely | `2.0.6` | Polygonal ROI masking and point-in-polygon checks |
-| **Image Processing** | OpenCV / Pillow | `4.10.0` / `10.4.0` | Frame decoding, spatial masks, and ROI transforms |
-| **Database & ORM** | PostgreSQL / Prisma | `6.19.3` | Relational analytics storage and data models |
-| **Cloud Storage** | Supabase Storage | `2.4.6` | Model checkpoint bucket (`model-checkpoints`) |
-| **Serialization** | `ujson` | `5.10.0` | High-throughput JSON encoding for 10 Hz frames |
-
----
-
-## Getting Started & Installation
+## 9. Installation & Environment Setup
 
 ### Prerequisites
-
 - **Node.js**: v20.0.0 or higher
-- **npm** or **pnpm**: v9.0.0 or higher
 - **Python**: v3.11.0 or higher
-- **Supabase Account** (or a local PostgreSQL instance)
+- **Supabase Account** (or local PostgreSQL instance)
 - **Git**
 
 ---
 
-### 1. Clone Repository
+### 1. Backend Setup (`/server`)
 
 ```bash
-git clone https://github.com/Sri-dinesh/FlowSync.git
-cd FlowSync
+cd server
+
+# Create and activate Python virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: .\venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables in server/.env
+cat <<EOF > .env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your-supabase-service-role-key
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+SIGNAL_RED_DURATION=3.0
+EOF
+
+# Launch FastAPI ASGI server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+*Interactive Swagger documentation is available at `http://localhost:8000/docs`.*
 
 ---
 
-### 2. Backend Setup (`/server`)
+### 2. Frontend Setup (`/client`)
 
-1. Navigate to the server directory:
-   ```bash
-   cd server
-   ```
+```bash
+cd client
 
-2. Create and activate a Python virtual environment:
-   ```bash
-   python -m venv venv
+# Install dependencies
+npm install
 
-   # Linux / macOS:
-   source venv/bin/activate
+# Configure environment variables in client/.env.local
+cat <<EOF > .env.local
+DATABASE_URL="postgresql://postgres:password@db.your-project.supabase.co:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
 
-   # Windows PowerShell:
-   .\venv\Scripts\Activate.ps1
-   ```
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
 
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+NEXT_PUBLIC_FASTAPI_HTTP_URL="http://localhost:8000"
+NEXT_PUBLIC_FASTAPI_WS_URL="ws://localhost:8000"
+NEXT_PUBLIC_API_URL="http://localhost:8000"
+NEXT_PUBLIC_WS_URL="ws://localhost:8000"
+EOF
 
-4. Configure environment variables in `server/.env`:
-   ```ini
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_SERVICE_KEY=your-supabase-service-role-key
-   CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-   SIGNAL_RED_DURATION=3.0
-   ```
+# Sync Prisma database schema
+npx prisma db push
+npx prisma generate
 
-5. Verify YOLOv8 pretrained weights:
-   FlowSync automatically downloads `yolov8n.pt` on initial launch if not present in the server root.
-
-6. Launch the FastAPI server:
-   ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-   ```
-   *Interactive Swagger documentation is available at `http://localhost:8000/docs`.*
+# Start Next.js development server
+npm run dev
+```
+*Open `http://localhost:3000` to launch the platform.*
 
 ---
 
-### 3. Frontend Setup (`/client`)
-
-1. Open a new terminal and navigate to the client directory:
-   ```bash
-   cd client
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   # or
-   pnpm install
-   ```
-
-3. Configure environment variables in `client/.env.local`:
-   ```ini
-   DATABASE_URL="postgresql://postgres:password@db.your-project.supabase.co:6543/postgres?pgbouncer=true"
-   DIRECT_URL="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
-
-   NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
-   NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key"
-
-   NEXT_PUBLIC_FASTAPI_HTTP_URL="http://localhost:8000"
-   NEXT_PUBLIC_FASTAPI_WS_URL="ws://localhost:8000"
-   NEXT_PUBLIC_API_URL="http://localhost:8000"
-   NEXT_PUBLIC_WS_URL="ws://localhost:8000"
-   ```
-
-4. Push the Prisma database schema and generate the client:
-   ```bash
-   npx prisma db push
-   npx prisma generate
-   ```
-
-5. Start the Next.js development server:
-   ```bash
-   npm run dev
-   # or
-   pnpm dev
-   ```
-   *Open `http://localhost:3000` in your browser to launch FlowSync.*
-
----
-
-### 4. Docker Deployment
+### 3. Docker Deployment
 
 To launch the backend service containerized via Docker:
 
@@ -758,132 +965,87 @@ docker compose up --build -d
 
 ---
 
-## Environment Variables Reference
+## 10. REST & WebSocket API Specifications
 
-### Backend (`server/.env`)
-
-| Variable | Required | Default | Description |
-| :--- | :---: | :---: | :--- |
-| `SUPABASE_URL` | **Yes** | — | Supabase project API URL (`https://xyz.supabase.co`) |
-| `SUPABASE_SERVICE_KEY` | **Yes** | — | Supabase `service_role` secret key (for database writes) |
-| `CORS_ORIGINS` | No | `http://localhost:3000` | Comma-separated list of allowed frontend origins |
-| `SIGNAL_RED_DURATION` | No | `3.0` | Duration (seconds) of all-red clearance interval |
-
-### Frontend (`client/.env.local`)
-
-| Variable | Required | Description |
-| :--- | :---: | :--- |
-| `DATABASE_URL` | **Yes** | Pooled PostgreSQL connection string (Supabase PgBouncer :6543) |
-| `DIRECT_URL` | **Yes** | Direct PostgreSQL connection string (for migrations :5432) |
-| `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Supabase public anonymous API key |
-| `NEXT_PUBLIC_FASTAPI_HTTP_URL` | **Yes** | HTTP URL of backend API (`http://localhost:8000`) |
-| `NEXT_PUBLIC_FASTAPI_WS_URL` | **Yes** | WebSocket URL of backend API (`ws://localhost:8000`) |
-| `NEXT_PUBLIC_API_URL` | No | Alternative base HTTP URL for client components |
-| `NEXT_PUBLIC_WS_URL` | No | Fallback WebSocket URL |
-
----
-
-## WebSocket & REST API Reference
-
-### Core WebSocket Commands
-
-Messages sent to `/ws/simulation` or `/ws/city`:
+### WebSocket Commands (`/ws/simulation` and `/ws/city`)
 
 ```json
-// Start simulation
+// Start simulation loop
 { "command": "start" }
 
-// Pause simulation
+// Pause simulation loop (freezes canvas, halts telemetry)
 { "command": "stop" }
 
-// Reset simulation state
+// Reset simulation (clears queues and resets step count)
 { "command": "reset" }
 
-// Switch control mode ("fixed" | "greedy" | "ai" | "manual")
+// Switch controller mode ("fixed" | "greedy" | "ai" | "manual")
 { "command": "set_mode", "mode": "ai" }
 
-// Manual signal override (phases 0 to 3)
+// Manual signal phase override (0: NS, 1: EW, 2: NS Left, 3: EW Left)
 { "command": "set_phase", "phase": 1 }
 
 // Run Timed Benchmark with Common Random Numbers (CRN)
 {
   "command": "run_timed_benchmark",
-  "duration_seconds": 30,
+  "duration_seconds": 60,
   "modes": ["fixed", "greedy", "ai"]
 }
 ```
 
 ### Key REST Endpoints
 
-- **`GET /health`**: Health check status.
-- **`GET /analytics/dashboard-summary`**: Aggregated performance KPIs, mode benchmarks, fleet classifications, and historical session list for the dashboard.
-- **`GET /api/simulation/state`**: Current snapshot of intersection state.
-- **`POST /api/training/start`**: Initiates background RL training loop.
-- **`POST /api/training/stop`**: Halts active background training.
-- **`GET /api/training/models`**: Lists all available trained model checkpoints.
-- **`POST /cctv/upload`**: Uploads video file for computer vision processing.
-- **`GET /cctv/videos`**: Lists uploaded video files.
-- **`GET /cctv/sessions/{session_id}/twin-data`**: Fetches digital twin arrival schedule for 3D showdown.
-- **`GET /cctv/model/status`**: Returns YOLOv8 load state, active device (CPU/CUDA/MPS), and ONNX status.
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Server health check and uptime status. |
+| `GET` | `/analytics/dashboard-summary` | Aggregated executive KPIs, mode benchmarks, HCM LOS grades, and historical sessions. |
+| `GET` | `/api/simulation/state` | Current 12-movement intersection state snapshot. |
+| `POST` | `/api/simulation/stop` | HTTP fallback to stop simulation and freeze vehicle physics. |
+| `POST` | `/api/simulation/emergency` | Triggers emergency vehicle priority override on a designated approach. |
+| `POST` | `/api/training/start` | Initiates asynchronous background D3QN training loop. |
+| `POST` | `/api/training/stop` | Halts active background training. |
+| `GET` | `/api/training/models` | Lists trained model checkpoints from Supabase Storage and database. |
+| `POST` | `/cctv/upload` | Uploads video file for YOLOv8 computer vision detection. |
+| `GET` | `/cctv/sessions/{session_id}/twin-data`| Retrieves chronological vehicle arrival schedule for 3D showdown. |
 
 ---
 
-## Empirical Performance Benchmarks
-
-FlowSync incorporates automated, seed-locked benchmark runners using Common Random Numbers (CRN) to evaluate signal policies under identical vehicle arrival conditions:
+## 11. Empirical Benchmarks
 
 ### 1. Single 4-Way Intersection Benchmark
+*Evaluated across 60-second stochastic bursts ($\lambda = 0.8\text{ veh/s}$, identical Poisson random seeds via CRN):*
 
-*Evaluated over 60-second stochastic Poisson arrival bursts ($\lambda = 0.8$ veh/s, identical random seed):*
-
-| Metric | Fixed-Timer Baseline | Greedy (Max-Queue) | D3QN AI Agent | Improvement vs Fixed |
+| Evaluation Metric | Fixed-Timer Baseline | Greedy (Max-Queue) | FlowSync D3QN AI | AI Improvement vs Baseline |
 | :--- | :---: | :---: | :---: | :---: |
-| **Average Wait Time** | 24.5s | 14.2s | **8.6s** | **~65% Reduction** |
-| **Intersection Throughput** | 320 veh/hr | 410 veh/hr | **530 veh/hr** | **+65% Flow** |
-| **Max Queue Length** | 12 vehicles | 7 vehicles | **3 vehicles** | **75% Shorter** |
-| **Phase Starvations** | Occasional | Frequent (on low lanes) | **0 (Zero)** | **Guaranteed (Watchdog)** |
+| **Average Delay** | 24.5s (LOS C) | 14.2s (LOS B) | **8.6s (LOS A)** | **-64.9% Wait Time** |
+| **Throughput** | 320 veh/hr | 410 veh/hr | **530 veh/hr** | **+65.6% Capacity** |
+| **Peak Queue** | 12 vehicles | 7 vehicles | **3 vehicles** | **-75.0% Congestion** |
+| **Approach Starvations** | Periodic | Frequent (low-flow lanes) | **0 (Zero)** | **Guaranteed by Watchdog** |
 
 ---
 
 ### 2. Multi-Intersection 2×2 City Grid Benchmark
+*Evaluated across 4 interconnected junctions with inter-intersection arterial routing:*
 
-*Evaluated across 4 interconnected junctions (A, B, C, D) with inter-intersection vehicle routing:*
-
-| Metric | Fixed-Timer Plan | Greedy Decentralized | Shared D3QN Policy | Improvement vs Fixed |
+| Evaluation Metric | Fixed-Timer Grid | Greedy Decentralized | FlowSync Shared Policy | AI Improvement vs Baseline |
 | :--- | :---: | :---: | :---: | :---: |
-| **Network Average Delay** | 31.8s | 19.4s | **12.1s** | **~62% Reduction** |
-| **Total Grid Throughput** | 1,120 veh/hr | 1,480 veh/hr | **1,890 veh/hr** | **+68% Flow** |
-| **Corridor Bottlenecks** | Severe (Phase spillback) | Moderate | **Minimal** | **Eliminated Gridlock** |
+| **Network Mean Delay** | 31.8s (LOS C) | 19.4s (LOS B) | **12.1s (LOS B)** | **-61.9% Delay** |
+| **Total Grid Flow** | 1,120 veh/hr | 1,480 veh/hr | **1,890 veh/hr** | **+68.8% Throughput** |
+| **Corridor Spillback** | Severe (Gridlock) | Moderate | **Minimal** | **Gridlock Eliminated** |
 
 ---
 
-### 3. Real-World Digital Twin Showdown
+### 3. Real-World CCTV Digital Twin Showdown
+*Replay of real-world traffic arrival schedules extracted from CCTV footage:*
 
-*Evaluated on real CCTV video footage replay with natural clearance time measurement:*
-
-| Metric | Fixed-Timer | Greedy | D3QN AI Agent | Real-World Gain |
+| Evaluation Metric | Fixed-Timer | Greedy | FlowSync D3QN AI | Real-World Performance Gain |
 | :--- | :---: | :---: | :---: | :---: |
-| **Clearance Time (Natural)** | 58.2s | 41.5s | **27.4s** | **52.9% Faster Clearance** |
-| **Average Vehicle Wait** | 21.6s | 13.9s | **7.8s** | **63.9% Wait Reduction** |
-| **Queue Dissipation Rate** | Linear | Fluctuating | **Optimal Wave** | **Smoothest Flow** |
+| **Natural Clearance Time** | 58.2s | 41.5s | **27.4s** | **-52.9% Faster Clearance** |
+| **Average Vehicle Wait** | 21.6s (LOS C) | 13.9s (LOS B) | **7.8s (LOS A)** | **-63.9% Wait Time** |
+| **Discharge Wave** | Stop-and-Go | Irregular | **Continuous Wave** | **Smooth Progression** |
 
 ---
 
-### 4. Production Telemetry & Reliability Score
-
-*Aggregated across processed footage and digital twin executions (`/analytics/dashboard-summary`):*
-
-| Telemetry Dimension | Measured Value | Operational Significance |
-| :--- | :---: | :--- |
-| **AI Wait Reduction** | **41.8%** | Direct congestion reduction measured across 25+ recorded sessions |
-| **Inference Latency** | **0.45 ms** | Sub-millisecond forward pass enables real-time 10 Hz signal actuation |
-| **Throughput Gain** | **+18.4%** | Measured vehicle flow expansion over legacy cycle plans |
-| **Max Queue Reduction** | **-54.1%** | Substantial mitigation of arterial spillback and queue build-up |
-| **AI Reliability Score** | **99.4%** | Robust continuous operation across multi-hour live feeds and simulated bursts |
-
----
-
-## License
+## 12. License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more details.
