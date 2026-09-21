@@ -99,6 +99,7 @@ class TrafficEnv(gym.Env):
         }
         self.watchdog_override_count: int = 0
         self.total_decision_steps: int = 0
+        self.passed_vehicle_waits: List[float] = []
 
     # ────────────────────────────────────────────────────────────────────────
     # Reset
@@ -121,6 +122,7 @@ class TrafficEnv(gym.Env):
         self.watchdog_override_count = 0
         self.total_decision_steps = 0
         self._env_step_count = 0  # BUG-E: reset per-episode counter
+        self.passed_vehicle_waits = []
 
         return self._get_obs(), {}
 
@@ -217,9 +219,12 @@ class TrafficEnv(gym.Env):
 
         # ── Watchdog override: max-green ─────────────────────────────────────
         was_overridden = False
+        override_reason: Optional[str] = None
         if signal.is_max_green_exceeded and action == signal.current_phase:
             action = self._get_best_alternative_phase()
             was_overridden = True
+            override_reason = "max_green_exceeded"
+            self.watchdog_override_count += 1
 
         # ── Watchdog override: starvation ────────────────────────────────────
         starved = signal.get_starved_directions()
@@ -228,6 +233,7 @@ class TrafficEnv(gym.Env):
             if starved_phase != signal.current_phase:
                 action = starved_phase
                 was_overridden = True
+                override_reason = f"starvation_{starved[0]}"
                 self.watchdog_override_count += 1
 
         executed_action = action  # BUG-01: actual applied action
@@ -241,7 +247,9 @@ class TrafficEnv(gym.Env):
         prev_spawned = self.intersection._spawned_this_interval
 
         # ── Tick environment ─────────────────────────────────────────────────
-        self.intersection.tick(dt=0.1, action=executed_action)
+        passed_vehicles = self.intersection.tick(dt=0.1, action=executed_action)
+        for pv in passed_vehicles:
+            self.passed_vehicle_waits.append(pv.wait_time)
 
         # ── Post-step snapshots ──────────────────────────────────────────────
         curr_pressures = self._compute_movement_pressures(self.intersection)
@@ -299,25 +307,29 @@ class TrafficEnv(gym.Env):
         )
 
         info: Dict[str, Any] = {
+            # S-01 / R-01: Explicit version tracking
+            "state_version":           "v1_28d",
+            "reward_version":          "v3_delay_anchored",
             # BUG-01: expose executed action for correct replay buffer push
-            "executed_action":    executed_action,
-            "proposed_action":    proposed_action,
-            "was_overridden":     was_overridden,
-            "is_decision_step":   is_decision_step,
+            "executed_action":         executed_action,
+            "proposed_action":         proposed_action,
+            "was_overridden":          was_overridden,
+            "override_reason":         override_reason,
+            "is_decision_step":        is_decision_step,
             # reward telemetry
-            "reward_components":  components,
-            "reward_accumulators": dict(self.reward_component_accumulators),
+            "reward_components":       components,
+            "reward_accumulators":     dict(self.reward_component_accumulators),
             # standard telemetry
-            "pressures":          curr_pressures,
-            "vehicles_passed":    vehicles_passed_this_step,
-            "avg_wait_time":      self.intersection.get_avg_wait_time(),
-            "starved_directions": starved,
+            "pressures":               curr_pressures,
+            "vehicles_passed":         vehicles_passed_this_step,
+            "avg_wait_time":           self.intersection.get_avg_wait_time(),
+            "starved_directions":      starved,
             # watchdog telemetry
             "watchdog_override_count": self.watchdog_override_count,
             "total_decision_steps":    self.total_decision_steps,
             "watchdog_override_rate":  override_rate,
             # Task 4.1: forecast debug
-            "forecast": self.forecaster.get_debug_info(),
+            "forecast":                self.forecaster.get_debug_info(),
         }
 
         return obs, reward, terminated, truncated, info
@@ -374,9 +386,9 @@ class TrafficEnv(gym.Env):
         signal = self.intersection.signal
         pressures = self._compute_movement_pressures(self.intersection)
 
-        # Dims 0-11: queue values in canonical MOVEMENT_KEYS order
+        # Dims 0-11: queue values in canonical MOVEMENT_KEYS order with smooth tanh saturation (S-03)
         movements = [
-            min(1.0, movement_queues.get(k, 0) / MAX_CAP)
+            float(np.tanh(movement_queues.get(k, 0) / 15.0))
             for k in MOVEMENT_KEYS
         ]
 
@@ -418,8 +430,20 @@ class TrafficEnv(gym.Env):
         override_rate = (
             self.watchdog_override_count / max(self.total_decision_steps, 1) * 100.0
         )
+        comp_dict = dict(self.reward_component_accumulators)
+        steps = max(self.total_decision_steps, 1)
+        comp_stats = {
+            k: {
+                "total": round(v, 3),
+                "mean_per_decision": round(v / steps, 4),
+            }
+            for k, v in comp_dict.items()
+        }
         return {
-            "reward_components":       dict(self.reward_component_accumulators),
+            "state_version":           "v1_28d",
+            "reward_version":          "v3_delay_anchored",
+            "reward_components":       comp_dict,
+            "reward_component_stats":  comp_stats,
             "watchdog_override_count": self.watchdog_override_count,
             "watchdog_override_rate":  override_rate,
             "total_decision_steps":    self.total_decision_steps,
