@@ -27,6 +27,7 @@ from ..realworld.models.config import SESSION_DIR
 from ..schemas.simulation_schema import build_frame
 from ..services import supabase_service
 from ..simulation.demand_forecast import ArrivalForecaster
+from ..simulation.traffic_math import MAX_CAP
 
 logger = logging.getLogger(__name__)
 
