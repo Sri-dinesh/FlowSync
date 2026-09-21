@@ -95,7 +95,7 @@ export default function DashboardKpis({ data }: Props) {
       subtitle: isFresh
         ? "0 simulation runs (0 passages)"
         : `${data.total_sessions} simulation runs (${data.total_movement_occurrences.toLocaleString()} passages)`,
-      badge: isFresh ? "Awaiting Ingest" : "+100% Real Tracking",
+      badge: isFresh ? "Awaiting Ingest" : "Multi-Lane Telemetry",
       badgeColor: isFresh
         ? "bg-white/5 text-white/40 border-white/10"
         : "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -120,17 +120,25 @@ export default function DashboardKpis({ data }: Props) {
         : "DQN AI Policy vs Standard Fixed Baseline",
       badge: isFresh
         ? "Uncalibrated"
-        : data.avg_wait_reduction_pct > 30
-        ? "Peak Efficiency"
-        : "Live Benchmarked",
+        : data.avg_wait_reduction_pct > 0
+        ? "Efficiency Gain"
+        : "Evaluation Deficit",
       badgeColor: isFresh
         ? "bg-white/5 text-white/40 border-white/10"
-        : "bg-amber-500/10 text-amber-300 border-amber-500/20",
+        : data.avg_wait_reduction_pct >= 0
+        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+        : "bg-rose-500/10 text-rose-300 border-rose-500/20",
       icon: TrendingDown,
       gradient: isFresh
         ? "from-white/5 to-transparent"
-        : "from-amber-500/20 via-orange-500/10 to-transparent",
-      borderColor: isFresh ? "border-white/10" : "border-amber-500/30",
+        : data.avg_wait_reduction_pct >= 0
+        ? "from-emerald-500/20 via-teal-500/10 to-transparent"
+        : "from-rose-500/20 via-amber-500/10 to-transparent",
+      borderColor: isFresh
+        ? "border-white/10"
+        : data.avg_wait_reduction_pct >= 0
+        ? "border-emerald-500/30"
+        : "border-rose-500/30",
     },
     {
       title: "Average Vehicle Delay",

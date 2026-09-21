@@ -43,9 +43,13 @@ export interface ModeBenchmarks {
     has_data?: boolean;
   };
   comparison: {
-    wait_reduction_pct: number;
-    throughput_gain_pct: number;
-    queue_reduction_pct: number;
+    wait_reduction_pct: number | null;
+    throughput_gain_pct: number | null;
+    queue_reduction_pct: number | null;
+    baseline_type?: string;
+    leader?: string;
+    leader_name?: string;
+    kpi_source?: string;
   };
 }
 
@@ -103,6 +107,17 @@ export default function ModeComparisonChart({ data }: Props) {
     );
   }
 
+  const leaderKey = data.comparison?.leader;
+  const leaderName = data.comparison?.leader_name || (
+    leaderKey === "greedy" ? "Greedy Controller" :
+    leaderKey === "fixed" ? "Fixed Timer" :
+    leaderKey === "ai" ? "FlowSync DQN AI" :
+    "Evaluated"
+  );
+  const isAiLeader = leaderKey === "ai";
+  const waitRed = data.comparison?.wait_reduction_pct;
+  const thrGain = data.comparison?.throughput_gain_pct;
+
   // Active chart rendering when benchmark data is present
   const chartData = [
     {
@@ -112,19 +127,13 @@ export default function ModeComparisonChart({ data }: Props) {
       ai: data.ai.avg_wait_time,
     },
     {
-      metric: "Throughput (veh/m)",
-      fixed: data.fixed.throughput_rate,
-      greedy: data.greedy.throughput_rate,
-      ai: data.ai.throughput_rate,
-    },
-    {
       metric: "Max Queue",
       fixed: data.fixed.max_queue_avg,
       greedy: data.greedy.max_queue_avg,
       ai: data.ai.max_queue_avg,
     },
     {
-      metric: "Efficiency (/100)",
+      metric: "Efficiency Score",
       fixed: data.fixed.efficiency_score,
       greedy: data.greedy.efficiency_score,
       ai: data.ai.efficiency_score,
@@ -140,32 +149,66 @@ export default function ModeComparisonChart({ data }: Props) {
             <h3 className="text-sm font-bold tracking-wider uppercase text-white">
               Controller Benchmark Showdown
             </h3>
-            <span className="flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[9px] font-semibold text-indigo-300">
-              <Award className="h-3 w-3 text-yellow-400" />
-              DQN AI Leads
+            <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-semibold border ${
+              leaderKey === "greedy"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : leaderKey === "fixed"
+                ? "bg-slate-500/10 border-slate-500/30 text-slate-300"
+                : leaderKey === "ai"
+                ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                : "bg-white/5 border-white/10 text-white/50"
+            }`}>
+              <Award className={`h-3 w-3 ${leaderKey === "ai" ? "text-yellow-400" : "text-emerald-400"}`} />
+              Leader: {leaderName}
             </span>
           </div>
           <p className="mt-1 text-xs text-white/40">
-            Multi-metric performance comparison across real session replays
+            Multi-metric performance comparison across paired benchmark evaluations
           </p>
         </div>
 
         {/* Advantage Highlights */}
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 text-right">
-            <div className="text-[9px] text-indigo-300/70 uppercase">Wait Reduction</div>
-            <div className="text-xs font-bold font-mono text-indigo-300">
-              {data.comparison.wait_reduction_pct > 0
-                ? `+${data.comparison.wait_reduction_pct}%`
-                : data.comparison.wait_reduction_pct < 0
-                ? `-${Math.abs(data.comparison.wait_reduction_pct)}%`
-                : "0.0%"}
+          <div className={`rounded-lg px-3 py-1 text-right border ${
+            waitRed === null || waitRed === undefined
+              ? "bg-white/5 border-white/10"
+              : waitRed > 0
+              ? "bg-emerald-500/10 border-emerald-500/20"
+              : "bg-rose-500/10 border-rose-500/20"
+          }`}>
+            <div className="text-[9px] text-white/50 uppercase">DQN vs Baseline Wait</div>
+            <div className={`text-xs font-bold font-mono ${
+              waitRed === null || waitRed === undefined
+                ? "text-white/40"
+                : waitRed > 0
+                ? "text-emerald-300"
+                : "text-rose-300"
+            }`}>
+              {waitRed === null || waitRed === undefined
+                ? "Pending Paired Run"
+                : waitRed > 0
+                ? `+${waitRed}%`
+                : `${waitRed}%`}
             </div>
           </div>
-          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-right">
-            <div className="text-[9px] text-emerald-300/70 uppercase">Throughput Gain</div>
-            <div className="text-xs font-bold font-mono text-emerald-300">
-              +{data.comparison.throughput_gain_pct}%
+          <div className={`rounded-lg px-3 py-1 text-right border ${
+            thrGain === null || thrGain === undefined
+              ? "bg-white/5 border-white/10"
+              : thrGain >= 0
+              ? "bg-emerald-500/10 border-emerald-500/20"
+              : "bg-rose-500/10 border-rose-500/20"
+          }`}>
+            <div className="text-[9px] text-white/50 uppercase">Throughput Delta</div>
+            <div className={`text-xs font-bold font-mono ${
+              thrGain === null || thrGain === undefined
+                ? "text-white/40"
+                : thrGain >= 0
+                ? "text-emerald-300"
+                : "text-rose-300"
+            }`}>
+              {thrGain === null || thrGain === undefined
+                ? "Pending"
+                : `${thrGain > 0 ? "+" : ""}${thrGain}%`}
             </div>
           </div>
         </div>
@@ -213,13 +256,23 @@ export default function ModeComparisonChart({ data }: Props) {
       {/* Comparison Highlights Bottom Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
         {/* Fixed Timer */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3.5 flex flex-col justify-between">
+        <div className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all ${
+          leaderKey === "fixed"
+            ? "border-slate-400/40 bg-slate-500/10 shadow-lg shadow-slate-500/5 ring-1 ring-slate-400/30"
+            : "border-white/[0.06] bg-white/[0.01]"
+        }`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 text-slate-400" />
               Fixed Timer
             </span>
-            <span className="text-[10px] font-mono text-white/40">Baseline</span>
+            {leaderKey === "fixed" ? (
+              <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-400/20 text-slate-200 px-2 py-0.5 rounded-full border border-slate-400/30">
+                Top Ranked
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono text-white/40">Baseline</span>
+            )}
           </div>
           <div className="mt-2.5 space-y-1.5 text-[11px]">
             <div className="flex justify-between text-white/50">
@@ -238,13 +291,23 @@ export default function ModeComparisonChart({ data }: Props) {
         </div>
 
         {/* Greedy */}
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-3.5 flex flex-col justify-between">
+        <div className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all ${
+          leaderKey === "greedy"
+            ? "border-emerald-500/40 bg-emerald-500/[0.08] shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-400/30"
+            : "border-emerald-500/20 bg-emerald-500/[0.03]"
+        }`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-emerald-400" />
               Greedy Controller
             </span>
-            <span className="text-[10px] font-mono text-emerald-400/80">Queue Reactive</span>
+            {leaderKey === "greedy" ? (
+              <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-400/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                Top Ranked
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono text-emerald-400/80">Queue Reactive</span>
+            )}
           </div>
           <div className="mt-2.5 space-y-1.5 text-[11px]">
             <div className="flex justify-between text-white/50">
@@ -263,15 +326,25 @@ export default function ModeComparisonChart({ data }: Props) {
         </div>
 
         {/* FlowSync DQN AI */}
-        <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/[0.07] p-3.5 flex flex-col justify-between shadow-lg shadow-indigo-500/5">
+        <div className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all ${
+          leaderKey === "ai"
+            ? "border-indigo-500/50 bg-indigo-500/[0.09] shadow-lg shadow-indigo-500/15 ring-1 ring-indigo-400/30"
+            : "border-indigo-500/20 bg-indigo-500/[0.03]"
+        }`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
-              <Award className="h-3.5 w-3.5 text-yellow-400" />
+              <Award className="h-3.5 w-3.5 text-indigo-400" />
               FlowSync DQN AI
             </span>
-            <span className="text-[9px] font-bold uppercase tracking-wider bg-yellow-400/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-400/30">
-              Top Ranked
-            </span>
+            {leaderKey === "ai" ? (
+              <span className="text-[9px] font-bold uppercase tracking-wider bg-indigo-400/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-400/30">
+                Top Ranked
+              </span>
+            ) : (
+              <span className="text-[9px] font-mono text-indigo-300/60 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                Adaptive RL
+              </span>
+            )}
           </div>
           <div className="mt-2.5 space-y-1.5 text-[11px]">
             <div className="flex justify-between text-white/50">

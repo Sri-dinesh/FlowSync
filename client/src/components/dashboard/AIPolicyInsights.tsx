@@ -107,9 +107,9 @@ export default function AIPolicyInsights({
             <ShieldCheck className="h-3.5 w-3.5" />
           </div>
           <div>
-            <div className="text-[10px] text-white/40 uppercase">Reliability Score</div>
+            <div className="text-[10px] text-white/40 uppercase">Action Validity</div>
             <div className="text-xs font-bold font-mono text-emerald-400">
-              {reliabilityScore > 0 ? `${reliabilityScore}% guaranteed` : "Pending Evaluation"}
+              {reliabilityScore > 0 ? `${reliabilityScore}% Verified` : "Pending Evaluation"}
             </div>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function AIPolicyInsights({
             <div className="text-[10px] text-white/40 uppercase">Action Masking</div>
             <div className="text-xs font-bold font-mono text-blue-300">
               {phaseDistribution.some((p) => p.share_pct > 0)
-                ? "0% Dead-Green cycles"
+                ? "Active Mask Guard"
                 : "Ready on Execution"}
             </div>
           </div>

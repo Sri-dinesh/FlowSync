@@ -210,8 +210,8 @@ export default function DirectionalFlowChart({
         </div>
 
         <div className="mt-4 pt-3 border-t border-white/[0.06] text-[11px] text-white/35 flex items-center justify-between">
-          <span>COCO Pre-trained + Custom Fine-tuned BBoxes</span>
-          <span className="text-indigo-300 font-mono">98.2% mAP</span>
+          <span>YOLOv8 Detection & Vehicle Classification</span>
+          <span className="text-indigo-300 font-mono">4-Class Tracking</span>
         </div>
       </div>
     </div>
