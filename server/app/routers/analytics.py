@@ -278,13 +278,27 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if model_episodes is None and mode == "ai":
                 model_episodes = 300
 
+            # F-04: Determine run_type for population separation
+            run_type = str(data.get("run_type") or "").lower()
+            if not run_type:
+                sid = str(sess_id).lower()
+                if sid.startswith("bench_"):
+                    run_type = "benchmark"
+                elif "cctv" in sid or len(arrivals) > 0:
+                    run_type = "cctv_replay"
+                else:
+                    run_type = "standalone"
+
+            # D-04: Default simulation vehicles to "car" when no vehicle_type in arrivals
+            if not arrivals and vehs > 0:
+                vehicle_type_counts["car"] += vehs
+
             # Session delay & peak queue
             if sess_waits:
                 sess_avg_wait = round(sum(sess_waits) / len(sess_waits), 1)
             else:
                 sess_avg_wait = float(stats.get("avg_wait_s", 0.0))
-                if sess_avg_wait == 0.0 and dur > 0:
-                    sess_avg_wait = 18.4 if mode == "ai" else (28.2 if mode == "greedy" else 38.5)
+                # F-03: Do NOT fabricate wait times — only use actual measured values
 
             if sess_peak_queue == 0:
                 sess_peak_queue = int(stats.get("peak_queue", max(1, int(vehs * 0.15))))
@@ -332,13 +346,16 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             else:
                 los = "F"
 
-            # Efficiency gain vs fixed-time 38.5s baseline
-            fixed_baseline = 38.5
-            eff_gain = round(((fixed_baseline - sess_avg_wait) / fixed_baseline) * 100.0, 1) if sess_avg_wait > 0 else 0.0
+            # F-03: Per-session efficiency gain — only compute against paired benchmark baseline
+            # No fabricated 38.5s reference; eff_gain is null when no paired Fixed run exists
+            eff_gain = None  # Will be computed properly by paired benchmark comparison
 
             mtime = file_path.stat().st_mtime
             created_at_val = data.get("created_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
             ts_ms_val = data.get("timestamp_ms") or int(mtime * 1000)
+            # F-04: Extract benchmark_id for paired comparisons
+            benchmark_id = data.get("benchmark_id") or None
+
             sessions_list.append({
                 "session_id": sess_id,
                 "created_at": created_at_val,
@@ -359,6 +376,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "performance_rating": perf_rating,
                 "level_of_service": los,
                 "efficiency_gain_pct": eff_gain,
+                "run_type": run_type,
+                "benchmark_id": benchmark_id,
+                "source_label": "CCTV Digital Twin" if (run_type == "cctv_replay" or len(arrivals) > 0) else ("Simulation Benchmark" if run_type == "benchmark" else "Simulation Standalone"),
+                "is_cctv_replay": run_type == "cctv_replay" or len(arrivals) > 0,
             })
         except Exception:
             continue
@@ -375,10 +396,14 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
     avg_intersection_wait_s = round(sum(all_waits) / len(all_waits), 1) if all_waits else 0.0
     avg_detection_fps = round(sum(fps_list) / len(fps_list), 2) if fps_list else 0.0
 
-    # Dynamic Controller Benchmarks from recorded sessions
-    ai_sessions = [s for s in sessions_list if (s.get("mode") or "").lower() == "ai"]
-    greedy_sessions = [s for s in sessions_list if (s.get("mode") or "").lower() == "greedy"]
-    fixed_sessions = [s for s in sessions_list if (s.get("mode") or "").lower() == "fixed"]
+    # F-04: Dynamic Controller Benchmarks — prefer benchmark-tagged sessions for official KPIs
+    # Fall back to all sessions if no benchmark-tagged runs exist yet
+    benchmark_sessions = [s for s in sessions_list if s.get("run_type") == "benchmark"]
+    kpi_pool = benchmark_sessions if benchmark_sessions else sessions_list
+
+    ai_sessions = [s for s in kpi_pool if (s.get("mode") or "").lower() == "ai"]
+    greedy_sessions = [s for s in kpi_pool if (s.get("mode") or "").lower() == "greedy"]
+    fixed_sessions = [s for s in kpi_pool if (s.get("mode") or "").lower() == "fixed"]
 
     def _calc_mode_kpis(mode_sess: List[Dict[str, Any]], color: str, name: str) -> Dict[str, Any]:
         if not mode_sess:
@@ -390,6 +415,7 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "efficiency_score": 0.0,
                 "color": color,
                 "has_data": False,
+                "session_count": 0,
             }
         waits = [s["avg_wait_s"] for s in mode_sess if s.get("avg_wait_s", 0) > 0]
         thrs = [s["throughput_pct"] for s in mode_sess if s.get("throughput_pct", 0) > 0]
@@ -408,29 +434,48 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             "efficiency_score": eff,
             "color": color,
             "has_data": True,
+            "session_count": len(mode_sess),
         }
 
     fixed_bm = _calc_mode_kpis(fixed_sessions, "#64748b", "Fixed Timer")
     greedy_bm = _calc_mode_kpis(greedy_sessions, "#10b981", "Greedy Controller")
     ai_bm = _calc_mode_kpis(ai_sessions, "#6366f1", "FlowSync DQN AI")
 
-    # Comparisons between DQN AI and Fixed Timer
+    # F-02 + F-03: Correct comparison logic
+    # Only compute paired deltas when BOTH AI and Fixed data exist from real runs.
+    # Never use a fabricated static baseline for official comparisons.
+    baseline_type = "none"
     if ai_bm["has_data"] and fixed_bm["has_data"] and fixed_bm["avg_wait_time"] > 0:
+        baseline_type = "paired"
         wait_red = round(((fixed_bm["avg_wait_time"] - ai_bm["avg_wait_time"]) / fixed_bm["avg_wait_time"]) * 100.0, 1)
         thr_gain = round(((ai_bm["throughput_rate"] - fixed_bm["throughput_rate"]) / max(1.0, fixed_bm["throughput_rate"])) * 100.0, 1)
         q_red = round(((fixed_bm["max_queue_avg"] - ai_bm["max_queue_avg"]) / max(1.0, fixed_bm["max_queue_avg"])) * 100.0, 1)
-    elif ai_bm["has_data"]:
-        # When only AI simulations exist, compare against industry-standard fixed timer baseline (38.5s wait, 78% throughput, 18 peak queue)
-        fixed_baseline_wait = 38.5
-        fixed_baseline_thr = 78.0
-        fixed_baseline_q = 18.0
-        wait_red = round(((fixed_baseline_wait - ai_bm["avg_wait_time"]) / fixed_baseline_wait) * 100.0, 1) if ai_bm["avg_wait_time"] > 0 else 0.0
-        thr_gain = round(((ai_bm["throughput_rate"] - fixed_baseline_thr) / fixed_baseline_thr) * 100.0, 1) if ai_bm["throughput_rate"] > 0 else 0.0
-        q_red = round(((fixed_baseline_q - ai_bm["max_queue_avg"]) / fixed_baseline_q) * 100.0, 1) if ai_bm["max_queue_avg"] > 0 else 22.0
     else:
-        wait_red = 0.0
-        thr_gain = 0.0
-        q_red = 0.0
+        # F-03: No paired baseline — do not fabricate comparisons
+        wait_red = None
+        thr_gain = None
+        q_red = None
+
+    # F-02: Derive leader from actual metric direction
+    # Lower wait = better, Higher throughput = better
+    modes_with_data = {}
+    if fixed_bm["has_data"]:
+        modes_with_data["fixed"] = fixed_bm
+    if greedy_bm["has_data"]:
+        modes_with_data["greedy"] = greedy_bm
+    if ai_bm["has_data"]:
+        modes_with_data["ai"] = ai_bm
+
+    if len(modes_with_data) >= 2:
+        # Leader = lowest avg_wait_time among modes with data
+        leader = min(modes_with_data, key=lambda m: modes_with_data[m]["avg_wait_time"])
+        leader_name = modes_with_data[leader]["name"]
+    elif len(modes_with_data) == 1:
+        leader = list(modes_with_data.keys())[0]
+        leader_name = modes_with_data[leader]["name"]
+    else:
+        leader = None
+        leader_name = None
 
     mode_benchmarks = {
         "fixed": fixed_bm,
@@ -440,6 +485,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             "wait_reduction_pct": wait_red,
             "throughput_gain_pct": thr_gain,
             "queue_reduction_pct": q_red,
+            "baseline_type": baseline_type,
+            "leader": leader,
+            "leader_name": leader_name,
+            "kpi_source": "benchmark" if benchmark_sessions else "all_sessions",
         },
     }
 
@@ -475,7 +524,7 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             "total_movement_occurrences": total_movement_occurrences or sum(lane_aggregates.values()) or total_vehicles,
             "peak_queue_observed": peak_queue_observed,
             "avg_detection_fps": avg_detection_fps,
-            "avg_wait_reduction_pct": wait_red,
+            "avg_wait_reduction_pct": wait_red if wait_red is not None else 0.0,
             "inference_latency_ms": inference_latency,
             "ai_reliability_score": ai_reliability,
         },
