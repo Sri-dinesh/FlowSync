@@ -179,6 +179,10 @@ async def _run_timed_benchmark(
             # ── Setup ──────────────────────────────────────────────────────
             intersection.reset()
             benchmark_forecaster = ArrivalForecaster()
+            vat_controller = None
+            if mode in ("vat", "actuated"):
+                from app.simulation.vat_controller import VATController
+                vat_controller = VATController(intersection)
             if is_realworld:
                 # Digital Twin Real-World Replay
                 intersection.spawner.set_enabled(False)
@@ -305,6 +309,17 @@ async def _run_timed_benchmark(
                 if mode in ("fixed", "manual"):
                     action = None
                     intersection.tick(dt=TICK_DT, action=None)
+                elif mode in ("vat", "actuated"):
+                    if vat_controller is None:
+                        from app.simulation.vat_controller import VATController
+                        vat_controller = VATController(intersection)
+                    action = vat_controller.select_action()
+                    last_action = action
+                    intersection.tick(dt=TICK_DT, action=action)
+                    vat_controller.update(
+                        dt=TICK_DT,
+                        spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)),
+                    )
                 elif mode == "greedy":
                     signal = intersection.signal
                     queues = intersection.get_movement_queues()
@@ -468,6 +483,11 @@ async def _run_timed_benchmark(
                     improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
                 if f_clear > 0:
                     improvements["greedy_clearance_pct"] = round(((f_clear - results["greedy"]["clearance_time"]) / f_clear) * 100, 1)
+            if "vat" in results:
+                if f_wait > 0:
+                    improvements["vat_wait_pct"] = round(((f_wait - results["vat"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if f_clear > 0:
+                    improvements["vat_clearance_pct"] = round(((f_clear - results["vat"]["clearance_time"]) / f_clear) * 100, 1)
 
         # Winner: lowest avg wait time, fastest clearance time as tiebreaker
         def _score_mode(m):
@@ -477,11 +497,26 @@ async def _run_timed_benchmark(
         winner = max(results.keys(), key=_score_mode) if results else None
 
         # Auto-persist benchmark mode telemetry to session files for dashboard analytics & replay
+        # E-01/F-04: Include benchmark metadata for scenario identification and population separation
         try:
+            import hashlib as _hashlib
             sessions_dir = Path(SESSION_DIR)
             sessions_dir.mkdir(parents=True, exist_ok=True)
             active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
             active_eps = getattr(app.state, "active_model_episode", 300)
+
+            # E-01: Compute scenario hash for CRN verification
+            scenario_input = json.dumps({
+                "seed": benchmark_seed,
+                "duration": duration_seconds,
+                "modes": sorted(modes),
+                "is_realworld": is_realworld,
+                "total_vehicles": total_vehicles_to_clear,
+            }, sort_keys=True)
+            scenario_hash = _hashlib.sha256(scenario_input.encode()).hexdigest()[:16]
+
+            # Shared benchmark_id groups all modes from this run together
+            benchmark_id = f"bm_{benchmark_seed}_{int(time.time())}"
 
             for m_key, r_data in results.items():
                 m_passed = int(r_data.get("vehicles_passed", r_data.get("total_passed", 0)))
@@ -499,6 +534,14 @@ async def _run_timed_benchmark(
                     "model_name": active_model if m_key == "ai" else None,
                     "model_episodes": active_eps if m_key == "ai" else None,
                     "throughput": m_passed,
+                    # F-04/E-01: Benchmark metadata for paired comparison & population separation
+                    "run_type": "benchmark",
+                    "benchmark_id": benchmark_id,
+                    "benchmark_seed": benchmark_seed,
+                    "scenario_hash": scenario_hash,
+                    "controller_type": m_key,
+                    "duration_seconds": duration_seconds,
+                    "is_realworld": is_realworld,
                     "stats": {
                         "session_id": sess_key,
                         "mode": m_key,
@@ -539,6 +582,14 @@ async def _run_timed_benchmark(
                 "benchmark_seed":   benchmark_seed,
                 "is_realworld":     is_realworld,
                 "total_vehicles":   total_vehicles_to_clear,
+                # D-02: Version metadata
+                "environment_version": "v1.2",
+                "state_version":       "v1_28d",
+                "reward_version":      "v3_delay_anchored",
+                "controller_version":  "v2.1",
+                # RW-01: Benchmark type labeling
+                "benchmark_type":      "cctv_digital_twin_replay" if is_realworld else "simulation_crn_paired",
+                "scenario_hash":       scenario_hash,
             })
         except Exception as e:
             logger.warning("Failed to send benchmark_results: %s", e)
@@ -567,21 +618,15 @@ async def _run_timed_benchmark(
 def _build_obs_from_intersection(intersection, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
     movement_queues = intersection.get_movement_queues()
     signal = intersection.signal
-    MAX_CAP = 10.0
-
+    # S-03b: Smooth tanh queue normalization to match environment.py exactly
     movements = [
-        movement_queues.get("north_straight", 0) / MAX_CAP,
-        movement_queues.get("north_left", 0) / MAX_CAP,
-        movement_queues.get("north_right", 0) / MAX_CAP,
-        movement_queues.get("south_straight", 0) / MAX_CAP,
-        movement_queues.get("south_left", 0) / MAX_CAP,
-        movement_queues.get("south_right", 0) / MAX_CAP,
-        movement_queues.get("east_straight", 0) / MAX_CAP,
-        movement_queues.get("east_left", 0) / MAX_CAP,
-        movement_queues.get("east_right", 0) / MAX_CAP,
-        movement_queues.get("west_straight", 0) / MAX_CAP,
-        movement_queues.get("west_left", 0) / MAX_CAP,
-        movement_queues.get("west_right", 0) / MAX_CAP,
+        float(np.tanh(movement_queues.get(k, 0) / 15.0))
+        for k in [
+            "north_straight", "north_left", "north_right",
+            "south_straight", "south_left", "south_right",
+            "east_straight",  "east_left",  "east_right",
+            "west_straight",  "west_left",  "west_right",
+        ]
     ]
 
     phase_onehot = [0.0, 0.0, 0.0, 0.0]
