@@ -98,6 +98,10 @@ class Trainer:
         _recent_rewards: list[dict] = []
         _REWARD_WINDOW = 50
 
+        # TR-03: Best-checkpoint tracking by validation delay
+        best_avg_wait: float = float("inf")
+        best_episode: int = 0
+
         for episode_index in range(num_episodes):
             if not self.is_training:
                 break
@@ -190,6 +194,18 @@ class Trainer:
             avg_wait = self.env.intersection.get_avg_wait_time()
             throughput = self.env.intersection.total_passed
 
+            # TR-03: Track best-checkpoint by minimum average wait time
+            is_new_best = False
+            if avg_wait > 0 and avg_wait < best_avg_wait and episode_num >= 10:
+                best_avg_wait = avg_wait
+                best_episode = episode_num
+                is_new_best = True
+                logger.info(
+                    "New best validation delay: %.2fs at episode %d",
+                    best_avg_wait,
+                    best_episode,
+                )
+
             # ── Task 0.2: Collect reward component telemetry ─────────────────
             episode_telemetry = self.env.get_episode_telemetry()
             reward_components = episode_telemetry.get("reward_components", {})
@@ -243,23 +259,41 @@ class Trainer:
                     "watchdog_override_count": watchdog_count,
                     # Task 5.2: curriculum info
                     "curriculum":              curriculum_status,
+                    # P-01/P-02/P-03: Q-value health monitoring
+                    "q_stats":                 getattr(self.agent, "latest_q_stats", {}),
+                    # TR-03: Best-checkpoint tracking
+                    "best_avg_wait":           best_avg_wait if best_avg_wait < float("inf") else None,
+                    "best_episode":            best_episode if best_episode > 0 else None,
+                    "is_new_best":             is_new_best,
                 }
             )
 
             is_stopping = not self.is_training
-            if simulation_id and (episode_num % 50 == 0 or is_last_episode or is_stopping):
+            if simulation_id and (episode_num % 50 == 0 or is_last_episode or is_stopping or is_new_best):
+                chk_state = self.agent.get_checkpoint_state() if hasattr(self.agent, "get_checkpoint_state") else {
+                    "online_net":  self.agent.online_net.state_dict(),
+                    "target_net":  self.agent.target_net.state_dict(),
+                    "optimizer":   self.agent.optimizer.state_dict(),
+                    "step_count":  self.agent.step_count,
+                    "obs_version": "v5_28dim_forecast",
+                }
+                chk_state["is_best"] = is_new_best
+                chk_state["best_avg_wait"] = best_avg_wait
+                chk_state["episode"] = episode_num
                 await asyncio.to_thread(
                     self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
-                    self.agent.get_checkpoint_state() if hasattr(self.agent, "get_checkpoint_state") else {
-                        "online_net":  self.agent.online_net.state_dict(),
-                        "target_net":  self.agent.target_net.state_dict(),
-                        "optimizer":   self.agent.optimizer.state_dict(),
-                        "step_count":  self.agent.step_count,
-                        "obs_version": "v5_28dim_forecast",
-                    },
+                    chk_state,
                 )
+                if is_new_best:
+                    # Save dedicated 'best' checkpoint file
+                    await asyncio.to_thread(
+                        self.model_service.save_checkpoint,
+                        simulation_id,
+                        0,  # 0 indicates best checkpoint
+                        chk_state,
+                    )
                 if self.app_state and hasattr(self.app_state, "sim_agent"):
                     sim_agent = self.app_state.sim_agent
                     sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())

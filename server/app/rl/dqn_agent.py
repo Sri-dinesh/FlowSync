@@ -13,10 +13,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from typing import Optional
+import logging
+from typing import Optional, Dict
 from app.rl.dqn_network import DuelingDQNNetwork
 from app.rl.replay_buffer import PrioritizedReplayBuffer
 from app.rl.hyperparams import HyperParams
+
+logger = logging.getLogger(__name__)
 
 HP = HyperParams()
 
@@ -48,6 +51,8 @@ class DQNAgent:
         self.replay_buffer = PrioritizedReplayBuffer(HP.REPLAY_BUFFER_SIZE)
         self.step_count = 0
         self.total_train_steps = 0  # BUG-B: persistent counter for diagnostics
+        self.all_masked_fallback_count = 0  # A-03: audit all-masked fallback triggers
+        self.latest_q_stats: Dict[str, float] = {}  # P-01/P-02/P-03: Q-value health metrics
 
     def select_action(
         self,
@@ -72,7 +77,13 @@ class DQNAgent:
 
         valid_indices = np.where(valid_action_mask)[0]
         if len(valid_indices) == 0:
+            self.all_masked_fallback_count += 1
+            logger.warning(
+                "Action masking: all actions masked out (count=%d); falling back to all valid",
+                self.all_masked_fallback_count,
+            )
             valid_indices = np.arange(HP.ACTION_DIM)  # safety fallback
+            valid_action_mask = np.ones(HP.ACTION_DIM, dtype=bool)
 
         if np.random.random() < epsilon:
             return int(np.random.choice(valid_indices))
@@ -166,6 +177,23 @@ class DQNAgent:
 
         self.step_count += 1
         self.total_train_steps += 1  # BUG-B: track actual gradient updates
+
+        # ── P-01/P-02/P-03: Q-value health monitoring ────────────────────────
+        with torch.no_grad():
+            q_mean = float(current_q.mean().item())
+            q_std = float(current_q.std().item()) if len(current_q) > 1 else 0.0
+            q_max = float(current_q.max().item())
+            q_min = float(current_q.min().item())
+
+        self.latest_q_stats = {
+            "q_mean": round(q_mean, 4),
+            "q_std": round(q_std, 4),
+            "q_max": round(q_max, 4),
+            "q_min": round(q_min, 4),
+            "td_error_mean": round(float(np.mean(np.abs(td_errors))), 4),
+            "td_error_max": round(float(np.max(np.abs(td_errors))), 4),
+            "loss": round(float(weighted_loss.item()), 5),
+        }
 
         # ── Update PER priorities with new TD errors ─────────────────────────
         self.replay_buffer.update_priorities(indices, np.abs(td_errors))
