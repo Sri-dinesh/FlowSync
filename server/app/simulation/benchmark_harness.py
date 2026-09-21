@@ -70,7 +70,17 @@ class EpisodeMetrics:
     total_reward: float
     watchdog_override_count: int
     watchdog_override_rate: float
+    # E-01: Scenario hash for CRN pairing audit
+    scenario_hash: str = ""
+    # E-05 / E-06 / E-07: Extended evaluation metrics
+    queue_area: float = 0.0
+    median_delay: float = 0.0
+    p95_delay: float = 0.0
+    std_delay: float = 0.0
+    max_queue: int = 0
     reward_components: Dict[str, float] = field(default_factory=dict)
+    # R-04: Detailed watchdog override audit log
+    watchdog_overrides: List[Dict[str, Any]] = field(default_factory=list)
     elapsed_wall_seconds: float = 0.0
 
 
@@ -85,7 +95,16 @@ class BenchmarkResult:
     std_avg_wait: float = 0.0
     mean_throughput: float = 0.0
     mean_override_rate: float = 0.0
+    # E-01 / E-05 / E-06 / E-07: Extended aggregate metrics
+    scenario_hash: str = ""
+    mean_queue_area: float = 0.0
+    mean_median_delay: float = 0.0
+    mean_p95_delay: float = 0.0
+    mean_max_queue: float = 0.0
     checkpoint_hash: str = ""
+    environment_version: str = "v1.2"
+    state_version: str = "v1_28d"
+    reward_version: str = "v3_delay_anchored"
     hyperparams: Dict[str, Any] = field(default_factory=dict)
     timestamp: str = ""
 
@@ -100,6 +119,12 @@ class BenchmarkResult:
         self.std_avg_wait = float(np.std(wait_times))
         self.mean_throughput = float(np.mean(throughputs))
         self.mean_override_rate = float(np.mean(override_rates))
+        self.mean_queue_area = float(np.mean([e.queue_area for e in self.episodes]))
+        self.mean_median_delay = float(np.mean([e.median_delay for e in self.episodes]))
+        self.mean_p95_delay = float(np.mean([e.p95_delay for e in self.episodes]))
+        self.mean_max_queue = float(np.mean([e.max_queue for e in self.episodes]))
+        if self.episodes:
+            self.scenario_hash = self.episodes[0].scenario_hash
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -209,9 +234,24 @@ class DeterministicEvaluator:
         env.intersection.set_spawn_rate(self.spawn_lambda)
         state, _ = env.reset(seed=seed)
 
+        # E-01: Compute immutable scenario hash for CRN verification
+        scenario_spec = {
+            "seed": seed,
+            "num_steps": num_steps,
+            "spawn_lambda": self.spawn_lambda,
+            "red_duration": self.red_duration,
+            "topology": "single_intersection",
+        }
+        scenario_hash = hashlib.sha256(
+            json.dumps(scenario_spec, sort_keys=True).encode()
+        ).hexdigest()[:16]
+
         total_reward = 0.0
         t_start = time.perf_counter()
         reward_components_accum: Dict[str, float] = {}
+        queue_area: float = 0.0
+        max_queue: int = 0
+        watchdog_overrides: List[Dict[str, Any]] = []
 
         for step in range(num_steps):
             if self.mode == "ai":
@@ -222,6 +262,21 @@ class DeterministicEvaluator:
 
             next_state, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
+
+            # E-06: Accumulate queue area (integral of queue length over dt=0.1s)
+            step_q = env.intersection.get_total_waiting()
+            queue_area += step_q * 0.1
+            if step_q > max_queue:
+                max_queue = step_q
+
+            # R-04: Log watchdog override details (requested vs executed action, reason)
+            if info.get("was_overridden"):
+                watchdog_overrides.append({
+                    "step": step,
+                    "proposed_action": info.get("proposed_action"),
+                    "executed_action": info.get("executed_action"),
+                    "reason": info.get("override_reason", "watchdog_safety"),
+                })
 
             # Accumulate reward components if available
             for k, v in info.get("reward_components", {}).items():
@@ -239,6 +294,24 @@ class DeterministicEvaluator:
         total_decisions = max(getattr(env, "total_decision_steps", 1), 1)
         override_rate = (watchdog_count / total_decisions) * 100.0
 
+        # E-07: Delay distribution statistics (median, p95, std)
+        all_delays: List[float] = []
+        if hasattr(env, "passed_vehicle_waits"):
+            all_delays.extend(env.passed_vehicle_waits)
+        for queue in env.intersection.lanes.values():
+            for v in queue:
+                if v.wait_time > 0:
+                    all_delays.append(v.wait_time)
+
+        if all_delays:
+            median_delay = float(np.median(all_delays))
+            p95_delay = float(np.percentile(all_delays, 95))
+            std_delay = float(np.std(all_delays))
+        else:
+            median_delay = avg_wait
+            p95_delay = avg_wait
+            std_delay = 0.0
+
         self._restore_agent_training_mode()
 
         return EpisodeMetrics(
@@ -250,7 +323,14 @@ class DeterministicEvaluator:
             total_reward=total_reward,
             watchdog_override_count=watchdog_count,
             watchdog_override_rate=override_rate,
+            scenario_hash=scenario_hash,
+            queue_area=round(queue_area, 2),
+            median_delay=round(median_delay, 2),
+            p95_delay=round(p95_delay, 2),
+            std_delay=round(std_delay, 2),
+            max_queue=max_queue,
             reward_components=reward_components_accum,
+            watchdog_overrides=watchdog_overrides,
             elapsed_wall_seconds=elapsed,
         )
 
@@ -336,12 +416,13 @@ class DeterministicEvaluator:
 
 def print_comparison_table(results: Dict[str, "BenchmarkResult"]) -> str:
     """Format benchmark results as a Markdown table for console/logging output."""
-    header = "| Mode   | Mean Wait (s) | Std  | Throughput | Override Rate |\n"
-    header += "|--------|--------------|------|-----------|---------------|\n"
+    header = "| Mode   | Mean Wait (s) | Std  | p95 Wait (s) | Queue Area | Throughput | Override Rate |\n"
+    header += "|--------|--------------|------|--------------|------------|-----------|---------------|\n"
     rows = []
     for mode, result in results.items():
         rows.append(
             f"| {mode:<6} | {result.mean_avg_wait:>12.2f} | {result.std_avg_wait:>4.2f} "
+            f"| {result.mean_p95_delay:>12.2f} | {result.mean_queue_area:>10.1f} "
             f"| {result.mean_throughput:>9.0f} | {result.mean_override_rate:>12.1f}% |"
         )
     table = header + "\n".join(rows)
