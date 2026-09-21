@@ -254,14 +254,14 @@ export function useSimulationSocket() {
     }
   }, []);
 
-  const startBenchmark = useCallback((durationSeconds: number = 30) => {
+  const startBenchmark = useCallback((durationSeconds: number = 30, modes: string[] = ["fixed", "vat", "greedy", "ai"]) => {
     setBenchmarkResults(null);
     setBenchmarkProgress(null);
     setBenchmarkRunning(true);
     sendCommand({
       command: "run_timed_benchmark",
       duration_seconds: durationSeconds,
-      modes: ["fixed", "greedy", "ai"],
+      modes,
     });
   }, [sendCommand]);
 

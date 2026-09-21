@@ -33,7 +33,7 @@ interface SimulationBenchmarkPanelProps {
   running: boolean;
   progress: SimBenchmarkProgress | null;
   results: SimBenchmarkResultsData | null;
-  onStart: (durationSeconds: number) => void;
+  onStart: (durationSeconds: number, modes?: string[]) => void;
   onStop: () => void;
   onReset: () => void;
 }
@@ -52,6 +52,15 @@ const MODE_CONFIG: Record<
     barColor: "#94a3b8",
     accentBg: "bg-slate-500/20",
     textAccent: "text-slate-300",
+  },
+  vat: {
+    label: "VAT Actuated",
+    shortLabel: "ACTUATED",
+    icon: Activity,
+    color: "border-sky-500/40 bg-sky-950/20",
+    barColor: "#0284c7",
+    accentBg: "bg-sky-500/20",
+    textAccent: "text-sky-400",
   },
   greedy: {
     label: "Greedy Policy",
@@ -73,7 +82,7 @@ const MODE_CONFIG: Record<
   },
 };
 
-const BENCHMARK_MODES = ["fixed", "greedy", "ai"];
+const BENCHMARK_MODES = ["fixed", "vat", "greedy", "ai"];
 
 export default function SimulationBenchmarkPanel({
   running,
@@ -183,10 +192,10 @@ export default function SimulationBenchmarkPanel({
           <div className="rounded-xl border border-white/[0.06] bg-black/40 p-3 space-y-2">
             <div className="text-[9px] uppercase tracking-[0.14em] text-white/40 font-semibold flex items-center justify-between">
               <span>Benchmark Pipeline</span>
-              <span className="font-mono text-white/60 font-normal">3 × {duration}s = {duration * 3}s</span>
+              <span className="font-mono text-white/60 font-normal">{BENCHMARK_MODES.length} × {duration}s = {duration * BENCHMARK_MODES.length}s</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {BENCHMARK_MODES.map((m, idx) => {
                 const cfg = MODE_CONFIG[m];
                 const Icon = cfg.icon;
@@ -206,11 +215,11 @@ export default function SimulationBenchmarkPanel({
 
           {/* Action Trigger */}
           <button
-            onClick={() => onStart(duration)}
+            onClick={() => onStart(duration, BENCHMARK_MODES)}
             className="w-full py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-xs uppercase tracking-[0.14em] shadow-[0_0_24px_rgba(52,211,153,0.3)] hover:shadow-[0_0_32px_rgba(52,211,153,0.45)] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
           >
             <Play className="w-3.5 h-3.5 fill-black" />
-            Launch Benchmark ({duration * 3}s)
+            Launch Benchmark ({duration * BENCHMARK_MODES.length}s)
           </button>
         </div>
       )}
@@ -236,8 +245,8 @@ export default function SimulationBenchmarkPanel({
             </span>
           </div>
 
-          {/* 3 Pipeline Step Cards */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Pipeline Step Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {BENCHMARK_MODES.map((m, idx) => {
               const isDone = (progress.modes_done ?? []).includes(m);
               const isCurrent = progress.current_mode === m;

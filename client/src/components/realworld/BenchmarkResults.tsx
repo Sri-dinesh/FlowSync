@@ -25,6 +25,8 @@ export interface BenchmarkResultsData {
     ai_clearance_pct?: number;
     greedy_wait_pct?: number;
     greedy_clearance_pct?: number;
+    vat_wait_pct?: number;
+    vat_clearance_pct?: number;
   };
   is_realworld?: boolean;
   total_vehicles?: number;
@@ -36,9 +38,10 @@ interface Props {
 }
 
 const MODE_CONFIG: Record<string, { label: string; icon: string; accent: string; barColor: string; glow: string }> = {
-  fixed:  { label: "Fixed Timer", icon: "T",  accent: "border-slate-500/40  bg-slate-500/[0.07]",    barColor: "#64748b", glow: "rgba(100,116,139,0.12)" },
-  ai:     { label: "DQN AI",      icon: "AI", accent: "border-indigo-500/40 bg-indigo-500/[0.07]",   barColor: "#6366f1", glow: "rgba(99,102,241,0.12)"  },
-  greedy: { label: "Greedy",      icon: "G",  accent: "border-emerald-500/40 bg-emerald-500/[0.07]", barColor: "#10b981", glow: "rgba(16,185,129,0.12)"  },
+  fixed:  { label: "Fixed Timer",  icon: "T",  accent: "border-slate-500/40  bg-slate-500/[0.07]",    barColor: "#64748b", glow: "rgba(100,116,139,0.12)" },
+  vat:    { label: "VAT Actuated", icon: "V",  accent: "border-sky-500/40    bg-sky-500/[0.07]",      barColor: "#0284c7", glow: "rgba(2,132,199,0.12)"   },
+  greedy: { label: "Greedy",       icon: "G",  accent: "border-emerald-500/40 bg-emerald-500/[0.07]", barColor: "#10b981", glow: "rgba(16,185,129,0.12)"  },
+  ai:     { label: "DQN AI",       icon: "AI", accent: "border-indigo-500/40 bg-indigo-500/[0.07]",   barColor: "#6366f1", glow: "rgba(99,102,241,0.12)"  },
 };
 
 export default function BenchmarkResults({ data, onRerun }: Props) {
