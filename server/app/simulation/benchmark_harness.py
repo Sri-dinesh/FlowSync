@@ -253,14 +253,43 @@ class DeterministicEvaluator:
         max_queue: int = 0
         watchdog_overrides: List[Dict[str, Any]] = []
 
+        vat_controller = None
+        if self.mode in ("vat", "actuated"):
+            from .vat_controller import VATController
+            vat_controller = VATController(env.intersection)
+
+        PHASE_DIRS = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
+        PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+
         for step in range(num_steps):
             if self.mode == "ai":
                 action = self._select_action(state)
+            elif self.mode in ("fixed", "manual"):
+                action = None
+            elif self.mode in ("vat", "actuated"):
+                action = vat_controller.select_action()
+            elif self.mode == "greedy":
+                signal = env.intersection.signal
+                queues = env.intersection.get_movement_queues()
+                phase_counts = {
+                    ph: sum(
+                        queues.get(f"{d}_{t}", 0)
+                        for d in PHASE_DIRS[ph]
+                        for t in PHASE_TURNS[ph]
+                    )
+                    for ph in range(4)
+                }
+                best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                action = best_phase if signal.can_switch_phase else signal.current_phase
             else:
-                # For non-AI modes the environment internally uses fixed/greedy logic
-                action = 0  # unused; TrafficEnv ignores for non-AI modes
+                action = None
 
             next_state, reward, terminated, truncated, info = env.step(action)
+            if vat_controller is not None:
+                vat_controller.update(
+                    dt=0.1,
+                    spawned_this_step=max(0, getattr(env.intersection, "_spawned_this_interval", 0)),
+                )
             total_reward += reward
 
             # E-06: Accumulate queue area (integral of queue length over dt=0.1s)
