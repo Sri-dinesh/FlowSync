@@ -614,7 +614,247 @@ async def _run_timed_benchmark(
             pass
 
 
+# ─── Scenario Benchmark ───────────────────────────────────────────────────────
+
+async def _run_scenario_benchmark(
+    app,
+    websocket: WebSocket,
+    scenario_id: str,
+    seed: int,
+    spawn_lambda: float,
+    duration_seconds: int,
+    model_id: str,
+    model_episode: int,
+) -> None:
+    """
+    Locked-seed AI-only benchmark for a named scenario.
+
+    Runs the currently loaded DQN agent against a fixed (seed, lambda, duration)
+    scenario, then persists the result to Supabase scenario_runs for cross-episode
+    comparison tracking.
+    """
+    import hashlib as _hashlib
+    TICK_DT   = 0.1
+    TICK_SLEEP = 0.04
+    PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
+    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+
+    prev_mode    = getattr(app.state, "mode", "fixed")
+    prev_running = getattr(app.state, "sim_running", False)
+
+    # Pause normal sim loop
+    app.state.sim_running = False
+    if getattr(app.state, "sim_task", None) is not None:
+        app.state.sim_task.cancel()
+        try:
+            await app.state.sim_task
+        except Exception:
+            pass
+    await asyncio.sleep(0.2)
+
+    try:
+        intersection = app.state.sim_intersection
+        agent        = app.state.sim_agent
+
+        # Compute immutable scenario hash (same formula as DeterministicEvaluator)
+        scenario_spec = json.dumps({
+            "seed": seed,
+            "num_steps": int(duration_seconds * 10),
+            "spawn_lambda": spawn_lambda,
+            "red_duration": 3.0,
+            "topology": "single_intersection",
+        }, sort_keys=True)
+        scenario_hash = _hashlib.sha256(scenario_spec.encode()).hexdigest()[:16]
+
+        # ── Setup intersection ────────────────────────────────────────────────
+        intersection.reset()
+        try:
+            intersection.spawner.set_seed(seed)
+            intersection.spawner.set_rate(spawn_lambda)
+            intersection.spawner.set_enabled(True)
+        except Exception:
+            pass
+
+        app.state.mode = "ai"
+
+        # Notify frontend: scenario benchmark starting
+        try:
+            await websocket.send_json({
+                "type": "benchmark_progress",
+                "current_mode": "ai",
+                "mode_index": 0,
+                "modes_total": 1,
+                "modes_done": [],
+                "elapsed": 0.0,
+                "duration_seconds": duration_seconds,
+                "benchmark_seed": seed,
+                "scenario_id": scenario_id,
+                "scenario_hash": scenario_hash,
+                "is_realworld": False,
+                "total_vehicles": 0,
+                "spawned_count": 0,
+                "passed_count": 0,
+            })
+        except Exception:
+            pass
+
+        # ── Run loop ─────────────────────────────────────────────────────────
+        sim_time         = 0.0
+        total_passed_acc = 0
+        max_queue_acc    = 0
+        override_count   = 0
+        total_steps      = 0
+        safety_deadline  = asyncio.get_event_loop().time() + max(duration_seconds * 3.0, 120.0)
+        benchmark_forecaster = ArrivalForecaster()
+
+        # Freeze agent weights for pure inference
+        if agent is not None:
+            try:
+                agent.online_net.eval()
+            except Exception:
+                pass
+
+        while sim_time < float(duration_seconds):
+            if asyncio.get_event_loop().time() > safety_deadline:
+                logger.warning("Scenario benchmark safety deadline hit at sim_time=%.1f", sim_time)
+                break
+
+            obs = _build_obs_from_intersection(intersection, benchmark_forecaster)
+
+            # DQN action
+            if agent is not None:
+                try:
+                    import torch
+                    signal = intersection.signal
+                    with torch.no_grad():
+                        q_vals = agent.online_net(
+                            torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+                        ).squeeze(0).numpy()
+                    valid = [p for p in range(4) if signal.can_switch_phase or p == signal.current_phase]
+                    action = int(max(valid, key=lambda p: q_vals[p])) if valid else 0
+                except Exception:
+                    action = 0
+            else:
+                action = 0
+
+            # Advance sim
+            intersection.step(dt=TICK_DT, action=action)
+            sim_time   += TICK_DT
+            total_steps += 1
+
+            step_q = intersection.get_total_waiting()
+            if step_q > max_queue_acc:
+                max_queue_acc = step_q
+
+            # Count newly passed vehicles (delta)
+            total_passed_acc = intersection.total_passed
+
+            # Broadcast live frame for 3D canvas
+            frame_data = {
+                "type": "simulation_frame",
+                "sim_time": round(sim_time, 1),
+                "benchmark_mode": "ai",
+                "scenario_id": scenario_id,
+                "benchmark_seed": seed,
+            }
+            try:
+                await websocket.send_json(frame_data)
+            except Exception:
+                break
+
+            # Throttle to ~25Hz wall-clock
+            await asyncio.sleep(TICK_SLEEP)
+
+            # Progress update every 5 sim-seconds
+            if total_steps % 50 == 0:
+                try:
+                    await websocket.send_json({
+                        "type": "benchmark_progress",
+                        "current_mode": "ai",
+                        "elapsed": round(sim_time, 1),
+                        "duration_seconds": duration_seconds,
+                        "benchmark_seed": seed,
+                        "scenario_id": scenario_id,
+                        "scenario_hash": scenario_hash,
+                        "passed_count": total_passed_acc,
+                    })
+                except Exception:
+                    break
+
+        # Restore agent to train mode
+        if agent is not None:
+            try:
+                agent.online_net.train()
+            except Exception:
+                pass
+
+        avg_wait      = intersection.get_avg_wait_time()
+        override_rate = 0.0  # watchdog rate not tracked at this level
+
+        # ── Persist to Supabase ───────────────────────────────────────────────
+        try:
+            await asyncio.to_thread(
+                supabase_service.save_scenario_run,
+                scenario_id,
+                model_id,
+                model_episode,
+                "ai",
+                scenario_hash,
+                float(avg_wait),
+                int(total_passed_acc),
+                int(max_queue_acc),
+                float(override_rate),
+            )
+            logger.info(
+                "Scenario run saved: scenario=%s model=%s ep=%d wait=%.2fs passed=%d hash=%s",
+                scenario_id, model_id, model_episode, avg_wait, total_passed_acc, scenario_hash,
+            )
+        except Exception as e:
+            logger.warning("Failed to save scenario run to Supabase: %s", e)
+
+        # ── Final broadcast ───────────────────────────────────────────────────
+        try:
+            await websocket.send_json({
+                "type": "scenario_benchmark_results",
+                "scenario_id": scenario_id,
+                "model_id": model_id,
+                "model_episode": model_episode,
+                "scenario_hash": scenario_hash,
+                "benchmark_seed": seed,
+                "duration_seconds": duration_seconds,
+                "results": {
+                    "ai": {
+                        "avg_wait_time": round(avg_wait, 3),
+                        "total_passed": total_passed_acc,
+                        "max_queue": max_queue_acc,
+                        "override_rate": override_rate,
+                        "duration_seconds": duration_seconds,
+                    }
+                },
+            })
+        except Exception as e:
+            logger.warning("Failed to send scenario_benchmark_results: %s", e)
+
+    except asyncio.CancelledError:
+        logger.info("Scenario benchmark cancelled")
+    except Exception as e:
+        logger.exception("Scenario benchmark error: %s", e)
+        try:
+            await websocket.send_json({"type": "error", "code": "SCENARIO_BENCHMARK_FAILED", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        app.state.mode = prev_mode
+        app.state.sim_running = False
+        app.state.sim_intersection.reset()
+        try:
+            app.state.sim_intersection.spawner.set_seed(None)
+        except Exception:
+            pass
+
+
 # ─── Simulation helper ────────────────────────────────────────────────────────
+
 
 def _build_obs_from_intersection(intersection, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
     movement_queues = intersection.get_movement_queues()
@@ -837,6 +1077,7 @@ VALID_COMMANDS = {
     "set_mode", "set_spawn_rate", "set_speed",
     "emergency_override", "manual_override",
     "run_timed_benchmark",
+    "run_scenario_benchmark",
 }
 
 COMMAND_SCHEMAS = {
@@ -1079,6 +1320,25 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 app.state.benchmark_task = asyncio.create_task(
                     _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes, arrivals)
                 )
+
+            elif command == "run_scenario_benchmark":
+                _sc_id   = str(message.get("scenario_id", ""))
+                _seed    = int(message.get("seed", 42))
+                _lambda  = float(message.get("spawn_lambda", 0.5))
+                _dur     = max(10, min(600, int(message.get("duration_seconds", 60))))
+                _model   = str(message.get("model_id", getattr(app.state, "active_model_id", "")))
+                _ep      = int(message.get("model_episode", getattr(app.state, "active_model_episode", 0)))
+                if not _sc_id:
+                    try:
+                        await websocket.send_json({"type": "error", "code": "MISSING_SCENARIO_ID", "message": "scenario_id is required"})
+                    except Exception:
+                        pass
+                else:
+                    if getattr(app.state, "benchmark_task", None) is not None:
+                        app.state.benchmark_task.cancel()
+                    app.state.benchmark_task = asyncio.create_task(
+                        _run_scenario_benchmark(app, websocket, _sc_id, _seed, _lambda, _dur, _model, _ep)
+                    )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
