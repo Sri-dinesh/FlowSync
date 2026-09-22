@@ -1,17 +1,7 @@
-/**
- * ScenarioSelector — inline scenario picker + creator for the Benchmark card.
- *
- * Features:
- *  - Dropdown of saved scenarios (name, seed, λ, duration preview)
- *  - "+ New" expander: name input, auto-generated seed with Regenerate button,
- *    λ slider, duration slider
- *  - Delete button for selected scenario
- *  - Calls parent onSelect with the chosen scenario (or null for "random")
- */
 "use client";
 
-import { useCallback, useState } from "react";
-import { RefreshCw, Trash2, Plus, ChevronDown, FlaskConical } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { RefreshCw, Trash2, Plus, ChevronDown, FlaskConical, Check } from "lucide-react";
 import type { Scenario } from "@/types/simulation";
 import { useScenarios } from "@/hooks/useScenarios";
 
@@ -21,20 +11,22 @@ interface ScenarioSelectorProps {
 }
 
 function generateSeed(): number {
-  return Math.floor(Math.random() * 10_000_000);
+  return Math.floor(Math.random() * 9_999_999) + 1;
 }
 
 export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) {
-  const { scenarios, loading, createScenario, deleteScenario, fetchScenarios } = useScenarios();
+  const { scenarios, loading, createScenario, deleteScenario } = useScenarios();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newSeed, setNewSeed] = useState(generateSeed);
-  const [newLambda, setNewLambda] = useState(0.5);
+  const [newName, setNewName]       = useState("");
+  const [newSeed, setNewSeed]       = useState(generateSeed);
+  const [newLambda, setNewLambda]   = useState(0.5);
   const [newDuration, setNewDuration] = useState(60);
-  const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [creating, setCreating]     = useState(false);
+  const [deleting, setDeleting]     = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
@@ -60,45 +52,64 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
   }, [selected, deleteScenario, onSelect]);
 
   return (
-    <div className="scenario-selector">
-      {/* Header row */}
-      <div className="scenario-header">
-        <FlaskConical size={14} className="scenario-icon" />
-        <span className="scenario-label">Scenario</span>
-      </div>
+    <div className="space-y-3">
 
-      {/* Dropdown + action buttons */}
-      <div className="scenario-controls">
-        <div className="scenario-dropdown-wrapper">
+      {/* ── Scenario Dropdown Row ─────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        {/* Dropdown */}
+        <div className="relative flex-1" ref={dropdownRef}>
           <button
-            className="scenario-dropdown-btn"
-            onClick={() => setDropdownOpen((o) => !o)}
             type="button"
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/10 hover:border-white/20 transition-colors text-sm text-white"
           >
-            <span className="scenario-dropdown-text">
-              {selected ? selected.name : "— Random seed (default) —"}
+            <span className="flex items-center gap-2 truncate">
+              <FlaskConical size={13} className="text-violet-400 shrink-0" />
+              <span className={`truncate ${selected ? "text-white" : "text-white/40"}`}>
+                {selected ? selected.name : "Random seed (default)"}
+              </span>
             </span>
-            <ChevronDown size={14} className={`scenario-chevron ${dropdownOpen ? "open" : ""}`} />
+            <ChevronDown
+              size={13}
+              className={`shrink-0 text-white/40 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+            />
           </button>
 
           {dropdownOpen && (
-            <div className="scenario-dropdown-menu">
+            <div className="absolute z-50 mt-1 w-full rounded-xl border border-white/10 bg-[#111] shadow-2xl overflow-hidden">
+              {/* None option */}
               <button
-                className="scenario-option scenario-option--none"
+                type="button"
                 onClick={() => { onSelect(null); setDropdownOpen(false); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.06] transition-colors ${!selected ? "text-violet-400" : "text-white/50"}`}
               >
-                — Random seed (default) —
+                {!selected && <Check size={12} className="shrink-0" />}
+                <span className={!selected ? "ml-0" : "ml-4"}>Random seed (default)</span>
               </button>
-              {loading && <div className="scenario-option-loading">Loading…</div>}
+
+              {/* Divider */}
+              {scenarios.length > 0 && <div className="border-t border-white/[0.07] mx-3" />}
+
+              {loading && (
+                <div className="px-3 py-2 text-xs text-white/30">Loading…</div>
+              )}
+
               {scenarios.map((s) => (
                 <button
                   key={s.id}
-                  className={`scenario-option ${selected?.id === s.id ? "active" : ""}`}
+                  type="button"
                   onClick={() => { onSelect(s); setDropdownOpen(false); }}
+                  className={`w-full flex items-start gap-2 px-3 py-2 text-sm text-left hover:bg-white/[0.06] transition-colors ${selected?.id === s.id ? "text-violet-300" : "text-white/80"}`}
                 >
-                  <span className="scenario-option-name">{s.name}</span>
-                  <span className="scenario-option-meta">
-                    seed {s.seed} · λ{s.spawn_lambda.toFixed(1)} · {s.duration_seconds}s
+                  {selected?.id === s.id
+                    ? <Check size={12} className="mt-0.5 shrink-0 text-violet-400" />
+                    : <span className="w-3 shrink-0" />
+                  }
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate">{s.name}</span>
+                    <span className="block text-[10px] text-white/30 font-mono mt-0.5">
+                      seed {s.seed} · λ{s.spawn_lambda.toFixed(1)} · {s.duration_seconds}s
+                    </span>
                   </span>
                 </button>
               ))}
@@ -106,117 +117,140 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
           )}
         </div>
 
-        {/* Add / Delete */}
+        {/* + New button */}
         <button
-          className="scenario-icon-btn"
-          title="Create new scenario"
-          onClick={() => setShowCreate((v) => !v)}
           type="button"
+          title="Create new scenario"
+          onClick={() => { setShowCreate((v) => !v); setDropdownOpen(false); }}
+          className={`shrink-0 p-2 rounded-lg border transition-colors ${
+            showCreate
+              ? "border-violet-500/60 bg-violet-500/20 text-violet-300"
+              : "border-white/10 bg-white/[0.05] text-white/50 hover:text-white/80 hover:border-white/20"
+          }`}
         >
           <Plus size={14} />
         </button>
+
+        {/* Delete button (only when scenario selected) */}
         {selected && (
           <button
-            className="scenario-icon-btn scenario-icon-btn--danger"
-            title="Delete selected scenario"
+            type="button"
+            title={`Delete "${selected.name}"`}
             onClick={handleDelete}
             disabled={deleting}
-            type="button"
+            className="shrink-0 p-2 rounded-lg border border-white/10 bg-white/[0.05] text-white/40 hover:text-red-400 hover:border-red-500/30 disabled:opacity-40 transition-colors"
           >
             <Trash2 size={14} />
           </button>
         )}
       </div>
 
-      {/* Selected scenario pill */}
+      {/* ── Selected scenario info pill ───────────────────────────── */}
       {selected && (
-        <div className="scenario-pill">
-          <span className="scenario-pill-hash">#{selected.seed}</span>
-          <span className="scenario-pill-meta">λ={selected.spawn_lambda.toFixed(1)} · {selected.duration_seconds}s</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-[11px]">
+          <span className="text-violet-300 font-mono">seed {selected.seed}</span>
+          <span className="text-white/20">·</span>
+          <span className="text-white/50">λ={selected.spawn_lambda.toFixed(1)} veh/s</span>
+          <span className="text-white/20">·</span>
+          <span className="text-white/50">{selected.duration_seconds}s</span>
         </div>
       )}
 
-      {/* Inline create form */}
+      {/* ── Inline Create Form ────────────────────────────────────── */}
       {showCreate && (
-        <div className="scenario-create-form">
-          <div className="scenario-form-row">
-            <label className="scenario-form-label">Name</label>
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-4 space-y-4">
+          <p className="text-[10px] uppercase tracking-widest text-violet-400/70 font-semibold">
+            New Scenario
+          </p>
+
+          {/* Name */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-white/40 font-medium">Name</label>
             <input
-              className="scenario-form-input"
-              placeholder="e.g. Rush Hour Stress Test"
+              type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Rush Hour Stress Test"
               maxLength={100}
+              className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
             />
           </div>
 
-          <div className="scenario-form-row">
-            <label className="scenario-form-label">Seed</label>
-            <div className="scenario-seed-row">
+          {/* Seed */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-white/40 font-medium">Seed</label>
+            <div className="flex items-center gap-2">
               <input
-                className="scenario-form-input scenario-seed-input"
                 type="number"
                 value={newSeed}
                 min={0}
                 max={10000000}
                 onChange={(e) => setNewSeed(Number(e.target.value))}
+                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50 transition-colors"
               />
               <button
-                className="scenario-regen-btn"
+                type="button"
                 title="Regenerate random seed"
                 onClick={() => setNewSeed(generateSeed())}
-                type="button"
+                className="shrink-0 p-2 rounded-lg border border-white/10 bg-white/[0.05] text-white/50 hover:text-violet-300 hover:border-violet-500/30 transition-colors"
               >
                 <RefreshCw size={13} />
               </button>
             </div>
           </div>
 
-          <div className="scenario-form-row">
-            <label className="scenario-form-label">
-              Spawn rate (λ) <span className="scenario-form-value">{newLambda.toFixed(1)} veh/s</span>
-            </label>
+          {/* Spawn rate slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] text-white/40 font-medium">Spawn rate (λ)</label>
+              <span className="text-[11px] text-violet-300 font-mono">{newLambda.toFixed(1)} veh/s</span>
+            </div>
             <input
               type="range"
-              className="scenario-slider"
               min={0.1} max={2.0} step={0.1}
               value={newLambda}
               onChange={(e) => setNewLambda(Number(e.target.value))}
+              className="w-full h-1.5 rounded-full accent-violet-500 cursor-pointer"
             />
-            <div className="scenario-slider-labels">
-              <span>Low 0.1</span><span>High 2.0</span>
+            <div className="flex justify-between text-[10px] text-white/25">
+              <span>Low 0.1</span>
+              <span>High 2.0</span>
             </div>
           </div>
 
-          <div className="scenario-form-row">
-            <label className="scenario-form-label">
-              Duration <span className="scenario-form-value">{newDuration}s</span>
-            </label>
+          {/* Duration slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] text-white/40 font-medium">Duration</label>
+              <span className="text-[11px] text-violet-300 font-mono">{newDuration}s</span>
+            </div>
             <input
               type="range"
-              className="scenario-slider"
               min={10} max={300} step={10}
               value={newDuration}
               onChange={(e) => setNewDuration(Number(e.target.value))}
+              className="w-full h-1.5 rounded-full accent-violet-500 cursor-pointer"
             />
-            <div className="scenario-slider-labels">
-              <span>10s</span><span>300s</span>
+            <div className="flex justify-between text-[10px] text-white/25">
+              <span>10s</span>
+              <span>300s</span>
             </div>
           </div>
 
-          <div className="scenario-form-actions">
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-1">
             <button
-              className="scenario-cancel-btn"
-              onClick={() => setShowCreate(false)}
               type="button"
+              onClick={() => { setShowCreate(false); setNewName(""); }}
+              className="flex-1 py-2 rounded-lg border border-white/10 text-white/50 hover:text-white/80 text-sm transition-colors"
             >
               Cancel
             </button>
             <button
-              className="scenario-save-btn"
+              type="button"
               onClick={handleCreate}
               disabled={creating || !newName.trim()}
-              type="button"
+              className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
             >
               {creating ? "Saving…" : "Save Scenario"}
             </button>

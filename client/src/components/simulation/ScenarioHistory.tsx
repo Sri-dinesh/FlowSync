@@ -1,12 +1,3 @@
-/**
- * ScenarioHistory — displays all benchmark runs for a selected scenario.
- *
- * Two tabs:
- *  1. Runs Table — per-run row: model_episode, avg_wait, passed, max_queue, override%, date
- *  2. Learning Curve — line chart: episode → avg_wait_time (DQN trend)
- *
- * Auto-fetches runs whenever selectedScenario changes.
- */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -14,13 +5,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Legend,
 } from "recharts";
-import { ChevronDown, ChevronUp, TrendingDown, TableProperties } from "lucide-react";
+import { ChevronDown, ChevronUp, TrendingDown, TableProperties, RefreshCw } from "lucide-react";
 import type { Scenario, ScenarioRun } from "@/types/simulation";
 import { useScenarios } from "@/hooks/useScenarios";
 
 interface ScenarioHistoryProps {
   selectedScenario: Scenario | null;
-  /** Latest result from a just-completed scenario benchmark run */
   latestRunResult?: {
     model_episode: number;
     avg_wait_time: number;
@@ -45,8 +35,8 @@ function formatDate(iso: string): string {
 
 export function ScenarioHistory({ selectedScenario, latestRunResult }: ScenarioHistoryProps) {
   const { fetchRuns } = useScenarios();
-  const [runs, setRuns] = useState<ScenarioRun[]>([]);
-  const [tab, setTab] = useState<Tab>("table");
+  const [runs, setRuns]       = useState<ScenarioRun[]>([]);
+  const [tab, setTab]         = useState<Tab>("table");
   const [expanded, setExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -58,18 +48,15 @@ export function ScenarioHistory({ selectedScenario, latestRunResult }: ScenarioH
     setLoading(false);
   }, [selectedScenario, fetchRuns]);
 
-  // Re-fetch when selected scenario changes
-  useEffect(() => {
-    loadRuns();
-  }, [loadRuns]);
+  useEffect(() => { loadRuns(); }, [loadRuns]);
 
-  // Append latest run result to table immediately (optimistic UI before next fetch)
+  // Optimistic append when a new run completes
   useEffect(() => {
     if (!latestRunResult || !selectedScenario) return;
     setRuns((prev) => {
       const already = prev.some(
         (r) => r.model_episode === latestRunResult.model_episode &&
-               r.avg_wait_time === latestRunResult.avg_wait_time,
+               Math.abs(r.avg_wait_time - latestRunResult.avg_wait_time) < 0.01,
       );
       if (already) return prev;
       const optimistic: ScenarioRun = {
@@ -87,151 +74,192 @@ export function ScenarioHistory({ selectedScenario, latestRunResult }: ScenarioH
       };
       return [...prev, optimistic].sort((a, b) => a.model_episode - b.model_episode);
     });
-    // Refresh from server shortly after
     const t = setTimeout(() => loadRuns(), 2500);
     return () => clearTimeout(t);
   }, [latestRunResult, selectedScenario, loadRuns]);
 
   if (!selectedScenario) return null;
 
-  // Chart data — sorted by episode ascending
-  const chartData = [...runs]
-    .sort((a, b) => a.model_episode - b.model_episode)
-    .map((r) => ({
-      episode: r.model_episode,
-      wait: Number(r.avg_wait_time.toFixed(2)),
-    }));
-
-  const bestWait = runs.length ? Math.min(...runs.map((r) => r.avg_wait_time)) : null;
+  const sorted     = [...runs].sort((a, b) => a.model_episode - b.model_episode);
+  const chartData  = sorted.map((r) => ({ episode: r.model_episode, wait: Number(r.avg_wait_time.toFixed(2)) }));
+  const bestWait   = runs.length ? Math.min(...runs.map((r) => r.avg_wait_time)) : null;
 
   return (
-    <div className="scenario-history">
-      {/* Collapsible header */}
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
+
+      {/* ── Collapsible header ─────────────────────────────────────── */}
       <button
-        className="scenario-history-header"
-        onClick={() => setExpanded((e) => !e)}
         type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-white/[0.03] transition-colors"
       >
-        <span className="scenario-history-title">
-          📊 Scenario History — <em>{selectedScenario.name}</em>
+        <span className="text-[10px] uppercase tracking-widest text-white/30 font-semibold flex-1">
+          📊 Scenario History
         </span>
-        <span className="scenario-history-meta">
+        <span className="text-[11px] text-white/30 font-mono shrink-0">
           {runs.length} run{runs.length !== 1 ? "s" : ""}
-          &nbsp;· seed {selectedScenario.seed}
-          &nbsp;· λ={selectedScenario.spawn_lambda.toFixed(1)}
         </span>
-        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); loadRuns(); }}
+          className="p-1 rounded text-white/25 hover:text-white/60 transition-colors"
+          title="Refresh"
+        >
+          <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+        </button>
+        {expanded ? <ChevronUp size={13} className="text-white/30" /> : <ChevronDown size={13} className="text-white/30" />}
       </button>
 
       {expanded && (
-        <div className="scenario-history-body">
+        <div className="px-4 pb-4 space-y-3">
+
+          {/* Scenario meta pill */}
+          <div className="text-[10px] text-white/30 font-mono px-1">
+            <em className="not-italic text-white/50">{selectedScenario.name}</em>
+            <span className="mx-1.5 text-white/20">·</span>
+            seed {selectedScenario.seed}
+            <span className="mx-1.5 text-white/20">·</span>
+            λ={selectedScenario.spawn_lambda.toFixed(1)}
+          </div>
+
           {/* Tab bar */}
-          <div className="scenario-history-tabs">
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/[0.07]">
             <button
-              className={`scenario-tab ${tab === "table" ? "active" : ""}`}
-              onClick={() => setTab("table")}
               type="button"
+              onClick={() => setTab("table")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                tab === "table"
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
-              <TableProperties size={13} /> Runs
+              <TableProperties size={11} /> Runs
             </button>
             <button
-              className={`scenario-tab ${tab === "chart" ? "active" : ""}`}
-              onClick={() => setTab("chart")}
               type="button"
+              onClick={() => setTab("chart")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                tab === "chart"
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
-              <TrendingDown size={13} /> Learning Curve
+              <TrendingDown size={11} /> Learning Curve
             </button>
           </div>
 
-          {loading && <div className="scenario-history-loading">Loading runs…</div>}
-
+          {/* Empty state */}
           {!loading && runs.length === 0 && (
-            <div className="scenario-history-empty">
-              No runs yet. Load a model checkpoint and click <strong>Run Scenario Benchmark</strong>.
-            </div>
+            <p className="text-center text-[11px] text-white/25 py-6 leading-relaxed">
+              No runs yet.<br />
+              Load a checkpoint then click<br />
+              <span className="text-violet-400">▶ Run Scenario Benchmark</span>
+            </p>
           )}
 
-          {/* ── Table tab ────────────────────────────────────────────────── */}
-          {tab === "table" && runs.length > 0 && (
-            <div className="scenario-table-wrapper">
-              <table className="scenario-table">
+          {loading && runs.length === 0 && (
+            <p className="text-center text-[11px] text-white/30 py-4">Loading…</p>
+          )}
+
+          {/* ── Table ──────────────────────────────────────────────── */}
+          {tab === "table" && sorted.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-white/[0.07]">
+              <table className="w-full text-[11px]">
                 <thead>
-                  <tr>
-                    <th>Episode</th>
-                    <th>Avg Wait (s)</th>
-                    <th>Passed</th>
-                    <th>Max Queue</th>
-                    <th>Override %</th>
-                    <th>Date</th>
+                  <tr className="border-b border-white/[0.07] bg-white/[0.03]">
+                    <th className="text-left px-3 py-2 text-white/30 font-medium">Episode</th>
+                    <th className="text-right px-3 py-2 text-white/30 font-medium">Avg Wait</th>
+                    <th className="text-right px-3 py-2 text-white/30 font-medium">Passed</th>
+                    <th className="text-right px-3 py-2 text-white/30 font-medium">MaxQ</th>
+                    <th className="text-right px-3 py-2 text-white/30 font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...runs]
-                    .sort((a, b) => a.model_episode - b.model_episode)
-                    .map((r) => (
+                  {sorted.map((r) => {
+                    const isBest = bestWait !== null && r.avg_wait_time === bestWait;
+                    return (
                       <tr
                         key={r.id}
-                        className={r.avg_wait_time === bestWait ? "scenario-table-best" : ""}
+                        className={`border-b border-white/[0.04] last:border-0 transition-colors ${
+                          isBest ? "bg-emerald-500/[0.06]" : "hover:bg-white/[0.02]"
+                        }`}
                       >
-                        <td>
-                          <span className="scenario-ep-badge">ep{r.model_episode}</span>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono text-[10px]">
+                            ep{r.model_episode}
+                          </span>
                         </td>
-                        <td className={r.avg_wait_time === bestWait ? "scenario-best-cell" : ""}>
-                          {r.avg_wait_time.toFixed(2)}
-                          {r.avg_wait_time === bestWait && (
-                            <span className="scenario-best-tag">best</span>
+                        <td className="px-3 py-2 text-right font-mono">
+                          <span className={isBest ? "text-emerald-400 font-semibold" : "text-white/70"}>
+                            {r.avg_wait_time.toFixed(2)}s
+                          </span>
+                          {isBest && (
+                            <span className="ml-1 text-[9px] text-emerald-400 font-semibold">best</span>
                           )}
                         </td>
-                        <td>{r.total_passed}</td>
-                        <td>{r.max_queue}</td>
-                        <td>{(r.override_rate * 100).toFixed(1)}%</td>
-                        <td className="scenario-date-cell">{formatDate(r.ran_at)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-white/60">{r.total_passed}</td>
+                        <td className="px-3 py-2 text-right font-mono text-white/60">{r.max_queue}</td>
+                        <td className="px-3 py-2 text-right text-white/30 text-[10px]">{formatDate(r.ran_at)}</td>
                       </tr>
-                    ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* ── Learning Curve tab ───────────────────────────────────────── */}
-          {tab === "chart" && runs.length > 0 && (
-            <div className="scenario-chart-wrapper">
-              <p className="scenario-chart-subtitle">
-                DQN avg wait time by training checkpoint — lower is better
+          {/* ── Learning Curve ─────────────────────────────────────── */}
+          {tab === "chart" && sorted.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] text-white/25 text-center">
+                DQN avg wait time by checkpoint — lower is better
               </p>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData} margin={{ top: 8, right: 12, left: -8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis
                     dataKey="episode"
-                    stroke="rgba(255,255,255,0.35)"
-                    tick={{ fontSize: 11 }}
-                    label={{ value: "Episode", position: "insideBottom", offset: -2, fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                    stroke="rgba(255,255,255,0.2)"
+                    tick={{ fontSize: 10, fill: "rgba(255,255,255,0.3)" }}
+                    tickLine={false}
+                    label={{ value: "Episode", position: "insideBottom", offset: -2, fontSize: 10, fill: "rgba(255,255,255,0.25)" }}
                   />
                   <YAxis
-                    stroke="rgba(255,255,255,0.35)"
-                    tick={{ fontSize: 11 }}
-                    label={{ value: "Avg Wait (s)", angle: -90, position: "insideLeft", fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+                    stroke="rgba(255,255,255,0.2)"
+                    tick={{ fontSize: 10, fill: "rgba(255,255,255,0.3)" }}
+                    tickLine={false}
                     domain={["auto", "auto"]}
+                    width={36}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "rgba(10,10,20,0.92)",
-                      border: "1px solid rgba(139,92,246,0.4)",
-                      borderRadius: 8,
+                      background: "rgba(8,8,16,0.95)",
+                      border: "1px solid rgba(139,92,246,0.35)",
+                      borderRadius: 10,
                       fontSize: 12,
+                      padding: "8px 12px",
                     }}
                     formatter={(v: unknown) => [`${Number(v).toFixed(2)}s`, "Avg Wait"]}
                     labelFormatter={(ep) => `Episode ${ep}`}
+                    cursor={{ stroke: "rgba(139,92,246,0.3)", strokeWidth: 1 }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {/* Best wait reference line */}
+                  <Legend
+                    wrapperStyle={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}
+                    iconType="circle"
+                    iconSize={7}
+                  />
                   {bestWait !== null && (
                     <ReferenceLine
                       y={bestWait}
                       stroke="#22c55e"
                       strokeDasharray="4 3"
-                      label={{ value: `Best ${bestWait.toFixed(1)}s`, fill: "#22c55e", fontSize: 10 }}
+                      strokeWidth={1}
+                      label={{
+                        value: `Best ${bestWait.toFixed(1)}s`,
+                        fill: "#22c55e",
+                        fontSize: 9,
+                        position: "right",
+                      }}
                     />
                   )}
                   <Line
@@ -239,13 +267,20 @@ export function ScenarioHistory({ selectedScenario, latestRunResult }: ScenarioH
                     dataKey="wait"
                     name="DQN AI"
                     stroke="#8b5cf6"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: "#8b5cf6", strokeWidth: 0 }}
-                    activeDot={{ r: 6, fill: "#a78bfa" }}
+                    strokeWidth={2}
+                    dot={{ r: 3.5, fill: "#8b5cf6", strokeWidth: 0 }}
+                    activeDot={{ r: 5.5, fill: "#a78bfa", strokeWidth: 0 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          )}
+
+          {/* Chart empty state */}
+          {tab === "chart" && sorted.length === 0 && !loading && (
+            <p className="text-center text-[11px] text-white/25 py-6">
+              Run at least one checkpoint to see the learning curve.
+            </p>
           )}
         </div>
       )}
