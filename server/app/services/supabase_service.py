@@ -294,7 +294,8 @@ def list_scenarios() -> List[Dict[str, Any]]:
         return []
 
 
-def create_scenario(name: str, seed: int, spawn_lambda: float, duration_seconds: int) -> Dict[str, Any]:
+def create_scenario(name: str, seed: int, spawn_lambda: float, duration_seconds: int,
+                    is_held_out: bool = False, scenario_type: str = "standard") -> Dict[str, Any]:
     """Insert a new named scenario and return the created row."""
     try:
         result = supabase_client.table("scenarios").insert({
@@ -302,6 +303,8 @@ def create_scenario(name: str, seed: int, spawn_lambda: float, duration_seconds:
             "seed": seed,
             "spawn_lambda": spawn_lambda,
             "duration_seconds": duration_seconds,
+            "is_held_out": is_held_out,
+            "scenario_type": scenario_type,
         }).execute()
         rows = getattr(result, "data", []) or []
         return rows[0] if rows else {}
@@ -348,20 +351,35 @@ def save_scenario_run(
     total_passed: int,
     max_queue: int,
     override_rate: float,
+    # Extended metrics
+    run_group_id: str = "",
+    median_delay: float = 0.0,
+    p95_delay: float = 0.0,
+    std_delay: float = 0.0,
+    queue_area: float = 0.0,
+    starvation_count: int = 0,
 ) -> Dict[str, Any]:
     """Insert a benchmark run result for a scenario. Returns the created row."""
     try:
-        result = supabase_client.table("scenario_runs").insert({
-            "scenario_id": scenario_id,
-            "model_id": model_id,
-            "model_episode": model_episode,
-            "controller": controller,
-            "scenario_hash": scenario_hash,
-            "avg_wait_time": avg_wait_time,
-            "total_passed": total_passed,
-            "max_queue": max_queue,
-            "override_rate": override_rate,
-        }).execute()
+        payload: Dict[str, Any] = {
+            "scenario_id":    scenario_id,
+            "model_id":       model_id,
+            "model_episode":  model_episode,
+            "controller":     controller,
+            "scenario_hash":  scenario_hash,
+            "avg_wait_time":  avg_wait_time,
+            "total_passed":   total_passed,
+            "max_queue":      max_queue,
+            "override_rate":  override_rate,
+            "median_delay":   median_delay,
+            "p95_delay":      p95_delay,
+            "std_delay":      std_delay,
+            "queue_area":     queue_area,
+            "starvation_count": starvation_count,
+        }
+        if run_group_id:
+            payload["run_group_id"] = run_group_id
+        result = supabase_client.table("scenario_runs").insert(payload).execute()
         rows = getattr(result, "data", []) or []
         return rows[0] if rows else {}
     except Exception:
@@ -370,4 +388,147 @@ def save_scenario_run(
             scenario_id, model_id, model_episode,
         )
         return {}
+
+
+# ─── Grouped + Aggregate reads ────────────────────────────────────────────────
+
+def get_grouped_scenario_runs(scenario_id: str) -> List[Dict[str, Any]]:
+    """
+    Return runs grouped by run_group_id — each group represents one full
+    execution (Fixed + Greedy + AI on the same seed).
+
+    Returns a list of dicts:
+      { run_group_id, ran_at, model_episode, fixed:{...}, greedy:{...}, ai:{...} }
+    """
+    try:
+        result = (
+            supabase_client.table("scenario_runs")
+            .select("*")
+            .eq("scenario_id", scenario_id)
+            .order("ran_at", desc=False)
+            .execute()
+        )
+        rows: List[Dict[str, Any]] = list(getattr(result, "data", []) or [])
+    except Exception:
+        logger.exception("get_grouped_scenario_runs failed for scenario_id=%s", scenario_id)
+        return []
+
+    # Group by run_group_id
+    from collections import defaultdict
+    groups: dict = defaultdict(lambda: {"controllers": {}, "ran_at": "", "model_episode": 0, "run_group_id": ""})
+    for row in rows:
+        gid = row.get("run_group_id") or row["id"]  # fallback: ungrouped row
+        groups[gid]["run_group_id"]  = gid
+        groups[gid]["ran_at"]        = row.get("ran_at", "")
+        groups[gid]["model_episode"] = row.get("model_episode", 0)
+        ctrl = row.get("controller", "ai")
+        groups[gid]["controllers"][ctrl] = {
+            "avg_wait_time":    row.get("avg_wait_time"),
+            "total_passed":     row.get("total_passed"),
+            "max_queue":        row.get("max_queue"),
+            "override_rate":    row.get("override_rate"),
+            "median_delay":     row.get("median_delay"),
+            "p95_delay":        row.get("p95_delay"),
+            "std_delay":        row.get("std_delay"),
+            "queue_area":       row.get("queue_area"),
+            "starvation_count": row.get("starvation_count", 0),
+            "scenario_hash":    row.get("scenario_hash", ""),
+        }
+
+    # Flatten to list, sorted by model_episode
+    out = []
+    for gid, g in groups.items():
+        entry: Dict[str, Any] = {
+            "run_group_id":  g["run_group_id"],
+            "ran_at":        g["ran_at"],
+            "model_episode": g["model_episode"],
+        }
+        for ctrl in ("fixed", "greedy", "ai"):
+            if ctrl in g["controllers"]:
+                entry[ctrl] = g["controllers"][ctrl]
+        out.append(entry)
+    out.sort(key=lambda x: (x["model_episode"], x["ran_at"]))
+    return out
+
+
+def get_aggregate_stats() -> Dict[str, Any]:
+    """
+    Cross-scenario aggregate statistics.
+    Returns per-controller mean/std wait + throughput, DQN win rate,
+    and delta vs baselines.
+    """
+    try:
+        runs_result = (
+            supabase_client.table("scenario_runs")
+            .select("controller,avg_wait_time,total_passed,starvation_count,run_group_id")
+            .execute()
+        )
+        rows = list(getattr(runs_result, "data", []) or [])
+        scenarios_result = supabase_client.table("scenarios").select("id").execute()
+        total_scenarios = len(list(getattr(scenarios_result, "data", []) or []))
+    except Exception:
+        logger.exception("get_aggregate_stats failed")
+        return {}
+
+    if not rows:
+        return {"total_scenarios": total_scenarios, "total_runs": 0}
+
+    # Per-controller stats
+    from collections import defaultdict
+    ctrl_waits: dict = defaultdict(list)
+    ctrl_throughput: dict = defaultdict(list)
+    ctrl_starvation: dict = defaultdict(list)
+    for r in rows:
+        ctrl = r.get("controller", "ai")
+        if r.get("avg_wait_time") is not None:
+            ctrl_waits[ctrl].append(float(r["avg_wait_time"]))
+        if r.get("total_passed") is not None:
+            ctrl_throughput[ctrl].append(int(r["total_passed"]))
+        if r.get("starvation_count") is not None:
+            ctrl_starvation[ctrl].append(int(r["starvation_count"]))
+
+    per_controller: Dict[str, Any] = {}
+    for ctrl in ("fixed", "greedy", "ai"):
+        waits = ctrl_waits.get(ctrl, [])
+        thru  = ctrl_throughput.get(ctrl, [])
+        starv = ctrl_starvation.get(ctrl, [])
+        per_controller[ctrl] = {
+            "mean_wait":         round(float(np.mean(waits)), 3) if waits else None,
+            "std_wait":          round(float(np.std(waits)), 3) if waits else None,
+            "mean_throughput":   round(float(np.mean(thru)), 1) if thru else None,
+            "mean_starvation":   round(float(np.mean(starv)), 2) if starv else None,
+        }
+
+    # DQN win rate: fraction of run_groups where DQN has lowest avg_wait
+    from collections import defaultdict as dd2
+    group_controllers: dict = dd2(dict)
+    for r in rows:
+        gid = r.get("run_group_id")
+        if gid and r.get("avg_wait_time") is not None:
+            group_controllers[gid][r["controller"]] = float(r["avg_wait_time"])
+
+    wins = 0
+    total_groups = 0
+    for gid, ctrlmap in group_controllers.items():
+        if "ai" in ctrlmap and len(ctrlmap) >= 2:
+            total_groups += 1
+            if ctrlmap["ai"] == min(ctrlmap.values()):
+                wins += 1
+
+    dqn_win_rate = round(wins / total_groups, 3) if total_groups else 0.0
+
+    # Delta vs baselines (positive = DQN is WORSE)
+    ai_mean   = per_controller.get("ai", {}).get("mean_wait")
+    gr_mean   = per_controller.get("greedy", {}).get("mean_wait")
+    fx_mean   = per_controller.get("fixed", {}).get("mean_wait")
+
+    return {
+        "total_scenarios": total_scenarios,
+        "total_runs":      len(rows),
+        "total_groups":    total_groups,
+        "per_controller":  per_controller,
+        "dqn_win_rate":    dqn_win_rate,
+        "dqn_vs_greedy_delta": round(ai_mean - gr_mean, 3) if (ai_mean and gr_mean) else None,
+        "dqn_vs_fixed_delta":  round(ai_mean - fx_mean, 3) if (ai_mean and fx_mean) else None,
+    }
 

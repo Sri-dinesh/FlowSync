@@ -34,6 +34,8 @@ export interface SimBenchmarkProgress {
   completed_mode?: string;
   result?: SimBenchmarkResult;
   scenario_id?: string;
+  run_group_id?: string;
+  benchmark_seed?: number;
 }
 
 const MAX_RETRIES = 5;
@@ -96,6 +98,9 @@ export function useSimulationSocket() {
             modes_done: raw.modes_done ?? [],
             completed_mode: raw.completed_mode,
             result: raw.result,
+            scenario_id: raw.scenario_id,
+            run_group_id: raw.run_group_id,
+            benchmark_seed: raw.benchmark_seed,
           });
           return;
         }

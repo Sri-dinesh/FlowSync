@@ -60,6 +60,8 @@ export interface EpisodeRecord {
 
 // ─── Scenario Builder ─────────────────────────────────────────────────────────
 
+export type ScenarioType = "standard" | "stress" | "held_out" | "sweep";
+
 export interface Scenario {
   id: string;
   name: string;
@@ -67,6 +69,8 @@ export interface Scenario {
   spawn_lambda: number;
   duration_seconds: number;
   created_at: string;
+  is_held_out: boolean;
+  scenario_type: ScenarioType;
 }
 
 export interface ScenarioRun {
@@ -74,26 +78,71 @@ export interface ScenarioRun {
   scenario_id: string;
   model_id: string;
   model_episode: number;
-  controller: string;
+  controller: string;     // "fixed" | "greedy" | "ai"
   scenario_hash: string;
   avg_wait_time: number;
   total_passed: number;
   max_queue: number;
   override_rate: number;
+  run_group_id: string;
+  median_delay: number;
+  p95_delay: number;
+  std_delay: number;
+  queue_area: number;
+  starvation_count: number;
   ran_at: string;
 }
 
-export interface ScenarioBenchmarkResult {
+/** Per-controller result within a run group */
+export interface ScenarioControllerResult {
   avg_wait_time: number;
   total_passed: number;
   max_queue: number;
   override_rate: number;
-  duration_seconds: number;
+  median_delay: number;
+  p95_delay: number;
+  std_delay: number;
+  queue_area: number;
+  starvation_count: number;
+  duration_seconds?: number;
 }
+
+/**
+ * One full execution group: Fixed + Greedy + AI on the same seed.
+ * Returned by /scenarios/{id}/runs/grouped.
+ */
+export interface ScenarioRunGroup {
+  run_group_id: string;
+  ran_at: string;
+  model_episode: number;
+  fixed?:  ScenarioControllerResult;
+  greedy?: ScenarioControllerResult;
+  ai?:     ScenarioControllerResult;
+}
+
+/** Cross-scenario aggregate statistics */
+export interface ScenarioAggregateStats {
+  total_scenarios: number;
+  total_runs: number;
+  total_groups: number;
+  per_controller: Record<string, {
+    mean_wait: number | null;
+    std_wait: number | null;
+    mean_throughput: number | null;
+    mean_starvation: number | null;
+  }>;
+  dqn_win_rate: number;
+  dqn_vs_greedy_delta: number | null;
+  dqn_vs_fixed_delta: number | null;
+}
+
+/** Broadcast result from WS scenario_benchmark_results event */
+export interface ScenarioBenchmarkResult extends ScenarioControllerResult {}
 
 export interface ScenarioBenchmarkResults {
   type: "scenario_benchmark_results";
   scenario_id: string;
+  run_group_id: string;
   model_id: string;
   model_episode: number;
   scenario_hash: string;
@@ -101,4 +150,5 @@ export interface ScenarioBenchmarkResults {
   duration_seconds: number;
   results: Record<string, ScenarioBenchmarkResult>;
 }
+
 

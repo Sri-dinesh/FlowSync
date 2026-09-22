@@ -13,6 +13,7 @@ import QValuePanel from "@/components/dashboard/QValuePanel";
 import TrainingChart from "@/components/dashboard/TrainingChart";
 import { ScenarioSelector } from "@/components/simulation/ScenarioSelector";
 import { ScenarioHistory } from "@/components/simulation/ScenarioHistory";
+import { ScenarioAggregatePanel } from "@/components/simulation/ScenarioAggregatePanel";
 import dynamic from "next/dynamic";
 
 const SimulationCanvas = dynamic(
@@ -207,12 +208,15 @@ export default function SimulationPage() {
 
                     {/* Run Scenario Benchmark button */}
                     {selectedScenario && (
-                      <div className="pt-2 border-t border-white/10">
-                        <p className="text-[11px] text-white/40 mb-2">
-                          Runs AI-only on locked seed · saves to history
-                        </p>
+                      <div className="pt-2 border-t border-white/10 space-y-3">
+                        <div>
+                          <p className="text-[11px] text-white/50 leading-relaxed">
+                            Runs <span className="text-blue-400 font-medium">Fixed</span>, <span className="text-emerald-400 font-medium">Greedy</span>, and <span className="text-violet-400 font-medium">DQN</span> on identical seeded conditions (CRN) to evaluate policy consistency.
+                          </p>
+                        </div>
+
                         <button
-                          className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold tracking-wide transition-all shadow-lg shadow-violet-950/40 flex items-center justify-center gap-2"
                           onClick={handleRunScenarioBenchmark}
                           disabled={benchmarkRunning}
                           type="button"
@@ -220,38 +224,87 @@ export default function SimulationPage() {
                           {benchmarkRunning ? (
                             <>
                               <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                              Running…
+                              <span>
+                                Evaluating: {benchmarkProgress?.current_mode?.toUpperCase() ?? "CRN BENCHMARK"}… ({((benchmarkProgress?.mode_index ?? 0) + 1)}/3)
+                              </span>
                             </>
                           ) : (
-                            <>▶ Run Scenario Benchmark</>
+                            <>▶ Run 3-Controller Benchmark (Fixed · Greedy · DQN)</>
                           )}
                         </button>
 
-                        {/* Show last result for this scenario run */}
+                        {/* Benchmark Controller Progress Pills */}
+                        {benchmarkRunning && benchmarkProgress && (
+                          <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] text-white/40">
+                              <span>Multi-Controller Execution</span>
+                              <span className="font-mono text-violet-300">Phase {(benchmarkProgress.mode_index ?? 0) + 1} of 3</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
+                              {["fixed", "greedy", "ai"].map((mode) => {
+                                const isDone = benchmarkProgress.modes_done?.includes(mode);
+                                const isCurrent = benchmarkProgress.current_mode === mode;
+                                return (
+                                  <div
+                                    key={mode}
+                                    className={`py-1 px-1.5 rounded border transition-all ${
+                                      isDone
+                                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-medium"
+                                        : isCurrent
+                                        ? "bg-violet-500/30 border-violet-500/60 text-white font-bold animate-pulse"
+                                        : "bg-white/[0.03] border-white/10 text-white/30"
+                                    }`}
+                                  >
+                                    {isDone ? "✓ " : isCurrent ? "▶ " : ""}{mode.toUpperCase()}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show latest 3-controller paired result for this scenario */}
                         {scenarioBenchmarkResults?.scenario_id === selectedScenario.id && (
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                            <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                              <div className="text-white/40">Avg Wait</div>
-                              <div className="text-white font-mono font-semibold">
-                                {scenarioBenchmarkResults.results?.ai?.avg_wait_time?.toFixed(2)}s
-                              </div>
+                          <div className="p-3 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-violet-200">Latest Benchmark Results</span>
+                              <span className="font-mono text-[10px] text-white/40">
+                                ep{scenarioBenchmarkResults.model_episode}
+                              </span>
                             </div>
-                            <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                              <div className="text-white/40">Passed</div>
-                              <div className="text-white font-mono font-semibold">
-                                {scenarioBenchmarkResults.results?.ai?.total_passed}
+
+                            <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                              {/* Fixed */}
+                              <div className="p-2 rounded-lg bg-black/40 border border-blue-500/20">
+                                <div className="text-[10px] text-blue-400 font-semibold">Fixed</div>
+                                <div className="text-white font-bold mt-0.5">
+                                  {scenarioBenchmarkResults.results?.fixed?.avg_wait_time?.toFixed(1) ?? "—"}s
+                                </div>
+                                <div className="text-[9px] text-white/40 mt-0.5">
+                                  {scenarioBenchmarkResults.results?.fixed?.total_passed ?? "—"} veh
+                                </div>
                               </div>
-                            </div>
-                            <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                              <div className="text-white/40">Max Queue</div>
-                              <div className="text-white font-mono font-semibold">
-                                {scenarioBenchmarkResults.results?.ai?.max_queue}
+
+                              {/* Greedy */}
+                              <div className="p-2 rounded-lg bg-black/40 border border-emerald-500/20">
+                                <div className="text-[10px] text-emerald-400 font-semibold">Greedy</div>
+                                <div className="text-white font-bold mt-0.5">
+                                  {scenarioBenchmarkResults.results?.greedy?.avg_wait_time?.toFixed(1) ?? "—"}s
+                                </div>
+                                <div className="text-[9px] text-white/40 mt-0.5">
+                                  {scenarioBenchmarkResults.results?.greedy?.total_passed ?? "—"} veh
+                                </div>
                               </div>
-                            </div>
-                            <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2">
-                              <div className="text-white/40">ep</div>
-                              <div className="text-white font-mono font-semibold">
-                                {scenarioBenchmarkResults.model_episode}
+
+                              {/* DQN */}
+                              <div className="p-2 rounded-lg bg-violet-950/40 border border-violet-500/40">
+                                <div className="text-[10px] text-violet-300 font-bold">DQN Policy</div>
+                                <div className="text-violet-200 font-bold mt-0.5">
+                                  {scenarioBenchmarkResults.results?.ai?.avg_wait_time?.toFixed(1) ?? "—"}s
+                                </div>
+                                <div className="text-[9px] text-violet-300/60 mt-0.5">
+                                  {scenarioBenchmarkResults.results?.ai?.total_passed ?? "—"} veh
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -260,11 +313,15 @@ export default function SimulationPage() {
                     )}
                   </div>
 
-                  {/* Scenario History — table + learning curve */}
+                  {/* Scenario History — 3-tab Paired Runs + 3-line Learning Curve + Metric Details */}
                   <ScenarioHistory
                     selectedScenario={selectedScenario}
                     latestRunResult={latestScenarioRun}
+                    latestBenchmarkResults={scenarioBenchmarkResults}
                   />
+
+                  {/* Cross-Scenario Aggregate Summary */}
+                  <ScenarioAggregatePanel refreshTrigger={scenarioBenchmarkResults} />
                 </TabsContent>
 
                 <TabsContent value="training" className="mt-4 text-sm text-white/70">

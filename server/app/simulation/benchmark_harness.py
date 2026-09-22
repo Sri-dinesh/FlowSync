@@ -82,6 +82,8 @@ class EpisodeMetrics:
     # R-04: Detailed watchdog override audit log
     watchdog_overrides: List[Dict[str, Any]] = field(default_factory=list)
     elapsed_wall_seconds: float = 0.0
+    # Starvation: number of times any direction waited > STARVATION_THRESHOLD steps
+    starvation_count: int = 0
 
 
 @dataclass
@@ -253,6 +255,13 @@ class DeterministicEvaluator:
         max_queue: int = 0
         watchdog_overrides: List[Dict[str, Any]] = []
 
+        # Starvation tracking: count events where a direction is denied green
+        # for >= STARVATION_THRESHOLD consecutive steps (~3 s at 10 Hz)
+        STARVATION_THRESHOLD = 30
+        _ALL_DIRS = ["north", "south", "east", "west"]
+        _per_dir_no_green: Dict[str, int] = {d: 0 for d in _ALL_DIRS}
+        starvation_events: int = 0
+
         vat_controller = None
         if self.mode in ("vat", "actuated"):
             from .vat_controller import VATController
@@ -297,6 +306,18 @@ class DeterministicEvaluator:
             queue_area += step_q * 0.1
             if step_q > max_queue:
                 max_queue = step_q
+
+            # Starvation tracking: which directions got green this step?
+            active_phase = env.intersection.signal.current_phase
+            green_dirs = PHASE_DIRS.get(active_phase, [])
+            for _d in _ALL_DIRS:
+                if _d not in green_dirs:
+                    _per_dir_no_green[_d] += 1
+                    if _per_dir_no_green[_d] >= STARVATION_THRESHOLD:
+                        starvation_events += 1
+                        _per_dir_no_green[_d] = 0  # reset counter after event
+                else:
+                    _per_dir_no_green[_d] = 0
 
             # R-04: Log watchdog override details (requested vs executed action, reason)
             if info.get("was_overridden"):
@@ -361,6 +382,7 @@ class DeterministicEvaluator:
             reward_components=reward_components_accum,
             watchdog_overrides=watchdog_overrides,
             elapsed_wall_seconds=elapsed,
+            starvation_count=starvation_events,
         )
 
     def run_multi_seed(

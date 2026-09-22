@@ -9,7 +9,13 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { getFastApiUrls } from "@/lib/utils";
-import type { Scenario, ScenarioRun } from "@/types/simulation";
+import type {
+  Scenario,
+  ScenarioRun,
+  ScenarioRunGroup,
+  ScenarioAggregateStats,
+  ScenarioType,
+} from "@/types/simulation";
 
 export function useScenarios() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -46,6 +52,8 @@ export function useScenarios() {
       seed: number,
       spawnLambda: number,
       durationSeconds: number,
+      isHeldOut: boolean = false,
+      scenarioType: ScenarioType = "standard",
     ): Promise<Scenario | null> => {
       setError(null);
       try {
@@ -57,6 +65,8 @@ export function useScenarios() {
             seed,
             spawn_lambda: spawnLambda,
             duration_seconds: durationSeconds,
+            is_held_out: isHeldOut,
+            scenario_type: scenarioType,
           }),
         });
         if (!res.ok) throw new Error(`POST /scenarios failed: ${res.status}`);
@@ -104,6 +114,36 @@ export function useScenarios() {
     [BASE],
   );
 
+  // ─── Fetch grouped runs (3-controller paired runs) ──────────────────────────
+  const fetchGroupedRuns = useCallback(
+    async (scenarioId: string): Promise<ScenarioRunGroup[]> => {
+      try {
+        const res = await fetch(`${BASE}/${scenarioId}/runs/grouped`);
+        if (!res.ok) throw new Error(`GET runs/grouped failed: ${res.status}`);
+        return await res.json();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to fetch grouped runs");
+        return [];
+      }
+    },
+    [BASE],
+  );
+
+  // ─── Fetch cross-scenario aggregate stats ──────────────────────────────────
+  const fetchAggregateStats = useCallback(
+    async (): Promise<ScenarioAggregateStats | null> => {
+      try {
+        const res = await fetch(`${BASE}/aggregate`);
+        if (!res.ok) throw new Error(`GET aggregate failed: ${res.status}`);
+        return await res.json();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to fetch aggregate stats");
+        return null;
+      }
+    },
+    [BASE],
+  );
+
   return {
     scenarios,
     loading,
@@ -112,5 +152,8 @@ export function useScenarios() {
     createScenario,
     deleteScenario,
     fetchRuns,
+    fetchGroupedRuns,
+    fetchAggregateStats,
   };
 }
+

@@ -23,6 +23,8 @@ class ScenarioCreate(BaseModel):
     seed: int = Field(..., ge=0, le=10_000_000)
     spawn_lambda: float = Field(0.5, ge=0.1, le=3.0)
     duration_seconds: int = Field(60, ge=10, le=600)
+    is_held_out: bool = Field(False)
+    scenario_type: str = Field("standard")
 
 
 def _build_snapshot(app) -> MetricsSnapshot:
@@ -181,6 +183,8 @@ async def create_scenario_endpoint(payload: ScenarioCreate) -> dict:
         payload.seed,
         payload.spawn_lambda,
         payload.duration_seconds,
+        payload.is_held_out,
+        payload.scenario_type,
     )
     if not created:
         raise HTTPException(status_code=500, detail="Failed to create scenario")
@@ -195,8 +199,25 @@ async def delete_scenario_endpoint(scenario_id: str) -> None:
         raise HTTPException(status_code=500, detail="Failed to delete scenario")
 
 
+@router.get("/scenarios/aggregate")
+async def get_scenario_aggregate() -> dict:
+    """Cross-scenario aggregate stats: win rate, mean/std per controller, DQN delta."""
+    stats = await asyncio.to_thread(supabase_service.get_aggregate_stats)
+    return stats
+
+
 @router.get("/scenarios/{scenario_id}/runs")
 async def get_scenario_runs(scenario_id: str) -> list:
-    """Return all benchmark runs for a scenario, sorted by model_episode ascending."""
+    """Return all benchmark runs for a scenario (flat rows, sorted by model_episode)."""
     runs = await asyncio.to_thread(supabase_service.list_scenario_runs, scenario_id)
     return runs
+
+
+@router.get("/scenarios/{scenario_id}/runs/grouped")
+async def get_scenario_runs_grouped(scenario_id: str) -> list:
+    """
+    Return runs grouped by run_group_id.
+    Each group = one full 3-controller execution (fixed + greedy + ai on same seed).
+    """
+    groups = await asyncio.to_thread(supabase_service.get_grouped_scenario_runs, scenario_id)
+    return groups
