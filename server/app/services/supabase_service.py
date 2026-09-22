@@ -275,3 +275,99 @@ def set_active_model(model_id: str) -> None:
         supabase_client.table("rl_models").update({"isActive": True}).eq("id", model_id).execute()
     except Exception:
         logger.exception("set_active_model failed for id=%s", model_id)
+
+
+# ─── Scenarios ───────────────────────────────────────────────────────────────
+
+def list_scenarios() -> List[Dict[str, Any]]:
+    """Return all saved scenarios ordered by creation time (newest first)."""
+    try:
+        result = (
+            supabase_client.table("scenarios")
+            .select("*")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return list(getattr(result, "data", []) or [])
+    except Exception:
+        logger.exception("list_scenarios failed")
+        return []
+
+
+def create_scenario(name: str, seed: int, spawn_lambda: float, duration_seconds: int) -> Dict[str, Any]:
+    """Insert a new named scenario and return the created row."""
+    try:
+        result = supabase_client.table("scenarios").insert({
+            "name": name,
+            "seed": seed,
+            "spawn_lambda": spawn_lambda,
+            "duration_seconds": duration_seconds,
+        }).execute()
+        rows = getattr(result, "data", []) or []
+        return rows[0] if rows else {}
+    except Exception:
+        logger.exception("create_scenario failed for name=%s", name)
+        return {}
+
+
+def delete_scenario(scenario_id: str) -> bool:
+    """Delete a scenario and all its runs (cascades via FK). Returns True on success."""
+    try:
+        supabase_client.table("scenarios").delete().eq("id", scenario_id).execute()
+        return True
+    except Exception:
+        logger.exception("delete_scenario failed for id=%s", scenario_id)
+        return False
+
+
+# ─── Scenario Runs ────────────────────────────────────────────────────────────
+
+def list_scenario_runs(scenario_id: str) -> List[Dict[str, Any]]:
+    """Return all runs for a scenario ordered by model_episode ascending."""
+    try:
+        result = (
+            supabase_client.table("scenario_runs")
+            .select("*")
+            .eq("scenario_id", scenario_id)
+            .order("model_episode", desc=False)
+            .execute()
+        )
+        return list(getattr(result, "data", []) or [])
+    except Exception:
+        logger.exception("list_scenario_runs failed for scenario_id=%s", scenario_id)
+        return []
+
+
+def save_scenario_run(
+    scenario_id: str,
+    model_id: str,
+    model_episode: int,
+    controller: str,
+    scenario_hash: str,
+    avg_wait_time: float,
+    total_passed: int,
+    max_queue: int,
+    override_rate: float,
+) -> Dict[str, Any]:
+    """Insert a benchmark run result for a scenario. Returns the created row."""
+    try:
+        result = supabase_client.table("scenario_runs").insert({
+            "scenario_id": scenario_id,
+            "model_id": model_id,
+            "model_episode": model_episode,
+            "controller": controller,
+            "scenario_hash": scenario_hash,
+            "avg_wait_time": avg_wait_time,
+            "total_passed": total_passed,
+            "max_queue": max_queue,
+            "override_rate": override_rate,
+        }).execute()
+        rows = getattr(result, "data", []) or []
+        return rows[0] if rows else {}
+    except Exception:
+        logger.exception(
+            "save_scenario_run failed for scenario_id=%s model=%s ep=%s",
+            scenario_id, model_id, model_episode,
+        )
+        return {}
+
