@@ -1,8 +1,8 @@
 import asyncio
 from typing import Literal
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from ..schemas.metrics_schema import MetricsSnapshot
 from ..services import supabase_service
@@ -16,6 +16,13 @@ class ModeUpdate(BaseModel):
 
 class ScenarioPayload(BaseModel):
     counts: dict[str, int]
+
+
+class ScenarioCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    seed: int = Field(..., ge=0, le=10_000_000)
+    spawn_lambda: float = Field(0.5, ge=0.1, le=3.0)
+    duration_seconds: int = Field(60, ge=10, le=600)
 
 
 def _build_snapshot(app) -> MetricsSnapshot:
@@ -154,3 +161,42 @@ async def set_mode(payload: ModeUpdate, request: Request) -> dict:
 async def get_status(request: Request) -> MetricsSnapshot:
     app = request.app
     return _build_snapshot(app)
+
+
+# ─── Scenario Builder Endpoints ───────────────────────────────────────────────
+
+@router.get("/scenarios")
+async def get_scenarios() -> list:
+    """List all saved named scenarios."""
+    scenarios = await asyncio.to_thread(supabase_service.list_scenarios)
+    return scenarios
+
+
+@router.post("/scenarios", status_code=201)
+async def create_scenario_endpoint(payload: ScenarioCreate) -> dict:
+    """Create a new named scenario and persist it to Supabase."""
+    created = await asyncio.to_thread(
+        supabase_service.create_scenario,
+        payload.name,
+        payload.seed,
+        payload.spawn_lambda,
+        payload.duration_seconds,
+    )
+    if not created:
+        raise HTTPException(status_code=500, detail="Failed to create scenario")
+    return created
+
+
+@router.delete("/scenarios/{scenario_id}", status_code=204)
+async def delete_scenario_endpoint(scenario_id: str) -> None:
+    """Delete a scenario and all its historical runs."""
+    ok = await asyncio.to_thread(supabase_service.delete_scenario, scenario_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to delete scenario")
+
+
+@router.get("/scenarios/{scenario_id}/runs")
+async def get_scenario_runs(scenario_id: str) -> list:
+    """Return all benchmark runs for a scenario, sorted by model_episode ascending."""
+    runs = await asyncio.to_thread(supabase_service.list_scenario_runs, scenario_id)
+    return runs
