@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSimulationStore } from "@/store/simulationStore";
-import type { SimulationFrame } from "@/types/simulation";
+import type { SimulationFrame, ScenarioBenchmarkResults } from "@/types/simulation";
 import { getFastApiUrls } from "@/lib/utils";
 
 export interface SimBenchmarkResult {
@@ -17,6 +17,11 @@ export interface SimBenchmarkResultsData {
   winner: string | null;
   modes: string[];
   improvements?: Record<string, number>;
+  // Scenario-linked fields (populated when run via run_scenario_benchmark)
+  scenario_id?: string;
+  model_episode?: number;
+  scenario_hash?: string;
+  benchmark_seed?: number;
 }
 
 export interface SimBenchmarkProgress {
@@ -28,6 +33,7 @@ export interface SimBenchmarkProgress {
   modes_done?: string[];
   completed_mode?: string;
   result?: SimBenchmarkResult;
+  scenario_id?: string;
 }
 
 const MAX_RETRIES = 5;
@@ -41,6 +47,7 @@ export function useSimulationSocket() {
   const [benchmarkRunning, setBenchmarkRunning] = useState(false);
   const [benchmarkProgress, setBenchmarkProgress] = useState<SimBenchmarkProgress | null>(null);
   const [benchmarkResults, setBenchmarkResults] = useState<SimBenchmarkResultsData | null>(null);
+  const [scenarioBenchmarkResults, setScenarioBenchmarkResults] = useState<ScenarioBenchmarkResults | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -104,6 +111,13 @@ export function useSimulationSocket() {
           setBenchmarkRunning(false);
           setBenchmarkProgress(null);
           setBenchmarkResults(raw as SimBenchmarkResultsData);
+          return;
+        }
+
+        if (raw.type === "scenario_benchmark_results") {
+          setBenchmarkRunning(false);
+          setBenchmarkProgress(null);
+          setScenarioBenchmarkResults(raw as ScenarioBenchmarkResults);
           return;
         }
 
@@ -265,6 +279,28 @@ export function useSimulationSocket() {
     });
   }, [sendCommand]);
 
+  const startScenarioBenchmark = useCallback((
+    scenarioId: string,
+    seed: number,
+    spawnLambda: number,
+    durationSeconds: number,
+    modelId: string,
+    modelEpisode: number,
+  ) => {
+    setScenarioBenchmarkResults(null);
+    setBenchmarkProgress(null);
+    setBenchmarkRunning(true);
+    sendCommand({
+      command: "run_scenario_benchmark",
+      scenario_id: scenarioId,
+      seed,
+      spawn_lambda: spawnLambda,
+      duration_seconds: durationSeconds,
+      model_id: modelId,
+      model_episode: modelEpisode,
+    });
+  }, [sendCommand]);
+
   const stopBenchmark = useCallback(() => {
     setBenchmarkRunning(false);
     setBenchmarkProgress(null);
@@ -282,7 +318,9 @@ export function useSimulationSocket() {
     benchmarkRunning,
     benchmarkProgress,
     benchmarkResults,
+    scenarioBenchmarkResults,
     startBenchmark,
+    startScenarioBenchmark,
     stopBenchmark,
     resetBenchmark,
   };

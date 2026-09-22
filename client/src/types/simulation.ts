@@ -57,3 +57,48 @@ export interface EpisodeRecord {
   loss: number | null;
   steps: number;
 }
+
+// ─── Scenario Builder ─────────────────────────────────────────────────────────
+
+export interface Scenario {
+  id: string;
+  name: string;
+  seed: number;
+  spawn_lambda: number;
+  duration_seconds: number;
+  created_at: string;
+}
+
+export interface ScenarioRun {
+  id: string;
+  scenario_id: string;
+  model_id: string;
+  model_episode: number;
+  controller: string;
+  scenario_hash: string;
+  avg_wait_time: number;
+  total_passed: number;
+  max_queue: number;
+  override_rate: number;
+  ran_at: string;
+}
+
+export interface ScenarioBenchmarkResult {
+  avg_wait_time: number;
+  total_passed: number;
+  max_queue: number;
+  override_rate: number;
+  duration_seconds: number;
+}
+
+export interface ScenarioBenchmarkResults {
+  type: "scenario_benchmark_results";
+  scenario_id: string;
+  model_id: string;
+  model_episode: number;
+  scenario_hash: string;
+  benchmark_seed: number;
+  duration_seconds: number;
+  results: Record<string, ScenarioBenchmarkResult>;
+}
+
