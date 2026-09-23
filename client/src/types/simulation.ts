@@ -32,6 +32,7 @@ export interface SimulationFrame {
   reward: number;
   episode: number;
   rl?: RLInfo | null;   // only populated in AI mode
+  target_duration?: number | null;
 }
 
 export interface TrainingMetric {

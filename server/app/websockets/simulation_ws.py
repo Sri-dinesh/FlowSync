@@ -614,7 +614,44 @@ async def _run_timed_benchmark(
             pass
 
 
-# ─── Scenario Benchmark (Fixed + Greedy + AI) ────────────────────────────────
+# ─── Scenario Benchmark (Fixed + Greedy + AI) with Real-Time 3D Simulation ────
+
+def _generate_scenario_traffic(
+    seed: int,
+    spawn_lambda: float,
+    duration_seconds: int,
+    dt: float = 0.1,
+) -> List[Dict[str, Any]]:
+    """
+    Pre-generate a deterministic vehicle arrival schedule for the entire scenario duration.
+    Guarantees 100% mathematical identicality across Fixed, Greedy, and DQN:
+      - Exact same total vehicle count
+      - Exact same arrival timestamps (time_s)
+      - Exact same lanes and turns
+      - Exact same initial speed (DEFAULT_SPEED) and zero wait time
+    """
+    rng = np.random.default_rng(int(seed))
+    arrivals: List[Dict[str, Any]] = []
+    dir_names = ["north", "south", "east", "west"]
+    total_ticks = int(duration_seconds / dt)
+
+    v_counter = 0
+    for tick in range(total_ticks):
+        time_s = round(tick * dt, 2)
+        for dir_name in dir_names:
+            num_arrivals = int(rng.poisson(spawn_lambda * dt))
+            for _ in range(num_arrivals):
+                turn = str(rng.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                arrivals.append({
+                    "vehicle_id": f"sc_{seed}_{v_counter}",
+                    "time_s": time_s,
+                    "lane": dir_name,
+                    "turn": turn,
+                })
+                v_counter += 1
+
+    return arrivals
+
 
 async def _run_scenario_benchmark(
     app,
@@ -627,22 +664,21 @@ async def _run_scenario_benchmark(
     model_episode: int,
 ) -> None:
     """
-    3-controller locked-seed scenario benchmark.
-
-    Runs Fixed → Greedy → AI (DQN) under identical CRN conditions.
-    Uses DeterministicEvaluator from benchmark_harness to guarantee:
-      - Identical seed/traffic sequence across all 3 controllers
-      - All extended metrics (median_delay, p95_delay, starvation_count, queue_area)
-    Persists one scenario_runs row per controller, tied by run_group_id.
-    Broadcasts progress per-controller and final results with all 3 side by side.
+    Real-time 3D multi-controller scenario evaluation.
+    Runs Fixed → Greedy → DQN (AI) sequentially in real-time, driving the 3D Canvas.
+    All controllers receive the identical pre-generated vehicle arrivals under Common Random Numbers (CRN).
     """
     import hashlib as _hashlib
-    from ..simulation.benchmark_harness import DeterministicEvaluator
+    from ..simulation.vehicle import DEFAULT_SPEED, Vehicle
+
+    PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
+    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    TICK_DT     = 0.1
 
     prev_mode    = getattr(app.state, "mode", "fixed")
     prev_running = getattr(app.state, "sim_running", False)
 
-    # Pause normal sim loop so resources are available for harness
+    # Pause any running background simulation loop
     app.state.sim_running = False
     if getattr(app.state, "sim_task", None) is not None:
         app.state.sim_task.cancel()
@@ -650,18 +686,18 @@ async def _run_scenario_benchmark(
             await app.state.sim_task
         except Exception:
             pass
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.15)
 
-    # Resolve model_id / model_episode from server state if caller passed empty
-    if not model_id:
-        model_id = getattr(app.state, "active_model_id", "")
-    if not model_episode:
-        model_episode = getattr(app.state, "active_model_episode", 0)
+    # Resolve active model id and episode
+    active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
+    active_e = getattr(app.state, "active_model_episode", None) or 1000
+    clean_model_id = str(model_id).strip() if model_id else active_m
+    clean_model_ep = int(model_episode) if model_episode else active_e
 
-    # Unique run group — ties all 3 controller rows together
+    # Unique run group identifier
     run_group_id = f"rg_{scenario_id[:8]}_{seed}_{int(time.time())}"
 
-    # Compute scenario hash (identical formula → same hash for all 3 controllers)
+    # Compute scenario hash
     num_steps = duration_seconds * 10
     scenario_spec = json.dumps({
         "seed": seed,
@@ -672,12 +708,49 @@ async def _run_scenario_benchmark(
     }, sort_keys=True)
     scenario_hash = _hashlib.sha256(scenario_spec.encode()).hexdigest()[:16]
 
+    # Pre-generate 100% identical vehicle arrival schedule
+    scenario_arrivals = _generate_scenario_traffic(seed, spawn_lambda, duration_seconds, dt=TICK_DT)
+    total_scheduled_vehicles = len(scenario_arrivals)
+    logger.info(
+        "Generated %d deterministic vehicle arrivals for scenario %s (seed=%d, λ=%.1f, dur=%ds)",
+        total_scheduled_vehicles, scenario_id, seed, spawn_lambda, duration_seconds,
+    )
+
     controllers = ["fixed", "greedy", "ai"]
     results: dict = {}
 
     try:
+        intersection = app.state.sim_intersection
+
         for i, controller in enumerate(controllers):
-            # ── Per-controller progress broadcast ────────────────────────────
+            # Reset intersection to clean state
+            intersection.reset()
+            intersection.spawner.set_enabled(False)  # Pre-scheduled arrivals drive all spawning
+            app.state.mode = controller
+
+            agent = app.state.sim_agent if controller == "ai" else None
+            forecaster = ArrivalForecaster()
+
+            # Local copy of identical arrivals schedule for this mode
+            pending_arrivals = [dict(a) for a in scenario_arrivals]
+            spawned_count = 0
+
+            # Metric collectors
+            per_dir_no_green = {d: 0 for d in ["north", "south", "east", "west"]}
+            starvation_count = 0
+            max_queue_seen = 0
+            queue_area = 0.0
+            delays: List[float] = []
+            watchdog_overrides = 0
+
+            sim_time = 0.0
+            tick_count = 0
+
+            # Real-time pacing (respects sim_speed: default 2.0x -> ~0.05s per tick)
+            sim_speed = float(getattr(app.state, "sim_speed", 2.0))
+            tick_sleep = max(0.015, 0.09 / max(0.5, sim_speed))
+
+            # Notify frontend: mode starting
             try:
                 await websocket.send_json({
                     "type": "benchmark_progress",
@@ -697,64 +770,221 @@ async def _run_scenario_benchmark(
             except Exception:
                 pass
 
-            # ── Run via DeterministicEvaluator ────────────────────────────────
-            agent = app.state.sim_agent if controller == "ai" else None
-            evaluator = DeterministicEvaluator(
-                agent=agent,
-                mode=controller,
-                spawn_lambda=spawn_lambda,
-            )
-            try:
-                metrics = await asyncio.to_thread(
-                    evaluator.run,
-                    num_steps=num_steps,
-                    seed=seed,
+            # ── Real-Time Simulation Loop for this controller ─────────────────
+            while sim_time < float(duration_seconds):
+                tick_start = asyncio.get_event_loop().time()
+                tick_count += 1
+                sim_time += TICK_DT
+
+                # 1. Inject scheduled vehicle arrivals whose time has arrived
+                while pending_arrivals and pending_arrivals[0]["time_s"] <= sim_time:
+                    next_arr = pending_arrivals[0]
+                    dir_name = next_arr["lane"]
+                    turn = next_arr["turn"]
+                    lane_key = f"{dir_name}_{turn}"
+                    lane_queue = intersection.lanes.get(lane_key, [])
+
+                    # Prevent overlap at entrance
+                    if len(lane_queue) >= 16:
+                        break
+                    if lane_queue and lane_queue[-1].position < 0.05:
+                        break
+
+                    arr = pending_arrivals.pop(0)
+                    v = Vehicle(
+                        id=arr["vehicle_id"],
+                        lane=dir_name,
+                        turn=turn,
+                        position=0.0,
+                        wait_time=0.0,
+                        speed=DEFAULT_SPEED,
+                        state="waiting",
+                    )
+                    intersection.lanes[lane_key].append(v)
+                    spawned_count += 1
+                    intersection._spawned_this_interval += 1
+
+                # 2. Action selection per controller
+                last_action = 0
+                obs = np.zeros(20, dtype=np.float32)
+
+                if controller == "fixed":
+                    action = None
+                    last_action = intersection.signal.current_phase
+                    passed = intersection.tick(dt=TICK_DT, action=None)
+
+                elif controller == "greedy":
+                    signal = intersection.signal
+                    queues = intersection.get_movement_queues()
+                    phase_counts = {
+                        ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                        for ph in range(4)
+                    }
+                    best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                    action = best_phase if signal.can_switch_phase else signal.current_phase
+                    last_action = action
+                    passed = intersection.tick(dt=TICK_DT, action=action)
+
+                elif controller == "ai":
+                    signal = intersection.signal
+                    forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
+                    obs = _build_obs_from_intersection(intersection, forecaster)
+
+                    if signal.can_switch_phase and signal.color.name == "GREEN":
+                        starved = signal.get_starved_directions()
+                        if starved:
+                            watchdog_overrides += 1
+                            starved_dir = starved[0]
+                            action = 0 if starved_dir in ("north", "south") else 1
+                        elif signal.is_max_green_exceeded:
+                            watchdog_overrides += 1
+                            queues = intersection.get_movement_queues()
+                            phase_counts = {
+                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                                for ph in range(4) if ph != signal.current_phase
+                            }
+                            action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
+                        else:
+                            if agent is not None:
+                                queues = intersection.get_movement_queues()
+                                phase_demands = {
+                                    ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+                                    for ph in range(4)
+                                }
+                                valid_phases = [p for p, d in phase_demands.items() if d > 0]
+                                if valid_phases:
+                                    q_values = agent.get_q_values(obs)
+                                    action = max(valid_phases, key=lambda p: q_values[p])
+                                else:
+                                    action = agent.select_action(obs, epsilon=0.0)
+                            else:
+                                action = signal.current_phase
+                    else:
+                        action = signal.current_phase
+
+                    last_action = action
+                    passed = intersection.tick(dt=TICK_DT, action=action)
+                else:
+                    passed = intersection.tick(dt=TICK_DT, action=None)
+
+                # 3. Accumulate vehicle delays
+                for v in passed:
+                    delays.append(v.wait_time)
+
+                # 4. Starvation detection (direction denied green >= 30 steps)
+                active_dirs = PHASE_DIRS.get(intersection.signal.current_phase, [])
+                for d in ["north", "south", "east", "west"]:
+                    if d not in active_dirs:
+                        per_dir_no_green[d] += 1
+                        if per_dir_no_green[d] >= 30:
+                            starvation_count += 1
+                            per_dir_no_green[d] = 0
+                    else:
+                        per_dir_no_green[d] = 0
+
+                # 5. Track queue metrics
+                q_lens = intersection.get_queue_lengths()
+                current_max_q = max(q_lens.values(), default=0)
+                if current_max_q > max_queue_seen:
+                    max_queue_seen = current_max_q
+                queue_area += sum(q_lens.values()) * TICK_DT
+
+                # 6. Real-time 3D Canvas broadcast
+                sim_id = getattr(app.state, "current_simulation_id", "scenario") or "scenario"
+                frame = build_frame(
+                    intersection=intersection,
+                    mode=controller,
+                    episode=clean_model_ep,
+                    simulation_id=sim_id,
+                    agent=agent if controller == "ai" else None,
+                    last_reward=0.0,
+                    cumulative_reward=0.0,
+                    epsilon=0.0,
+                    last_action=last_action,
+                    was_exploring=False,
+                    obs=obs,
                 )
-            except Exception as e:
-                logger.exception("DeterministicEvaluator failed for controller=%s: %s", controller, e)
-                try:
-                    await websocket.send_json({
-                        "type": "error",
-                        "code": "SCENARIO_CONTROLLER_FAILED",
-                        "controller": controller,
-                        "message": str(e),
-                    })
-                except Exception:
-                    pass
-                continue
+                await manager.broadcast(frame.model_dump())
 
-            results[controller] = metrics
+                # 7. Progress broadcast every 5 ticks (~0.5s)
+                if tick_count % 5 == 0:
+                    try:
+                        await websocket.send_json({
+                            "type": "benchmark_progress",
+                            "current_mode": controller,
+                            "mode_index": i,
+                            "modes_total": len(controllers),
+                            "modes_done": controllers[:i],
+                            "elapsed": min(float(duration_seconds), round(sim_time, 1)),
+                            "duration_seconds": duration_seconds,
+                            "benchmark_seed": seed,
+                            "scenario_id": scenario_id,
+                            "scenario_hash": scenario_hash,
+                            "run_group_id": run_group_id,
+                            "spawned_count": spawned_count,
+                            "passed_count": intersection.total_passed,
+                        })
+                    except Exception:
+                        pass
+
+                # 8. Real-time pacing sleep
+                elapsed = asyncio.get_event_loop().time() - tick_start
+                sleep_t = max(0.0, tick_sleep - elapsed)
+                await asyncio.sleep(sleep_t)
+
+            # ── Collect metrics for this controller ────────────────────────────
+            avg_wait = round(intersection.get_avg_wait_time(), 3)
+            tot_passed = int(intersection.total_passed)
+            med_delay = round(float(np.median(delays)), 3) if delays else avg_wait
+            p95_d = round(float(np.percentile(delays, 95)), 3) if delays else avg_wait
+            std_d = round(float(np.std(delays)), 3) if delays else 0.0
+            q_area = round(float(queue_area), 2)
+            starv = int(starvation_count)
+            ovr_rate = round(float(watchdog_overrides / max(1, tick_count)), 4)
+
+            ctrl_result = {
+                "avg_wait_time": avg_wait,
+                "total_passed": tot_passed,
+                "max_queue": max_queue_seen,
+                "median_delay": med_delay,
+                "p95_delay": p95_d,
+                "std_delay": std_d,
+                "queue_area": q_area,
+                "starvation_count": starv,
+                "override_rate": ovr_rate,
+                "duration_seconds": duration_seconds,
+            }
+            results[controller] = ctrl_result
+
             logger.info(
-                "Scenario run [%s] controller=%s wait=%.2fs passed=%d starvation=%d hash=%s",
-                run_group_id, controller,
-                metrics.avg_wait_time, metrics.total_vehicles_passed,
-                metrics.starvation_count, scenario_hash,
+                "Scenario [%s] Mode %s completed: wait=%.2fs passed=%d queue=%d starv=%d",
+                run_group_id, controller, avg_wait, tot_passed, max_queue_seen, starv,
             )
 
-            # ── Persist to Supabase ───────────────────────────────────────────
+            # ── Persist row to Supabase ─────────────────────────────────────────
             try:
                 await asyncio.to_thread(
                     supabase_service.save_scenario_run,
                     scenario_id,
-                    model_id,
-                    model_episode,
+                    clean_model_id,
+                    clean_model_ep,
                     controller,
                     scenario_hash,
-                    float(metrics.avg_wait_time),
-                    int(metrics.total_vehicles_passed),
-                    int(metrics.max_queue),
-                    float(metrics.watchdog_override_rate / 100.0),
+                    avg_wait,
+                    tot_passed,
+                    max_queue_seen,
+                    ovr_rate,
                     run_group_id,
-                    float(metrics.median_delay),
-                    float(metrics.p95_delay),
-                    float(metrics.std_delay),
-                    float(metrics.queue_area),
-                    int(metrics.starvation_count),
+                    med_delay,
+                    p95_d,
+                    std_d,
+                    q_area,
+                    starv,
                 )
             except Exception as e:
                 logger.warning("save_scenario_run failed for controller=%s: %s", controller, e)
 
-            # ── Partial result broadcast (controller done) ────────────────────
+            # ── Send completion update for this controller ─────────────────────
             try:
                 await websocket.send_json({
                     "type": "benchmark_progress",
@@ -769,54 +999,37 @@ async def _run_scenario_benchmark(
                     "scenario_id": scenario_id,
                     "scenario_hash": scenario_hash,
                     "run_group_id": run_group_id,
-                    "result": {
-                        "avg_wait_time": round(metrics.avg_wait_time, 3),
-                        "total_passed":  metrics.total_vehicles_passed,
-                        "max_queue":     metrics.max_queue,
-                        "median_delay":  round(metrics.median_delay, 3),
-                        "p95_delay":     round(metrics.p95_delay, 3),
-                        "starvation_count": metrics.starvation_count,
-                        "override_rate": round(metrics.watchdog_override_rate / 100.0, 4),
-                    },
+                    "result": ctrl_result,
                 })
             except Exception:
                 pass
 
-        # ── Final results broadcast ───────────────────────────────────────────
-        def _metrics_dict(m) -> dict:
-            return {
-                "avg_wait_time":    round(m.avg_wait_time, 3),
-                "total_passed":     m.total_vehicles_passed,
-                "max_queue":        m.max_queue,
-                "median_delay":     round(m.median_delay, 3),
-                "p95_delay":        round(m.p95_delay, 3),
-                "std_delay":        round(m.std_delay, 3),
-                "queue_area":       round(m.queue_area, 2),
-                "starvation_count": m.starvation_count,
-                "override_rate":    round(m.watchdog_override_rate / 100.0, 4),
-                "duration_seconds": duration_seconds,
-            }
+            # Pause briefly between controllers for clear visual transition
+            if i < len(controllers) - 1:
+                await asyncio.sleep(0.8)
 
+        # ── Final broadcast with full 3-controller paired results ─────────────
         try:
             await websocket.send_json({
                 "type":           "scenario_benchmark_results",
                 "scenario_id":    scenario_id,
                 "run_group_id":   run_group_id,
-                "model_id":       model_id,
-                "model_episode":  model_episode,
+                "model_id":       clean_model_id,
+                "model_episode":  clean_model_ep,
                 "scenario_hash":  scenario_hash,
                 "benchmark_seed": seed,
                 "duration_seconds": duration_seconds,
-                "results": {
-                    ctrl: _metrics_dict(m)
-                    for ctrl, m in results.items()
-                },
+                "results":        results,
             })
         except Exception as e:
             logger.warning("Final scenario_benchmark_results broadcast failed: %s", e)
 
     except asyncio.CancelledError:
-        logger.info("Scenario benchmark cancelled (run_group=%s)", run_group_id)
+        logger.info("Scenario benchmark cancelled by user (run_group=%s)", run_group_id)
+        try:
+            await websocket.send_json({"type": "simulation_stopped", "run_group_id": run_group_id})
+        except Exception:
+            pass
     except Exception as e:
         logger.exception("Scenario benchmark error: %s", e)
         try:
@@ -828,6 +1041,7 @@ async def _run_scenario_benchmark(
         app.state.sim_running = False
         app.state.sim_intersection.reset()
         try:
+            app.state.sim_intersection.spawner.set_enabled(True)
             app.state.sim_intersection.spawner.set_seed(None)
         except Exception:
             pass
@@ -1025,6 +1239,7 @@ async def _simulation_loop(app) -> None:
                 if should_flush:
                     asyncio.create_task(_flush_buffer())
 
+            target_duration = getattr(app.state, "target_duration", None)
             frame = build_frame(
                 intersection=intersection,
                 mode=mode,
@@ -1037,9 +1252,132 @@ async def _simulation_loop(app) -> None:
                 last_action=last_action,
                 was_exploring=was_exploring,
                 obs=obs,
+                target_duration=target_duration,
             )
 
             await manager.broadcast(frame.model_dump())
+
+            # ── Check target duration auto-stop ──────────────────────────────
+            run_start_step = getattr(app.state, "run_start_step", 0)
+            if target_duration is not None and target_duration > 0:
+                elapsed_sim_time = (intersection.timestep - run_start_step) * 0.1
+                if elapsed_sim_time >= target_duration:
+                    logger.info(
+                        "Simulation target duration reached (%.1fs / %.1fs). Auto-stopping immediately.",
+                        elapsed_sim_time, target_duration,
+                    )
+                    # 1. Immediately halt simulation state
+                    app.state.sim_running = False
+                    app.state.target_duration = None
+                    try:
+                        intersection.spawner.set_enabled(False)
+                    except Exception:
+                        pass
+
+                    total_steps = intersection.timestep
+                    duration_ms = int(total_steps * 0.1 * 1000)
+                    duration_s = round(total_steps * 0.1, 1)
+                    avg_wait = round(intersection.get_avg_wait_time(), 2)
+                    passed = intersection.total_passed
+                    peak_queue = max(intersection.get_queue_lengths().values(), default=0)
+                    active_mode = getattr(app.state, "mode", "fixed")
+                    active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
+                    active_eps = getattr(app.state, "active_model_episode", 300)
+                    sim_id = app.state.current_simulation_id
+
+                    # 2. IMMEDIATELY broadcast simulation_stopped to all connected clients without blocking
+                    try:
+                        await manager.broadcast({
+                            "type": "simulation_stopped",
+                            "reason": "duration_reached",
+                            "simulation_id": sim_id,
+                            "total_steps": total_steps,
+                            "passed": passed,
+                            "avg_wait": avg_wait,
+                            "duration_seconds": target_duration,
+                        })
+                    except Exception as b_err:
+                        logger.warning("Failed to broadcast duration_reached stop: %s", b_err)
+
+                    # 3. Safely persist telemetry and session file (isolated in try/except)
+                    try:
+                        if sim_id and not str(sim_id).startswith("local-"):
+                            try:
+                                await _flush_buffer()
+                            except Exception:
+                                pass
+                            try:
+                                await asyncio.gather(
+                                    asyncio.to_thread(
+                                        supabase_service.update_simulation,
+                                        sim_id,
+                                        "completed",
+                                        total_steps,
+                                        duration_ms,
+                                    ),
+                                    asyncio.to_thread(
+                                        supabase_service.save_performance_metric,
+                                        sim_id,
+                                        active_mode,
+                                        avg_wait,
+                                        passed,
+                                        peak_queue,
+                                        total_steps,
+                                    ),
+                                )
+                            except Exception:
+                                logger.exception("Failed to persist simulation metrics on duration stop")
+
+                        # Save local session JSON
+                        sessions_dir = Path(SESSION_DIR)
+                        sessions_dir.mkdir(parents=True, exist_ok=True)
+                        sess_key = sim_id or f"sim_{active_mode}_{int(time.time())}"
+                        file_p = sessions_dir / f"{sess_key}.json"
+                        movement_queues = intersection.get_movement_queues()
+                        agg_counts = {k: int(v) for k, v in movement_queues.items()}
+                        total_vehs = passed + sum(len(q) for q in intersection.lanes.values())
+
+                        payload = {
+                            "session_id": sess_key,
+                            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "mode": active_mode,
+                            "model_name": active_model if active_mode == "ai" else None,
+                            "model_episodes": active_eps if active_mode == "ai" else None,
+                            "throughput": passed,
+                            "stats": {
+                                "session_id": sess_key,
+                                "mode": active_mode,
+                                "model_name": active_model if active_mode == "ai" else None,
+                                "model_episodes": active_eps if active_mode == "ai" else None,
+                                "frame_count": total_steps,
+                                "duration_s": duration_s,
+                                "avg_fps": 10.0,
+                                "total_detections": max(total_vehs, passed),
+                                "throughput": passed,
+                                "avg_wait_s": avg_wait,
+                                "peak_queue": peak_queue,
+                                "aggregate_counts": agg_counts,
+                            },
+                            "twin_data": {
+                                "session_id": sess_key,
+                                "total_frames_processed": total_steps,
+                                "total_vehicles_detected": max(total_vehs, passed),
+                                "video_duration_s": duration_s,
+                                "total_passed": passed,
+                                "arrivals": [],
+                                "aggregate_counts": agg_counts,
+                            },
+                            "frames": [],
+                        }
+                        with open(file_p, "w", encoding="utf-8") as sf:
+                            json.dump(payload, sf, indent=2)
+                    except Exception as s_err:
+                        logger.warning("Error saving session on duration stop: %s", s_err)
+
+                    app.state.current_simulation_id = None
+                    await asyncio.sleep(0.1)
+                    continue
+
             await asyncio.sleep(sleep_duration)
     except asyncio.CancelledError:
         # Flush any remaining buffered rows before exiting
@@ -1104,37 +1442,61 @@ async def simulation_socket(websocket: WebSocket) -> None:
             command = message.get("command")
 
             if command == "start":
-                app.state.sim_running = True
-                if not hasattr(app.state, "sim_task") or app.state.sim_task is None:
-                    app.state.sim_task = asyncio.create_task(_simulation_loop(app))
-                    
-                try:
-                    app.state.sim_intersection.spawner.set_enabled(True)
-                    total_existing = sum(len(q) for q in app.state.sim_intersection.lanes.values())
-                    if total_existing == 0:
-                        app.state.sim_intersection.spawner.seed_initial_vehicles(app.state.sim_intersection.lanes)
-                except Exception:
-                    pass
-
-                if not app.state.current_simulation_id:
+                # Parse optional target duration (seconds)
+                duration_val = message.get("duration_seconds")
+                if duration_val is not None:
                     try:
-                        simulation_id = await asyncio.to_thread(
-                            supabase_service.create_simulation,
-                            app.state.mode,
-                        )
-                        if simulation_id:
-                            app.state.current_simulation_id = simulation_id
-                        else:
-                            logger.error("create_simulation returned empty id")
-                    except Exception:
-                        logger.exception("Failed to create simulation record")
-                        app.state.current_simulation_id = f"local-{int(time.time())}"
+                        app.state.target_duration = max(5.0, min(3600.0, float(duration_val)))
+                    except (ValueError, TypeError):
+                        app.state.target_duration = None
+                else:
+                    app.state.target_duration = None
 
-            elif command == "stop":
+                logger.info(
+                    "[SimWS] Starting simulation: mode=%s, target_duration=%s (raw=%s)",
+                    getattr(app.state, "mode", "fixed"),
+                    app.state.target_duration,
+                    duration_val,
+                )
+
+                # Cancel any existing benchmark task if running
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                     app.state.benchmark_task = None
+
+                # Clean reset of intersection to ensure a brand-new, consistent run
+                app.state.sim_intersection.reset()
+                app.state.run_start_step = 0
+                app.state.sim_running = True
+                
+                try:
+                    app.state.sim_intersection.spawner.set_enabled(True)
+                    app.state.sim_intersection.spawner.seed_initial_vehicles(app.state.sim_intersection.lanes)
+                except Exception:
+                    pass
+
+                if not hasattr(app.state, "sim_task") or app.state.sim_task is None:
+                    app.state.sim_task = asyncio.create_task(_simulation_loop(app))
+
+                try:
+                    simulation_id = await asyncio.to_thread(
+                        supabase_service.create_simulation,
+                        app.state.mode,
+                    )
+                    app.state.current_simulation_id = simulation_id or f"local-{int(time.time())}"
+                except Exception:
+                    logger.exception("Failed to create simulation record")
+                    app.state.current_simulation_id = f"local-{int(time.time())}"
+
+            elif command == "stop":
+                # 1. Immediately cancel any background benchmark task
+                if getattr(app.state, "benchmark_task", None) is not None:
+                    app.state.benchmark_task.cancel()
+                    app.state.benchmark_task = None
+
+                # 2. Hard stop the simulation loop
                 app.state.sim_running = False
+                app.state.target_duration = None
                 try:
                     app.state.sim_intersection.spawner.set_enabled(False)
                 except Exception:
@@ -1242,22 +1604,57 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     pass
 
             elif command == "reset":
+                # 1. Cancel background benchmark task immediately
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                     app.state.benchmark_task = None
+
+                # 2. Hard stop execution
+                app.state.sim_running = False
+                app.state.target_duration = None
                 simulation_id = app.state.current_simulation_id
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
+
+                # 3. Completely purge intersection state & all vehicle lists
                 app.state.sim_intersection.reset()
-                app.state.sim_running = False
+                for queue in app.state.sim_intersection.lanes.values():
+                    queue.clear()
+
+                # 4. Spawner completely disabled — DO NOT re-seed vehicles
+                try:
+                    app.state.sim_intersection.spawner.set_enabled(False)
+                except Exception:
+                    pass
+
                 app.state.current_simulation_id = None
                 _buffer.traffic_rows.clear()
                 _buffer.signal_rows.clear()
+                app.state.sim_forecaster = ArrivalForecaster()
+
+                # 5. Broadcast empty reset frame so 3D canvas and UI clear immediately
                 try:
-                    app.state.sim_intersection.spawner.set_enabled(False)
-                    app.state.sim_intersection.spawner.seed_initial_vehicles(app.state.sim_intersection.lanes)
-                except Exception:
-                    pass
+                    empty_frame = build_frame(
+                        intersection=app.state.sim_intersection,
+                        mode=app.state.mode,
+                        episode=app.state.trainer.current_episode if getattr(app.state, "trainer", None) else 0,
+                        simulation_id=None,
+                        agent=getattr(app.state, "sim_agent", None),
+                        last_reward=0.0,
+                        cumulative_reward=0.0,
+                        epsilon=0.0,
+                        last_action=0,
+                        was_exploring=False,
+                        obs=None,
+                        target_duration=None,
+                    )
+                    await manager.broadcast(empty_frame.model_dump())
+                    await manager.broadcast({
+                        "type": "simulation_stopped",
+                        "reason": "reset",
+                    })
+                except Exception as re:
+                    logger.warning("Failed to broadcast reset empty frame: %s", re)
 
             elif command == "set_mode":
                 mode = message.get("mode")

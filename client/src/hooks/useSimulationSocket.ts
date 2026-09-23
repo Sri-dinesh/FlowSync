@@ -109,6 +109,9 @@ export function useSimulationSocket() {
           setRunning(false);
           setBenchmarkRunning(false);
           setBenchmarkProgress(null);
+          if (raw.reason === "reset") {
+            useSimulationStore.getState().resetSimulation();
+          }
           return;
         }
 

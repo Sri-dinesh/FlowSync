@@ -59,6 +59,7 @@ class SimulationFrame(BaseModel):
     rl: Optional[RLState]           # None in fixed/manual mode
 
     frame_type: str = "simulation"
+    target_duration: Optional[float] = None
 
 PHASE_LABELS = {0: "NS_GREEN", 1: "EW_GREEN", 2: "NS_LEFT", 3: "EW_LEFT"}
 PHASE_GREEN_DIRS = {
@@ -102,6 +103,7 @@ def build_frame(
     last_action: int = 0,
     was_exploring: bool = False,
     obs: Optional[Any] = None,
+    target_duration: Optional[float] = None,
     # Support old keyword arguments mapping
     reward: Optional[float] = None,
 ) -> SimulationFrame:
@@ -206,4 +208,5 @@ def build_frame(
         metrics=metrics,
         rl=rl_state,
         frame_type="simulation",
+        target_duration=target_duration,
     )
