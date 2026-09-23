@@ -49,6 +49,111 @@ interface Props {
   sessions: SessionItem[];
 }
 
+/**
+ * Safely parse date timestamp across ISO strings, SQL "YYYY-MM-DD HH:MM:SS", or epoch ms
+ */
+function parseSessionDate(createdAt?: string, timestampMs?: number): Date | null {
+  if (timestampMs && !isNaN(timestampMs) && timestampMs > 0) {
+    const d = new Date(timestampMs);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (!createdAt) return null;
+  const sanitized = createdAt.includes(" ") && !createdAt.includes("T")
+    ? createdAt.replace(" ", "T")
+    : createdAt;
+  const d = new Date(sanitized);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Format session creation time into human-friendly, concise, understandable format
+ */
+function formatSessionFriendlyTime(createdAt?: string, timestampMs?: number): {
+  display: string;
+  relative: string;
+  full: string;
+} {
+  const d = parseSessionDate(createdAt, timestampMs);
+  if (!d) {
+    const fallback = createdAt || "Unknown time";
+    return { display: fallback, relative: "", full: fallback };
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  let relative = "";
+  if (diffSec < 45 && diffSec >= -5) {
+    relative = "Just now";
+  } else if (diffMin < 60 && diffMin >= 0) {
+    relative = `${diffMin}m ago`;
+  } else if (diffHour < 24 && diffHour >= 0) {
+    relative = `${diffHour}h ago`;
+  } else if (diffDay === 1) {
+    relative = "Yesterday";
+  } else if (diffDay < 7 && diffDay > 1) {
+    relative = `${diffDay}d ago`;
+  } else {
+    relative = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  const timeStr = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const isToday = now.toDateString() === d.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = yesterday.toDateString() === d.toDateString();
+
+  let display = "";
+  if (isToday) {
+    display = `Today, ${timeStr}`;
+  } else if (isYesterday) {
+    display = `Yesterday, ${timeStr}`;
+  } else if (now.getFullYear() === d.getFullYear()) {
+    display = `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${timeStr}`;
+  } else {
+    display = `${d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`;
+  }
+
+  const full = d.toLocaleString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  return { display, relative, full };
+}
+
+/**
+ * Format duration in seconds into intuitive minutes and seconds
+ * e.g., 40 -> "40s", 120 -> "2m 00s", 1335.7 -> "22m 16s"
+ */
+function formatDuration(seconds?: number): string {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return "0s";
+  const s = Math.round(seconds);
+  if (s < 60) return `${s}s`;
+  const mins = Math.floor(s / 60);
+  const remSec = s % 60;
+  if (mins < 60) {
+    return `${mins}m ${String(remSec).padStart(2, "0")}s`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return `${hours}h ${String(remMins).padStart(2, "0")}m`;
+}
+
 export default function HistoricalSessionsTable({ sessions }: Props) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,6 +185,13 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
       (s.performance_rating && s.performance_rating.toUpperCase() === ratingFilter);
 
     return matchesSearch && matchesMode && matchesCongestion && matchesRating;
+  });
+
+  // Ensure sessions are sorted chronologically with newest first
+  const sortedSessions = [...filteredSessions].sort((a, b) => {
+    const timeA = a.timestamp_ms || (parseSessionDate(a.created_at)?.getTime() ?? 0);
+    const timeB = b.timestamp_ms || (parseSessionDate(b.created_at)?.getTime() ?? 0);
+    return timeB - timeA;
   });
 
   const getModeBadge = (mode?: string) => {
@@ -317,25 +429,29 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
               <tr className="border-b border-white/[0.06] text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                <th className="py-2.5 px-3">Session & Mode</th>
+                <th className="py-2.5 px-3">Session & Timing</th>
                 <th className="py-2.5 px-3">AI Model / Policy</th>
-                <th className="py-2.5 px-3">Throughput</th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1" title="Vehicles successfully passed through the intersection vs total volume">
+                    <span>Throughput & Clearance</span>
+                  </div>
+                </th>
                 <th className="py-2.5 px-3">Avg Delay & LOS</th>
                 <th className="py-2.5 px-3">Performance Evaluation</th>
                 <th className="py-2.5 px-3">Peak Queue</th>
-                <th className="py-2.5 px-3">Duration</th>
+                <th className="py-2.5 px-3">Run Duration</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.03] text-xs">
-              {filteredSessions.length === 0 ? (
+              {sortedSessions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-white/30 text-xs">
                     No historical sessions found matching your filters.
                   </td>
                 </tr>
               ) : (
-                filteredSessions.map((session) => {
+                sortedSessions.map((session) => {
                   const modeBadge = getModeBadge(session.mode);
                   const ratingBadge = getRatingBadge(session.performance_rating);
                   const losClass = getLosBadge(session.level_of_service);
@@ -345,29 +461,41 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                   const avgWait = session.avg_wait_s ?? 22.4;
                   const peakQueue = session.peak_queue ?? 0;
                   const effGain = session.efficiency_gain_pct ?? 0;
+                  const sessionTime = formatSessionFriendlyTime(session.created_at, session.timestamp_ms);
+                  const formattedDuration = formatDuration(session.duration_s);
 
                   return (
                     <tr
                       key={session.session_id}
                       className="hover:bg-white/[0.02] transition-colors group"
                     >
-                      {/* Session ID & Mode */}
+                      {/* Session ID, Mode & Timing */}
                       <td className="py-3 px-3">
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-white group-hover:text-indigo-300 transition-colors">
+                            <span className="font-mono font-bold text-white group-hover:text-indigo-300 transition-colors text-xs">
                               {session.session_id}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${modeBadge.className}`}
                             >
                               {modeBadge.icon}
                               <span>{modeBadge.label}</span>
                             </span>
-                            <span className="text-[10px] text-white/40">
-                              {session.created_at.split(" ")[0]}
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] text-white/70 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/10 cursor-help transition-colors hover:bg-white/[0.08]"
+                              title={`Recorded: ${sessionTime.full}`}
+                            >
+                              <Clock className="h-2.5 w-2.5 text-indigo-400" />
+                              <span className="font-medium text-white/90">{sessionTime.display}</span>
+                              {sessionTime.relative && (
+                                <>
+                                  <span className="text-white/20">•</span>
+                                  <span className="text-white/50">{sessionTime.relative}</span>
+                                </>
+                              )}
                             </span>
                           </div>
                         </div>
@@ -399,15 +527,18 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                         )}
                       </td>
 
-                      {/* Throughput */}
+                      {/* Throughput & Clearance */}
                       <td className="py-3 px-3">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-baseline gap-1">
+                          <div className="flex items-baseline gap-1.5">
                             <span className="font-mono font-bold text-white text-sm">
-                              {throughput}
+                              {throughput.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-medium text-emerald-400">
+                              cleared
                             </span>
                             <span className="text-[10px] text-white/40">
-                              / {session.total_vehicles} veh
+                              of {session.total_vehicles.toLocaleString()} total
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -423,19 +554,24 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                                 style={{ width: `${Math.min(100, Math.max(0, throughputPct))}%` }}
                               />
                             </div>
-                            <span className="font-mono text-[10px] text-white/60">
-                              {throughputPct}%
+                            <span className="font-mono text-[10px] text-white/70">
+                              {throughputPct}% cleared
                             </span>
+                            {session.duration_s > 0 && (
+                              <span className="text-[9px] font-mono text-white/30 hidden sm:inline" title="Flow Rate">
+                                · {Math.round((throughput / session.duration_s) * 60)} veh/min
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Avg Wait & Level of Service */}
+                      {/* Avg Delay & Level of Service */}
                       <td className="py-3 px-3">
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono font-bold text-white text-sm">
-                              {avgWait}s
+                              {avgWait.toFixed(1)}s
                             </span>
                             <span
                               className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${losClass}`}
@@ -444,6 +580,9 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                               LOS {session.level_of_service || "C"}
                             </span>
                           </div>
+                          <span className="text-[10px] text-white/40">
+                            avg wait / veh
+                          </span>
                           {effGain !== 0 && (
                             <span
                               className={`text-[10px] font-medium ${
@@ -487,9 +626,18 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                         </div>
                       </td>
 
-                      {/* Duration */}
-                      <td className="py-3 px-3 font-mono text-white/70 text-[11px]">
-                        {session.duration_s}s
+                      {/* Run Duration */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 font-mono font-semibold text-white text-xs">
+                            <Clock className="h-3 w-3 text-indigo-400/80" />
+                            <span>{formattedDuration}</span>
+                          </div>
+                          <span className="text-[10px] text-white/40 font-mono">
+                            {session.duration_s >= 60 ? `${Math.round(session.duration_s)}s · ` : ""}
+                            {session.total_frames.toLocaleString()} frames
+                          </span>
+                        </div>
                       </td>
 
                       {/* Actions */}
