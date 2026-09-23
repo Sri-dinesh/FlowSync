@@ -253,23 +253,41 @@ export default function SimulationPage() {
                               </p>
                             </div>
 
-                            <button
-                              className="w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold tracking-wide transition-all shadow-lg shadow-violet-950/40 flex items-center justify-center gap-2"
-                              onClick={handleRunScenarioBenchmark}
-                              disabled={benchmarkRunning}
-                              type="button"
-                            >
-                              {benchmarkRunning ? (
-                                <>
-                                  <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                                  <span>
-                                    Evaluating: {benchmarkProgress?.current_mode?.toUpperCase() ?? "CRN BENCHMARK"}… ({((benchmarkProgress?.mode_index ?? 0) + 1)}/3)
-                                  </span>
-                                </>
-                              ) : (
-                                <>▶ Run 3-Controller Benchmark (Fixed · Greedy · DQN)</>
+                            <div className="flex gap-2">
+                              <button
+                                className={`py-2.5 rounded-lg text-white text-xs font-semibold tracking-wide transition-all shadow-lg flex items-center justify-center gap-2 ${
+                                  benchmarkRunning
+                                    ? "flex-1 bg-violet-600/30 border border-violet-500/40 text-violet-200 cursor-default"
+                                    : "w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-violet-950/40"
+                                }`}
+                                onClick={handleRunScenarioBenchmark}
+                                disabled={benchmarkRunning}
+                                type="button"
+                              >
+                                {benchmarkRunning ? (
+                                  <>
+                                    <span className="h-2 w-2 rounded-full bg-violet-400 animate-pulse" />
+                                    <span>
+                                      Evaluating: {benchmarkProgress?.current_mode?.toUpperCase() ?? "CRN BENCHMARK"}… ({((benchmarkProgress?.mode_index ?? 0) + 1)}/3)
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>▶ Run 3-Controller Benchmark (Fixed · Greedy · DQN)</>
+                                )}
+                              </button>
+
+                              {benchmarkRunning && (
+                                <button
+                                  className="px-4 py-2.5 rounded-lg bg-rose-600/90 hover:bg-rose-600 active:scale-95 text-white text-xs font-semibold tracking-wide transition-all shadow-lg shadow-rose-950/40 flex items-center justify-center gap-1.5 shrink-0 border border-rose-500/40"
+                                  onClick={stopBenchmark}
+                                  type="button"
+                                  title="Stop Scenario Benchmark"
+                                >
+                                  <span className="h-2 w-2 rounded-sm bg-white" />
+                                  <span>Stop</span>
+                                </button>
                               )}
-                            </button>
+                            </div>
 
                             {/* Benchmark Controller Progress Pills */}
                             {benchmarkRunning && benchmarkProgress && (
@@ -278,25 +296,72 @@ export default function SimulationPage() {
                                   <span>Multi-Controller Execution</span>
                                   <span className="font-mono text-violet-300">Phase {(benchmarkProgress.mode_index ?? 0) + 1} of 3</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
+                                <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
                                   {["fixed", "greedy", "ai"].map((mode) => {
                                     const isDone = benchmarkProgress.modes_done?.includes(mode);
                                     const isCurrent = benchmarkProgress.current_mode === mode;
                                     return (
                                       <div
                                         key={mode}
-                                        className={`py-1 px-1.5 rounded border transition-all ${
+                                        className={`py-1.5 px-1.5 rounded-lg border transition-all flex flex-col items-center justify-center ${
                                           isDone
-                                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-medium"
+                                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
                                             : isCurrent
-                                            ? "bg-violet-500/30 border-violet-500/60 text-white font-bold animate-pulse"
+                                            ? "bg-violet-500/30 border-violet-500/60 text-white font-bold"
                                             : "bg-white/[0.03] border-white/10 text-white/30"
                                         }`}
                                       >
-                                        {isDone ? "✓ " : isCurrent ? "▶ " : ""}{mode.toUpperCase()}
+                                        <span className="text-[10px] tracking-wider">
+                                          {isDone ? "✓ " : isCurrent ? "▶ " : ""}{mode.toUpperCase()}
+                                        </span>
+                                        {/* Active live timer exclusively when benchmark is running */}
+                                        {isCurrent && (
+                                          <span className="mt-0.5 text-[9px] text-violet-200 font-bold">
+                                            {Math.round(benchmarkProgress.elapsed ?? 0)}s / {Math.round(benchmarkProgress.duration_seconds ?? 60)}s
+                                          </span>
+                                        )}
+                                        {isDone && (
+                                          <span className="mt-0.5 text-[9px] text-emerald-400/80">
+                                            {Math.round(benchmarkProgress.duration_seconds ?? 60)}s done
+                                          </span>
+                                        )}
+                                        {!isCurrent && !isDone && (
+                                          <span className="mt-0.5 text-[9px] text-white/20">
+                                            queued
+                                          </span>
+                                        )}
                                       </div>
                                     );
                                   })}
+                                </div>
+                                {/* Active controller mini progress bar */}
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex justify-between text-[9px] text-white/50 font-mono">
+                                    <span className="capitalize">{benchmarkProgress.current_mode} controller active</span>
+                                    <span>
+                                      {Math.max(
+                                        0,
+                                        Math.round(
+                                          (benchmarkProgress.duration_seconds ?? 60) - (benchmarkProgress.elapsed ?? 0)
+                                        )
+                                      )}s remaining
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-violet-500 via-indigo-400 to-emerald-400 transition-all duration-300 rounded-full"
+                                      style={{
+                                        width: `${Math.min(
+                                          100,
+                                          Math.round(
+                                            ((benchmarkProgress.elapsed ?? 0) /
+                                              Math.max(1, benchmarkProgress.duration_seconds ?? 60)) *
+                                              100
+                                          )
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             )}
