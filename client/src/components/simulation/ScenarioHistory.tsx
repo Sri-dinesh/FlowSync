@@ -115,7 +115,9 @@ export function ScenarioHistory({
   }, [groupedRuns]);
 
   const chartData = useMemo(() => {
-    return sortedGroups.map((g) => ({
+    return sortedGroups.map((g, idx) => ({
+      runKey: `R${idx + 1}·ep${g.model_episode}`,
+      runLabel: `Run #${idx + 1} (ep ${g.model_episode})`,
       episode: g.model_episode,
       dqn: g.ai ? Number(g.ai.avg_wait_time.toFixed(2)) : undefined,
       greedy: g.greedy ? Number(g.greedy.avg_wait_time.toFixed(2)) : undefined,
@@ -381,35 +383,37 @@ export function ScenarioHistory({
               </div>
 
               <div className="rounded-xl border border-neutral-800 bg-neutral-900/30 p-2">
-                <ResponsiveContainer width="100%" height={230}>
+                <ResponsiveContainer width="100%" height={230} minWidth={100} minHeight={230}>
                   <LineChart data={chartData} margin={{ top: 12, right: 16, left: -6, bottom: 6 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                     <XAxis
-                      dataKey="episode"
+                      dataKey="runKey"
                       stroke="rgba(255,255,255,0.2)"
-                      tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+                      tick={{ fontSize: 10, fill: "rgba(255,255,255,0.5)" }}
                       tickLine={false}
-                      label={{ value: "Episode Checkpoint", position: "insideBottom", offset: -4, fontSize: 10, fill: "rgba(255,255,255,0.3)" }}
                     />
                     <YAxis
                       stroke="rgba(255,255,255,0.2)"
-                      tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
+                      tick={{ fontSize: 10, fill: "rgba(255,255,255,0.5)" }}
                       tickLine={false}
                       domain={["auto", "auto"]}
                       width={38}
                     />
                     <Tooltip
                       contentStyle={{
-                        background: "#0a0a0a",
-                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "#0d1117",
+                        border: "1px solid rgba(255,255,255,0.15)",
                         borderRadius: 10,
                         fontSize: 11,
                         padding: "8px 12px",
                       }}
-                      labelFormatter={(ep) => `Checkpoint Episode ${ep}`}
+                      labelFormatter={(_, payload) => {
+                        const item = payload?.[0]?.payload;
+                        return item?.runLabel ?? "";
+                      }}
                       formatter={(v: unknown, name: unknown) => [
                         `${Number(v).toFixed(2)}s`,
-                        name === "dqn" ? "DQN AI" : name === "greedy" ? "Greedy" : "Fixed",
+                        name === "dqn" ? "DQN AI" : name === "greedy" ? "Greedy" : "Fixed Timer",
                       ]}
                     />
                     <Legend
@@ -422,30 +426,30 @@ export function ScenarioHistory({
                       type="monotone"
                       dataKey="fixed"
                       name="Fixed Time"
-                      stroke="#404040"
-                      strokeWidth={1.5}
+                      stroke="#60a5fa"
+                      strokeWidth={2}
                       strokeDasharray="4 3"
-                      dot={{ r: 3, fill: "#404040" }}
+                      dot={{ r: 3, fill: "#60a5fa" }}
                     />
 
                     <Line
                       type="monotone"
                       dataKey="greedy"
                       name="Greedy"
-                      stroke="#A3A3A3"
-                      strokeWidth={1.5}
+                      stroke="#34d399"
+                      strokeWidth={2}
                       strokeDasharray="3 2"
-                      dot={{ r: 3, fill: "#A3A3A3" }}
+                      dot={{ r: 3, fill: "#34d399" }}
                     />
 
                     <Line
                       type="monotone"
                       dataKey="dqn"
                       name="DQN Agent"
-                      stroke="#FFFFFF"
+                      stroke="#c084fc"
                       strokeWidth={2.5}
-                      dot={{ r: 4, fill: "#FFFFFF", strokeWidth: 0 }}
-                      activeDot={{ r: 6, fill: "#FFFFFF" }}
+                      dot={{ r: 4, fill: "#c084fc", strokeWidth: 0 }}
+                      activeDot={{ r: 6, fill: "#e879f9" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
