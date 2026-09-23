@@ -10,6 +10,7 @@ interface SimulationStore {
   isCityConnected: boolean;
   isConnected: boolean;
   isRunning: boolean;
+  isBenchmarkRunning: boolean;
   isTraining: boolean;
   mode: SimulationMode;
   currentFrame: SimulationFrame | null;
@@ -21,6 +22,7 @@ interface SimulationStore {
   setConnected: (value: boolean) => void;
   setCityConnected: (value: boolean) => void;
   setRunning: (value: boolean) => void;
+  setIsBenchmarkRunning: (value: boolean) => void;
   setTraining: (value: boolean) => void;
   resetMetrics: () => void;
   resetSimulation: () => void;
@@ -32,6 +34,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   isCityConnected: false,
   isConnected: false,
   isRunning: false,
+  isBenchmarkRunning: false,
   isTraining: false,
   mode: "fixed",
   currentFrame: null,
@@ -59,11 +62,13 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   setConnected: (value) => set({ isConnected: value }),
   setCityConnected: (value) => set({ isCityConnected: value }),
   setRunning: (value) => set({ isRunning: value }),
+  setIsBenchmarkRunning: (value) => set({ isBenchmarkRunning: value }),
   setTraining: (value) => set({ isTraining: value }),
   resetMetrics: () => set({ trainingMetrics: [] }),
   resetSimulation: () =>
     set({
       isRunning: false,
+      isBenchmarkRunning: false,
       currentFrame: null,
       lastFrameAt: null,
     }),

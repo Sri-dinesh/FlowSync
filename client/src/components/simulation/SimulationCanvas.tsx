@@ -11,17 +11,22 @@ import { useSimulationStore } from "@/store/simulationStore";
 const SimulationCanvas = memo(function SimulationCanvas() {
   const isConnected = useSimulationStore((state) => state.isConnected);
   const isRunning = useSimulationStore((state) => state.isRunning);
+  const isBenchmarkRunning = useSimulationStore((state) => state.isBenchmarkRunning);
+  const currentFrame = useSimulationStore((state) => state.currentFrame);
   const [timeOfDay, setTimeOfDay] = useState<"day" | "night">("night");
 
   const statusMessage = useMemo(() => {
     if (!isConnected) {
       return "Backend Disconnected";
     }
+    if (isBenchmarkRunning) {
+      return "Benchmark Active";
+    }
     if (!isRunning) {
       return "Simulation Paused";
     }
     return "Live Simulation";
-  }, [isConnected, isRunning]);
+  }, [isConnected, isRunning, isBenchmarkRunning]);
 
   const bgColor = timeOfDay === "day" ? "#f0f4f8" : "#111622";
 
@@ -145,7 +150,7 @@ const SimulationCanvas = memo(function SimulationCanvas() {
       {/* Dynamic Status Indicator */}
       <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-md pointer-events-auto">
         <div className={`h-2 w-2 rounded-full animate-pulse ${
-          !isConnected ? 'bg-rose-500' : !isRunning ? 'bg-amber-500' : 'bg-emerald-500'
+          !isConnected ? 'bg-rose-500' : (isRunning || isBenchmarkRunning) ? 'bg-emerald-500' : 'bg-amber-500'
         }`} />
         <span className="text-[10px] font-medium uppercase tracking-wider text-white/80">
           {statusMessage}
@@ -172,15 +177,15 @@ const SimulationCanvas = memo(function SimulationCanvas() {
         </span>
       </div>
       
-      {/* Hint overlay - only show when disconnected or not running to encourage user action */}
-      {(!isConnected || !isRunning) && (
+      {/* Hint overlay - only show when disconnected or when completely idle and no benchmark is active */}
+      {(!isConnected || (!isRunning && !isBenchmarkRunning && !(currentFrame && currentFrame.timestep > 0))) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10">
           <div className="rounded-xl border border-white/10 bg-black/40 p-6 backdrop-blur-sm text-center shadow-2xl">
             <p className="text-sm font-light tracking-[0.15em] text-white/90">
               {!isConnected ? "READY FOR CONNECTION" : "READY TO START"}
             </p>
             <p className="mt-2 text-[10px] text-white/40 uppercase tracking-widest">
-              {!isConnected ? "Ensure backend server is running" : "Click the Start button to begin simulation"}
+              {!isConnected ? "Ensure backend server is running" : "Click Start or Run Benchmark to begin"}
             </p>
           </div>
         </div>
