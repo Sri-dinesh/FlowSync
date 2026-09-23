@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
+  BoxGeometry,
   CylinderGeometry,
   MeshStandardMaterial,
   Group,
@@ -117,6 +118,38 @@ function buildCurve(lane: string, turn: Turn): CurvePath<Vector3> {
   return path;
 }
 
+// ── Static Precomputed Curve Cache (Zero allocation during simulation) ───────
+const LANES = ["north", "south", "east", "west"] as const;
+const TURNS = ["straight", "left", "right"] as const;
+const CURVE_CACHE = new Map<string, { curve: CurvePath<Vector3>; t_stop: number }>();
+
+for (const lane of LANES) {
+  for (const turn of TURNS) {
+    const curve = buildCurve(lane, turn);
+    const t_stop = (SPAWN_DIST - 3.5) / curve.getLength();
+    CURVE_CACHE.set(`${lane}_${turn}`, { curve, t_stop });
+  }
+}
+
+function getCachedCurve(lane: string, turn: Turn) {
+  const key = `${lane}_${turn}`;
+  const hit = CURVE_CACHE.get(key);
+  if (hit) return hit;
+  const curve = buildCurve(lane, turn);
+  const t_stop = (SPAWN_DIST - 3.5) / curve.getLength();
+  CURVE_CACHE.set(key, { curve, t_stop });
+  return { curve, t_stop };
+}
+
+// ── Color & Vehicle Type Generator ──────────────────────────────────────────
+const VEHICLE_COLORS = [
+  "#dc2626", "#2563eb", "#16a34a", "#ea580c",
+  "#9333ea", "#0891b2", "#db2777", "#e2e8f0",
+  "#292524", "#facc15",
+] as const;
+
+const VEHICLE_TYPES = ["sedan", "suv", "hatchback", "sportscar", "bike"] as const;
+
 function getVehicleProps(id: string, isEmergency?: boolean) {
   if (isEmergency) {
     return {
@@ -128,159 +161,189 @@ function getVehicleProps(id: string, isEmergency?: boolean) {
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const colors = [
-    "#dc2626", "#2563eb", "#16a34a", "#ea580c",
-    "#9333ea", "#0891b2", "#db2777", "#e2e8f0",
-    "#292524", "#facc15",
-  ];
-  const types = ["sedan", "suv", "hatchback", "sportscar", "bike"] as const;
   return {
-    paintColor: colors[Math.abs(hash) % colors.length],
-    type: types[Math.abs(hash >> 3) % types.length],
+    paintColor: VEHICLE_COLORS[Math.abs(hash) % VEHICLE_COLORS.length],
+    type: VEHICLE_TYPES[Math.abs(hash >> 3) % VEHICLE_TYPES.length],
   };
 }
 
-function useMaterials(paintColor: string, isWaiting: boolean) {
-  return useMemo(() => ({
-    paint: new MeshStandardMaterial({
-      color: paintColor, roughness: 0.25, metalness: 0.75,
-      emissive: paintColor, emissiveIntensity: 0.08,
-    }),
-    window: new MeshStandardMaterial({
-      color: "#0a0a14", roughness: 0.02, metalness: 0.97,
-      transparent: true, opacity: 0.88,
-    }),
-    wheel: new MeshStandardMaterial({ color: "#0f0f0f", roughness: 0.7, metalness: 0.3 }),
-    headlight: new MeshStandardMaterial({
-      color: "#fffde7", emissive: "#fffde7", emissiveIntensity: 2.2,
-    }),
-    brakelight: new MeshStandardMaterial({
-      color: "#ff0000", emissive: "#ff0000",
-      emissiveIntensity: isWaiting ? 3.5 : 0.25,
-    }),
-  }), [paintColor, isWaiting]);
+// ── Shared Module Geometries (0 GC Churn & 0 GPU Buffer Re-allocations) ──────
+const WHEEL_GEO = new CylinderGeometry(0.09, 0.09, 0.07, 8);
+
+// Sedan
+const SEDAN_BODY_GEO = new BoxGeometry(0.42, 0.14, 0.84);
+const SEDAN_CABIN_GEO = new BoxGeometry(0.38, 0.11, 0.46);
+const SEDAN_WINDOW_GEO = new BoxGeometry(0.39, 0.08, 0.43);
+
+// SUV
+const SUV_BODY_GEO = new BoxGeometry(0.44, 0.18, 0.82);
+const SUV_CABIN_GEO = new BoxGeometry(0.40, 0.13, 0.50);
+const SUV_WINDOW_GEO = new BoxGeometry(0.41, 0.09, 0.47);
+
+// Hatchback
+const HATCH_BODY_GEO = new BoxGeometry(0.42, 0.14, 0.74);
+const HATCH_CABIN_GEO = new BoxGeometry(0.38, 0.11, 0.44);
+const HATCH_WINDOW_GEO = new BoxGeometry(0.39, 0.08, 0.41);
+
+// Sportscar
+const SPORT_BODY_GEO = new BoxGeometry(0.46, 0.10, 0.88);
+const SPORT_CABIN_GEO = new BoxGeometry(0.38, 0.09, 0.40);
+const SPORT_WINDOW_GEO = new BoxGeometry(0.39, 0.07, 0.37);
+
+// Bike
+const BIKE_FRAME_GEO = new BoxGeometry(0.12, 0.20, 0.45);
+const BIKE_TANK_GEO = new BoxGeometry(0.11, 0.08, 0.18);
+const BIKE_SEAT_GEO = new BoxGeometry(0.10, 0.03, 0.16);
+const BIKE_BAR_GEO = new CylinderGeometry(0.015, 0.015, 0.26, 8);
+
+// Ambulance
+const AMBULANCE_BODY_GEO = new BoxGeometry(0.46, 0.28, 0.85);
+const AMBULANCE_CAB_GEO = new BoxGeometry(0.44, 0.14, 0.25);
+const AMBULANCE_WINDOW_GEO = new BoxGeometry(0.41, 0.08, 0.18);
+const AMBULANCE_CROSS_H_GEO = new BoxGeometry(0.12, 0.03, 0.005);
+const AMBULANCE_CROSS_V_GEO = new BoxGeometry(0.03, 0.12, 0.005);
+const AMBULANCE_SIREN_BAR_GEO = new BoxGeometry(0.3, 0.03, 0.06);
+const AMBULANCE_FLASHER_GEO = new BoxGeometry(0.1, 0.03, 0.05);
+
+// Lights
+const HEADLIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
+const BRAKELIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
+const BIKE_HEADLIGHT_GEO = new BoxGeometry(0.08, 0.06, 0.01);
+const BIKE_BRAKELIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
+
+// ── Shared Static Materials Singletons (0 Shader Re-compilations) ────────────
+const WINDOW_MAT = new MeshStandardMaterial({
+  color: "#0a0a14",
+  roughness: 0.02,
+  metalness: 0.97,
+  transparent: true,
+  opacity: 0.88,
+});
+
+const WHEEL_MAT = new MeshStandardMaterial({
+  color: "#0f0f0f",
+  roughness: 0.7,
+  metalness: 0.3,
+});
+
+const BIKE_BAR_MAT = new MeshStandardMaterial({
+  color: "#0f0f0f",
+  roughness: 0.5,
+});
+
+const HEADLIGHT_MAT = new MeshStandardMaterial({
+  color: "#fffde7",
+  emissive: "#fffde7",
+  emissiveIntensity: 2.2,
+});
+
+const BRAKELIGHT_NORMAL_MAT = new MeshStandardMaterial({
+  color: "#ff0000",
+  emissive: "#ff0000",
+  emissiveIntensity: 0.25,
+});
+
+const BRAKELIGHT_WAITING_MAT = new MeshStandardMaterial({
+  color: "#ff0000",
+  emissive: "#ff0000",
+  emissiveIntensity: 3.5,
+});
+
+const CROSS_MAT = new MeshStandardMaterial({
+  color: "#dc2626",
+  roughness: 0.3,
+});
+
+const SIREN_BAR_MAT = new MeshStandardMaterial({
+  color: "#1f2937",
+  metalness: 0.8,
+  roughness: 0.2,
+});
+
+// Paint material palette cache (10 colors + ambulance white = 11 cached instances)
+const PAINT_MAT_CACHE = new Map<string, MeshStandardMaterial>();
+
+function getPaintMaterial(paintColor: string): MeshStandardMaterial {
+  let mat = PAINT_MAT_CACHE.get(paintColor);
+  if (!mat) {
+    mat = new MeshStandardMaterial({
+      color: paintColor,
+      roughness: 0.25,
+      metalness: 0.75,
+      emissive: paintColor,
+      emissiveIntensity: 0.08,
+    });
+    PAINT_MAT_CACHE.set(paintColor, mat);
+  }
+  return mat;
 }
 
-function CarBody({ type, mats }: {
+// ── Car Body Component (Zero GC, Reuses Module Singletons) ───────────────────
+function CarBody({
+  type,
+  paintMat,
+}: {
   type: "sedan" | "suv" | "hatchback" | "sportscar" | "bike" | "ambulance";
-  mats: ReturnType<typeof useMaterials>;
+  paintMat: MeshStandardMaterial;
 }) {
   switch (type) {
     case "suv":
       return (
         <>
-          <mesh castShadow receiveShadow position={[0, 0.10, 0]} material={mats.paint}>
-            <boxGeometry args={[0.44, 0.18, 0.82]} />
-          </mesh>
-          <mesh castShadow position={[0, 0.24, -0.05]} material={mats.paint}>
-            <boxGeometry args={[0.40, 0.13, 0.50]} />
-          </mesh>
-          <mesh position={[0, 0.24, -0.05]} material={mats.window}>
-            <boxGeometry args={[0.41, 0.09, 0.47]} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.1, 0]} geometry={SUV_BODY_GEO} material={paintMat} />
+          <mesh castShadow position={[0, 0.24, -0.05]} geometry={SUV_CABIN_GEO} material={paintMat} />
+          <mesh position={[0, 0.24, -0.05]} geometry={SUV_WINDOW_GEO} material={WINDOW_MAT} />
         </>
       );
     case "hatchback":
       return (
         <>
-          <mesh castShadow receiveShadow position={[0, 0.08, 0]} material={mats.paint}>
-            <boxGeometry args={[0.42, 0.14, 0.74]} />
-          </mesh>
-          <mesh castShadow position={[0, 0.19, -0.07]} material={mats.paint}>
-            <boxGeometry args={[0.38, 0.11, 0.44]} />
-          </mesh>
-          <mesh position={[0, 0.19, -0.07]} material={mats.window}>
-            <boxGeometry args={[0.39, 0.08, 0.41]} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.08, 0]} geometry={HATCH_BODY_GEO} material={paintMat} />
+          <mesh castShadow position={[0, 0.19, -0.07]} geometry={HATCH_CABIN_GEO} material={paintMat} />
+          <mesh position={[0, 0.19, -0.07]} geometry={HATCH_WINDOW_GEO} material={WINDOW_MAT} />
         </>
       );
     case "sportscar":
       return (
         <>
-          <mesh castShadow receiveShadow position={[0, 0.06, 0]} material={mats.paint}>
-            <boxGeometry args={[0.46, 0.10, 0.88]} />
-          </mesh>
-          <mesh castShadow position={[0, 0.14, -0.03]} material={mats.paint}>
-            <boxGeometry args={[0.38, 0.09, 0.40]} />
-          </mesh>
-          <mesh position={[0, 0.14, -0.03]} material={mats.window}>
-            <boxGeometry args={[0.39, 0.07, 0.37]} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.06, 0]} geometry={SPORT_BODY_GEO} material={paintMat} />
+          <mesh castShadow position={[0, 0.14, -0.03]} geometry={SPORT_CABIN_GEO} material={paintMat} />
+          <mesh position={[0, 0.14, -0.03]} geometry={SPORT_WINDOW_GEO} material={WINDOW_MAT} />
         </>
       );
     case "bike":
       return (
         <>
-          {/* Main frame block */}
-          <mesh castShadow receiveShadow position={[0, 0.12, 0]} material={mats.window}>
-            <boxGeometry args={[0.12, 0.20, 0.45]} />
-          </mesh>
-          {/* Fuel tank */}
-          <mesh castShadow position={[0, 0.22, 0.08]} material={mats.paint}>
-            <boxGeometry args={[0.11, 0.08, 0.18]} />
-          </mesh>
-          {/* Rider seat */}
-          <mesh castShadow position={[0, 0.20, -0.08]} material={mats.wheel}>
-            <boxGeometry args={[0.10, 0.03, 0.16]} />
-          </mesh>
-          {/* Handlebars */}
-          <mesh position={[0, 0.25, 0.16]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.015, 0.015, 0.26, 8]} />
-            <meshStandardMaterial color="#0f0f0f" roughness={0.5} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.12, 0]} geometry={BIKE_FRAME_GEO} material={WINDOW_MAT} />
+          <mesh castShadow position={[0, 0.22, 0.08]} geometry={BIKE_TANK_GEO} material={paintMat} />
+          <mesh position={[0, 0.2, -0.08]} geometry={BIKE_SEAT_GEO} material={WHEEL_MAT} />
+          <mesh position={[0, 0.25, 0.16]} rotation={[0, 0, Math.PI / 2]} geometry={BIKE_BAR_GEO} material={BIKE_BAR_MAT} />
         </>
       );
     case "ambulance":
       return (
         <>
-          {/* Main Ambulance Body */}
-          <mesh castShadow receiveShadow position={[0, 0.18, -0.05]} material={mats.paint}>
-            <boxGeometry args={[0.46, 0.28, 0.85]} />
-          </mesh>
-          {/* Driver Cab (Front) */}
-          <mesh castShadow position={[0, 0.11, 0.35]} material={mats.paint}>
-            <boxGeometry args={[0.44, 0.14, 0.25]} />
-          </mesh>
-          {/* Cab Window */}
-          <mesh position={[0, 0.13, 0.38]} material={mats.window}>
-            <boxGeometry args={[0.41, 0.08, 0.18]} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.18, -0.05]} geometry={AMBULANCE_BODY_GEO} material={paintMat} />
+          <mesh castShadow position={[0, 0.11, 0.35]} geometry={AMBULANCE_CAB_GEO} material={paintMat} />
+          <mesh position={[0, 0.13, 0.38]} geometry={AMBULANCE_WINDOW_GEO} material={WINDOW_MAT} />
           {/* Red Cross Left Side */}
           <group position={[-0.231, 0.18, -0.05]} rotation={[0, -Math.PI / 2, 0]}>
-            <mesh castShadow>
-              <boxGeometry args={[0.12, 0.03, 0.005]} />
-              <meshStandardMaterial color="#dc2626" roughness={0.3} />
-            </mesh>
-            <mesh castShadow>
-              <boxGeometry args={[0.03, 0.12, 0.005]} />
-              <meshStandardMaterial color="#dc2626" roughness={0.3} />
-            </mesh>
+            <mesh geometry={AMBULANCE_CROSS_H_GEO} material={CROSS_MAT} />
+            <mesh geometry={AMBULANCE_CROSS_V_GEO} material={CROSS_MAT} />
           </group>
           {/* Red Cross Right Side */}
           <group position={[0.231, 0.18, -0.05]} rotation={[0, Math.PI / 2, 0]}>
-            <mesh castShadow>
-              <boxGeometry args={[0.12, 0.03, 0.005]} />
-              <meshStandardMaterial color="#dc2626" roughness={0.3} />
-            </mesh>
-            <mesh castShadow>
-              <boxGeometry args={[0.03, 0.12, 0.005]} />
-              <meshStandardMaterial color="#dc2626" roughness={0.3} />
-            </mesh>
+            <mesh geometry={AMBULANCE_CROSS_H_GEO} material={CROSS_MAT} />
+            <mesh geometry={AMBULANCE_CROSS_V_GEO} material={CROSS_MAT} />
           </group>
         </>
       );
-    default:
+    default: // sedan
       return (
         <>
-          <mesh castShadow receiveShadow position={[0, 0.08, 0]} material={mats.paint}>
-            <boxGeometry args={[0.42, 0.14, 0.84]} />
-          </mesh>
-          <mesh castShadow position={[0, 0.19, -0.03]} material={mats.paint}>
-            <boxGeometry args={[0.38, 0.11, 0.46]} />
-          </mesh>
-          <mesh position={[0, 0.19, -0.03]} material={mats.window}>
-            <boxGeometry args={[0.39, 0.08, 0.43]} />
-          </mesh>
+          <mesh castShadow receiveShadow position={[0, 0.08, 0]} geometry={SEDAN_BODY_GEO} material={paintMat} />
+          <mesh castShadow position={[0, 0.19, -0.03]} geometry={SEDAN_CABIN_GEO} material={paintMat} />
+          <mesh position={[0, 0.19, -0.03]} geometry={SEDAN_WINDOW_GEO} material={WINDOW_MAT} />
         </>
       );
   }
@@ -292,11 +355,19 @@ interface VehicleProps {
 
 export default function Vehicle({ vehicle }: VehicleProps) {
   const turn = (vehicle.turn ?? "straight") as Turn;
-  const { paintColor, type } = useMemo(() => getVehicleProps(vehicle.id, vehicle.is_emergency), [vehicle.id, vehicle.is_emergency]);
-  const mats = useMaterials(paintColor, vehicle.state === "waiting");
+  const { paintColor, type } = useMemo(
+    () => getVehicleProps(vehicle.id, vehicle.is_emergency),
+    [vehicle.id, vehicle.is_emergency]
+  );
 
-  const curve = useMemo(() => buildCurve(vehicle.lane, turn), [vehicle.lane, turn]);
-  const t_stop = useMemo(() => (SPAWN_DIST - 3.5) / curve.getLength(), [curve]);
+  const paintMat = useMemo(() => getPaintMaterial(paintColor), [paintColor]);
+  const isWaiting = vehicle.state === "waiting";
+  const brakelightMat = isWaiting ? BRAKELIGHT_WAITING_MAT : BRAKELIGHT_NORMAL_MAT;
+
+  const { curve, t_stop } = useMemo(
+    () => getCachedCurve(vehicle.lane, turn),
+    [vehicle.lane, turn]
+  );
 
   const groupRef = useRef<Group>(null);
   const smoothRotRef = useRef<number | null>(null);
@@ -307,8 +378,8 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const lrRef = useRef<Mesh>(null);
 
   // Siren refs for emergency vehicles
-  const sirenRedMeshRef = useRef<import("three").MeshStandardMaterial>(null);
-  const sirenBlueMeshRef = useRef<import("three").MeshStandardMaterial>(null);
+  const sirenRedMeshRef = useRef<MeshStandardMaterial>(null);
+  const sirenBlueMeshRef = useRef<MeshStandardMaterial>(null);
   const sirenRedLightRef = useRef<import("three").PointLight>(null);
   const sirenBlueLightRef = useRef<import("three").PointLight>(null);
 
@@ -318,8 +389,6 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const lastVisualTRef = useRef(vehicle.position);
   const lastUpdateTimeRef = useRef<number | null>(null);
   const lastUpdateIntervalRef = useRef(0.1);
-
-  const wheelGeo = useMemo(() => new CylinderGeometry(0.09, 0.09, 0.07, 10), []);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
@@ -407,24 +476,18 @@ export default function Vehicle({ vehicle }: VehicleProps) {
 
   return (
     <group ref={groupRef}>
-      <CarBody type={type} mats={mats} />
+      <CarBody type={type} paintMat={paintMat} />
 
       {/* Sirens for emergency vehicle (Ambulance) */}
       {type === "ambulance" && (
         <group position={[0, 0.33, 0.1]}>
-          {/* Siren Base Bar */}
-          <mesh castShadow>
-            <boxGeometry args={[0.3, 0.03, 0.06]} />
-            <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
-          </mesh>
+          <mesh geometry={AMBULANCE_SIREN_BAR_GEO} material={SIREN_BAR_MAT} />
           {/* Red Flasher */}
-          <mesh position={[-0.08, 0.02, 0]}>
-            <boxGeometry args={[0.1, 0.03, 0.05]} />
+          <mesh position={[-0.08, 0.02, 0]} geometry={AMBULANCE_FLASHER_GEO}>
             <meshStandardMaterial ref={sirenRedMeshRef} color="#ff0000" emissive="#ff0000" emissiveIntensity={0.2} />
           </mesh>
           {/* Blue Flasher */}
-          <mesh position={[0.08, 0.02, 0]}>
-            <boxGeometry args={[0.1, 0.03, 0.05]} />
+          <mesh position={[0.08, 0.02, 0]} geometry={AMBULANCE_FLASHER_GEO}>
             <meshStandardMaterial ref={sirenBlueMeshRef} color="#0000ff" emissive="#0000ff" emissiveIntensity={0.2} />
           </mesh>
           {/* Sirens point lights */}
@@ -433,88 +496,73 @@ export default function Vehicle({ vehicle }: VehicleProps) {
         </group>
       )}
 
+      {/* Headlights (selective shadow removal for performance) */}
       {isBike ? (
-        <mesh position={[0, 0.22, 0.32]} material={mats.headlight} castShadow>
-          <boxGeometry args={[0.08, 0.06, 0.01]} />
-        </mesh>
+        <mesh position={[0, 0.22, 0.32]} geometry={BIKE_HEADLIGHT_GEO} material={HEADLIGHT_MAT} />
       ) : (
         <>
-          <mesh position={[-0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
-            <boxGeometry args={[0.06, 0.04, 0.01]} />
-          </mesh>
-          <mesh position={[0.14, 0.07, 0.43]} material={mats.headlight} castShadow>
-            <boxGeometry args={[0.06, 0.04, 0.01]} />
-          </mesh>
+          <mesh position={[-0.14, 0.07, 0.43]} geometry={HEADLIGHT_GEO} material={HEADLIGHT_MAT} />
+          <mesh position={[0.14, 0.07, 0.43]} geometry={HEADLIGHT_GEO} material={HEADLIGHT_MAT} />
         </>
       )}
 
+      {/* Brakelights */}
       {isBike ? (
-        <mesh position={[0, 0.18, -0.32]} material={mats.brakelight} castShadow>
-          <boxGeometry args={[0.06, 0.04, 0.01]} />
-        </mesh>
+        <mesh position={[0, 0.18, -0.32]} geometry={BIKE_BRAKELIGHT_GEO} material={brakelightMat} />
       ) : (
         <>
-          <mesh position={[-0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
-            <boxGeometry args={[0.06, 0.04, 0.01]} />
-          </mesh>
-          <mesh position={[0.14, 0.07, -0.43]} material={mats.brakelight} castShadow>
-            <boxGeometry args={[0.06, 0.04, 0.01]} />
-          </mesh>
+          <mesh position={[-0.14, 0.07, -0.43]} geometry={BRAKELIGHT_GEO} material={brakelightMat} />
+          <mesh position={[0.14, 0.07, -0.43]} geometry={BRAKELIGHT_GEO} material={brakelightMat} />
         </>
       )}
 
+      {/* Wheels */}
       {isBike ? (
         <>
           <mesh
             ref={rfRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[0, wy, 0.25]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
           <mesh
             ref={rrRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[0, wy, -0.25]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
         </>
       ) : (
         <>
           <mesh
             ref={rfRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[0.22, wy, wz]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
           <mesh
             ref={lfRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[-0.22, wy, wz]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
           <mesh
             ref={rrRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[0.22, wy, -wz]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
           <mesh
             ref={lrRef}
-            geometry={wheelGeo}
-            material={mats.wheel}
+            geometry={WHEEL_GEO}
+            material={WHEEL_MAT}
             position={[-0.22, wy, -wz]}
             rotation={[0, 0, Math.PI / 2]}
-            castShadow
           />
         </>
       )}

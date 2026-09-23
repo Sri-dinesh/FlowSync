@@ -38,6 +38,7 @@ export const GlassTower = React.memo(function GlassTower({
   // Window band horizontal spandrel strips
   const numFloors = Math.floor(h / 0.7);
   const floorSlabGeo = useMemo(() => new BoxGeometry(w + 0.04, 0.05, d + 0.04), [w, d]);
+  const bladeGeo = useMemo(() => new BoxGeometry(0.06, h + 0.2, 0.06), [h]);
 
   // Facade Materials
   const glassMat = useMemo(
@@ -114,22 +115,22 @@ export const GlassTower = React.memo(function GlassTower({
 
       {/* ── Vertical Architectural Accent Blades on Corners ── */}
       <mesh
-        geometry={new BoxGeometry(0.06, h + 0.2, 0.06)}
+        geometry={bladeGeo}
         material={accentMat}
         position={[-w / 2, h / 2 + 0.9, -d / 2]}
       />
       <mesh
-        geometry={new BoxGeometry(0.06, h + 0.2, 0.06)}
+        geometry={bladeGeo}
         material={accentMat}
         position={[w / 2, h / 2 + 0.9, -d / 2]}
       />
       <mesh
-        geometry={new BoxGeometry(0.06, h + 0.2, 0.06)}
+        geometry={bladeGeo}
         material={accentMat}
         position={[-w / 2, h / 2 + 0.9, d / 2]}
       />
       <mesh
-        geometry={new BoxGeometry(0.06, h + 0.2, 0.06)}
+        geometry={bladeGeo}
         material={accentMat}
         position={[w / 2, h / 2 + 0.9, d / 2]}
       />
@@ -294,6 +295,7 @@ export const PlazaTower = React.memo(function PlazaTower({
   const [w, h, d] = size;
   const towerGeo = useMemo(() => new BoxGeometry(w, h, d), [w, h, d]);
   const crownGeo = useMemo(() => new BoxGeometry(w + 0.1, 0.3, d + 0.1), [w, d]);
+  const edgeGeo = useMemo(() => new BoxGeometry(0.04, h, 0.04), [h]);
 
   const glassMat = useMemo(
     () =>
@@ -323,22 +325,22 @@ export const PlazaTower = React.memo(function PlazaTower({
 
       {/* Illuminated Edge Fin Ribbons */}
       <mesh
-        geometry={new BoxGeometry(0.04, h, 0.04)}
+        geometry={edgeGeo}
         material={neonMat}
         position={[-w / 2 + 0.02, h / 2, -d / 2 + 0.02]}
       />
       <mesh
-        geometry={new BoxGeometry(0.04, h, 0.04)}
+        geometry={edgeGeo}
         material={neonMat}
         position={[w / 2 - 0.02, h / 2, -d / 2 + 0.02]}
       />
       <mesh
-        geometry={new BoxGeometry(0.04, h, 0.04)}
+        geometry={edgeGeo}
         material={neonMat}
         position={[-w / 2 + 0.02, h / 2, d / 2 - 0.02]}
       />
       <mesh
-        geometry={new BoxGeometry(0.04, h, 0.04)}
+        geometry={edgeGeo}
         material={neonMat}
         position={[w / 2 - 0.02, h / 2, d / 2 - 0.02]}
       />

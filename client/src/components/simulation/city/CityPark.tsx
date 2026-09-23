@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
 import {
@@ -61,16 +61,14 @@ export function CityPark({
 
   const waterMat = useMemo(
     () =>
-      new MeshPhysicalMaterial({
+      new MeshStandardMaterial({
         color: "#0284c7",
-        roughness: 0.05,
-        metalness: 0.1,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.05,
-        transmission: 0.6,
-        ior: 1.333,
+        roughness: 0.1,
+        metalness: 0.2,
+        transparent: true,
+        opacity: 0.8,
         emissive: "#0369a1",
-        emissiveIntensity: 0.3,
+        emissiveIntensity: 0.4,
       }),
     []
   );

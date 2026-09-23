@@ -46,6 +46,7 @@ export default function Header() {
               <Link
                 key={key}
                 href={href}
+                prefetch={false}
                 className={`text-[11px] px-3 py-1.5 rounded-md border font-medium tracking-wide transition-all ${
                   isActive
                     ? "text-white bg-white/10 border-white/20"

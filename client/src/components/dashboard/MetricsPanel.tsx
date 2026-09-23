@@ -14,15 +14,10 @@ function AnimatedValue({
   suffix?: string;
 }) {
   return (
-    <motion.span
-      key={value}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-    >
+    <span className="tabular-nums transition-colors duration-150">
       {value.toFixed(1)}
       {suffix}
-    </motion.span>
+    </span>
   );
 }
 

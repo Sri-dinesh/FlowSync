@@ -45,7 +45,9 @@ const SimulationCanvas = memo(function SimulationCanvas() {
       <Canvas
         orthographic
         shadows
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
+        performance={{ min: 0.5 }}
+        gl={{ powerPreference: "high-performance", antialias: true, alpha: false }}
         camera={{ position: [20, 20, 20], zoom: 45, near: 0.1, far: 1000 }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(0, 0, 0);
@@ -65,8 +67,8 @@ const SimulationCanvas = memo(function SimulationCanvas() {
                  position={[20, 40, 20]} 
                  intensity={2.0} 
                  castShadow 
-                 shadow-mapSize-width={2048} 
-                 shadow-mapSize-height={2048}
+                 shadow-mapSize-width={1024} 
+                 shadow-mapSize-height={1024}
                  shadow-bias={-0.0001}
                  color="#fffcf2"
                />
@@ -87,8 +89,8 @@ const SimulationCanvas = memo(function SimulationCanvas() {
                   position={[10, 20, 10]} 
                   intensity={1.2} 
                   castShadow 
-                  shadow-mapSize-width={2048} 
-                  shadow-mapSize-height={2048}
+                  shadow-mapSize-width={1024} 
+                  shadow-mapSize-height={1024}
                   shadow-bias={-0.0001}
                 />
                 <directionalLight 
@@ -106,6 +108,7 @@ const SimulationCanvas = memo(function SimulationCanvas() {
           <IntersectionScene />
           
           <ContactShadows 
+            frames={1}
             position={[0, 0.01, 0]} 
             opacity={0.8} 
             scale={50} 
@@ -129,7 +132,7 @@ const SimulationCanvas = memo(function SimulationCanvas() {
             autoRotateSpeed={0.5}
           />
 
-          <EffectComposer>
+          <EffectComposer multisampling={0}>
             <Bloom 
               luminanceThreshold={timeOfDay === "day" ? 0.9 : 0.2} 
               luminanceSmoothing={0.9} 

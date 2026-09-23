@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Text, Billboard } from "@react-three/drei";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
@@ -93,11 +94,23 @@ export default function IntersectionScene() {
     west:  queueLengths.west  ?? 0,
   };
 
-  const avgWaitPerDir = (dir: string): number => {
-    const waiting = vehicles.filter((v) => v.lane === dir && v.state !== "passed" && v.wait_time > 0);
-    if (waiting.length === 0) return 0;
-    return waiting.reduce((sum, v) => sum + v.wait_time, 0) / waiting.length;
-  };
+  const avgWaitTimes = useMemo(() => {
+    const sums: Record<string, number> = { north: 0, south: 0, east: 0, west: 0 };
+    const counts: Record<string, number> = { north: 0, south: 0, east: 0, west: 0 };
+    for (let i = 0; i < vehicles.length; i++) {
+      const v = vehicles[i];
+      if (v.state !== "passed" && v.wait_time > 0 && v.lane in sums) {
+        sums[v.lane] += v.wait_time;
+        counts[v.lane] += 1;
+      }
+    }
+    return {
+      north: counts.north > 0 ? sums.north / counts.north : 0,
+      south: counts.south > 0 ? sums.south / counts.south : 0,
+      east: counts.east > 0 ? sums.east / counts.east : 0,
+      west: counts.west > 0 ? sums.west / counts.west : 0,
+    };
+  }, [vehicles]);
 
   return (
     <group>
@@ -108,9 +121,10 @@ export default function IntersectionScene() {
       <TrafficLight color={resolveLightColor(signalPhase, signalColor, "south")} position={[ 3.2, 0,  3.2]} direction="south" />
       <TrafficLight color={resolveLightColor(signalPhase, signalColor, "east")}  position={[ 3.2, 0, -3.2]} direction="east"  />
       <TrafficLight color={resolveLightColor(signalPhase, signalColor, "west")}  position={[-3.2, 0,  3.2]} direction="west"  />
-      <QueueLabel queueCount={displayQueueLengths.north} avgWait={avgWaitPerDir("north")} position={[-1.2, 2.5, -7.2]} />
-      <QueueLabel queueCount={displayQueueLengths.south} avgWait={avgWaitPerDir("south")} position={[ 1.2, 2.5,  7.2]} />
-      <QueueLabel queueCount={displayQueueLengths.east}  avgWait={avgWaitPerDir("east")}  position={[ 7.2, 2.5, -1.2]} />
+      <QueueLabel queueCount={displayQueueLengths.north} avgWait={avgWaitTimes.north} position={[-1.2, 2.5, -7.2]} />
+      <QueueLabel queueCount={displayQueueLengths.south} avgWait={avgWaitTimes.south} position={[ 1.2, 2.5,  7.2]} />
+      <QueueLabel queueCount={displayQueueLengths.east}  avgWait={avgWaitTimes.east}  position={[ 7.2, 2.5, -1.2]} />
+      <QueueLabel queueCount={displayQueueLengths.west}  avgWait={avgWaitTimes.west}  position={[-7.2, 2.5,  1.2]} />
       {vehicles.map((vehicle) => <Vehicle key={vehicle.id} vehicle={vehicle} />)}
     </group>
   );
