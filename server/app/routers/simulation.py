@@ -1,5 +1,5 @@
 import asyncio
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -44,12 +44,35 @@ def _build_snapshot(app) -> MetricsSnapshot:
     )
 
 
+class StartSimulationPayload(BaseModel):
+    duration_seconds: Optional[float] = None
+
+
 @router.post("/start")
-async def start_simulation(request: Request) -> dict:
+async def start_simulation(request: Request, payload: Optional[StartSimulationPayload] = None) -> dict:
     app = request.app
     intersection = app.state.sim_intersection
+
+    # Cancel any active benchmark task
+    if getattr(app.state, "benchmark_task", None) is not None:
+        app.state.benchmark_task.cancel()
+        app.state.benchmark_task = None
+
     intersection.reset()
     intersection.spawner.set_enabled(True)
+    try:
+        intersection.spawner.seed_initial_vehicles(intersection.lanes)
+    except Exception:
+        pass
+
+    app.state.run_start_step = 0
+    if payload and payload.duration_seconds:
+        try:
+            app.state.target_duration = max(5.0, min(3600.0, float(payload.duration_seconds)))
+        except (ValueError, TypeError):
+            app.state.target_duration = None
+    else:
+        app.state.target_duration = None
 
     if not app.state.sim_running:
         app.state.sim_running = True
@@ -71,6 +94,7 @@ async def stop_simulation(request: Request) -> dict:
         app.state.benchmark_task.cancel()
         app.state.benchmark_task = None
     app.state.sim_running = False
+    app.state.target_duration = None
     app.state.sim_intersection.spawner.set_enabled(False)
 
     simulation_id = app.state.current_simulation_id
@@ -103,18 +127,39 @@ async def stop_simulation(request: Request) -> dict:
 @router.post("/reset")
 async def reset_simulation(request: Request) -> dict:
     from ..websockets.simulation_ws import manager
+    from ..schemas.simulation_schema import build_frame
 
     app = request.app
     if getattr(app.state, "benchmark_task", None) is not None:
         app.state.benchmark_task.cancel()
         app.state.benchmark_task = None
-    app.state.sim_intersection.reset()
     app.state.sim_running = False
+    app.state.target_duration = None
+
+    app.state.sim_intersection.reset()
+    for lane in app.state.sim_intersection.lanes.values():
+        lane.clear()
     app.state.sim_intersection.spawner.set_enabled(False)
 
     try:
+        empty_frame = build_frame(
+            intersection=app.state.sim_intersection,
+            mode=app.state.mode,
+            episode=app.state.trainer.current_episode if getattr(app.state, "trainer", None) else 0,
+            simulation_id=None,
+            agent=getattr(app.state, "sim_agent", None),
+            last_reward=0.0,
+            cumulative_reward=0.0,
+            epsilon=0.0,
+            last_action=0,
+            was_exploring=False,
+            obs=None,
+            target_duration=None,
+        )
+        await manager.broadcast(empty_frame.model_dump())
         await manager.broadcast({
             "type": "simulation_stopped",
+            "reason": "reset",
             "simulation_id": None,
         })
     except Exception:

@@ -2,10 +2,12 @@ import datetime
 import io
 from pathlib import Path
 from typing import Any, Dict, List
+import time
+from functools import wraps
 
 import torch
 
-from .supabase_service import supabase_client
+from .supabase_service import supabase_client, retry_on_transient_error
 
 BUCKET_NAME = "model-checkpoints"
 LOCAL_MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
@@ -89,6 +91,13 @@ def list_checkpoints(model_id: str) -> List[str]:
     return [f"{folder}/{path.name}" for path in checkpoints]
 
 
+@retry_on_transient_error(max_retries=3)
+def _fetch_rl_models_from_db() -> List[Dict[str, Any]]:
+    """Fetch RL model metadata from database with retry logic."""
+    result = supabase_client.table("rl_models").select("*").execute()
+    return getattr(result, "data", []) or []
+
+
 def list_all_models() -> List[Dict[str, Any]]:
     """List all available model checkpoints from rl_models DB, Supabase Storage, and local disk."""
     import logging
@@ -98,8 +107,7 @@ def list_all_models() -> List[Dict[str, Any]]:
     # 1. Fetch metadata from rl_models database table
     db_meta: Dict[str, Dict[str, Any]] = {}
     try:
-        result = supabase_client.table("rl_models").select("*").execute()
-        rows = getattr(result, "data", []) or []
+        rows = _fetch_rl_models_from_db()
         for row in rows:
             mid = row.get("id")
             if mid:

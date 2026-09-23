@@ -5,12 +5,16 @@ Write strategy:
   - All functions are synchronous (called via asyncio.to_thread from async context).
   - Bulk inserts use a single .insert([...]) call to reduce round-trips.
   - Logging is attached to every failure so nothing silently disappears.
+  - Transient network errors (DNS, connection) are retried with exponential backoff.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+import time
+from functools import wraps
+from typing import Any, Dict, List, Optional, Callable
 from uuid import uuid4
 import datetime
+import numpy as np
 from supabase import Client, create_client
 
 from ..config import settings
@@ -23,8 +27,50 @@ supabase_client: Client = create_client(
 )
 
 
+def retry_on_transient_error(max_retries: int = 3, base_delay: float = 0.5):
+    """
+    Retry decorator for transient network errors (DNS, connection timeouts, etc.).
+    Uses exponential backoff: 0.5s, 1s, 2s between retries.
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    # Only retry on transient errors
+                    is_transient = (
+                        "temporary failure in name resolution" in error_msg or
+                        "connection reset" in error_msg or
+                        "timeout" in error_msg or
+                        "connection refused" in error_msg or
+                        "network unreachable" in error_msg or
+                        "errno -3" in error_msg
+                    )
+                    
+                    if not is_transient or attempt == max_retries - 1:
+                        raise
+                    
+                    last_exception = e
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(
+                        f"{func.__name__} attempt {attempt + 1}/{max_retries} failed with transient error, "
+                        f"retrying in {delay}s: {e}"
+                    )
+                    time.sleep(delay)
+            
+            if last_exception:
+                raise last_exception
+        return wrapper
+    return decorator
+
+
 # ─── Simulations ─────────────────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def create_simulation(mode: str) -> str:
     simulation_id = str(uuid4())
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -45,6 +91,7 @@ def create_simulation(mode: str) -> str:
         return simulation_id
 
 
+@retry_on_transient_error(max_retries=3)
 def update_simulation(
     simulation_id: str,
     status: str,
@@ -65,6 +112,7 @@ def update_simulation(
 
 # ─── Episodes ────────────────────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def save_episode(
     simulation_id: str,
     episode_num: int,
@@ -95,6 +143,7 @@ def save_episode(
 
 # ─── Traffic logs (sampled) ───────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def save_traffic_logs_bulk(rows: List[Dict[str, Any]]) -> None:
     """
     Insert multiple traffic log rows in one round-trip.
@@ -130,6 +179,7 @@ def save_traffic_log(
 
 # ─── Signal states (sampled) ──────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def save_signal_states_bulk(rows: List[Dict[str, Any]]) -> None:
     """
     Insert multiple signal state rows in one round-trip.
@@ -166,6 +216,7 @@ def save_signal_state(
 
 # ─── Performance metrics ──────────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def save_performance_metric(
     simulation_id: str,
     mode: str,
@@ -216,6 +267,18 @@ def save_model_metadata(
     Updates the existing row if it already exists (checkpoint at episode 50, 100, …)
     so we don't accumulate duplicate rows per training run.
     """
+    return _save_model_metadata_impl(simulation_id, episode, avg_reward, epsilon, total_episodes)
+
+
+@retry_on_transient_error(max_retries=3)
+def _save_model_metadata_impl(
+    simulation_id: str,
+    episode: int,
+    avg_reward: float,
+    epsilon: float,
+    total_episodes: int,
+) -> str:
+    """Implementation of save_model_metadata with retry logic."""
     model_id = simulation_id  # reuse simulation UUID as model identifier
     storage_path = f"models/{simulation_id}/checkpoint_{episode}.pt"
     version = str(episode)
@@ -268,6 +331,7 @@ def save_model_metadata(
         return model_id
 
 
+@retry_on_transient_error(max_retries=3)
 def set_active_model(model_id: str) -> None:
     try:
         # Clear all active flags first, then set the target
@@ -279,6 +343,7 @@ def set_active_model(model_id: str) -> None:
 
 # ─── Scenarios ───────────────────────────────────────────────────────────────
 
+@retry_on_transient_error(max_retries=3)
 def list_scenarios() -> List[Dict[str, Any]]:
     """Return all saved scenarios ordered by creation time (newest first)."""
     try:
@@ -361,10 +426,13 @@ def save_scenario_run(
 ) -> Dict[str, Any]:
     """Insert a benchmark run result for a scenario. Returns the created row."""
     try:
+        clean_model_id = str(model_id).strip() if model_id else f"controller_{controller}"
+        clean_model_ep = int(model_episode) if model_episode is not None else 0
+
         payload: Dict[str, Any] = {
             "scenario_id":    scenario_id,
-            "model_id":       model_id,
-            "model_episode":  model_episode,
+            "model_id":       clean_model_id,
+            "model_episode":  clean_model_ep,
             "controller":     controller,
             "scenario_hash":  scenario_hash,
             "avg_wait_time":  avg_wait_time,
