@@ -42,7 +42,9 @@ export function useScenarios() {
   }, [BASE]);
 
   useEffect(() => {
-    fetchScenarios();
+    setTimeout(() => {
+      fetchScenarios();
+    }, 0);
   }, [fetchScenarios]);
 
   // ─── Create ─────────────────────────────────────────────────────────────────

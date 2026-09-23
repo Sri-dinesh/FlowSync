@@ -46,7 +46,7 @@ export default function SimulationPage() {
   const { data: simulations = [] } = useSimulations();
   const simulationId = simulations[0]?.id ?? null;
   const mode = useSimulationStore((s) => s.mode);
-  const rl   = useSimulationStore((s) => s.currentFrame?.rl);
+  const rl = useSimulationStore((s) => s.currentFrame?.rl);
 
   // Scenario state
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
@@ -56,8 +56,8 @@ export default function SimulationPage() {
     ? {
         model_episode: scenarioBenchmarkResults.model_episode,
         avg_wait_time: scenarioBenchmarkResults.results?.ai?.avg_wait_time ?? 0,
-        total_passed:  scenarioBenchmarkResults.results?.ai?.total_passed ?? 0,
-        max_queue:     scenarioBenchmarkResults.results?.ai?.max_queue ?? 0,
+        total_passed: scenarioBenchmarkResults.results?.ai?.total_passed ?? 0,
+        max_queue: scenarioBenchmarkResults.results?.ai?.max_queue ?? 0,
         override_rate: scenarioBenchmarkResults.results?.ai?.override_rate ?? 0,
       }
     : null;
@@ -116,74 +116,74 @@ export default function SimulationPage() {
         </div>
 
         {/* Right Side: Controls Sidebar */}
-        <aside className="w-[420px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl z-10 pointer-events-auto">
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent flex-none">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+        <aside className="w-[420px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-[#0a0a0a] border-l border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 shadow-2xl z-10 pointer-events-auto">
+          <div className="border-b border-neutral-800 bg-transparent flex-none">
+            <div className="px-4 pt-6 pb-3">
+              <h3 className="text-xs font-medium text-neutral-400">
                 Controls
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5 pb-4">
+              </h3>
+            </div>
+            <div className="px-4 pb-4 space-y-5">
               <SimulationControls sendCommand={sendSimulationCommand} />
               <TrainingControls
                 sendCommand={sendTrainingCommand}
                 simulationId={simulationId}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
-            <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
+          <div className="border-b border-neutral-800 bg-transparent p-4 flex-none">
+            <h3 className="mb-3 text-xs font-medium text-neutral-400">
               Real-time Metrics
-            </CardTitle>
+            </h3>
             <MetricsPanel />
-          </Card>
+          </div>
 
           {/* Agent Reasoning — only in AI mode */}
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
-            <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
+          <div className="border-b border-neutral-800 bg-transparent p-4 flex-none">
+            <h3 className="mb-3 text-xs font-medium text-neutral-400">
               Agent Reasoning
-            </CardTitle>
+            </h3>
             <QValuePanel rl={mode === "ai" ? rl : null} />
-          </Card>
+          </div>
 
-          <Card className="rounded-none border-0 bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+          <div className="bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
+            <div className="px-4 pt-6 pb-3">
+              <h3 className="text-xs font-medium text-neutral-400">
                 Analytics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 pb-6">
+              </h3>
+            </div>
+            <div className="px-4 pb-6">
               <Tabs defaultValue="comparison" className="w-full">
                 <TabsList className="h-auto gap-1 bg-transparent p-0 flex-wrap">
                   <TabsTrigger
                     value="comparison"
-                    className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    className="text-neutral-500 hover:text-neutral-300 data-[state=active]:border-neutral-700 data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
                   >
                     Benchmark
                   </TabsTrigger>
                   <TabsTrigger
                     value="scenarios"
-                    className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    className="text-neutral-500 hover:text-neutral-300 data-[state=active]:border-neutral-700 data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
                   >
                     Scenarios
                   </TabsTrigger>
                   <TabsTrigger
                     value="training"
-                    className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    className="text-neutral-500 hover:text-neutral-300 data-[state=active]:border-neutral-700 data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
                   >
                     Training
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    className="text-neutral-500 hover:text-neutral-300 data-[state=active]:border-neutral-700 data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
                   >
                     History
                   </TabsTrigger>
                 </TabsList>
 
                 {/* Standard benchmark tab */}
-                <TabsContent value="comparison" className="mt-4 text-sm text-white/70">
+                <TabsContent value="comparison" className="mt-4 text-sm text-neutral-400">
                   <SimulationBenchmarkPanel
                     running={benchmarkRunning}
                     progress={benchmarkProgress}
@@ -208,10 +208,10 @@ export default function SimulationPage() {
 
                     {/* Run Scenario Benchmark button */}
                     {selectedScenario && (
-                      <div className="pt-2 border-t border-white/10 space-y-3">
+                      <div className="pt-2 border-t border-neutral-800 space-y-3">
                         <div>
-                          <p className="text-[11px] text-white/50 leading-relaxed">
-                            Runs <span className="text-blue-400 font-medium">Fixed</span>, <span className="text-emerald-400 font-medium">Greedy</span>, and <span className="text-violet-400 font-medium">DQN</span> on identical seeded conditions (CRN) to evaluate policy consistency.
+                          <p className="text-[11px] text-neutral-400 leading-relaxed">
+                            Runs <span className="text-white font-medium">Fixed</span>, <span className="text-white font-medium">Greedy</span>, and <span className="text-white font-medium">DQN</span> on identical seeded conditions (CRN) to evaluate policy consistency.
                           </p>
                         </div>
 
@@ -331,11 +331,10 @@ export default function SimulationPage() {
                   <EpisodeHistory simulationId={simulationId} />
                 </TabsContent>
               </Tabs>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </aside>
       </div>
     </div>
   );
 }
-

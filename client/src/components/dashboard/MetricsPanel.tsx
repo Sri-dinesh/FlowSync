@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSimulationStore } from "@/store/simulationStore";
 
 const HISTORY_LENGTH = 20;
@@ -48,15 +46,15 @@ function Sparkline({ data }: { data: number[] }) {
   }, [data]);
 
   if (!data.length) {
-    return <div className="h-10 w-full rounded bg-white/5" />;
+    return <div className="h-10 w-full rounded bg-neutral-900" />;
   }
 
   return (
     <svg viewBox="0 0 100 100" className="h-10 w-full overflow-visible">
       <polyline
         fill="none"
-        stroke="#38bdf8"
-        strokeWidth="3"
+        stroke="rgba(255,255,255,0.7)"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={points}
@@ -76,23 +74,13 @@ export default function MetricsPanel() {
   const [episodeHistory, setEpisodeHistory] = useState<number[]>([]);
 
   useEffect(() => {
-    // Only accumulate telemetry history while simulation is actively running
     if (!frame || !isRunning) {
       return;
     }
 
     const maxQueue = Math.max(...Object.values(frame.queue_lengths ?? {}), 0);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWaitHistory((prev) => [
-      ...prev.slice(-HISTORY_LENGTH + 1),
-      frame.avg_wait_time,
-    ]);
-     
-    setThroughputHistory((prev) => [
-      ...prev.slice(-HISTORY_LENGTH + 1),
-      frame.throughput,
-    ]);
-     
+    setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.avg_wait_time]);
+    setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.throughput]);
     setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
   }, [frame, isRunning]);
 
@@ -104,11 +92,7 @@ export default function MetricsPanel() {
     if (!latest) {
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEpisodeHistory((prev) => [
-      ...prev.slice(-HISTORY_LENGTH + 1),
-      latest.episode,
-    ]);
+    setEpisodeHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), latest.episode]);
   }, [trainingMetrics, isRunning]);
 
   const metrics = useMemo(() => {
@@ -134,7 +118,6 @@ export default function MetricsPanel() {
       value: metrics.avgWait,
       suffix: "s",
       history: waitHistory,
-      accent: "bg-blue-500",
       ratio: Math.min(1, metrics.avgWait / 14),
     },
     {
@@ -142,7 +125,6 @@ export default function MetricsPanel() {
       value: metrics.throughput,
       suffix: "",
       history: throughputHistory,
-      accent: "bg-emerald-500",
       ratio: Math.min(1, metrics.throughput / 200),
     },
     {
@@ -150,7 +132,6 @@ export default function MetricsPanel() {
       value: metrics.maxQueue,
       suffix: "",
       history: queueHistory,
-      accent: "bg-amber-400",
       ratio: Math.min(1, metrics.maxQueue / 10),
     },
     {
@@ -158,32 +139,31 @@ export default function MetricsPanel() {
       value: metrics.currentEpisode,
       suffix: "",
       history: episodeHistory,
-      accent: "bg-violet-400",
       ratio: Math.min(1, metrics.currentEpisode / 500),
     },
   ];
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {/* Real-time streaming status banner */}
       <div className="flex items-center justify-between px-0.5 text-[10px]">
         <div className="flex items-center gap-1.5">
           <span
-            className={`h-2 w-2 rounded-full ${
+            className={`h-1.5 w-1.5 rounded-full ${
               isRunning
-                ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]"
-                : "bg-white/30"
+                ? "bg-white"
+                : "bg-neutral-600"
             }`}
           />
-          <span className="font-semibold uppercase tracking-wider text-white/50">
+          <span className="font-medium text-neutral-400">
             {isRunning ? "Live Stream Active" : "Telemetry Frozen"}
           </span>
         </div>
         <span
-          className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+          className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border ${
             isRunning
-              ? "text-emerald-400 bg-emerald-950/50 border-emerald-500/30"
-              : "text-amber-300 bg-amber-950/40 border-amber-500/30"
+              ? "text-white bg-neutral-800 border-neutral-700"
+              : "text-neutral-500 bg-neutral-900 border-neutral-800"
           }`}
         >
           {isRunning ? "STREAMING" : "STOPPED"}
@@ -192,25 +172,21 @@ export default function MetricsPanel() {
 
       <div className="grid grid-cols-2 gap-2">
       {cards.map((card) => (
-        <Card key={card.title} className="border-white/10 bg-[#161616]">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-[10px] uppercase tracking-[0.09em] text-white/40">
-              {card.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            <div className="text-[34px] font-medium leading-none tracking-tight text-white">
-              <AnimatedValue value={card.value} suffix={card.suffix} />
-            </div>
-            <div className="h-0.5 rounded bg-white/10">
-              <div
-                className={`h-0.5 rounded ${card.accent}`}
-                style={{ width: `${card.ratio * 100}%` }}
-              />
-            </div>
-            <Sparkline data={card.history} />
-          </CardContent>
-        </Card>
+        <div key={card.title} className="p-3 rounded-lg border border-neutral-800 bg-neutral-900/50">
+          <div className="text-[10px] font-medium text-neutral-500 mb-1 uppercase tracking-wider">
+            {card.title}
+          </div>
+          <div className="text-2xl font-medium leading-none tracking-tight text-white mb-2">
+            <AnimatedValue value={card.value} suffix={card.suffix} />
+          </div>
+          <div className="h-0.5 rounded bg-neutral-800 mb-3">
+            <div
+              className="h-0.5 rounded bg-white"
+              style={{ width: `${card.ratio * 100}%` }}
+            />
+          </div>
+          <Sparkline data={card.history} />
+        </div>
       ))}
       </div>
     </div>
