@@ -6,7 +6,6 @@ import type { CityMode } from "@/types/city";
 import { useCitySocket } from "@/hooks/useCitySocket";
 
 import Header from "@/components/layout/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import CityControls from "@/components/city/CityControls";
@@ -125,14 +124,14 @@ export default function CityPage() {
         </div>
 
         {/* Right Side: Controls Sidebar */}
-        <aside className="w-[420px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl z-10 pointer-events-auto">
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent flex-none">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+        <aside className="w-[420px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-[#0a0a0a] border-l border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 shadow-2xl z-10 pointer-events-auto">
+          <div className="border-b border-neutral-800 bg-transparent flex-none">
+            <div className="px-4 pt-6 pb-3">
+              <h3 className="text-xs font-medium text-neutral-400">
                 Controls
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5 pb-4">
+              </h3>
+            </div>
+            <div className="px-4 pb-4 space-y-5">
               <CityControls
                 running={running}
                 mode={mode}
@@ -145,35 +144,35 @@ export default function CityPage() {
                 onSpawnRateChange={handleSpawnRateChange}
                 onToggleCongestion={() => setShowCongestion((v) => !v)}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="rounded-none border-0 border-b border-white/10 bg-transparent p-4 flex-none">
-            <CardTitle className="mb-3 text-xs uppercase tracking-[0.14em] text-white/35">
+          <div className="border-b border-neutral-800 bg-transparent p-4 flex-none">
+            <h3 className="mb-3 text-xs font-medium text-neutral-400">
               City Metrics
-            </CardTitle>
+            </h3>
             <CityMetricsPanel frame={frame} />
-          </Card>
+          </div>
 
-          <Card className="rounded-none border-0 bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs uppercase tracking-[0.14em] text-white/35">
+          <div className="bg-transparent flex-none min-h-[300px] overflow-visible pb-10">
+            <div className="px-4 pt-6 pb-3">
+              <h3 className="text-xs font-medium text-neutral-400">
                 Analytics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 pb-6">
+              </h3>
+            </div>
+            <div className="px-4 pb-6">
               <Tabs defaultValue="comparison" className="w-full">
                 <TabsList className="h-auto gap-1 bg-transparent p-0">
                   <TabsTrigger
                     value="comparison"
-                    className="text-white/40 hover:text-white/70 data-[state=active]:border-white/20 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    className="text-neutral-500 hover:text-neutral-300 data-[state=active]:border-neutral-700 data-[state=active]:bg-neutral-800 data-[state=active]:text-white"
                   >
                     Compare
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent
                   value="comparison"
-                  className="mt-4 text-sm text-white/70"
+                  className="mt-4 text-sm text-neutral-400"
                 >
                   <CityComparisonPanel
                     results={comparisonResults}
@@ -185,8 +184,8 @@ export default function CityPage() {
                   />
                 </TabsContent>
               </Tabs>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </aside>
       </div>
     </div>

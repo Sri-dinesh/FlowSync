@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CityFrame } from "@/types/city";
 
 const HISTORY_LENGTH = 20;
@@ -38,15 +37,15 @@ function Sparkline({ data }: { data: number[] }) {
   }, [data]);
 
   if (!data.length) {
-    return <div className="h-10 w-full rounded bg-white/5" />;
+    return <div className="h-10 w-full rounded bg-neutral-900" />;
   }
 
   return (
     <svg viewBox="0 0 100 100" className="h-10 w-full overflow-visible">
       <polyline
         fill="none"
-        stroke="#38bdf8"
-        strokeWidth="3"
+        stroke="rgba(255,255,255,0.7)"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         points={points}
@@ -57,14 +56,10 @@ function Sparkline({ data }: { data: number[] }) {
 
 function QueueBar({ value, max = 12 }: { value: number; max?: number }) {
   const pct = Math.min((value / max) * 100, 100);
-  const color =
-    pct < 33 ? "from-emerald-500 to-emerald-400" :
-    pct < 66 ? "from-amber-500 to-amber-400" :
-               "from-red-500 to-red-400";
   return (
-    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+    <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
       <div
-        className={`h-full bg-gradient-to-r ${color} transition-all duration-300`}
+        className="h-full bg-white transition-all duration-300"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -73,19 +68,19 @@ function QueueBar({ value, max = 12 }: { value: number; max?: number }) {
 
 function IntersectionRow({ data }: { data: { id: string; avg_wait: number; waiting: number; signal_color: string; phase: number; queues: Record<string, number> } }) {
   const colorClass: Record<string, string> = {
-    green: "bg-emerald-500",
-    yellow: "bg-amber-400",
-    red: "bg-red-500",
+    green: "bg-white",
+    yellow: "bg-neutral-400",
+    red: "bg-neutral-600",
   };
   const totalQ = Object.values(data.queues).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex items-center gap-2 py-2 border-b border-white/5 last:border-0">
-      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colorClass[data.signal_color] ?? "bg-white/20"} shadow-lg`} />
-      <span className="text-[11px] font-bold text-white/90 w-5">ID {data.id}</span>
+    <div className="flex items-center gap-2 py-2 border-b border-neutral-800 last:border-0">
+      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${colorClass[data.signal_color] ?? "bg-neutral-700"}`} />
+      <span className="text-[11px] font-medium text-neutral-300 w-5">ID {data.id}</span>
       <QueueBar value={totalQ} max={48} />
-      <span className="text-[10px] font-mono text-white/50 w-14 text-right">{data.waiting} wait</span>
-      <span className="text-[10px] font-mono text-white/30 w-6">P{data.phase}</span>
+      <span className="text-[10px] font-mono text-neutral-500 w-14 text-right">{data.waiting} wait</span>
+      <span className="text-[10px] font-mono text-neutral-600 w-6">P{data.phase}</span>
     </div>
   );
 }
@@ -98,7 +93,7 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
 
   useEffect(() => {
     if (!frame) return;
-    
+
     setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.avg_wait_time]);
     setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.total_throughput]);
     setActiveHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.active_vehicles]);
@@ -114,7 +109,6 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
       value: metrics?.avg_wait_time ?? 0,
       suffix: "s",
       history: waitHistory,
-      accent: "bg-blue-500",
       ratio: Math.min(1, (metrics?.avg_wait_time ?? 0) / 20),
     },
     {
@@ -122,7 +116,6 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
       value: metrics?.total_throughput ?? 0,
       suffix: "",
       history: throughputHistory,
-      accent: "bg-emerald-500",
       ratio: Math.min(1, (metrics?.total_throughput ?? 0) / 400),
     },
     {
@@ -130,7 +123,6 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
       value: metrics?.active_vehicles ?? 0,
       suffix: "",
       history: activeHistory,
-      accent: "bg-amber-400",
       ratio: Math.min(1, (metrics?.active_vehicles ?? 0) / 100),
     },
     {
@@ -138,60 +130,47 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
       value: metrics?.road_vehicles ?? 0,
       suffix: "",
       history: roadsHistory,
-      accent: "bg-violet-400",
       ratio: Math.min(1, (metrics?.road_vehicles ?? 0) / 100),
     },
   ];
 
-  const congestionColors: Record<string, string> = {
-    low: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    moderate: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    high: "text-orange-400 bg-orange-500/10 border-orange-500/20",
-    critical: "text-red-400 bg-red-500/10 border-red-500/20",
-  };
-
   const currentCongestion = metrics?.congestion_level ?? "unknown";
-  const congestionStyle = congestionColors[currentCongestion] ?? "text-white/40 bg-white/5 border-white/10";
 
   return (
     <div className="space-y-4">
       {/* Congestion Level Banner */}
-      <div className={`flex items-center justify-between px-3 py-2 rounded-lg border ${congestionStyle}`}>
-        <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80">City Congestion</span>
-        <span className="text-xs font-bold uppercase tracking-widest">{currentCongestion}</span>
+      <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400">
+        <span className="text-[10px] uppercase tracking-wider font-medium opacity-80">City Congestion</span>
+        <span className="text-xs font-bold uppercase tracking-widest text-white">{currentCongestion}</span>
       </div>
 
-      {/* 2x2 Grid for Global Metrics - styled exactly like /simulation */}
+      {/* 2x2 Grid for Global Metrics */}
       <div className="grid grid-cols-2 gap-2">
         {cards.map((card) => (
-          <Card key={card.title} className="border-white/10 bg-[#161616]">
-            <CardHeader className="pb-1">
-              <CardTitle className="text-[10px] uppercase tracking-[0.09em] text-white/40">
-                {card.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pt-0">
-              <div className="text-[34px] font-medium leading-none tracking-tight text-white">
-                <AnimatedValue value={card.value} suffix={card.suffix} />
-              </div>
-              <div className="h-0.5 rounded bg-white/10">
-                <div
-                  className={`h-0.5 rounded ${card.accent}`}
-                  style={{ width: `${card.ratio * 100}%` }}
-                />
-              </div>
-              <Sparkline data={card.history} />
-            </CardContent>
-          </Card>
+          <div key={card.title} className="p-3 rounded-lg border border-neutral-800 bg-neutral-900/50">
+            <div className="text-[10px] font-medium text-neutral-500 mb-1 uppercase tracking-wider">
+              {card.title}
+            </div>
+            <div className="text-2xl font-medium leading-none tracking-tight text-white mb-2">
+              <AnimatedValue value={card.value} suffix={card.suffix} />
+            </div>
+            <div className="h-0.5 rounded bg-neutral-800 mb-3">
+              <div
+                className="h-0.5 rounded bg-white"
+                style={{ width: `${card.ratio * 100}%` }}
+              />
+            </div>
+            <Sparkline data={card.history} />
+          </div>
         ))}
       </div>
 
       {/* Per-Intersection Breakdown */}
-      <div className="space-y-1 bg-white/[0.02] rounded-lg p-3 border border-white/5">
-        <div className="text-[10px] uppercase tracking-wider text-white/40 mb-2">Per-Intersection</div>
+      <div className="space-y-1 bg-neutral-900/50 rounded-lg p-3 border border-neutral-800">
+        <div className="text-[10px] uppercase tracking-wider text-neutral-500 mb-2">Per-Intersection</div>
         {(["A", "B", "C", "D"] as const).map((id) => {
           const inter = intersections[id];
-          if (!inter) return <div key={id} className="text-[10px] text-white/20 pl-1 py-1">INT {id} — no data</div>;
+          if (!inter) return <div key={id} className="text-[10px] text-neutral-600 pl-1 py-1">INT {id} — no data</div>;
           return (
             <IntersectionRow
               key={id}

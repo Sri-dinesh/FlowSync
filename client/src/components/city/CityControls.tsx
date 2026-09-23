@@ -1,31 +1,9 @@
 "use client";
 
 import type { CityMode } from "@/types/city";
-
-function ModeButton({
-  label,
-  active,
-  onClick,
-  color,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  color: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold tracking-wider uppercase transition-all duration-200 ${
-        active
-          ? `bg-gradient-to-r ${color} text-white shadow-md shadow-black/20`
-          : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Play, Square, RotateCcw, Layers } from "lucide-react";
 
 interface CityControlsProps {
   running: boolean;
@@ -53,73 +31,106 @@ export default function CityControls({
   onToggleCongestion,
 }: CityControlsProps) {
   return (
-    <div className="flex flex-col gap-5 text-white w-full">
-      {/* Mode */}
-      <div className="space-y-2.5">
-        <div className="text-[10px] uppercase tracking-wider text-white/40">Control Mode</div>
-        <div className="flex gap-1.5">
-          <ModeButton label="Fixed" active={mode === "fixed"} onClick={() => onModeChange("fixed")} color="from-slate-600 to-slate-500" />
-          <ModeButton label="Greedy" active={mode === "greedy"} onClick={() => onModeChange("greedy")} color="from-amber-600 to-amber-500" />
-          <ModeButton label="AI" active={mode === "ai"} onClick={() => onModeChange("ai")} color="from-emerald-600 to-emerald-500" />
+    <div className="flex flex-col gap-4 text-white w-full">
+      {/* Mode toggle */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
+          <p className="text-xs font-medium text-neutral-400">Control Mode</p>
+          <p className="text-sm text-white">
+            {mode === "ai" ? "AI Agent" : mode === "greedy" ? "Greedy Controller" : "Fixed Timer"}
+          </p>
+        </div>
+        <div className="flex items-center p-1 bg-neutral-900 rounded-lg border border-neutral-800">
+          {["fixed", "greedy", "ai"].map((m) => (
+            <Button
+              key={m}
+              size="sm"
+              variant="ghost"
+              onClick={() => onModeChange(m as CityMode)}
+              className={`flex-1 h-7 text-xs capitalize ${
+                mode === m
+                  ? "bg-neutral-800 text-white shadow-sm"
+                  : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50"
+              }`}
+            >
+              {m}
+            </Button>
+          ))}
         </div>
         {mode === "ai" && (
-          <div className="text-[9px] text-emerald-400/70 italic pl-1">
+          <div className="text-[9px] text-neutral-500 italic pl-1">
             Shared-policy DQN — one agent, 4 intersections
           </div>
         )}
       </div>
 
-      {/* Start / Stop / Reset */}
-      <div className="flex gap-1.5">
-        <button
-          onClick={running ? onStop : onStart}
-          className={`flex-1 py-2 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all duration-200 shadow-lg ${
-            running
-              ? "bg-gradient-to-r from-red-700 to-rose-600 hover:from-red-600 hover:to-rose-500 text-white shadow-rose-900/20"
-              : "bg-gradient-to-r from-emerald-700 to-teal-600 hover:from-emerald-600 hover:to-teal-500 text-white shadow-emerald-900/20"
-          }`}
-        >
-          {running ? "■ Stop" : "▶ Start"}
-        </button>
-        <button
+      {/* Control buttons */}
+      <div className="flex gap-2">
+        {!running ? (
+          <Button
+            size="sm"
+            className="flex-1 bg-white text-black hover:bg-neutral-200 font-medium"
+            onClick={onStart}
+          >
+            <Play className="h-3.5 w-3.5 mr-1.5" />
+            Start
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="flex-1 bg-neutral-900 text-white border border-neutral-800 hover:bg-neutral-800"
+            onClick={onStop}
+          >
+            <Square className="h-3.5 w-3.5 mr-1.5" />
+            Stop
+          </Button>
+        )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white"
           onClick={onReset}
-          className="px-3 py-2 rounded-md text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/90 transition-all border border-white/5 hover:border-white/10"
         >
-          ↺
-        </button>
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+          Reset
+        </Button>
       </div>
 
       {/* Spawn rate */}
-      <div className="space-y-2.5">
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] uppercase tracking-wider text-white/40">Spawn Rate (λ)</span>
-          <span className="text-xs font-mono text-white/70">{spawnRate.toFixed(2)}</span>
+      <div className="space-y-1.5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-2.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 font-medium text-neutral-400">
+            Spawn Rate (λ)
+          </span>
+          <span className="font-mono text-white font-medium">{spawnRate.toFixed(2)}</span>
         </div>
-        <input
-          type="range"
+        <Slider
           min={0.05}
           max={1.5}
           step={0.05}
-          value={spawnRate}
-          onChange={(e) => onSpawnRateChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 accent-violet-500 cursor-pointer"
+          value={[spawnRate]}
+          onValueChange={(val) => onSpawnRateChange(val[0] ?? 0.3)}
         />
-        <div className="flex justify-between text-[9px] text-white/20">
-          <span>0.05</span><span>0.75</span><span>1.5</span>
+        <div className="flex justify-between text-[9px] text-neutral-500">
+          <span>0.05</span><span>0.75</span><span>1.50</span>
         </div>
       </div>
 
       {/* Congestion heatmap toggle */}
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={onToggleCongestion}
-        className={`py-2 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all border ${
+        className={`w-full h-8 text-[11px] font-medium border-neutral-800 transition-colors ${
           showCongestion
-            ? "bg-orange-600/20 text-orange-300 border-orange-600/40"
-            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+            ? "bg-neutral-800 text-white border-neutral-700"
+            : "bg-neutral-900 text-neutral-400 hover:bg-neutral-800 hover:text-white"
         }`}
       >
-        {showCongestion ? "● Congestion Heatmap ON" : "○ Congestion Heatmap"}
-      </button>
+        <Layers className="h-3.5 w-3.5 mr-1.5 text-neutral-500" />
+        {showCongestion ? "Congestion Heatmap ON" : "Congestion Heatmap OFF"}
+      </Button>
     </div>
   );
 }
