@@ -1382,6 +1382,8 @@ async def _simulation_loop(app) -> None:
     except asyncio.CancelledError:
         # Flush any remaining buffered rows before exiting
         await _flush_buffer()
+    except Exception as fatal_err:
+        logger.exception("[SimWS] Fatal error in _simulation_loop: %s", fatal_err)
     finally:
         app.state.sim_task = None
 

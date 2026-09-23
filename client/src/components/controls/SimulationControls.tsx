@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Play, RotateCcw, Square, Siren, FastForward, Gauge, Zap, Timer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,15 @@ export default function SimulationControls({
   const [simSpeed, setSimSpeed] = useState(1.0);
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const simElapsedSec = (currentFrame?.timestep ?? 0) * 0.1;
+  const runStartTimestepRef = useRef<number | null>(null);
+
+  // If backend resets timestep to 0 on a new run, adapt the base step
+  if (currentFrame && currentFrame.timestep < (runStartTimestepRef.current ?? 0)) {
+    runStartTimestepRef.current = 0;
+  }
+
+  const baseStep = runStartTimestepRef.current ?? (currentFrame?.timestep ?? 0);
+  const simElapsedSec = Math.max(0, ((currentFrame?.timestep ?? 0) - baseStep) * 0.1);
 
   const modeLabel = useMemo(
     () =>
@@ -60,6 +68,7 @@ export default function SimulationControls({
   };
 
   const handleStart = () => {
+    runStartTimestepRef.current = currentFrame?.timestep ?? 0;
     setRunning(true);
     const durationSeconds = durationMode === "timed" ? targetDuration : null;
     sendCommand({ command: "start", duration_seconds: durationSeconds });
@@ -72,6 +81,7 @@ export default function SimulationControls({
   };
 
   const handleReset = () => {
+    runStartTimestepRef.current = 0;
     // Send reset to backend first — cancels tasks, empties all vehicle queues, disables spawner
     sendCommand({ command: "reset" });
     fetch(`${API_BASE}/simulation/reset`, { method: "POST" }).catch(() => {});
@@ -83,7 +93,7 @@ export default function SimulationControls({
   useEffect(() => {
     if (!isRunning || durationMode !== "timed" || !targetDuration) return;
 
-    if (simElapsedSec >= targetDuration) {
+    if (simElapsedSec >= targetDuration && simElapsedSec > 0.5) {
       console.log(
         `[SimulationControls] Target duration reached (${simElapsedSec.toFixed(1)}s >= ${targetDuration}s). Auto-stopping simulation.`
       );

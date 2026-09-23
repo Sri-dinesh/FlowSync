@@ -136,30 +136,7 @@ class Intersection:
                         if not is_green_for_movement:
                             break
 
-                # If vehicle is behind or at the stop line, process signal/intersection entrance
-                if vehicle.position <= STOP_LINE:
-                    if not is_green_for_movement:
-                        # If light is red, vehicle stops at the stop line
-                        if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
-                            vehicle.position = STOP_LINE
-                            can_move = False
-                    else:
-                        # Light is green, check if entering the intersection
-                        entering = vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE
-                        if entering:
-                            # Allow entering if intersection is empty or reserved by the same direction group
-                            current_group = 0 if self.signal.current_phase in (0, 2) else 1
-                            reserved_group = 0 if self.intersection_reserved_phase in (0, 2) else 1 if self.intersection_reserved_phase is not None else None
-                            
-                            if (self.intersection_reserved_phase is None or current_group == reserved_group):
-                                self.vehicles_in_intersection.add(vehicle.id)
-                                self.intersection_reserved_phase = self.signal.current_phase
-                            else:
-                                # Perpendicular traffic is still clearing the intersection
-                                vehicle.position = STOP_LINE
-                                can_move = False
-
-                # Check vehicle ahead collision
+                # Check vehicle ahead collision first to prevent premature intersection reservation
                 if i > 0:
                     vehicle_ahead = lane_queue[i - 1]
                     if vehicle_ahead.position < 1.0:
@@ -169,13 +146,43 @@ class Intersection:
                             # Can only move if vehicle ahead is moving (keeps queue flowing smoothly)
                             can_move = can_move and (vehicle_ahead.speed > 0)
 
-                vehicle.tick(dt, can_move)
+                # If vehicle is behind or at the stop line, process signal/intersection entrance
+                if vehicle.position <= STOP_LINE:
+                    if not is_green_for_movement:
+                        # If light is red, vehicle stops at the stop line
+                        if vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE:
+                            vehicle.position = STOP_LINE
+                            can_move = False
+                    else:
+                        # Light is green, check if entering the intersection
+                        entering = can_move and (vehicle.position + (DEFAULT_SPEED * dt) >= STOP_LINE)
+                        if entering:
+                            # Allow entering if intersection is empty or reserved by the same direction group
+                            current_group = 0 if self.signal.current_phase in (0, 2) else 1
+                            reserved_group = (
+                                0 if self.intersection_reserved_phase in (0, 2)
+                                else 1 if self.intersection_reserved_phase is not None
+                                else None
+                            )
 
-                # Release the phase lock when the last vehicle exits
-                if vehicle.state == "passed" and vehicle.id in self.vehicles_in_intersection:
-                    self.vehicles_in_intersection.remove(vehicle.id)
-                    if not self.vehicles_in_intersection:
-                        self.intersection_reserved_phase = None
+                            # Verify no perpendicular traffic is physically still clearing
+                            perpendicular_dirs = ("east", "west") if dir_name in ("north", "south") else ("north", "south")
+                            perpendicular_clearing = any(
+                                STOP_LINE < v.position < 0.70
+                                for lane_k, q in self.lanes.items()
+                                if lane_k.split("_")[0] in perpendicular_dirs
+                                for v in q
+                                if getattr(v, "turn", None) != "right"
+                            )
+
+                            if not perpendicular_clearing and (self.intersection_reserved_phase is None or current_group == reserved_group):
+                                self.intersection_reserved_phase = self.signal.current_phase
+                            else:
+                                # Perpendicular traffic is still clearing the intersection
+                                vehicle.position = STOP_LINE
+                                can_move = False
+
+                vehicle.tick(dt, can_move)
 
             newly_passed = [vehicle for vehicle in lane_queue if vehicle.state == "passed"]
             if newly_passed:
@@ -185,6 +192,16 @@ class Intersection:
                 self.lanes[lane_id] = [
                     vehicle for vehicle in lane_queue if vehicle.state != "passed"
                 ]
+
+        # Dynamically synchronize vehicles actually inside the intersection box
+        self.vehicles_in_intersection = {
+            v.id
+            for q in self.lanes.values()
+            for v in q
+            if STOP_LINE < v.position < 1.0
+        }
+        if not self.vehicles_in_intersection:
+            self.intersection_reserved_phase = None
 
         self.timestep += 1
         return passed_vehicles
