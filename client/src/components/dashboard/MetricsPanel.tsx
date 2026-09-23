@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { useSimulationStore } from "@/store/simulationStore";
 
 const HISTORY_LENGTH = 20;
@@ -9,13 +8,15 @@ const HISTORY_LENGTH = 20;
 function AnimatedValue({
   value,
   suffix = "",
+  decimals = 1,
 }: {
   value: number;
   suffix?: string;
+  decimals?: number;
 }) {
   return (
     <span className="tabular-nums transition-colors duration-150">
-      {value.toFixed(1)}
+      {value.toFixed(decimals)}
       {suffix}
     </span>
   );
@@ -112,6 +113,8 @@ export default function MetricsPanel() {
       title: "Avg Wait Time",
       value: metrics.avgWait,
       suffix: "s",
+      unit: "seconds avg",
+      decimals: 1,
       history: waitHistory,
       ratio: Math.min(1, metrics.avgWait / 14),
     },
@@ -119,6 +122,8 @@ export default function MetricsPanel() {
       title: "Throughput",
       value: metrics.throughput,
       suffix: "",
+      unit: "veh cleared",
+      decimals: 1,
       history: throughputHistory,
       ratio: Math.min(1, metrics.throughput / 200),
     },
@@ -126,6 +131,8 @@ export default function MetricsPanel() {
       title: "Max Queue",
       value: metrics.maxQueue,
       suffix: "",
+      unit: "veh peak",
+      decimals: 0,
       history: queueHistory,
       ratio: Math.min(1, metrics.maxQueue / 10),
     },
@@ -133,6 +140,8 @@ export default function MetricsPanel() {
       title: "Episode",
       value: metrics.currentEpisode,
       suffix: "",
+      unit: "training eps",
+      decimals: 0,
       history: episodeHistory,
       ratio: Math.min(1, metrics.currentEpisode / 500),
     },
@@ -146,7 +155,7 @@ export default function MetricsPanel() {
           <span
             className={`h-1.5 w-1.5 rounded-full ${
               isRunning
-                ? "bg-white"
+                ? "bg-emerald-500 animate-pulse"
                 : "bg-neutral-600"
             }`}
           />
@@ -155,9 +164,9 @@ export default function MetricsPanel() {
           </span>
         </div>
         <span
-          className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border ${
+          className={`text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-full border ${
             isRunning
-              ? "text-white bg-neutral-800 border-neutral-700"
+              ? "text-emerald-300 bg-emerald-950/30 border-emerald-800/50"
               : "text-neutral-500 bg-neutral-900 border-neutral-800"
           }`}
         >
@@ -165,24 +174,71 @@ export default function MetricsPanel() {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-      {cards.map((card) => (
-        <div key={card.title} className="p-3 rounded-lg border border-neutral-800 bg-neutral-900/50">
-          <div className="text-[10px] font-medium text-neutral-500 mb-1 uppercase tracking-wider">
-            {card.title}
-          </div>
-          <div className="text-2xl font-medium leading-none tracking-tight text-white mb-2">
-            <AnimatedValue value={card.value} suffix={card.suffix} />
-          </div>
-          <div className="h-0.5 rounded bg-neutral-800 mb-3">
+      <div className="grid grid-cols-2 gap-3">
+        {cards.map((card) => {
+          const prev = card.history[card.history.length - 2];
+          const hasDelta = prev !== undefined && card.history.length >= 2;
+          const delta = hasDelta ? card.value - prev : 0;
+          const isUp = delta > 0.01;
+          const isDown = delta < -0.01;
+          // For wait/queue/episode, down is good; for throughput, up is good
+          const isPositive = card.title === "Throughput" ? isUp : isDown;
+          const isNegative = card.title === "Throughput" ? isDown : isUp;
+          return (
             <div
-              className="h-0.5 rounded bg-white"
-              style={{ width: `${card.ratio * 100}%` }}
-            />
-          </div>
-          <Sparkline data={card.history} />
-        </div>
-      ))}
+              key={card.title}
+              className="flex flex-col gap-2 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5 transition-colors hover:bg-neutral-900/60"
+            >
+              <div className="flex h-5 items-center justify-between gap-2">
+                <span className="truncate text-[11px] font-medium text-neutral-400">
+                  {card.title}
+                </span>
+                {hasDelta ? (
+                  <span
+                    className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px font-mono text-[10px] leading-4 ${
+                      isPositive
+                        ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                        : isNegative
+                          ? "border-rose-500/20 bg-rose-500/10 text-rose-400"
+                          : "border-neutral-700 bg-neutral-800 text-neutral-500"
+                    }`}
+                  >
+                    <span>{isUp ? "↑" : isDown ? "↓" : "→"}</span>
+                    <span>
+                      {delta > 0 ? "+" : ""}
+                      {delta.toFixed(card.decimals)}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="h-4" />
+                )}
+              </div>
+
+              <div>
+                <div className="font-mono text-2xl font-medium leading-none tracking-tight text-white">
+                  <AnimatedValue
+                    value={card.value}
+                    suffix={card.suffix}
+                    decimals={card.decimals}
+                  />
+                </div>
+                <div className="mt-1.5 font-mono text-[10px] text-neutral-500">
+                  {card.unit}
+                </div>
+              </div>
+
+              <div className="mt-auto space-y-2 pt-1">
+                <Sparkline data={card.history} />
+                <div className="h-1 overflow-hidden rounded-full bg-neutral-800">
+                  <div
+                    className="h-full rounded-full bg-white/70 transition-all duration-500"
+                    style={{ width: `${card.ratio * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

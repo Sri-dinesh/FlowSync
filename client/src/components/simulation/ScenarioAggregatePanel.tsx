@@ -58,203 +58,149 @@ export function ScenarioAggregatePanel({ refreshTrigger }: ScenarioAggregatePane
   const winRatePct = (stats.dqn_win_rate * 100).toFixed(0);
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4 space-y-4">
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4 space-y-4 overflow-hidden">
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-neutral-800 text-neutral-400 border border-neutral-700">
-            <BarChart3 size={16} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-1.5 rounded-lg bg-neutral-800 text-white border border-neutral-700 shrink-0">
+            <BarChart3 size={14} />
           </div>
-          <div className="flex flex-col">
-            <h3 className="text-sm font-medium text-white flex items-center gap-2">
-              Cross-Scenario Aggregate Performance
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-neutral-800 text-neutral-300 border border-neutral-700">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium text-white leading-tight flex flex-wrap items-center gap-1.5">
+              <span>Cross-Scenario Aggregate</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-white text-black border border-neutral-200 font-semibold">
                 CRN Validated
               </span>
             </h3>
-            <p className="text-[11px] text-neutral-500">
-              Aggregated across {stats.total_scenarios} scenarios · {stats.total_groups} paired executions ({stats.total_runs} runs)
+            <p className="text-xs text-neutral-500 leading-tight mt-0.5 truncate">
+              {stats.total_scenarios} scenarios · {stats.total_groups} paired · {stats.total_runs} runs
             </p>
           </div>
         </div>
-
         <Button
           variant="outline"
           size="sm"
-          className="h-8 w-8 p-0 border-neutral-800 bg-neutral-900 text-neutral-500 hover:text-white"
+          className="h-7 w-7 p-0 border-neutral-800 bg-neutral-900 text-neutral-500 hover:text-white shrink-0"
           onClick={loadStats}
           disabled={loading}
         >
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
         </Button>
       </div>
 
       {/* ── Key Metrics Cards ───────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
-        {/* Win Rate */}
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3 space-y-1">
-          <span className="text-[10px] uppercase font-medium text-neutral-500 tracking-wider flex items-center gap-1">
-            <Award size={11} className="text-neutral-400" /> DQN Win Rate
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-neutral-800 bg-[#0a0a0a] p-3 space-y-1.5">
+          <span className="text-[10px] font-medium text-neutral-500 flex items-center gap-1">
+            <Award size={10} className="text-neutral-500" /> Win Rate
           </span>
-          <div className="text-xl font-medium font-mono text-white flex items-baseline gap-1.5">
-            <span className="text-white">
-              {winRatePct}%
-            </span>
-            <span className="text-[11px] font-normal text-neutral-600 font-sans">of paired groups</span>
+          <div className="text-lg font-mono font-medium text-white leading-none">
+            {winRatePct}%
           </div>
+          <div className="text-xs text-neutral-500 leading-tight">of paired groups</div>
         </div>
-
-        {/* Delta vs Greedy */}
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3 space-y-1">
-          <span className="text-[10px] uppercase font-medium text-neutral-500 tracking-wider flex items-center gap-1">
-            <TrendingDown size={11} className="text-neutral-400" /> DQN vs. Greedy
+        <div className="rounded-xl border border-neutral-800 bg-[#0a0a0a] p-3 space-y-1.5">
+          <span className="text-[10px] font-medium text-neutral-500 flex items-center gap-1">
+            <TrendingDown size={10} className="text-neutral-500" /> vs Greedy
           </span>
-          <div className="text-xl font-medium font-mono text-white flex items-baseline gap-1.5">
+          <div className="text-sm font-mono font-medium text-white leading-none">
             {stats.dqn_vs_greedy_delta != null ? (
-              <>
-                <span className="text-white">
-                  {stats.dqn_vs_greedy_delta <= 0 ? "-" : "+"}{Math.abs(stats.dqn_vs_greedy_delta).toFixed(2)}s
-                </span>
-                <span className="text-[11px] font-normal text-neutral-600 font-sans">
-                  {stats.dqn_vs_greedy_delta <= 0 ? "faster" : "slower"}
-                </span>
-              </>
+              <span className={stats.dqn_vs_greedy_delta <= 0 ? "text-emerald-400" : "text-rose-400"}>
+                {stats.dqn_vs_greedy_delta <= 0 ? "" : "+"}{stats.dqn_vs_greedy_delta.toFixed(2)}s
+              </span>
             ) : (
-              <span className="text-neutral-600 text-sm font-sans">No paired runs</span>
+              <span className="text-neutral-600 text-xs">—</span>
             )}
           </div>
+          <div className="text-xs text-neutral-500 leading-tight">
+            {stats.dqn_vs_greedy_delta != null
+              ? stats.dqn_vs_greedy_delta <= 0 ? "faster" : "slower"
+              : "no data"}
+          </div>
         </div>
-
-        {/* Delta vs Fixed */}
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3 space-y-1">
-          <span className="text-[10px] uppercase font-medium text-neutral-500 tracking-wider flex items-center gap-1">
-            <Zap size={11} className="text-neutral-400" /> DQN vs. Fixed
+        <div className="rounded-xl border border-neutral-800 bg-[#0a0a0a] p-3 space-y-1.5">
+          <span className="text-[10px] font-medium text-neutral-500 flex items-center gap-1">
+            <Zap size={10} className="text-neutral-500" /> vs Fixed
           </span>
-          <div className="text-xl font-medium font-mono text-white flex items-baseline gap-1.5">
+          <div className="text-sm font-mono font-medium text-white leading-none">
             {stats.dqn_vs_fixed_delta != null ? (
-              <>
-                <span className="text-white">
-                  {stats.dqn_vs_fixed_delta <= 0 ? "-" : "+"}{Math.abs(stats.dqn_vs_fixed_delta).toFixed(2)}s
-                </span>
-                <span className="text-[11px] font-normal text-neutral-600 font-sans">
-                  {stats.dqn_vs_fixed_delta <= 0 ? "faster" : "slower"}
-                </span>
-              </>
+              <span className={stats.dqn_vs_fixed_delta <= 0 ? "text-emerald-400" : "text-rose-400"}>
+                {stats.dqn_vs_fixed_delta <= 0 ? "" : "+"}{stats.dqn_vs_fixed_delta.toFixed(2)}s
+              </span>
             ) : (
-              <span className="text-neutral-600 text-sm font-sans">No paired runs</span>
+              <span className="text-neutral-600 text-xs">—</span>
             )}
+          </div>
+          <div className="text-xs text-neutral-500 leading-tight">
+            {stats.dqn_vs_fixed_delta != null
+              ? stats.dqn_vs_fixed_delta <= 0 ? "faster" : "slower"
+              : "no data"}
           </div>
         </div>
       </div>
 
-      {/* ── Controller Comparison Table ─────────────────────────── */}
-      <div className="overflow-x-auto rounded-lg border border-neutral-800">
-        <table className="w-full text-[11px]">
-          <thead className="bg-neutral-900">
-            <tr className="border-b border-neutral-800">
-              <th className="text-left px-3 py-2 text-neutral-500 font-medium">Controller</th>
-              <th className="text-right px-3 py-2 text-neutral-500 font-medium">Mean Wait (± Std)</th>
-              <th className="text-right px-3 py-2 text-neutral-500 font-medium">Mean Throughput</th>
-              <th className="text-right px-3 py-2 text-neutral-500 font-medium">Mean Starvations</th>
-              <th className="text-center px-3 py-2 text-neutral-500 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-800">
-            {/* Fixed */}
-            <tr className="hover:bg-neutral-800/30">
-              <td className="px-3 py-2 font-medium text-neutral-300 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-neutral-600" /> Fixed Time
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-400">
-                {fixed?.mean_wait != null ? (
-                  <span>
-                    {fixed.mean_wait.toFixed(2)}s
-                    <span className="text-neutral-600 ml-1">±{fixed.std_wait?.toFixed(2) ?? 0}</span>
-                  </span>
-                ) : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-500">
-                {fixed?.mean_throughput != null ? `${fixed.mean_throughput.toFixed(1)} veh` : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-500">
-                {fixed?.mean_starvation != null ? fixed.mean_starvation.toFixed(1) : "—"}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {bestCtrl === "fixed" ? (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] bg-neutral-800 text-neutral-300 font-semibold border border-neutral-700">
-                    👑 Leader
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-neutral-600">Baseline</span>
-                )}
-              </td>
-            </tr>
+      {/* ── Controller Comparison — card stack (no horizontal scroll) ─ */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-medium text-neutral-400">Controller Means</span>
+          <span className="text-xs text-neutral-600">{stats.total_groups} paired runs</span>
+        </div>
 
-            {/* Greedy */}
-            <tr className="hover:bg-neutral-800/30">
-              <td className="px-3 py-2 font-medium text-neutral-300 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" /> Greedy Actuated
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-400">
-                {greedy?.mean_wait != null ? (
-                  <span>
-                    {greedy.mean_wait.toFixed(2)}s
-                    <span className="text-neutral-600 ml-1">±{greedy.std_wait?.toFixed(2) ?? 0}</span>
-                  </span>
-                ) : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-500">
-                {greedy?.mean_throughput != null ? `${greedy.mean_throughput.toFixed(1)} veh` : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-neutral-500">
-                {greedy?.mean_starvation != null ? greedy.mean_starvation.toFixed(1) : "—"}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {bestCtrl === "greedy" ? (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] bg-neutral-800 text-neutral-300 font-semibold border border-neutral-700">
-                    👑 Leader
+        {[
+          { key: "fixed", label: "Fixed Time", dot: "bg-neutral-600", data: fixed, baseline: true },
+          { key: "greedy", label: "Greedy Actuated", dot: "bg-neutral-500", data: greedy, baseline: false },
+          { key: "ai", label: "DQN Policy", dot: "bg-white", data: ai, baseline: false },
+        ].map(({ key, label, dot, data: d, baseline }) => {
+          const isBest = bestCtrl === key;
+          return (
+            <div
+              key={key}
+              className={`rounded-xl border p-3 space-y-2.5 ${
+                isBest ? "border-white bg-white text-black" : "border-neutral-800 bg-[#0a0a0a] text-white"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-medium flex items-center gap-1.5 ${isBest ? "text-black" : "text-white"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isBest ? "bg-black" : dot}`} /> {label}
+                </span>
+                {isBest ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-black text-white">
+                    <Award size={10} /> Leader
                   </span>
                 ) : (
-                  <span className="text-[10px] text-neutral-600">Strong Baseline</span>
+                  <span className={`text-xs ${baseline ? "text-neutral-500" : "text-neutral-600"}`}>
+                    {baseline ? "Baseline" : key === "greedy" ? "Strong Baseline" : "Trained Agent"}
+                  </span>
                 )}
-              </td>
-            </tr>
-
-            {/* DQN */}
-            <tr className={`hover:bg-neutral-800/30 ${bestCtrl === "ai" ? "bg-neutral-800/40" : ""}`}>
-              <td className="px-3 py-2 font-semibold text-white flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" /> DQN Policy
-              </td>
-              <td className="px-3 py-2 text-right font-mono font-semibold">
-                {ai?.mean_wait != null ? (
-                  <span className={bestCtrl === "ai" ? "text-white" : "text-neutral-300"}>
-                    {ai.mean_wait.toFixed(2)}s
-                    <span className="text-neutral-600 ml-1">±{ai.std_wait?.toFixed(2) ?? 0}</span>
-                  </span>
-                ) : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-white/80 font-medium">
-                {ai?.mean_throughput != null ? `${ai.mean_throughput.toFixed(1)} veh` : "—"}
-              </td>
-              <td className="px-3 py-2 text-right font-mono text-white/80">
-                L-T {ai?.mean_starvation != null ? (
-                  <span className={ai.mean_starvation === 0 ? "text-white font-bold" : "text-neutral-400"}>
-                    {ai.mean_starvation.toFixed(1)}
-                  </span>
-                ) : "—"}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {bestCtrl === "ai" ? (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-white text-black font-bold border border-neutral-700">
-                    <Award size={10} /> DQN WIN
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-neutral-500">Trained Agent</span>
-                )}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+              <div className="grid grid-cols-3 gap-3 pt-2 border-t border-neutral-800/50">
+                <div className="space-y-0.5">
+                  <div className={`text-[10px] ${isBest ? "text-black/60" : "text-neutral-500"}`}>Mean Wait</div>
+                  <div className={`text-xs font-mono font-medium ${isBest ? "text-black" : "text-white"}`}>
+                    {d?.mean_wait != null ? `${d.mean_wait.toFixed(2)}s` : "—"}
+                  </div>
+                  <div className={`text-xs font-mono ${isBest ? "text-black/50" : "text-neutral-600"}`}>
+                    {d?.mean_wait != null ? `±${d.std_wait?.toFixed(2) ?? "0.00"}s` : ""}
+                  </div>
+                </div>
+                <div className="space-y-0.5 text-center border-x border-neutral-800/50 px-2">
+                  <div className={`text-[10px] ${isBest ? "text-black/60" : "text-neutral-500"}`}>Throughput</div>
+                  <div className={`text-xs font-mono font-medium ${isBest ? "text-black" : "text-white"}`}>
+                    {d?.mean_throughput != null ? d.mean_throughput.toFixed(1) : "—"}
+                  </div>
+                  <div className={`text-xs ${isBest ? "text-black/50" : "text-neutral-600"}`}>veh avg</div>
+                </div>
+                <div className="space-y-0.5 text-right">
+                  <div className={`text-[10px] ${isBest ? "text-black/60" : "text-neutral-500"}`}>Starvations</div>
+                  <div className={`text-xs font-mono font-medium ${isBest ? "text-black" : d?.mean_starvation === 0 ? "text-emerald-400" : "text-white"}`}>
+                    {d?.mean_starvation != null ? d.mean_starvation.toFixed(1) : "—"}
+                  </div>
+                  <div className={`text-xs ${isBest ? "text-black/50" : "text-neutral-600"}`}>mean</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -56,7 +56,6 @@ const ScenarioAggregatePanel = dynamic(
   { ssr: false }
 );
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSimulationSocket } from "@/hooks/useSimulationSocket";
 import { useTrainingSocket } from "@/hooks/useTrainingSocket";
@@ -151,13 +150,15 @@ export default function SimulationPage() {
           <SimulationCanvas />
         </div>
 
-        {/* Right Side: Controls Sidebar */}
-        <aside className="w-[420px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-[#0a0a0a] border-l border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 shadow-2xl z-10 pointer-events-auto">
+        {/* Right Side: Controls Sidebar — order for usage: Act → Understand → Analyze → Observe */}
+        <aside className="w-[440px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-[#0a0a0a] border-l border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent hover:scrollbar-thumb-neutral-700 shadow-2xl z-10 pointer-events-auto">
+          {/* 1. Act — primary controls at top for immediate interaction */}
           <div className="border-b border-neutral-800 bg-transparent flex-none">
-            <div className="px-4 pt-6 pb-3">
+            <div className="px-4 pt-4 pb-3">
               <h3 className="text-xs font-medium text-neutral-400">
                 Controls
               </h3>
+              <p className="text-[10px] text-neutral-600 mt-0.5">Mode, playback, and density</p>
             </div>
             <div className="px-4 pb-4 space-y-5">
               <SimulationControls sendCommand={sendSimulationCommand} />
@@ -168,17 +169,11 @@ export default function SimulationPage() {
             </div>
           </div>
 
+          {/* 2. Understand — AI reasoning directly below controls */}
           <div className="border-b border-neutral-800 bg-transparent p-4 flex-none">
-            <h3 className="mb-3 text-xs font-medium text-neutral-400">
-              Real-time Metrics
-            </h3>
-            <MetricsPanel />
-          </div>
-
-          {/* Agent Reasoning — only in AI mode */}
-          <div className="border-b border-neutral-800 bg-transparent p-4 flex-none">
-            <h3 className="mb-3 text-xs font-medium text-neutral-400">
-              Agent Reasoning
+            <h3 className="mb-3 text-xs font-medium text-neutral-400 flex items-center justify-between">
+              <span>Agent Reasoning</span>
+              {mode !== "ai" && <span className="text-[10px] font-normal text-neutral-600">AI mode only</span>}
             </h3>
             <QValuePanel rl={mode === "ai" ? rl : null} />
           </div>
@@ -437,6 +432,18 @@ export default function SimulationPage() {
                 </TabsContent>
               </Tabs>
             </div>
+          </div>
+
+          {/* 4. Observe — live telemetry at last, one-by-one, clear deltas */}
+          <div className="border-t border-neutral-800 bg-neutral-900/20 p-4 flex-none">
+            <h3 className="mb-3 text-xs font-medium text-neutral-300 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Telemetry
+            </h3>
+            <p className="text-[11px] text-neutral-500 mb-3 leading-relaxed">
+              Real-time stream — each metric stacked vertically with trend and delta.
+            </p>
+            <MetricsPanel />
           </div>
         </aside>
       </div>

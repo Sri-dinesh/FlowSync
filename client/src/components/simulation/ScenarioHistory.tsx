@@ -189,24 +189,28 @@ export function ScenarioHistory({
 
       {expanded && (
         <div className="px-4 pb-4 space-y-3">
-          {/* Scenario info bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-500 font-mono px-1 py-1 border-b border-neutral-800">
-            <div className="flex items-center gap-2">
-              <span className="text-neutral-300 font-medium">{selectedScenario.name}</span>
-              <span className="text-neutral-700">·</span>
-              <span>seed: {selectedScenario.seed}</span>
-              <span className="text-neutral-700">·</span>
-              <span>λ={selectedScenario.spawn_lambda.toFixed(1)} veh/s</span>
-              <span className="text-neutral-700">·</span>
-              <span>{selectedScenario.duration_seconds}s</span>
+          {/* Scenario info bar — wrap-friendly, truncate long names */}
+          <div className="flex flex-col gap-1.5 px-1 py-2 border-b border-neutral-800">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-medium text-white truncate flex-1 min-w-0" title={selectedScenario.name}>
+                {selectedScenario.name}
+              </span>
               {selectedScenario.is_held_out && (
-                <>
-                  <span className="text-neutral-700">·</span>
-                  <span className="inline-flex items-center gap-1 text-neutral-400 font-medium">
-                    🔒 Held-Out Scenario
-                  </span>
-                </>
+                <span className="shrink-0 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                  🔒 Held-Out
+                </span>
               )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-neutral-500">
+              <span className="inline-flex items-center gap-1 rounded-full bg-neutral-900 border border-neutral-800 px-2 py-0.5">
+                seed {selectedScenario.seed}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-neutral-900 border border-neutral-800 px-2 py-0.5">
+                λ {selectedScenario.spawn_lambda.toFixed(1)} veh/s
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-neutral-900 border border-neutral-800 px-2 py-0.5">
+                {selectedScenario.duration_seconds}s
+              </span>
             </div>
           </div>
 
@@ -457,118 +461,143 @@ export function ScenarioHistory({
             </div>
           )}
 
-          {/* ── TAB 3: METRIC DETAILS DRILL-DOWN ────────────────────────── */}
+          {/* ── TAB 3: METRIC DETAILS DRILL-DOWN — stacked cards for readability ─ */}
           {tab === "details" && sortedGroups.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {sortedGroups.map((g) => (
                 <div
                   key={g.run_group_id}
-                  className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 space-y-2.5"
+                  className="rounded-xl border border-neutral-800 bg-[#0a0a0a] p-3.5 space-y-3"
                 >
-                  <div className="flex items-center justify-between text-xs border-b border-neutral-800 pb-2">
-                    <span className="font-semibold text-neutral-300 font-mono flex items-center gap-1.5">
-                      Episode {g.model_episode} Paired Metrics
+                  <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-2.5">
+                    <span className="text-xs font-medium text-white flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white text-black text-[10px] font-bold">
+                        {g.model_episode}
+                      </span>
+                      Episode {g.model_episode} · Paired Metrics
                     </span>
-                    <span className="text-[10px] text-neutral-600 font-mono">
+                    <span className="text-xs text-neutral-500 font-mono">
                       {formatDate(g.ran_at)}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="rounded-lg bg-neutral-800/30 border border-neutral-800 p-2 space-y-1">
-                      <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider block">
-                        Fixed Timing
-                      </span>
-                      <div className="space-y-0.5 text-[11px] font-mono">
-                        <div className="flex justify-between text-neutral-500">
-                          <span>Avg Wait:</span>
-                          <span className="text-white">{g.fixed ? `${g.fixed.avg_wait_time.toFixed(2)}s` : "—"}</span>
+                  <div className="flex flex-col gap-2.5">
+                    {/* Fixed */}
+                    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-600" /> Fixed Timing
+                        </span>
+                        <span className="text-xs font-mono text-neutral-500">
+                          {g.fixed ? `${g.fixed.avg_wait_time.toFixed(1)}s avg` : "—"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">Avg Wait</div>
+                          <div className="text-xs font-mono font-medium text-white mt-0.5">
+                            {g.fixed ? `${g.fixed.avg_wait_time.toFixed(2)}s` : "—"}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>P95 Delay:</span>
-                          <span>{g.fixed?.p95_delay ? `${g.fixed.p95_delay.toFixed(1)}s` : "—"}</span>
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">Throughput</div>
+                          <div className="text-xs font-mono font-medium text-white mt-0.5">
+                            {g.fixed?.total_passed ?? "—"}
+                          </div>
+                          <div className="text-[10px] text-neutral-600">veh</div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Throughput:</span>
-                          <span>{g.fixed?.total_passed ?? "—"} veh</span>
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">P95 Delay</div>
+                          <div className="text-xs font-mono text-neutral-400 mt-0.5">
+                            {g.fixed?.p95_delay ? `${g.fixed.p95_delay.toFixed(1)}s` : "—"}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Max Queue:</span>
-                          <span>{g.fixed?.max_queue ?? "—"}</span>
-                        </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Starvations:</span>
-                          <span className={g.fixed?.starvation_count ? "text-neutral-400 font-bold" : "text-neutral-600"}>
-                            {g.fixed?.starvation_count ?? 0}
-                          </span>
-                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-neutral-600 border-t border-neutral-800 pt-2">
+                        <span>Max Queue {g.fixed?.max_queue ?? "—"} · Starvations {g.fixed?.starvation_count ?? 0}</span>
+                        <span className="text-neutral-500">—</span>
                       </div>
                     </div>
 
-                    <div className="rounded-lg bg-neutral-800/30 border border-neutral-800 p-2 space-y-1">
-                      <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider block">
-                        Greedy (Actuated)
-                      </span>
-                      <div className="space-y-0.5 text-[11px] font-mono">
-                        <div className="flex justify-between text-neutral-500">
-                          <span>Avg Wait:</span>
-                          <span className="text-white">{g.greedy ? `${g.greedy.avg_wait_time.toFixed(2)}s` : "—"}</span>
+                    {/* Greedy */}
+                    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" /> Greedy (Actuated)
+                        </span>
+                        <span className="text-xs font-mono text-neutral-500">
+                          {g.greedy ? `${g.greedy.avg_wait_time.toFixed(1)}s avg` : "—"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">Avg Wait</div>
+                          <div className="text-xs font-mono font-medium text-white mt-0.5">
+                            {g.greedy ? `${g.greedy.avg_wait_time.toFixed(2)}s` : "—"}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>P95 Delay:</span>
-                          <span>{g.greedy?.p95_delay ? `${g.greedy.p95_delay.toFixed(1)}s` : "—"}</span>
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">Throughput</div>
+                          <div className="text-xs font-mono font-medium text-white mt-0.5">
+                            {g.greedy?.total_passed ?? "—"}
+                          </div>
+                          <div className="text-[10px] text-neutral-600">veh</div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Throughput:</span>
-                          <span>{g.greedy?.total_passed ?? "—"} veh</span>
+                        <div className="rounded-md bg-[#0a0a0a] border border-neutral-800 p-2 text-center">
+                          <div className="text-[10px] text-neutral-500">P95 Delay</div>
+                          <div className="text-xs font-mono text-neutral-400 mt-0.5">
+                            {g.greedy?.p95_delay ? `${g.greedy.p95_delay.toFixed(1)}s` : "—"}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Max Queue:</span>
-                          <span>{g.greedy?.max_queue ?? "—"}</span>
-                        </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Starvations:</span>
-                          <span className={g.greedy?.starvation_count ? "text-neutral-400 font-bold" : "text-neutral-600"}>
-                            {g.greedy?.starvation_count ?? 0}
-                          </span>
-                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-neutral-600 border-t border-neutral-800 pt-2">
+                        <span>Max Queue {g.greedy?.max_queue ?? "—"} · Starvations {g.greedy?.starvation_count ?? 0}</span>
+                        <span className="text-neutral-500">—</span>
                       </div>
                     </div>
 
-                    <div className="rounded-lg bg-neutral-800/30 border border-neutral-800 p-2 space-y-1">
-                      <span className="text-[10px] font-semibold text-neutral-300 uppercase tracking-wider block flex items-center justify-between">
-                        <span>DQN Reinforcement</span>
-                        {g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time && (
-                          <span className="text-[9px] text-neutral-400 font-bold flex items-center gap-0.5">
-                            <Trophy size={9} /> WIN
+                    {/* DQN */}
+                    <div className={`rounded-lg border p-3 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "border-white bg-white text-black" : "border-neutral-800 bg-neutral-900 text-white"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium flex items-center gap-1.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black" : "bg-white"}`} /> DQN Reinforcement
+                        </span>
+                        {g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-black text-white">
+                            <Trophy size={10} /> WIN
+                          </span>
+                        ) : (
+                          <span className={`text-xs font-mono ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/70" : "text-neutral-500"}`}>
+                            {g.ai ? `${g.ai.avg_wait_time.toFixed(1)}s avg` : "—"}
                           </span>
                         )}
-                      </span>
-                      <div className="space-y-0.5 text-[11px] font-mono">
-                        <div className="flex justify-between text-neutral-500">
-                          <span>Avg Wait:</span>
-                          <span className="text-white font-bold">
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Avg Wait</div>
+                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
                             {g.ai ? `${g.ai.avg_wait_time.toFixed(2)}s` : "—"}
-                          </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>P95 Delay:</span>
-                          <span>{g.ai?.p95_delay ? `${g.ai.p95_delay.toFixed(1)}s` : "—"}</span>
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Throughput</div>
+                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
+                            {g.ai?.total_passed ?? "—"}
+                          </div>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/50" : "text-neutral-600"}`}>veh</div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Throughput:</span>
-                          <span>{g.ai?.total_passed ?? "—"} veh</span>
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>P95 Delay</div>
+                          <div className={`text-xs font-mono mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-neutral-400"}`}>
+                            {g.ai?.p95_delay ? `${g.ai.p95_delay.toFixed(1)}s` : "—"}
+                          </div>
                         </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Max Queue:</span>
-                          <span>{g.ai?.max_queue ?? "—"}</span>
-                        </div>
-                        <div className="flex justify-between text-neutral-600">
-                          <span>Starvations:</span>
-                          <span className={g.ai?.starvation_count ? "text-neutral-400 font-bold" : "text-neutral-600"}>
-                            {g.ai?.starvation_count ?? 0}
-                          </span>
-                        </div>
+                      </div>
+                      <div className={`mt-2 flex items-center justify-between text-xs border-t pt-2 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60 border-black/10" : "text-neutral-600 border-neutral-800"}`}>
+                        <span>Max Queue {g.ai?.max_queue ?? "—"} · Starvations {g.ai?.starvation_count ?? 0}</span>
+                        {g.ai?.starvation_count === 0 ? (
+                          <span className={g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black font-medium" : "text-emerald-400 font-medium"}>✓ No starvation</span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
