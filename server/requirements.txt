@@ -1,9 +1,11 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 websockets>=12.0
 pydantic>=2.10.6
 pydantic-settings>=2.7.0
-torch>=2.0.0
+torch==2.3.1+cpu              # CPU-only: CUDA wheels (~2.5GB) exceed Render build limits
+torchvision==0.18.1+cpu       # must match torch 2.3.x; satisfies ultralytics' torchvision>=0.9.0
 numpy>=1.26.4
 gymnasium>=0.29.1
 supabase>=2.4.6

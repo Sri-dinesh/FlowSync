@@ -4,8 +4,8 @@ services:
     runtime: python
     buildCommand: >-
       pip install --upgrade pip &&
-      pip install torch==2.3.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu &&
-      pip install -r server/requirements.txt
+      pip install --no-cache-dir torch==2.3.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu &&
+      pip install --no-cache-dir -r server/requirements.txt
     startCommand: bash -c "cd server && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: SUPABASE_URL
