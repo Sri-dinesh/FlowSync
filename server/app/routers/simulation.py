@@ -214,8 +214,17 @@ async def get_status(request: Request) -> MetricsSnapshot:
 
 @router.get("/scenarios")
 async def get_scenarios() -> list:
-    """List all saved named scenarios."""
+    """List all saved named scenarios. Automatically seeds defaults if empty."""
     scenarios = await asyncio.to_thread(supabase_service.list_scenarios)
+    if not scenarios:
+        scenarios = await asyncio.to_thread(supabase_service.seed_default_scenarios)
+    return scenarios
+
+
+@router.post("/scenarios/seed-defaults")
+async def seed_defaults_endpoint() -> list:
+    """Seed the default standard evaluation scenarios (Low, Moderate, High, Critical, Held-out)."""
+    scenarios = await asyncio.to_thread(supabase_service.seed_default_scenarios)
     return scenarios
 
 

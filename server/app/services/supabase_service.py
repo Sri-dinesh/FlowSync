@@ -378,6 +378,67 @@ def create_scenario(name: str, seed: int, spawn_lambda: float, duration_seconds:
         return {}
 
 
+DEFAULT_BENCHMARK_SCENARIOS = [
+    {
+        "name": "Low Congestion (Baseline Flow)",
+        "seed": 42,
+        "spawn_lambda": 0.25,
+        "duration_seconds": 60,
+        "is_held_out": False,
+        "scenario_type": "standard",
+    },
+    {
+        "name": "Moderate Flow (Balanced Traffic)",
+        "seed": 101,
+        "spawn_lambda": 0.55,
+        "duration_seconds": 60,
+        "is_held_out": False,
+        "scenario_type": "standard",
+    },
+    {
+        "name": "High Congestion (Rush Hour Peak)",
+        "seed": 202,
+        "spawn_lambda": 0.90,
+        "duration_seconds": 90,
+        "is_held_out": False,
+        "scenario_type": "stress",
+    },
+    {
+        "name": "Critical Gridlock (Extreme Load)",
+        "seed": 303,
+        "spawn_lambda": 1.40,
+        "duration_seconds": 120,
+        "is_held_out": False,
+        "scenario_type": "stress",
+    },
+    {
+        "name": "Held-Out Unseen Evaluation Set",
+        "seed": 999,
+        "spawn_lambda": 0.70,
+        "duration_seconds": 60,
+        "is_held_out": True,
+        "scenario_type": "held_out",
+    },
+]
+
+
+def seed_default_scenarios() -> List[Dict[str, Any]]:
+    """Seeds the fixed evaluation scenarios if they do not already exist."""
+    existing = list_scenarios()
+    existing_names = {s.get("name") for s in existing}
+    for sc in DEFAULT_BENCHMARK_SCENARIOS:
+        if sc["name"] not in existing_names:
+            create_scenario(
+                name=sc["name"],
+                seed=sc["seed"],
+                spawn_lambda=sc["spawn_lambda"],
+                duration_seconds=sc["duration_seconds"],
+                is_held_out=sc["is_held_out"],
+                scenario_type=sc["scenario_type"],
+            )
+    return list_scenarios()
+
+
 def delete_scenario(scenario_id: str) -> bool:
     """Delete a scenario and all its runs (cascades via FK). Returns True on success."""
     try:
