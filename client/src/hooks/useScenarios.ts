@@ -146,6 +146,20 @@ export function useScenarios() {
     [BASE],
   );
 
+  // ─── Seed Default Evaluation Scenarios ─────────────────────────────────────
+  const seedDefaultScenarios = useCallback(async (): Promise<boolean> => {
+    setError(null);
+    try {
+      const res = await fetch(`${BASE}/seed-defaults`, { method: "POST" });
+      if (!res.ok) throw new Error(`POST /seed-defaults failed: ${res.status}`);
+      await fetchScenarios();
+      return true;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to seed default scenarios");
+      return false;
+    }
+  }, [BASE, fetchScenarios]);
+
   return {
     scenarios,
     loading,
@@ -153,6 +167,7 @@ export function useScenarios() {
     fetchScenarios,
     createScenario,
     deleteScenario,
+    seedDefaultScenarios,
     fetchRuns,
     fetchGroupedRuns,
     fetchAggregateStats,

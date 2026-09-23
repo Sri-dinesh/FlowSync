@@ -12,12 +12,45 @@ interface ScenarioSelectorProps {
   onSelect: (scenario: Scenario | null) => void;
 }
 
+const QUICK_PRESETS = [
+  {
+    key: "low",
+    label: "Low Flow",
+    sub: "λ 0.25 · 60s",
+    match: (s: Scenario) => s.name.toLowerCase().includes("low") || (s.spawn_lambda <= 0.35 && !s.is_held_out),
+  },
+  {
+    key: "moderate",
+    label: "Moderate",
+    sub: "λ 0.55 · 60s",
+    match: (s: Scenario) => s.name.toLowerCase().includes("moderate") || (s.spawn_lambda > 0.35 && s.spawn_lambda <= 0.7 && !s.is_held_out && s.scenario_type !== "held_out"),
+  },
+  {
+    key: "high",
+    label: "Rush Hour",
+    sub: "λ 0.90 · 90s",
+    match: (s: Scenario) => s.name.toLowerCase().includes("high") || (s.spawn_lambda > 0.7 && s.spawn_lambda <= 1.1 && !s.is_held_out),
+  },
+  {
+    key: "critical",
+    label: "Gridlock",
+    sub: "λ 1.40 · 120s",
+    match: (s: Scenario) => s.name.toLowerCase().includes("critical") || s.name.toLowerCase().includes("gridlock") || s.spawn_lambda > 1.1,
+  },
+  {
+    key: "held_out",
+    label: "Held-Out",
+    sub: "λ 0.70 · 60s",
+    match: (s: Scenario) => s.is_held_out || s.scenario_type === "held_out" || s.name.toLowerCase().includes("held"),
+  },
+];
+
 function generateSeed(): number {
   return Math.floor(Math.random() * 9_999_999) + 1;
 }
 
 export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) {
-  const { scenarios, loading, createScenario, deleteScenario } = useScenarios();
+  const { scenarios, loading, createScenario, deleteScenario, seedDefaultScenarios } = useScenarios();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName]       = useState("");
@@ -27,9 +60,32 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
   const [scenarioType, setScenarioType] = useState<ScenarioType>("standard");
   const [creating, setCreating]     = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  const [seeding, setSeeding]       = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleSeedDefaults = useCallback(async () => {
+    setSeeding(true);
+    await seedDefaultScenarios();
+    setSeeding(false);
+  }, [seedDefaultScenarios]);
+
+  const handleSelectPreset = useCallback(async (presetKey: string) => {
+    const preset = QUICK_PRESETS.find((p) => p.key === presetKey);
+    if (!preset) return;
+
+    let match = scenarios.find(preset.match);
+    if (match) {
+      onSelect(match);
+      return;
+    }
+
+    // Auto-seed defaults if not found
+    setSeeding(true);
+    await seedDefaultScenarios();
+    setSeeding(false);
+  }, [scenarios, seedDefaultScenarios, onSelect]);
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
@@ -65,6 +121,45 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
 
   return (
     <div className="space-y-3">
+      {/* ── 1-Click Evaluation Presets ─────────────────────────── */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium">
+          <span className="flex items-center gap-1.5">
+            <Zap size={12} className="text-violet-400" />
+            Quick Presets
+          </span>
+          <button
+            type="button"
+            onClick={handleSeedDefaults}
+            disabled={seeding || loading}
+            className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={10} className={seeding ? "animate-spin" : ""} />
+            {seeding ? "Seeding..." : "Reset Defaults"}
+          </button>
+        </div>
+        <div className="grid grid-cols-5 gap-1.5">
+          {QUICK_PRESETS.map((p) => {
+            const matchScenario = scenarios.find(p.match);
+            const isSelected = Boolean(selected && matchScenario && selected.id === matchScenario.id);
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => handleSelectPreset(p.key)}
+                className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
+                  isSelected
+                    ? "bg-violet-500/20 border-violet-500/60 text-white shadow-sm ring-1 ring-violet-500/40"
+                    : "bg-neutral-900/80 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-800/80"
+                }`}
+              >
+                <span className="text-[11px] font-semibold tracking-tight truncate w-full">{p.label}</span>
+                <span className="text-[9px] text-neutral-500 font-mono mt-0.5 truncate w-full">{p.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Scenario Dropdown Row ─────────────────────────────────── */}
       <div className="flex items-center gap-2">
@@ -111,33 +206,49 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
                 <div className="px-3 py-2 text-xs text-neutral-500">Loading…</div>
               )}
 
+              {scenarios.length === 0 && !loading && (
+                <div className="p-3 text-center space-y-2">
+                  <div className="text-xs text-neutral-400">No scenarios found</div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSeedDefaults}
+                    disabled={seeding}
+                    className="w-full text-xs border-violet-500/40 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20"
+                  >
+                    <RefreshCw size={12} className={`mr-1.5 ${seeding ? "animate-spin" : ""}`} />
+                    {seeding ? "Seeding Standard Scenarios..." : "Seed Standard Scenarios"}
+                  </Button>
+                </div>
+              )}
+
               {scenarios.map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => { onSelect(s); setDropdownOpen(false); }}
-                  className={`w-full flex items-start gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800 transition-colors ${selected?.id === s.id ? "text-white" : "text-neutral-400"}`}
+                  className={`w-full flex items-start gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800 transition-colors ${selected?.id === s.id ? "text-white bg-neutral-800/50" : "text-neutral-400"}`}
                 >
                   {selected?.id === s.id
-                    ? <Check size={12} className="mt-0.5 shrink-0 text-white" />
+                    ? <Check size={12} className="mt-0.5 shrink-0 text-violet-400" />
                     : <span className="w-3 shrink-0" />
                   }
                   <span className="flex-1 min-w-0">
                     <span className="flex items-center gap-2">
-                      <span className="block truncate">{s.name}</span>
+                      <span className="block truncate font-medium">{s.name}</span>
                       {s.is_held_out && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-neutral-800 text-neutral-300 border border-neutral-700 font-medium flex items-center gap-0.5">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-950/60 text-purple-300 border border-purple-800 font-medium flex items-center gap-0.5">
                           <Lock size={8} /> Held-out
                         </span>
                       )}
                       {s.scenario_type === "stress" && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-neutral-800 text-neutral-300 border border-neutral-700 font-medium flex items-center gap-0.5">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-rose-950/60 text-rose-300 border border-rose-800 font-medium flex items-center gap-0.5">
                           <Flame size={8} /> Stress
                         </span>
                       )}
                     </span>
-                    <span className="block text-[10px] text-neutral-600 font-mono mt-0.5">
-                      seed {s.seed} · λ{s.spawn_lambda.toFixed(1)} · {s.duration_seconds}s
+                    <span className="block text-[10px] text-neutral-500 font-mono mt-0.5">
+                      seed {s.seed} · λ {s.spawn_lambda.toFixed(2)} veh/s · {s.duration_seconds}s
                     </span>
                   </span>
                 </button>
