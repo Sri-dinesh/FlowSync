@@ -27,7 +27,7 @@ from ..realworld.models.config import SESSION_DIR
 from ..schemas.simulation_schema import build_frame
 from ..services import supabase_service
 from ..simulation.demand_forecast import ArrivalForecaster
-from ..simulation.traffic_math import MAX_CAP
+from ..simulation.traffic_math import MAX_CAP, compute_movement_pressures
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +123,131 @@ async def _flush_buffer() -> None:
         await asyncio.to_thread(supabase_service.save_signal_states_bulk, signal_rows)
 
 
+# ─── Observation & AI Action Helpers ─────────────────────────────────────────
+
+def _build_obs_from_intersection(intersection, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
+    movement_queues = intersection.get_movement_queues()
+    signal = intersection.signal
+    # S-03b: Smooth tanh queue normalization to match environment.py exactly
+    movements = [
+        float(np.tanh(movement_queues.get(k, 0) / 15.0))
+        for k in [
+            "north_straight", "north_left", "north_right",
+            "south_straight", "south_left", "south_right",
+            "east_straight",  "east_left",  "east_right",
+            "west_straight",  "west_left",  "west_right",
+        ]
+    ]
+
+    phase_onehot = [0.0, 0.0, 0.0, 0.0]
+    phase_onehot[signal.current_phase] = 1.0
+
+    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
+    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
+
+    # Compute pressure identically to TrafficEnv._get_obs() — must match training exactly
+    dest_map = {
+        "north_straight": "south", "north_left": "east",   "north_right": "west",
+        "south_straight": "north", "south_left": "west",   "south_right": "east",
+        "east_straight":  "west",  "east_left":  "south",  "east_right":  "north",
+        "west_straight":  "east",  "west_left":  "north",  "west_right":  "south",
+    }
+    outgoing = intersection.get_outgoing_counts()
+    total_pressure = 0.0
+    for movement, dest in dest_map.items():
+        incoming = movement_queues.get(movement, 0) / MAX_CAP
+        out = outgoing.get(dest, 0) / MAX_CAP
+        total_pressure += max(0.0, incoming - out)
+    pressure_norm = min(total_pressure / 20.0, 1.0)
+
+    max_starv_norm = min(
+        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
+    )
+
+    if forecaster is not None:
+        forecast_features = forecaster.get_forecast_features().tolist()
+    else:
+        forecast_features = [0.0] * 8
+
+    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm] + forecast_features
+    return np.array(obs, dtype=np.float32)
+
+
+def _select_ai_phase_action(
+    signal,
+    intersection,
+    agent,
+    obs: np.ndarray,
+    phase_starvation: Dict[int, float],
+    dt: float = 0.1,
+) -> tuple[int, bool]:
+    """
+    Selects AI signal phase action with:
+      1. Dynamic 4-Phase Demand Calculation (0: NS_THRU, 1: EW_THRU, 2: NS_LEFT, 3: EW_LEFT).
+      2. Starvation Watchdog: tracks wait time per phase; if any phase with waiting vehicles
+         has been starved >= 25s, it is guaranteed service (prevents left-turn lockup).
+      3. Max-Green Ceiling: forces switch if current phase exceeds MAX_GREEN_TIME.
+      4. DQN Q-Value Policy with Demand Action Masking over all valid phases.
+    Returns: (action, was_watchdog_override)
+    """
+    PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
+    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+
+    queues = intersection.get_movement_queues()
+    phase_demands = {
+        ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
+        for ph in range(4)
+    }
+
+    # Update starvation timers per phase
+    for ph in range(4):
+        if ph == signal.current_phase and signal.color.name == "GREEN":
+            phase_starvation[ph] = 0.0
+        elif phase_demands[ph] > 0:
+            phase_starvation[ph] = phase_starvation.get(ph, 0.0) + dt
+        else:
+            phase_starvation[ph] = 0.0
+
+    if not (signal.can_switch_phase and signal.color.name == "GREEN"):
+        return signal.current_phase, False
+
+    # 1. Starvation Watchdog Guard: any phase with queued vehicles starved >= 12.0s
+    starved_phases = [ph for ph, t in phase_starvation.items() if t >= 12.0 and phase_demands[ph] > 0]
+    if starved_phases:
+        action = max(starved_phases, key=lambda p: phase_starvation[p])
+        return action, True
+
+    # 2. Max Green Ceiling: prevent lingering on green when other directions are queued
+    other_phase_counts = {
+        ph: phase_demands[ph] for ph in range(4) if ph != signal.current_phase
+    }
+    if (signal.is_max_green_exceeded or signal.time_in_phase >= 18.0) and any(other_phase_counts.values()):
+        action = max(other_phase_counts, key=lambda p: other_phase_counts[p])
+        return action, True
+
+    # 3. DQN Policy with Demand Action Masking
+    valid_phases = [p for p, d in phase_demands.items() if d > 0]
+    if valid_phases:
+        if agent is not None:
+            try:
+                q_values = agent.get_q_values(obs)
+                action = max(valid_phases, key=lambda p: q_values[p])
+            except Exception:
+                action = max(valid_phases, key=lambda p: phase_demands[p])
+        else:
+            action = max(valid_phases, key=lambda p: phase_demands[p])
+        return action, False
+
+    # Fallback when all queues are 0: let agent explore/choose or hold phase
+    if agent is not None:
+        try:
+            action = agent.select_action(obs, epsilon=0.0)
+            return action, False
+        except Exception:
+            pass
+    return signal.current_phase, False
+
+
 # ─── Timed Benchmark ─────────────────────────────────────────────────────────
 
 async def _run_timed_benchmark(
@@ -147,7 +272,7 @@ async def _run_timed_benchmark(
        - Broadcasts real-time 10Hz frames driving the 3-D canvas.
     """
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
-    TICK_SLEEP = 0.04      # wall-clock seconds between ticks (~2.5x speed for snappy evaluation)
+    TICK_SLEEP = 0.10      # wall-clock seconds between ticks (normal 1.0x real-time speed)
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
     PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
 
@@ -157,6 +282,8 @@ async def _run_timed_benchmark(
 
     # Pause normal simulation loop so both don't fight over the intersection
     app.state.sim_running = False
+    app.state.benchmark_running = True
+    app.state.benchmark_cancelled = False
     if getattr(app.state, "sim_task", None) is not None:
         app.state.sim_task.cancel()
         try:
@@ -179,6 +306,7 @@ async def _run_timed_benchmark(
 
             # ── Setup ──────────────────────────────────────────────────────
             intersection.reset()
+            phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
             benchmark_forecaster = ArrivalForecaster()
             vat_controller = None
             if mode in ("vat", "actuated"):
@@ -247,6 +375,9 @@ async def _run_timed_benchmark(
                 safety_deadline = asyncio.get_event_loop().time() + max(duration_seconds * 3.0, 120.0)
 
             while True:
+                if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                    break
+
                 # Check exit condition
                 now = asyncio.get_event_loop().time()
 
@@ -341,37 +472,14 @@ async def _run_timed_benchmark(
                     benchmark_forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
                     obs = _build_obs_from_intersection(intersection, benchmark_forecaster)
 
-                    # Real-world safety controller with phase synchronization & starvation watchdog
-                    if signal.can_switch_phase and signal.color.name == "GREEN":
-                        starved = signal.get_starved_directions()
-                        if starved:
-                            # Safety Guard 1: Starvation protection (prevent locking out red lanes)
-                            starved_dir = starved[0]
-                            action = 0 if starved_dir in ("north", "south") else 1
-                        elif signal.is_max_green_exceeded:
-                            # Safety Guard 2: Max green ceiling cap (fair cycle distribution)
-                            queues = intersection.get_movement_queues()
-                            phase_counts = {
-                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                for ph in range(4) if ph != signal.current_phase
-                            }
-                            action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
-                        else:
-                            # DQN Q-value policy with Demand Action Masking
-                            queues = intersection.get_movement_queues()
-                            phase_demands = {
-                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                for ph in range(4)
-                            }
-                            valid_phases = [p for p, d in phase_demands.items() if d > 0]
-                            if valid_phases:
-                                q_values = agent.get_q_values(obs)
-                                action = max(valid_phases, key=lambda p: q_values[p])
-                            else:
-                                action = agent.select_action(obs, epsilon=0.0)
-                    else:
-                        # Hold phase during transitions / minimum green
-                        action = signal.current_phase
+                    action, _ = _select_ai_phase_action(
+                        signal=signal,
+                        intersection=intersection,
+                        agent=agent,
+                        obs=obs,
+                        phase_starvation=phase_starvation,
+                        dt=TICK_DT,
+                    )
 
                     last_action = action
                     was_exploring = False
@@ -719,10 +827,18 @@ async def _run_scenario_benchmark(
     controllers = ["fixed", "greedy", "ai"]
     results: dict = {}
 
+    prev_mode = getattr(app.state, "mode", "fixed")
+    app.state.sim_running = False
+    app.state.benchmark_running = True
+    app.state.benchmark_cancelled = False
+
     try:
         intersection = app.state.sim_intersection
 
         for i, controller in enumerate(controllers):
+            if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                break
+
             # Reset intersection to clean state
             intersection.reset()
             intersection.spawner.set_enabled(False)  # Pre-scheduled arrivals drive all spawning
@@ -730,6 +846,7 @@ async def _run_scenario_benchmark(
 
             agent = app.state.sim_agent if controller == "ai" else None
             forecaster = ArrivalForecaster()
+            phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
 
             # Local copy of identical arrivals schedule for this mode
             pending_arrivals = [dict(a) for a in scenario_arrivals]
@@ -746,9 +863,8 @@ async def _run_scenario_benchmark(
             sim_time = 0.0
             tick_count = 0
 
-            # Real-time pacing (respects sim_speed: default 2.0x -> ~0.05s per tick)
-            sim_speed = float(getattr(app.state, "sim_speed", 2.0))
-            tick_sleep = max(0.015, 0.09 / max(0.5, sim_speed))
+            # Normal 1.0x real-time pacing (0.1s simulation tick = 0.1s wall-clock time)
+            tick_sleep = 0.10
 
             # Notify frontend: mode starting
             try:
@@ -770,8 +886,10 @@ async def _run_scenario_benchmark(
             except Exception:
                 pass
 
-            # ── Real-Time Simulation Loop for this controller ─────────────────
             while sim_time < float(duration_seconds):
+                if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                    logger.info("Scenario benchmark cancelled during mode %s", controller)
+                    break
                 tick_start = asyncio.get_event_loop().time()
                 tick_count += 1
                 sim_time += TICK_DT
@@ -830,37 +948,16 @@ async def _run_scenario_benchmark(
                     forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
                     obs = _build_obs_from_intersection(intersection, forecaster)
 
-                    if signal.can_switch_phase and signal.color.name == "GREEN":
-                        starved = signal.get_starved_directions()
-                        if starved:
-                            watchdog_overrides += 1
-                            starved_dir = starved[0]
-                            action = 0 if starved_dir in ("north", "south") else 1
-                        elif signal.is_max_green_exceeded:
-                            watchdog_overrides += 1
-                            queues = intersection.get_movement_queues()
-                            phase_counts = {
-                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                for ph in range(4) if ph != signal.current_phase
-                            }
-                            action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
-                        else:
-                            if agent is not None:
-                                queues = intersection.get_movement_queues()
-                                phase_demands = {
-                                    ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                    for ph in range(4)
-                                }
-                                valid_phases = [p for p, d in phase_demands.items() if d > 0]
-                                if valid_phases:
-                                    q_values = agent.get_q_values(obs)
-                                    action = max(valid_phases, key=lambda p: q_values[p])
-                                else:
-                                    action = agent.select_action(obs, epsilon=0.0)
-                            else:
-                                action = signal.current_phase
-                    else:
-                        action = signal.current_phase
+                    action, was_override = _select_ai_phase_action(
+                        signal=signal,
+                        intersection=intersection,
+                        agent=agent,
+                        obs=obs,
+                        phase_starvation=phase_starvation,
+                        dt=TICK_DT,
+                    )
+                    if was_override:
+                        watchdog_overrides += 1
 
                     last_action = action
                     passed = intersection.tick(dt=TICK_DT, action=action)
@@ -927,10 +1024,13 @@ async def _run_scenario_benchmark(
                     except Exception:
                         pass
 
-                # 8. Real-time pacing sleep
+                # 8. Real-time pacing sleep (normal 1.0x real-time speed)
                 elapsed = asyncio.get_event_loop().time() - tick_start
-                sleep_t = max(0.0, tick_sleep - elapsed)
+                sleep_t = max(0.001, tick_sleep - elapsed)
                 await asyncio.sleep(sleep_t)
+
+            if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                break
 
             # ── Collect metrics for this controller ────────────────────────────
             avg_wait = round(intersection.get_avg_wait_time(), 3)
@@ -1004,8 +1104,24 @@ async def _run_scenario_benchmark(
             except Exception:
                 pass
 
-            # Pause briefly between controllers for clear visual transition
+            # Pause briefly between controllers for clear visual transition and clean environment reset
             if i < len(controllers) - 1:
+                next_ctrl = controllers[i + 1]
+                intersection.reset()
+                empty_frame = build_frame(
+                    intersection=intersection,
+                    mode=next_ctrl,
+                    episode=clean_model_ep,
+                    simulation_id=sim_id,
+                    agent=app.state.sim_agent if next_ctrl == "ai" else None,
+                    last_reward=0.0,
+                    cumulative_reward=0.0,
+                    epsilon=0.0,
+                    last_action=0,
+                    was_exploring=False,
+                    obs=None,
+                )
+                await manager.broadcast(empty_frame.model_dump())
                 await asyncio.sleep(0.8)
 
         # ── Final broadcast with full 3-controller paired results ─────────────
@@ -1015,7 +1131,6 @@ async def _run_scenario_benchmark(
                 "scenario_id":    scenario_id,
                 "run_group_id":   run_group_id,
                 "model_id":       clean_model_id,
-                "model_episode":  clean_model_ep,
                 "scenario_hash":  scenario_hash,
                 "benchmark_seed": seed,
                 "duration_seconds": duration_seconds,
@@ -1037,6 +1152,7 @@ async def _run_scenario_benchmark(
         except Exception:
             pass
     finally:
+        app.state.benchmark_running = False
         app.state.mode = prev_mode
         app.state.sim_running = False
         app.state.sim_intersection.reset()
@@ -1045,55 +1161,6 @@ async def _run_scenario_benchmark(
             app.state.sim_intersection.spawner.set_seed(None)
         except Exception:
             pass
-# ─── Simulation helper ────────────────────────────────────────────────────────
-
-
-def _build_obs_from_intersection(intersection, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
-    movement_queues = intersection.get_movement_queues()
-    signal = intersection.signal
-    # S-03b: Smooth tanh queue normalization to match environment.py exactly
-    movements = [
-        float(np.tanh(movement_queues.get(k, 0) / 15.0))
-        for k in [
-            "north_straight", "north_left", "north_right",
-            "south_straight", "south_left", "south_right",
-            "east_straight",  "east_left",  "east_right",
-            "west_straight",  "west_left",  "west_right",
-        ]
-    ]
-
-    phase_onehot = [0.0, 0.0, 0.0, 0.0]
-    phase_onehot[signal.current_phase] = 1.0
-
-    time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
-    is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
-
-    # Compute pressure identically to TrafficEnv._get_obs() — must match training exactly
-    dest_map = {
-        "north_straight": "south", "north_left": "east",   "north_right": "west",
-        "south_straight": "north", "south_left": "west",   "south_right": "east",
-        "east_straight":  "west",  "east_left":  "south",  "east_right":  "north",
-        "west_straight":  "east",  "west_left":  "north",  "west_right":  "south",
-    }
-    outgoing = intersection.get_outgoing_counts()
-    total_pressure = 0.0
-    for movement, dest in dest_map.items():
-        incoming = movement_queues.get(movement, 0) / MAX_CAP
-        out = outgoing.get(dest, 0) / MAX_CAP
-        total_pressure += max(0.0, incoming - out)
-    pressure_norm = min(total_pressure / 20.0, 1.0)
-
-    max_starv_norm = min(
-        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
-    )
-
-    if forecaster is not None:
-        forecast_features = forecaster.get_forecast_features().tolist()
-    else:
-        forecast_features = [0.0] * 8
-
-    obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm] + forecast_features
-    return np.array(obs, dtype=np.float32)
 
 
 # ─── Simulation loop ──────────────────────────────────────────────────────────
@@ -1112,10 +1179,11 @@ async def _simulation_loop(app) -> None:
 
     PHASE_DIRS = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
     PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
 
     try:
         while True:
-            if not app.state.sim_running:
+            if not app.state.sim_running or getattr(app.state, "benchmark_running", False):
                 await asyncio.sleep(0.1)
                 continue
 
@@ -1172,56 +1240,42 @@ async def _simulation_loop(app) -> None:
                     forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this))
                     obs = _build_obs_from_intersection(intersection, forecaster)
 
-                    if signal.can_switch_phase and signal.color.name == "GREEN":
-                        starved = signal.get_starved_directions()
-                        if starved:
-                            starved_dir = starved[0]
-                            action = 0 if starved_dir in ("north", "south") else 1
-                        elif signal.is_max_green_exceeded:
-                            queues = intersection.get_movement_queues()
-                            phase_counts = {
-                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                for ph in range(4) if ph != signal.current_phase
-                            }
-                            action = max(phase_counts, key=lambda p: phase_counts[p]) if phase_counts else 0
-                        else:
-                            # DQN Q-value policy with Demand Action Masking
-                            queues = intersection.get_movement_queues()
-                            phase_demands = {
-                                ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
-                                for ph in range(4)
-                            }
-                            valid_phases = [p for p, d in phase_demands.items() if d > 0]
-                            if valid_phases:
-                                q_values = agent.get_q_values(obs)
-                                action = max(valid_phases, key=lambda p: q_values[p])
-                            else:
-                                action = agent.select_action(obs, epsilon=0.0)
-                    else:
-                        action = signal.current_phase
+                    action, _ = _select_ai_phase_action(
+                        signal=signal,
+                        intersection=intersection,
+                        agent=agent,
+                        obs=obs,
+                        phase_starvation=phase_starvation,
+                        dt=0.1,
+                    )
 
                     last_action = action
 
-                    prev_pressures = app.state.training_env._compute_movement_pressures(intersection)
+                    prev_pressures = compute_movement_pressures(intersection.get_movement_queues(), intersection.get_outgoing_counts())
                     prev_passed = intersection.total_passed
                     prev_phase = intersection.signal.current_phase
 
                     intersection.tick(dt=0.1, action=action)
 
-                    curr_pressures = app.state.training_env._compute_movement_pressures(intersection)
+                    curr_pressures = compute_movement_pressures(intersection.get_movement_queues(), intersection.get_outgoing_counts())
                     curr_passed = intersection.total_passed
                     vehicles_passed = curr_passed - prev_passed
                     phase_changed = (action != prev_phase) and (intersection.signal.color.value == "green")
 
-                    reward_result = app.state.training_env.compute_reward(
-                        prev_pressures=prev_pressures,
-                        curr_pressures=curr_pressures,
-                        vehicles_passed=vehicles_passed,
-                        phase_changed=phase_changed,
-                        signal=intersection.signal,
-                        prev_phase=prev_phase,
-                    )
-                    last_reward = float(reward_result[0]) if isinstance(reward_result, tuple) else float(reward_result)
+                    last_reward = 0.0
+                    try:
+                        if getattr(app.state, "training_env", None) is not None:
+                            reward_result = app.state.training_env.compute_reward(
+                                prev_pressures=prev_pressures,
+                                curr_pressures=curr_pressures,
+                                vehicles_passed=vehicles_passed,
+                                phase_changed=phase_changed,
+                                signal=intersection.signal,
+                                prev_phase=prev_phase,
+                            )
+                            last_reward = float(reward_result[0]) if isinstance(reward_result, tuple) else float(reward_result)
+                    except Exception:
+                        pass
                     cumulative_reward += last_reward
                 else:
                     intersection.tick(dt=0.1, action=None)
@@ -1492,6 +1546,8 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             elif command == "stop":
                 # 1. Immediately cancel any background benchmark task
+                app.state.benchmark_running = False
+                app.state.benchmark_cancelled = True
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                     app.state.benchmark_task = None
@@ -1692,6 +1748,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 modes = message.get("modes", ["fixed", "greedy", "ai"])
                 # Clamp duration between 10 and 600 seconds
                 duration_seconds = max(10, min(600, duration_seconds))
+                app.state.sim_running = False
+                app.state.benchmark_running = True
+                app.state.benchmark_cancelled = False
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                 app.state.benchmark_task = asyncio.create_task(
@@ -1711,6 +1770,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     except Exception:
                         pass
                 else:
+                    app.state.sim_running = False
+                    app.state.benchmark_running = True
+                    app.state.benchmark_cancelled = False
                     if getattr(app.state, "benchmark_task", None) is not None:
                         app.state.benchmark_task.cancel()
                     app.state.benchmark_task = asyncio.create_task(

@@ -175,10 +175,10 @@ class Intersection:
                                 if getattr(v, "turn", None) != "right"
                             )
 
-                            if not perpendicular_clearing and (self.intersection_reserved_phase is None or current_group == reserved_group):
+                            if not perpendicular_clearing:
                                 self.intersection_reserved_phase = self.signal.current_phase
                             else:
-                                # Perpendicular traffic is still clearing the intersection
+                                # Perpendicular traffic is physically still clearing the intersection
                                 vehicle.position = STOP_LINE
                                 can_move = False
 
@@ -193,14 +193,17 @@ class Intersection:
                     vehicle for vehicle in lane_queue if vehicle.state != "passed"
                 ]
 
-        # Dynamically synchronize vehicles actually inside the intersection box
+        # Dynamically synchronize vehicles actually inside the conflict zone box
+        # Right turns slip along the curb and never conflict with perpendicular traffic.
+        # Vehicles past 0.70 have already cleared the intersection box.
         self.vehicles_in_intersection = {
             v.id
             for q in self.lanes.values()
             for v in q
-            if STOP_LINE < v.position < 1.0
+            if STOP_LINE < v.position < 0.70 and getattr(v, "turn", None) != "right"
         }
-        if not self.vehicles_in_intersection:
+        from .traffic_signal import SignalColor
+        if not self.vehicles_in_intersection or self.signal.color == SignalColor.RED:
             self.intersection_reserved_phase = None
 
         self.timestep += 1
