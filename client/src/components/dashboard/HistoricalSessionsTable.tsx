@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   History,
@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Activity,
   ArrowRight,
+  Info,
 } from "lucide-react";
 
 export interface SessionItem {
@@ -154,18 +155,130 @@ function formatDuration(seconds?: number): string {
   return `${hours}h ${String(remMins).padStart(2, "0")}m`;
 }
 
+/**
+ * Generate a clear, human-understandable title and short identifier for each session
+ */
+function formatSessionTitle(session: SessionItem): {
+  title: string;
+  category: string;
+  shortId: string;
+} {
+  const sid = session.session_id.toLowerCase();
+  const mode = (session.mode || "ai").toLowerCase();
+  const shortId =
+    session.session_id.length > 12
+      ? `${session.session_id.slice(0, 8)}…`
+      : session.session_id;
+
+  // 1. Multi-mode Benchmark evaluations
+  if (sid.startsWith("bench_") || (session as any).run_type === "benchmark") {
+    let modeLabel = "DQN AI";
+    if (mode === "greedy") modeLabel = "Greedy Controller";
+    else if (mode === "fixed") modeLabel = "Fixed Timer";
+    else if (mode === "manual") modeLabel = "Manual Control";
+
+    const epsLabel =
+      mode === "ai" && session.model_episodes
+        ? ` (${session.model_episodes} eps)`
+        : "";
+    return {
+      title: `${modeLabel} Benchmark${epsLabel}`,
+      category: "Benchmark",
+      shortId,
+    };
+  }
+
+  // 2. Real-World CCTV Digital Twin / Camera playback
+  if (
+    session.has_arrivals ||
+    sid.includes("cctv") ||
+    (session as any).run_type === "cctv_replay"
+  ) {
+    return {
+      title: "CCTV Digital Twin Replay",
+      category: "Digital Twin",
+      shortId,
+    };
+  }
+
+  // 3. Regular Simulation Runs
+  let modeName = "FlowSync DQN AI";
+  if (mode === "greedy") modeName = "Greedy Adaptive";
+  else if (mode === "fixed") modeName = "Fixed-Time Cycle";
+  else if (mode === "manual") modeName = "Manual Override";
+
+  const epsSuffix =
+    mode === "ai" && session.model_episodes
+      ? ` (${session.model_episodes} eps)`
+      : "";
+  return {
+    title: `${modeName} Simulation${epsSuffix}`,
+    category: "Simulation",
+    shortId,
+  };
+}
+
+/**
+ * Get comprehensive Highway Capacity Manual (HCM) Level of Service (LOS) description
+ */
+function getLosDescription(los?: string): string {
+  const l = (los || "C").toUpperCase();
+  switch (l) {
+    case "A":
+      return "LOS A: Free Flow (≤10s avg delay). Minimal wait time, optimal intersection performance.";
+    case "B":
+      return "LOS B: Stable Flow (10.1s - 20.0s avg delay). Good progression, minor queuing.";
+    case "C":
+      return "LOS C: Acceptable Flow (20.1s - 35.0s avg delay). Fair progression, standard urban target.";
+    case "D":
+      return "LOS D: Tolerable Flow (35.1s - 55.0s avg delay). Noticeable congestion, queues approaching capacity.";
+    case "E":
+      return "LOS E: Unstable Flow (55.1s - 80.0s avg delay). Operating at maximum junction capacity, long queues.";
+    case "F":
+    default:
+      return "LOS F: Forced Breakdown (>80.0s avg delay). Severe delay, demand exceeds junction capacity.";
+  }
+}
+
 export default function HistoricalSessionsTable({ sessions }: Props) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [modeFilter, setModeFilter] = useState("ALL");
+  const [episodeFilter, setEpisodeFilter] = useState("ALL");
   const [congestionFilter, setCongestionFilter] = useState("ALL");
   const [ratingFilter, setRatingFilter] = useState("ALL");
 
+  // Dynamic list of unique training episodes from sessions
+  const uniqueEpisodes = useMemo(() => {
+    const epsSet = new Set<number>();
+    sessions.forEach((s) => {
+      if (s.model_episodes !== undefined && s.model_episodes !== null) {
+        const num = Number(s.model_episodes);
+        if (!isNaN(num) && num > 0) epsSet.add(num);
+      } else if ((s.mode || "ai").toLowerCase() === "ai") {
+        epsSet.add(300);
+      }
+    });
+    if (epsSet.size === 0 && sessions.length > 0) {
+      [50, 100, 300, 500, 1000].forEach((e) => epsSet.add(e));
+    }
+    return Array.from(epsSet).sort((a, b) => a - b);
+  }, [sessions]);
+
+  const handleModeFilterChange = (mode: string) => {
+    setModeFilter(mode);
+    if (mode !== "ALL" && mode !== "AI") {
+      setEpisodeFilter("ALL");
+    }
+  };
+
   const filteredSessions = sessions.filter((s) => {
     const term = searchTerm.toLowerCase().trim();
+    const friendlyTitle = formatSessionTitle(s).title.toLowerCase();
     const matchesSearch =
       !term ||
       s.session_id.toLowerCase().includes(term) ||
+      friendlyTitle.includes(term) ||
       (s.model_name && s.model_name.toLowerCase().includes(term)) ||
       (s.mode && s.mode.toLowerCase().includes(term));
 
@@ -177,6 +290,10 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
       (modeFilter === "FIXED" && sMode === "fixed") ||
       (modeFilter === "MANUAL" && sMode === "manual");
 
+    const matchesEpisode =
+      episodeFilter === "ALL" ||
+      String(s.model_episodes ?? (sMode === "ai" ? 300 : "")) === episodeFilter;
+
     const matchesCongestion =
       congestionFilter === "ALL" || s.congestion_level === congestionFilter;
 
@@ -184,7 +301,7 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
       ratingFilter === "ALL" ||
       (s.performance_rating && s.performance_rating.toUpperCase() === ratingFilter);
 
-    return matchesSearch && matchesMode && matchesCongestion && matchesRating;
+    return matchesSearch && matchesMode && matchesEpisode && matchesCongestion && matchesRating;
   });
 
   // Ensure sessions are sorted chronologically with newest first
@@ -342,7 +459,7 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
           <div className="relative">
             <select
               value={modeFilter}
-              onChange={(e) => setModeFilter(e.target.value)}
+              onChange={(e) => handleModeFilterChange(e.target.value)}
               className="h-8 rounded-lg bg-black/40 border border-white/10 px-2.5 text-xs text-white/80 focus:border-indigo-500 focus:outline-none transition-colors"
             >
               <option value="ALL">All Modes</option>
@@ -352,6 +469,25 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
               <option value="MANUAL">Manual</option>
             </select>
           </div>
+
+          {/* Model Episodes Filter (For AI or All modes) */}
+          {(modeFilter === "ALL" || modeFilter === "AI") && (
+            <div className="relative">
+              <select
+                value={episodeFilter}
+                onChange={(e) => setEpisodeFilter(e.target.value)}
+                className="h-8 rounded-lg bg-black/40 border border-indigo-500/30 px-2.5 text-xs text-indigo-300 focus:border-indigo-500 focus:outline-none transition-colors"
+                title="Filter by DQN model training episodes"
+              >
+                <option value="ALL">All Episodes</option>
+                {uniqueEpisodes.map((ep) => (
+                  <option key={ep} value={String(ep)}>
+                    {ep} Episodes
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Performance Rating Filter */}
           <div className="relative">
@@ -429,14 +565,26 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
           <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
               <tr className="border-b border-white/[0.06] text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                <th className="py-2.5 px-3">Session & Timing</th>
+                <th className="py-2.5 px-3">Simulation Run & Timing</th>
                 <th className="py-2.5 px-3">AI Model / Policy</th>
                 <th className="py-2.5 px-3">
-                  <div className="flex items-center gap-1" title="Vehicles successfully passed through the intersection vs total volume">
+                  <div
+                    className="flex items-center gap-1 cursor-help group/th"
+                    title="Throughput & Clearance: Total vehicles that successfully crossed and exited the intersection vs total arrival volume (e.g., 95 cleared of 100 total = 95% clearance efficiency)."
+                  >
                     <span>Throughput & Clearance</span>
+                    <Info className="h-3 w-3 text-white/40 group-hover/th:text-indigo-400 transition-colors" />
                   </div>
                 </th>
-                <th className="py-2.5 px-3">Avg Delay & LOS</th>
+                <th className="py-2.5 px-3">
+                  <div
+                    className="flex items-center gap-1 cursor-help group/th"
+                    title="HCM Level of Service (LOS): International standard for intersection wait time (LOS A: ≤10s, B: ≤20s, C: ≤35s, D: ≤55s, E: ≤80s, F: >80s avg vehicle delay)."
+                  >
+                    <span>Avg Delay & LOS</span>
+                    <Info className="h-3 w-3 text-white/40 group-hover/th:text-indigo-400 transition-colors" />
+                  </div>
+                </th>
                 <th className="py-2.5 px-3">Performance Evaluation</th>
                 <th className="py-2.5 px-3">Peak Queue</th>
                 <th className="py-2.5 px-3">Run Duration</th>
@@ -452,6 +600,7 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                 </tr>
               ) : (
                 sortedSessions.map((session) => {
+                  const sessionDetails = formatSessionTitle(session);
                   const modeBadge = getModeBadge(session.mode);
                   const ratingBadge = getRatingBadge(session.performance_rating);
                   const losClass = getLosBadge(session.level_of_service);
@@ -469,12 +618,18 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                       key={session.session_id}
                       className="hover:bg-white/[0.02] transition-colors group"
                     >
-                      {/* Session ID, Mode & Timing */}
+                      {/* Simulation Name, Mode & Timing */}
                       <td className="py-3 px-3">
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-white group-hover:text-indigo-300 transition-colors text-xs">
-                              {session.session_id}
+                            <span className="font-semibold text-white group-hover:text-indigo-300 transition-colors text-xs">
+                              {sessionDetails.title}
+                            </span>
+                            <span
+                              className="font-mono text-[9px] text-white/40 bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/5 cursor-help"
+                              title={`Full Session ID: ${session.session_id}`}
+                            >
+                              #{sessionDetails.shortId}
                             </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -530,7 +685,10 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                       {/* Throughput & Clearance */}
                       <td className="py-3 px-3">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-baseline gap-1.5">
+                          <div
+                            className="flex items-baseline gap-1.5 cursor-help"
+                            title={`${throughput.toLocaleString()} vehicles cleared out of ${session.total_vehicles.toLocaleString()} total demand`}
+                          >
                             <span className="font-mono font-bold text-white text-sm">
                               {throughput.toLocaleString()}
                             </span>
@@ -542,7 +700,10 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <div className="h-1.5 w-16 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-1.5 w-16 bg-white/10 rounded-full overflow-hidden"
+                              title={`Clearance efficiency: ${throughputPct}%`}
+                            >
                               <div
                                 className={`h-full rounded-full ${
                                   throughputPct >= 90
@@ -574,8 +735,8 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                               {avgWait.toFixed(1)}s
                             </span>
                             <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${losClass}`}
-                              title="Highway Capacity Manual Level of Service"
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border cursor-help ${losClass}`}
+                              title={getLosDescription(session.level_of_service)}
                             >
                               LOS {session.level_of_service || "C"}
                             </span>
