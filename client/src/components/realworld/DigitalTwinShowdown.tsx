@@ -253,7 +253,7 @@ export default function DigitalTwinShowdown({
       command: "run_timed_benchmark",
       arrivals: arrivals,
       scenario_counts: !arrivals ? scenarioCounts : null,
-      modes: ["fixed", "greedy", "ai"],
+      modes: ["ai", "fixed", "greedy"],
     });
   }, [twinData, scenarioCounts, benchmarkState, isWsConnected, sendWsCommand, setStoreRunning]);
 
@@ -296,8 +296,8 @@ export default function DigitalTwinShowdown({
     );
   }
 
-  const MODE_LABELS: Record<string, string> = { fixed: "Fixed Timer", ai: "DQN AI", greedy: "Greedy" };
-  const MODES_ORDER = ["fixed", "greedy", "ai"];
+  const MODE_LABELS: Record<string, string> = { ai: "DQN AI", fixed: "Fixed Timer", greedy: "Greedy" };
+  const MODES_ORDER = ["ai", "fixed", "greedy"];
 
   return (
     <div className="flex flex-1 w-full h-full bg-[#0a0a0a] overflow-hidden">

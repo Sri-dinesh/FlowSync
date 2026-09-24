@@ -147,7 +147,7 @@ class DeterministicEvaluator:
 
     Args:
         agent: Optional DQNAgent. Required for mode="ai".
-        mode: One of "fixed", "greedy", "ai".
+        mode: One of "ai", "fixed", "greedy".
         spawn_lambda: Vehicle arrival rate (vehicles/s).
         red_duration: All-red clearance duration in seconds.
     """
@@ -448,7 +448,7 @@ class DeterministicEvaluator:
         seeds: Optional[List[int]] = None,
     ) -> Dict[str, BenchmarkResult]:
         """
-        Run all three modes (fixed, greedy, ai) with identical seeds and summarize.
+        Run all three modes (ai, fixed, greedy) with identical seeds and summarize.
 
         Args:
             agent: DQNAgent for AI mode.
@@ -461,7 +461,7 @@ class DeterministicEvaluator:
         seeds = seeds or CRN_SEEDS
         results: Dict[str, BenchmarkResult] = {}
 
-        for mode in ("fixed", "greedy", "ai"):
+        for mode in ("ai", "fixed", "greedy"):
             eval_agent = agent if mode == "ai" else None
             evaluator = DeterministicEvaluator(
                 agent=eval_agent,

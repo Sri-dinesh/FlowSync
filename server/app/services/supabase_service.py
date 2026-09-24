@@ -572,7 +572,7 @@ def get_grouped_scenario_runs(scenario_id: str) -> List[Dict[str, Any]]:
             "ran_at":        g["ran_at"],
             "model_episode": g["model_episode"],
         }
-        for ctrl in ("fixed", "greedy", "ai"):
+        for ctrl in ("ai", "fixed", "greedy"):
             if ctrl in g["controllers"]:
                 entry[ctrl] = g["controllers"][ctrl]
         out.append(entry)
@@ -617,7 +617,7 @@ def get_aggregate_stats() -> Dict[str, Any]:
             ctrl_starvation[ctrl].append(int(r["starvation_count"]))
 
     per_controller: Dict[str, Any] = {}
-    for ctrl in ("fixed", "greedy", "ai"):
+    for ctrl in ("ai", "fixed", "greedy"):
         waits = ctrl_waits.get(ctrl, [])
         thru  = ctrl_throughput.get(ctrl, [])
         starv = ctrl_starvation.get(ctrl, [])

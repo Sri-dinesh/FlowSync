@@ -61,7 +61,7 @@ const MODE_CONFIG: Record<
   },
 };
 
-const BENCHMARK_MODES = ["fixed", "greedy", "ai"];
+const BENCHMARK_MODES = ["ai", "fixed", "greedy"];
 
 export default function CityComparisonPanel({
   results,
@@ -73,7 +73,7 @@ export default function CityComparisonPanel({
 }: CityComparisonPanelProps) {
   const [duration, setDuration] = useState<number>(15);
 
-  const modes = useMemo(() => ["fixed", "greedy", "ai"], []);
+  const modes = useMemo(() => ["ai", "fixed", "greedy"], []);
 
   const chartData = useMemo(() => {
     if (!results) return [];

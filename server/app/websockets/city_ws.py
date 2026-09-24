@@ -56,7 +56,7 @@ class ComparisonTestState:
     def __init__(self) -> None:
         self.running: bool = False
         self.current_mode_idx: int = 0
-        self.modes = ["fixed", "greedy", "ai"]
+        self.modes = ["ai", "fixed", "greedy"]
         self.duration_per_mode: int = 30   # seconds
         self.results: Dict[str, Dict] = {}
         self.started_at: float = 0.0
@@ -194,7 +194,7 @@ async def _city_simulation_loop(app) -> None:
                             "winner": finish_data.get("winner"),
                             "improvements": finish_data.get("improvements", {}),
                             "duration_seconds": finish_data.get("duration_seconds", 30),
-                            "modes": finish_data.get("modes", ["fixed", "greedy", "ai"]),
+                            "modes": finish_data.get("modes", ["ai", "fixed", "greedy"]),
                             "benchmark_seed": finish_data.get("benchmark_seed"),
                         })
                         app.state.city_mode = "fixed"

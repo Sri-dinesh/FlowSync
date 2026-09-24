@@ -267,7 +267,7 @@ export default function SimulationPage() {
                                     </span>
                                   </>
                                 ) : (
-                                  <>▶ Run 3-Controller Benchmark (Fixed · Greedy · DQN)</>
+                                  <>▶ Run 3-Controller Benchmark (DQN · Fixed · Greedy)</>
                                 )}
                               </button>
 
@@ -292,7 +292,7 @@ export default function SimulationPage() {
                                   <span className="font-mono text-violet-300">Phase {(benchmarkProgress.mode_index ?? 0) + 1} of 3</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                                  {["fixed", "greedy", "ai"].map((mode) => {
+                                  {["ai", "fixed", "greedy"].map((mode) => {
                                     const isDone = benchmarkProgress.modes_done?.includes(mode);
                                     const isCurrent = benchmarkProgress.current_mode === mode;
                                     return (
@@ -372,6 +372,17 @@ export default function SimulationPage() {
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                                  {/* DQN */}
+                                  <div className="p-2 rounded-lg bg-violet-950/40 border border-violet-500/40">
+                                    <div className="text-[10px] text-violet-300 font-bold">DQN Policy</div>
+                                    <div className="text-violet-200 font-bold mt-0.5">
+                                      {scenarioBenchmarkResults.results?.ai?.avg_wait_time?.toFixed(1) ?? "—"}s
+                                    </div>
+                                    <div className="text-[9px] text-violet-300/60 mt-0.5">
+                                      {scenarioBenchmarkResults.results?.ai?.total_passed ?? "—"} veh
+                                    </div>
+                                  </div>
+
                                   {/* Fixed */}
                                   <div className="p-2 rounded-lg bg-black/40 border border-blue-500/20">
                                     <div className="text-[10px] text-blue-400 font-semibold">Fixed</div>
@@ -391,17 +402,6 @@ export default function SimulationPage() {
                                     </div>
                                     <div className="text-[9px] text-white/40 mt-0.5">
                                       {scenarioBenchmarkResults.results?.greedy?.total_passed ?? "—"} veh
-                                    </div>
-                                  </div>
-
-                                  {/* DQN */}
-                                  <div className="p-2 rounded-lg bg-violet-950/40 border border-violet-500/40">
-                                    <div className="text-[10px] text-violet-300 font-bold">DQN Policy</div>
-                                    <div className="text-violet-200 font-bold mt-0.5">
-                                      {scenarioBenchmarkResults.results?.ai?.avg_wait_time?.toFixed(1) ?? "—"}s
-                                    </div>
-                                    <div className="text-[9px] text-violet-300/60 mt-0.5">
-                                      {scenarioBenchmarkResults.results?.ai?.total_passed ?? "—"} veh
                                     </div>
                                   </div>
                                 </div>

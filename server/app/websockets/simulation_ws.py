@@ -782,7 +782,7 @@ async def _run_scenario_benchmark(
 ) -> None:
     """
     Real-time 3D multi-controller scenario evaluation.
-    Runs Fixed → Greedy → DQN (AI) sequentially in real-time, driving the 3D Canvas.
+    Runs DQN (AI) → Fixed → Greedy sequentially in real-time, driving the 3D Canvas.
     All controllers receive the identical pre-generated vehicle arrivals under Common Random Numbers (CRN).
     """
     import hashlib as _hashlib
@@ -833,7 +833,7 @@ async def _run_scenario_benchmark(
         total_scheduled_vehicles, scenario_id, seed, spawn_lambda, duration_seconds,
     )
 
-    controllers = ["fixed", "greedy", "ai"]
+    controllers = ["ai", "fixed", "greedy"]
     results: dict = {}
 
     prev_mode = getattr(app.state, "mode", "fixed")
@@ -1772,7 +1772,7 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 duration_seconds = int(message.get("duration_seconds", 30))
                 scenario_counts = message.get("scenario_counts", None)
                 arrivals = message.get("arrivals", None)
-                modes = message.get("modes", ["fixed", "greedy", "ai"])
+                modes = message.get("modes", ["ai", "fixed", "greedy"])
                 # Clamp duration between 10 and 600 seconds
                 duration_seconds = max(10, min(600, duration_seconds))
                 app.state.sim_running = False

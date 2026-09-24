@@ -459,12 +459,12 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
     # F-02: Derive leader from actual metric direction
     # Lower wait = better, Higher throughput = better
     modes_with_data = {}
+    if ai_bm["has_data"]:
+        modes_with_data["ai"] = ai_bm
     if fixed_bm["has_data"]:
         modes_with_data["fixed"] = fixed_bm
     if greedy_bm["has_data"]:
         modes_with_data["greedy"] = greedy_bm
-    if ai_bm["has_data"]:
-        modes_with_data["ai"] = ai_bm
 
     if len(modes_with_data) >= 2:
         # Leader = lowest avg_wait_time among modes with data
@@ -478,9 +478,9 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         leader_name = None
 
     mode_benchmarks = {
+        "ai": ai_bm,
         "fixed": fixed_bm,
         "greedy": greedy_bm,
-        "ai": ai_bm,
         "comparison": {
             "wait_reduction_pct": wait_red,
             "throughput_gain_pct": thr_gain,

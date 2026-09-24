@@ -89,9 +89,9 @@ export function ScenarioHistory({
         run_group_id: latestBenchmarkResults.run_group_id || `optimistic-${Date.now()}`,
         ran_at: new Date().toISOString(),
         model_episode: latestBenchmarkResults.model_episode,
+        ai: bRes?.ai,
         fixed: bRes?.fixed,
         greedy: bRes?.greedy,
-        ai: bRes?.ai,
       };
 
       setGroupedRuns((prev) => {
@@ -275,9 +275,9 @@ export function ScenarioHistory({
                 <thead className="bg-neutral-900">
                   <tr className="border-b border-neutral-800">
                     <th className="text-left px-3 py-2 text-neutral-500 font-medium">Checkpoint</th>
+                    <th className="text-right px-3 py-2 text-white font-medium">DQN Policy</th>
                     <th className="text-right px-3 py-2 text-neutral-400 font-medium">Fixed</th>
                     <th className="text-right px-3 py-2 text-neutral-400 font-medium">Greedy</th>
-                    <th className="text-right px-3 py-2 text-white font-medium">DQN Policy</th>
                     <th className="text-center px-3 py-2 text-neutral-500 font-medium">Winner</th>
                     <th className="text-right px-3 py-2 text-neutral-500 font-medium">Starvation</th>
                     <th className="text-right px-3 py-2 text-neutral-600 font-medium">Date</th>
@@ -315,14 +315,6 @@ export function ScenarioHistory({
                           </span>
                         </td>
 
-                        <td className="px-3 py-2 text-right font-mono text-neutral-500">
-                          {fWait !== undefined ? `${fWait.toFixed(2)}s` : "—"}
-                        </td>
-
-                        <td className="px-3 py-2 text-right font-mono text-neutral-400">
-                          {gWait !== undefined ? `${gWait.toFixed(2)}s` : "—"}
-                        </td>
-
                         <td className="px-3 py-2 text-right font-mono">
                           {dWait !== undefined ? (
                             <div className="inline-flex flex-col items-end">
@@ -342,6 +334,14 @@ export function ScenarioHistory({
                           ) : "—"}
                         </td>
 
+                        <td className="px-3 py-2 text-right font-mono text-neutral-500">
+                          {fWait !== undefined ? `${fWait.toFixed(2)}s` : "—"}
+                        </td>
+
+                        <td className="px-3 py-2 text-right font-mono text-neutral-400">
+                          {gWait !== undefined ? `${gWait.toFixed(2)}s` : "—"}
+                        </td>
+
                         <td className="px-3 py-2 text-center">
                           {winner ? (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -356,15 +356,15 @@ export function ScenarioHistory({
                         </td>
 
                         <td className="px-3 py-2 text-right font-mono text-[10px] text-neutral-600">
-                          <span className="text-neutral-400">{group.fixed?.starvation_count ?? 0}</span>
-                          <span className="mx-1 text-neutral-800">/</span>
-                          <span className="text-neutral-400">{group.greedy?.starvation_count ?? 0}</span>
-                          <span className="mx-1 text-neutral-800">/</span>
                           <span className={
                             (group.ai?.starvation_count ?? 0) === 0 ? "text-white font-semibold" : "text-neutral-400"
                           }>
                             {group.ai?.starvation_count ?? 0}
                           </span>
+                          <span className="mx-1 text-neutral-800">/</span>
+                          <span className="text-neutral-400">{group.fixed?.starvation_count ?? 0}</span>
+                          <span className="mx-1 text-neutral-800">/</span>
+                          <span className="text-neutral-400">{group.greedy?.starvation_count ?? 0}</span>
                         </td>
 
                         <td className="px-3 py-2 text-right text-neutral-600 text-[10px]">
@@ -428,6 +428,16 @@ export function ScenarioHistory({
 
                     <Line
                       type="monotone"
+                      dataKey="dqn"
+                      name="DQN Agent"
+                      stroke="#c084fc"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: "#c084fc", strokeWidth: 0 }}
+                      activeDot={{ r: 6, fill: "#e879f9" }}
+                    />
+
+                    <Line
+                      type="monotone"
                       dataKey="fixed"
                       name="Fixed Time"
                       stroke="#60a5fa"
@@ -444,16 +454,6 @@ export function ScenarioHistory({
                       strokeWidth={2}
                       strokeDasharray="3 2"
                       dot={{ r: 3, fill: "#34d399" }}
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="dqn"
-                      name="DQN Agent"
-                      stroke="#c084fc"
-                      strokeWidth={2.5}
-                      dot={{ r: 4, fill: "#c084fc", strokeWidth: 0 }}
-                      activeDot={{ r: 6, fill: "#e879f9" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -482,6 +482,51 @@ export function ScenarioHistory({
                   </div>
 
                   <div className="flex flex-col gap-2.5">
+                    {/* DQN */}
+                    <div className={`rounded-lg border p-3 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "border-white bg-white text-black" : "border-neutral-800 bg-neutral-900 text-white"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-medium flex items-center gap-1.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black" : "bg-white"}`} /> DQN Reinforcement
+                        </span>
+                        {g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-black text-white">
+                            <Trophy size={10} /> WIN
+                          </span>
+                        ) : (
+                          <span className={`text-xs font-mono ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/70" : "text-neutral-500"}`}>
+                            {g.ai ? `${g.ai.avg_wait_time.toFixed(1)}s avg` : "—"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Avg Wait</div>
+                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
+                            {g.ai ? `${g.ai.avg_wait_time.toFixed(2)}s` : "—"}
+                          </div>
+                        </div>
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Throughput</div>
+                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
+                            {g.ai?.total_passed ?? "—"}
+                          </div>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/50" : "text-neutral-600"}`}>veh</div>
+                        </div>
+                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
+                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>P95 Delay</div>
+                          <div className={`text-xs font-mono mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-neutral-400"}`}>
+                            {g.ai?.p95_delay ? `${g.ai.p95_delay.toFixed(1)}s` : "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`mt-2 flex items-center justify-between text-xs border-t pt-2 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60 border-black/10" : "text-neutral-600 border-neutral-800"}`}>
+                        <span>Max Queue {g.ai?.max_queue ?? "—"} · Starvations {g.ai?.starvation_count ?? 0}</span>
+                        {g.ai?.starvation_count === 0 ? (
+                          <span className={g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black font-medium" : "text-emerald-400 font-medium"}>✓ No starvation</span>
+                        ) : null}
+                      </div>
+                    </div>
+
                     {/* Fixed */}
                     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
                       <div className="flex items-center justify-between mb-2">
@@ -553,51 +598,6 @@ export function ScenarioHistory({
                       <div className="mt-2 flex items-center justify-between text-xs text-neutral-600 border-t border-neutral-800 pt-2">
                         <span>Max Queue {g.greedy?.max_queue ?? "—"} · Starvations {g.greedy?.starvation_count ?? 0}</span>
                         <span className="text-neutral-500">—</span>
-                      </div>
-                    </div>
-
-                    {/* DQN */}
-                    <div className={`rounded-lg border p-3 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "border-white bg-white text-black" : "border-neutral-800 bg-neutral-900 text-white"}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-xs font-medium flex items-center gap-1.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black" : "bg-white"}`} /> DQN Reinforcement
-                        </span>
-                        {g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-black text-white">
-                            <Trophy size={10} /> WIN
-                          </span>
-                        ) : (
-                          <span className={`text-xs font-mono ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/70" : "text-neutral-500"}`}>
-                            {g.ai ? `${g.ai.avg_wait_time.toFixed(1)}s avg` : "—"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
-                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Avg Wait</div>
-                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
-                            {g.ai ? `${g.ai.avg_wait_time.toFixed(2)}s` : "—"}
-                          </div>
-                        </div>
-                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
-                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>Throughput</div>
-                          <div className={`text-xs font-mono font-bold mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-white"}`}>
-                            {g.ai?.total_passed ?? "—"}
-                          </div>
-                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/50" : "text-neutral-600"}`}>veh</div>
-                        </div>
-                        <div className={`rounded-md border p-2 text-center ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "bg-black/5 border-black/10" : "bg-[#0a0a0a] border-neutral-800"}`}>
-                          <div className={`text-[10px] ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60" : "text-neutral-500"}`}>P95 Delay</div>
-                          <div className={`text-xs font-mono mt-0.5 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black" : "text-neutral-400"}`}>
-                            {g.ai?.p95_delay ? `${g.ai.p95_delay.toFixed(1)}s` : "—"}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`mt-2 flex items-center justify-between text-xs border-t pt-2 ${g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black/60 border-black/10" : "text-neutral-600 border-neutral-800"}`}>
-                        <span>Max Queue {g.ai?.max_queue ?? "—"} · Starvations {g.ai?.starvation_count ?? 0}</span>
-                        {g.ai?.starvation_count === 0 ? (
-                          <span className={g.ai && g.greedy && g.ai.avg_wait_time < g.greedy.avg_wait_time ? "text-black font-medium" : "text-emerald-400 font-medium"}>✓ No starvation</span>
-                        ) : null}
                       </div>
                     </div>
                   </div>

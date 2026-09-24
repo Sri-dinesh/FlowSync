@@ -61,7 +61,7 @@ const MODE_CONFIG: Record<
   },
 };
 
-const BENCHMARK_MODES = ["fixed", "greedy", "ai"];
+const BENCHMARK_MODES = ["ai", "fixed", "greedy"];
 
 export default function SimulationBenchmarkPanel({
   running,

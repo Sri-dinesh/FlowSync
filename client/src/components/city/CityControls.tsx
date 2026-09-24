@@ -41,7 +41,7 @@ export default function CityControls({
           </p>
         </div>
         <div className="flex items-center p-1 bg-neutral-900 rounded-lg border border-neutral-800">
-          {["fixed", "greedy", "ai"].map((m) => (
+          {["ai", "fixed", "greedy"].map((m) => (
             <Button
               key={m}
               size="sm"
