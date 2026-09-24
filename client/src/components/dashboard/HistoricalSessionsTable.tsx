@@ -14,6 +14,10 @@ import {
   Sparkles,
   Info,
   X,
+  ChevronDown,
+  ChevronUp,
+  Trophy,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -27,7 +31,7 @@ export interface SessionItem {
   congestion_level: string;
   avg_fps: number;
   has_arrivals: boolean;
-  mode?: "ai" | "greedy" | "fixed" | "manual" | string;
+  mode?: "ai" | "greedy" | "fixed" | "manual" | "benchmark" | string;
   model_name?: string;
   model_episodes?: number | string;
   throughput?: number;
@@ -37,10 +41,43 @@ export interface SessionItem {
   performance_rating?: "OPTIMAL" | "EFFICIENT" | "MODERATE" | "CONGESTED" | string;
   level_of_service?: "A" | "B" | "C" | "D" | "E" | "F" | string;
   efficiency_gain_pct?: number;
+  run_type?: "benchmark" | "cctv_replay" | "standalone" | string;
+  benchmark_id?: string;
+  winner?: string;
+  improvements?: Record<string, number>;
+  benchmark_modes?: string[];
+  benchmark_results?: Record<
+    string,
+    {
+      avg_wait_s?: number;
+      avg_wait_time?: number;
+      throughput?: number;
+      total_passed?: number;
+      peak_queue?: number;
+      max_queue?: number;
+      duration_seconds?: number;
+    }
+  >;
+  scenario_id?: string;
+  source_label?: string;
+  is_cctv_replay?: boolean;
+}
+
+interface DisplaySessionItem extends SessionItem {
+  isBenchmarkGroup?: boolean;
+  benchmarkRun?: {
+    benchmark_id: string;
+    winner: string;
+    improvements: Record<string, number>;
+    modes_results: Record<string, any>;
+    child_sessions: Record<string, SessionItem>;
+  };
 }
 
 interface Props {
   sessions: SessionItem[];
+  benchmarks?: any[];
+  initialModeFilter?: string;
 }
 
 function parseSessionDate(createdAt?: string, timestampMs?: number): Date | null {
@@ -49,14 +86,18 @@ function parseSessionDate(createdAt?: string, timestampMs?: number): Date | null
     if (!isNaN(d.getTime())) return d;
   }
   if (!createdAt) return null;
-  const sanitized = createdAt.includes(" ") && !createdAt.includes("T")
-    ? createdAt.replace(" ", "T")
-    : createdAt;
+  const sanitized =
+    createdAt.includes(" ") && !createdAt.includes("T")
+      ? createdAt.replace(" ", "T")
+      : createdAt;
   const d = new Date(sanitized);
   return isNaN(d.getTime()) ? null : d;
 }
 
-function formatSessionFriendlyTime(createdAt?: string, timestampMs?: number): {
+function formatSessionFriendlyTime(
+  createdAt?: string,
+  timestampMs?: number
+): {
   display: string;
   relative: string;
   full: string;
@@ -142,8 +183,23 @@ function formatSessionTitle(session: SessionItem): {
     session.session_id.length > 12
       ? `${session.session_id.slice(0, 8)}…`
       : session.session_id;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (sid.startsWith("bench_") || (session as any).run_type === "benchmark") {
+
+  if (
+    (session as DisplaySessionItem).isBenchmarkGroup ||
+    session.run_type === "benchmark" ||
+    sid.startsWith("bm_")
+  ) {
+    const scTitle = session.scenario_id
+      ? `Scenario: ${session.scenario_id.toUpperCase()}`
+      : "3-Mode Controller Benchmark";
+    return {
+      title: scTitle,
+      category: "Benchmark",
+      shortId,
+    };
+  }
+
+  if (sid.startsWith("bench_")) {
     let modeLabel = "DQN AI";
     if (mode === "greedy") modeLabel = "Greedy Controller";
     else if (mode === "fixed") modeLabel = "Fixed Timer";
@@ -158,11 +214,11 @@ function formatSessionTitle(session: SessionItem): {
       shortId,
     };
   }
+
   if (
     session.has_arrivals ||
     sid.includes("cctv") ||
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (session as any).run_type === "cctv_replay"
+    session.run_type === "cctv_replay"
   ) {
     return {
       title: "CCTV Digital Twin Replay",
@@ -170,6 +226,7 @@ function formatSessionTitle(session: SessionItem): {
       shortId,
     };
   }
+
   let modeName = "FlowSync DQN AI";
   if (mode === "greedy") modeName = "Greedy Adaptive";
   else if (mode === "fixed") modeName = "Fixed-Time Cycle";
@@ -183,26 +240,6 @@ function formatSessionTitle(session: SessionItem): {
     category: "Simulation",
     shortId,
   };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getLosDescription(los?: string): string {
-  const l = (los || "C").toUpperCase();
-  switch (l) {
-    case "A":
-      return "LOS A: Free Flow (≤10s). Minimal wait, optimal performance.";
-    case "B":
-      return "LOS B: Stable Flow (10.1–20s). Good progression, minor queuing.";
-    case "C":
-      return "LOS C: Acceptable Flow (20.1–35s). Standard urban target.";
-    case "D":
-      return "LOS D: Tolerable (35.1–55s). Queues approaching capacity.";
-    case "E":
-      return "LOS E: Unstable (55.1–80s). Maximum capacity, long queues.";
-    case "F":
-    default:
-      return "LOS F: Breakdown (>80s). Severe delay, demand exceeds capacity.";
-  }
 }
 
 function InlineInfoPopover({
@@ -237,18 +274,148 @@ function InlineInfoPopover({
   );
 }
 
-export default function HistoricalSessionsTable({ sessions }: Props) {
+export default function HistoricalSessionsTable({
+  sessions,
+  benchmarks = [],
+  initialModeFilter,
+}: Props) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [modeFilter, setModeFilter] = useState("ALL");
+  const [modeFilter, setModeFilter] = useState(initialModeFilter || "ALL");
   const [episodeFilter, setEpisodeFilter] = useState("ALL");
   const [congestionFilter, setCongestionFilter] = useState("ALL");
   const [ratingFilter, setRatingFilter] = useState("ALL");
   const [activePopover, setActivePopover] = useState<"throughput" | "delay" | null>(null);
+  const [expandedBenchmarkId, setExpandedBenchmarkId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialModeFilter) {
+      setModeFilter(initialModeFilter);
+    }
+  }, [initialModeFilter]);
+
+  // Consolidate benchmark sessions sharing a benchmark_id into unified multi-controller entries
+  const consolidatedSessions = useMemo(() => {
+    const list: DisplaySessionItem[] = [];
+    const groupedBenchmarkIds = new Set<string>();
+
+    // Index all benchmark child sessions by benchmark_id
+    const bmChildren: Record<string, Record<string, SessionItem>> = {};
+    for (const s of sessions) {
+      const bid = s.benchmark_id;
+      if (bid) {
+        if (!bmChildren[bid]) bmChildren[bid] = {};
+        const m = (s.mode || "ai").toLowerCase();
+        bmChildren[bid][m] = s;
+      }
+    }
+
+    // First inject consolidated benchmarks from `benchmarks` prop
+    if (benchmarks && benchmarks.length > 0) {
+      for (const bm of benchmarks) {
+        const bid = bm.benchmark_id;
+        if (!bid) continue;
+        groupedBenchmarkIds.add(bid);
+        const children = bmChildren[bid] || {};
+        const aiStats = bm.modes_results?.ai || {};
+        const fixedStats = bm.modes_results?.fixed || {};
+        const greedyStats = bm.modes_results?.greedy || {};
+
+        const maxQ = Math.max(
+          aiStats.peak_queue ?? aiStats.max_queue ?? 0,
+          fixedStats.peak_queue ?? fixedStats.max_queue ?? 0,
+          greedyStats.peak_queue ?? greedyStats.max_queue ?? 0
+        );
+
+        const aiWait = aiStats.avg_wait_s ?? aiStats.avg_wait_time ?? 0;
+        const totalVehs = (aiStats.throughput ?? 0) || 10;
+
+        list.push({
+          session_id: bid,
+          created_at: bm.created_at,
+          timestamp_ms: bm.timestamp_ms,
+          duration_s: bm.duration_seconds || 30.0,
+          total_frames: Math.round((bm.duration_seconds || 30.0) * 10),
+          total_vehicles: totalVehs,
+          congestion_level: "MODERATE",
+          avg_fps: 10.0,
+          has_arrivals: false,
+          mode: "benchmark",
+          model_name: "FlowSync DQN vs Fixed vs Greedy",
+          model_episodes: bm.model_episodes ?? 300,
+          throughput: aiStats.throughput ?? aiStats.total_passed ?? 0,
+          avg_wait_s: aiWait,
+          peak_queue: maxQ,
+          performance_rating: "OPTIMAL",
+          level_of_service: aiWait <= 10 ? "A" : aiWait <= 20 ? "B" : "C",
+          efficiency_gain_pct: bm.improvements?.ai_wait_pct ?? 0,
+          run_type: "benchmark",
+          benchmark_id: bid,
+          winner: bm.winner || "ai",
+          improvements: bm.improvements || {},
+          benchmark_modes: bm.modes || ["ai", "fixed", "greedy"],
+          benchmark_results: bm.modes_results || {},
+          scenario_id: bm.scenario_id,
+          isBenchmarkGroup: true,
+          benchmarkRun: {
+            benchmark_id: bid,
+            winner: bm.winner || "ai",
+            improvements: bm.improvements || {},
+            modes_results: bm.modes_results || {},
+            child_sessions: children,
+          },
+        });
+      }
+    }
+
+    // Now process the raw sessions list
+    for (const s of sessions) {
+      if (s.benchmark_id && groupedBenchmarkIds.has(s.benchmark_id)) {
+        // Child session already absorbed into consolidated benchmark row
+        continue;
+      }
+
+      if (s.benchmark_id) {
+        groupedBenchmarkIds.add(s.benchmark_id);
+        const children = bmChildren[s.benchmark_id] || {};
+        const bResults = s.benchmark_results || {};
+        const aiStats = bResults.ai || children.ai || {};
+        const fixedStats = bResults.fixed || children.fixed || {};
+        const greedyStats = bResults.greedy || children.greedy || {};
+
+        const maxQ = Math.max(
+          aiStats.peak_queue ?? aiStats.max_queue ?? s.peak_queue ?? 0,
+          fixedStats.peak_queue ?? fixedStats.max_queue ?? 0,
+          greedyStats.peak_queue ?? greedyStats.max_queue ?? 0
+        );
+
+        list.push({
+          ...s,
+          session_id: s.benchmark_id,
+          mode: "benchmark",
+          peak_queue: maxQ,
+          isBenchmarkGroup: true,
+          benchmarkRun: {
+            benchmark_id: s.benchmark_id,
+            winner: s.winner || "ai",
+            improvements: s.improvements || {},
+            modes_results: bResults,
+            child_sessions: children,
+          },
+        });
+        continue;
+      }
+
+      // Regular standalone session or CCTV replay
+      list.push(s);
+    }
+
+    return list;
+  }, [sessions, benchmarks]);
 
   const uniqueEpisodes = useMemo(() => {
     const epsSet = new Set<number>();
-    sessions.forEach((s) => {
+    consolidatedSessions.forEach((s) => {
       if (s.model_episodes !== undefined && s.model_episodes !== null) {
         const num = Number(s.model_episodes);
         if (!isNaN(num) && num > 0) epsSet.add(num);
@@ -256,11 +423,11 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
         epsSet.add(300);
       }
     });
-    if (epsSet.size === 0 && sessions.length > 0) {
+    if (epsSet.size === 0 && consolidatedSessions.length > 0) {
       [50, 100, 300, 500, 1000].forEach((e) => epsSet.add(e));
     }
     return Array.from(epsSet).sort((a, b) => a - b);
-  }, [sessions]);
+  }, [consolidatedSessions]);
 
   const handleModeFilterChange = (mode: string) => {
     setModeFilter(mode);
@@ -269,7 +436,7 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
     }
   };
 
-  const filteredSessions = sessions.filter((s) => {
+  const filteredSessions = consolidatedSessions.filter((s) => {
     const term = searchTerm.toLowerCase().trim();
     const friendlyTitle = formatSessionTitle(s).title.toLowerCase();
     const matchesSearch =
@@ -278,13 +445,23 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
       friendlyTitle.includes(term) ||
       (s.model_name && s.model_name.toLowerCase().includes(term)) ||
       (s.mode && s.mode.toLowerCase().includes(term));
+
     const sMode = (s.mode || "ai").toLowerCase();
-    const matchesMode =
-      modeFilter === "ALL" ||
-      (modeFilter === "AI" && sMode === "ai") ||
-      (modeFilter === "GREEDY" && sMode === "greedy") ||
-      (modeFilter === "FIXED" && sMode === "fixed") ||
-      (modeFilter === "MANUAL" && sMode === "manual");
+    const isBm = s.isBenchmarkGroup || s.run_type === "benchmark" || s.session_id.startsWith("bench_");
+
+    let matchesMode = modeFilter === "ALL";
+    if (modeFilter === "BENCHMARKS") {
+      matchesMode = isBm;
+    } else if (modeFilter === "AI") {
+      matchesMode = sMode === "ai" || isBm;
+    } else if (modeFilter === "GREEDY") {
+      matchesMode = sMode === "greedy" || (isBm && s.benchmark_results?.greedy !== undefined);
+    } else if (modeFilter === "FIXED") {
+      matchesMode = sMode === "fixed" || (isBm && s.benchmark_results?.fixed !== undefined);
+    } else if (modeFilter === "MANUAL") {
+      matchesMode = sMode === "manual";
+    }
+
     const matchesEpisode =
       episodeFilter === "ALL" ||
       String(s.model_episodes ?? (sMode === "ai" ? 300 : "")) === episodeFilter;
@@ -293,6 +470,7 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
     const matchesRating =
       ratingFilter === "ALL" ||
       (s.performance_rating && s.performance_rating.toUpperCase() === ratingFilter);
+
     return matchesSearch && matchesMode && matchesEpisode && matchesCongestion && matchesRating;
   });
 
@@ -302,7 +480,14 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
     return timeB - timeA;
   });
 
-  const getModeBadge = (mode?: string) => {
+  const getModeBadge = (mode?: string, isBenchmark?: boolean) => {
+    if (isBenchmark) {
+      return {
+        icon: <Trophy className="h-3 w-3 text-amber-400" />,
+        label: "3-Mode Benchmark",
+        className: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
+      };
+    }
     const m = (mode || "ai").toLowerCase();
     switch (m) {
       case "ai":
@@ -369,13 +554,13 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
     const l = (los || "C").toUpperCase();
     switch (l) {
       case "A":
-        return "bg-emerald-500/15 text-emerald-300 border-emerald-500/25";
-      case "B":
         return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      case "B":
+        return "bg-teal-500/10 text-teal-400 border-teal-500/20";
       case "C":
-        return "bg-cyan-500/10 text-cyan-300 border-cyan-500/20";
+        return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
       case "D":
-        return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
       case "E":
         return "bg-orange-500/10 text-orange-400 border-orange-500/20";
       case "F":
@@ -403,9 +588,13 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
     router.push(`/realworld?session=${sessionId}`);
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedBenchmarkId((prev) => (prev === id ? null : id));
+  };
+
   return (
     <div className="rounded-xl border border-neutral-800 bg-[#0a0a0a] overflow-hidden">
-      {/* Header — airy, balanced */}
+      {/* Header */}
       <div className="px-6 py-5 border-b border-neutral-800/80">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -415,22 +604,22 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
             <div>
               <h3 className="text-sm font-medium text-white leading-none">History</h3>
               <p className="text-xs text-neutral-500 mt-1.5">
-                {filteredSessions.length} sessions · newest first
+                {filteredSessions.length} sessions & benchmarks · newest first
               </p>
             </div>
           </div>
           <span className="hidden sm:inline-flex rounded-full bg-neutral-900 border border-neutral-800 px-3 py-1.5 text-xs font-mono text-neutral-400">
-            {sessions.length} total
+            {consolidatedSessions.length} total runs
           </span>
         </div>
 
-        {/* Filters — centered, balanced */}
+        {/* Filters */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-600" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search runs"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-8 w-44 sm:w-52 rounded-full bg-neutral-900 border border-neutral-800 pl-9 pr-3 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700"
@@ -439,222 +628,311 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
           <select
             value={modeFilter}
             onChange={(e) => handleModeFilterChange(e.target.value)}
-            className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700"
+            className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700 font-medium"
           >
-            <option value="ALL">All modes</option>
+            <option value="ALL">All Modes</option>
+            <option value="BENCHMARKS">🏆 3-Mode Benchmarks</option>
             <option value="AI">DQN AI</option>
             <option value="GREEDY">Greedy</option>
             <option value="FIXED">Fixed</option>
             <option value="MANUAL">Manual</option>
           </select>
+
           {(modeFilter === "ALL" || modeFilter === "AI") && (
             <select
               value={episodeFilter}
               onChange={(e) => setEpisodeFilter(e.target.value)}
               className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700"
             >
-              <option value="ALL">Episodes</option>
+              <option value="ALL">All checkpoints</option>
               {uniqueEpisodes.map((ep) => (
                 <option key={ep} value={String(ep)}>
-                  {ep}
+                  {ep} eps
                 </option>
               ))}
             </select>
           )}
-          <select
-            value={ratingFilter}
-            onChange={(e) => setRatingFilter(e.target.value)}
-            className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700"
-          >
-            <option value="ALL">Rating</option>
-            <option value="OPTIMAL">Optimal</option>
-            <option value="EFFICIENT">Efficient</option>
-            <option value="MODERATE">Moderate</option>
-            <option value="CONGESTED">Congested</option>
-          </select>
+
           <select
             value={congestionFilter}
             onChange={(e) => setCongestionFilter(e.target.value)}
             className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700"
           >
-            <option value="ALL">Congestion</option>
+            <option value="ALL">All density</option>
             <option value="LOW">Low</option>
             <option value="MODERATE">Moderate</option>
             <option value="HIGH">High</option>
             <option value="CRITICAL">Critical</option>
           </select>
+
+          <select
+            value={ratingFilter}
+            onChange={(e) => setRatingFilter(e.target.value)}
+            className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700"
+          >
+            <option value="ALL">All status</option>
+            <option value="OPTIMAL">Optimal</option>
+            <option value="EFFICIENT">Efficient</option>
+            <option value="MODERATE">Moderate</option>
+            <option value="CONGESTED">Congested</option>
+          </select>
         </div>
       </div>
 
-        {sessions.length === 0 ? (
-          <div className="px-6 py-16 flex flex-col items-center justify-center text-center">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-600">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <h4 className="mt-3 text-sm font-medium text-white">No sessions yet</h4>
-            <p className="mt-1 text-xs text-neutral-500 max-w-sm">
-              Run a simulation or ingest CCTV to populate history.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => router.push("/simulation")}
-                className="h-8 rounded-full bg-white text-black hover:bg-neutral-200 text-xs"
-              >
-                <Play className="h-3 w-3 mr-1.5" />
-                Simulation
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/realworld")}
-                className="h-8 rounded-full border-neutral-800 bg-transparent text-neutral-400 hover:bg-neutral-900 hover:text-white text-xs"
-              >
-                <Video className="h-3 w-3 mr-1.5" />
-                CCTV Twin
-              </Button>
-            </div>
+      {/* Content */}
+      {consolidatedSessions.length === 0 ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-neutral-400">No session history yet</p>
+          <p className="text-xs text-neutral-600 mt-1 max-w-sm mx-auto">
+            Run a simulation or benchmark to populate history.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => router.push("/simulation")}
+              className="h-8 rounded-full bg-white text-black hover:bg-neutral-200 text-xs"
+            >
+              <Play className="h-3 w-3 mr-1.5" />
+              Simulation
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/realworld")}
+              className="h-8 rounded-full border-neutral-800 bg-transparent text-neutral-400 hover:bg-neutral-900 hover:text-white text-xs"
+            >
+              <Video className="h-3 w-3 mr-1.5" />
+              CCTV Twin
+            </Button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1080px]">
-              <thead>
-                <tr className="border-b border-neutral-800/80 text-xs">
-                  <th className="py-3 px-6 font-normal text-neutral-500 w-[26%]">Run</th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[13%]">Model</th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[15%]">
-                    <div className="relative inline-flex">
-                      <button
-                        onClick={() =>
-                          setActivePopover(activePopover === "throughput" ? null : "throughput")
-                        }
-                        className="flex items-center gap-1.5 hover:text-white transition-colors"
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[1080px]">
+            <thead>
+              <tr className="border-b border-neutral-800/80 text-xs">
+                <th className="py-3 px-6 font-normal text-neutral-500 w-[26%]">Run</th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[13%]">Model</th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[15%]">
+                  <div className="relative inline-flex">
+                    <button
+                      onClick={() =>
+                        setActivePopover(activePopover === "throughput" ? null : "throughput")
+                      }
+                      className="flex items-center gap-1.5 hover:text-white transition-colors"
+                    >
+                      <span>Throughput</span>
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] transition-colors ${
+                          activePopover === "throughput"
+                            ? "bg-white text-black border-white"
+                            : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-white"
+                        }`}
                       >
-                        <span>Throughput</span>
-                        <span
-                          className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] transition-colors ${
-                            activePopover === "throughput"
-                              ? "bg-white text-black border-white"
-                              : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-white"
-                          }`}
-                        >
-                          <Info className="h-2.5 w-2.5" />
-                        </span>
-                      </button>
-                      {activePopover === "throughput" && (
-                        <InlineInfoPopover
-                          title="Throughput"
-                          description="Vehicles cleared vs total demand. E.g., 95/100 = 95% efficiency. Higher is better."
-                          onClose={() => setActivePopover(null)}
-                        />
-                      )}
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[14%]">
-                    <div className="relative inline-flex">
-                      <button
-                        onClick={() => setActivePopover(activePopover === "delay" ? null : "delay")}
-                        className="flex items-center gap-1.5 hover:text-white transition-colors"
+                        <Info className="h-2.5 w-2.5" />
+                      </span>
+                    </button>
+                    {activePopover === "throughput" && (
+                      <InlineInfoPopover
+                        title="Throughput"
+                        description="Vehicles cleared vs total demand. Higher is better."
+                        onClose={() => setActivePopover(null)}
+                      />
+                    )}
+                  </div>
+                </th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[14%]">
+                  <div className="relative inline-flex">
+                    <button
+                      onClick={() => setActivePopover(activePopover === "delay" ? null : "delay")}
+                      className="flex items-center gap-1.5 hover:text-white transition-colors"
+                    >
+                      <span>Delay</span>
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] transition-colors ${
+                          activePopover === "delay"
+                            ? "bg-white text-black border-white"
+                            : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-white"
+                        }`}
                       >
-                        <span>Delay</span>
-                        <span
-                          className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] transition-colors ${
-                            activePopover === "delay"
-                              ? "bg-white text-black border-white"
-                              : "border-neutral-700 bg-neutral-800 text-neutral-500 hover:bg-neutral-700 hover:text-white"
-                          }`}
-                        >
-                          <Info className="h-2.5 w-2.5" />
-                        </span>
-                      </button>
-                      {activePopover === "delay" && (
-                        <InlineInfoPopover
-                          title="Delay · LOS"
-                          description="LOS maps avg delay to A (≤10s) → F (>80s). Lower delay and better LOS = smoother flow."
-                          onClose={() => setActivePopover(null)}
-                        />
-                      )}
-                    </div>
-                  </th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[10%]">Status</th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[9%]">Queue</th>
-                  <th className="py-3 px-4 font-normal text-neutral-500 w-[8%]">Time</th>
-                  <th className="py-3 px-6 font-normal text-neutral-500 text-right w-[5%]">Action</th>
+                        <Info className="h-2.5 w-2.5" />
+                      </span>
+                    </button>
+                    {activePopover === "delay" && (
+                      <InlineInfoPopover
+                        title="Delay · LOS"
+                        description="LOS maps avg delay to A (≤10s) → F (>80s). Lower delay and better LOS = smoother flow."
+                        onClose={() => setActivePopover(null)}
+                      />
+                    )}
+                  </div>
+                </th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[10%]">Status</th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[9%]">Queue</th>
+                <th className="py-3 px-4 font-normal text-neutral-500 w-[8%]">Time</th>
+                <th className="py-3 px-6 font-normal text-neutral-500 text-right w-[5%]">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-800/40">
+              {sortedSessions.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center">
+                    <p className="text-sm text-neutral-500">No matching sessions</p>
+                    <p className="text-xs text-neutral-600 mt-1">Adjust filters</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-800/40">
-                {sortedSessions.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-16 text-center">
-                      <p className="text-sm text-neutral-500">No matching sessions</p>
-                      <p className="text-xs text-neutral-600 mt-1">Adjust filters</p>
-                    </td>
-                  </tr>
-                ) : (
-                  sortedSessions.map((session) => {
-                    const { title } = formatSessionTitle(session);
-                    const modeBadge = getModeBadge(session.mode);
-                    const rating = getRatingBadge(session.performance_rating);
-                    const losClass = getLosBadge(session.level_of_service);
-                    const isAI = (session.mode || "ai").toLowerCase() === "ai";
-                    const throughput = session.throughput ?? session.total_vehicles;
-                    const throughputPct =
-                      session.throughput_pct ??
-                      (session.total_vehicles > 0
-                        ? Math.round((throughput / session.total_vehicles) * 100)
-                        : 100);
-                    const avgWait = session.avg_wait_s ?? 22.4;
-                    const peakQueue = session.peak_queue ?? 0;
-                    const sessionTime = formatSessionFriendlyTime(
-                      session.created_at,
-                      session.timestamp_ms
-                    );
-                    const formattedDuration = formatDuration(session.duration_s);
+              ) : (
+                sortedSessions.map((session) => {
+                  const isBenchmark =
+                    Boolean(session.isBenchmarkGroup) ||
+                    session.run_type === "benchmark" ||
+                    Boolean(session.benchmark_results);
 
-                    return (
-                      <tr
-                        key={session.session_id}
-                        className="hover:bg-neutral-900/40 transition-colors"
-                      >
-                        <td className="py-5 px-6">
-                          <div className="space-y-2">
-                            <div className="text-sm font-medium text-white leading-tight">
+                  const isExpanded = expandedBenchmarkId === session.session_id;
+                  const { title } = formatSessionTitle(session);
+                  const modeBadge = getModeBadge(session.mode, isBenchmark);
+                  const rating = getRatingBadge(session.performance_rating);
+                  const losClass = getLosBadge(session.level_of_service);
+                  const isAI = (session.mode || "ai").toLowerCase() === "ai";
+                  const throughput = session.throughput ?? session.total_vehicles;
+                  const throughputPct =
+                    session.throughput_pct ??
+                    (session.total_vehicles > 0
+                      ? Math.round((throughput / session.total_vehicles) * 100)
+                      : 100);
+                  const avgWait = session.avg_wait_s ?? 22.4;
+                  const peakQueue = session.peak_queue ?? 0;
+                  const sessionTime = formatSessionFriendlyTime(
+                    session.created_at,
+                    session.timestamp_ms
+                  );
+                  const formattedDuration = formatDuration(session.duration_s);
+
+                  const bmResults = session.benchmark_results || {};
+                  const bmAI = bmResults.ai;
+                  const bmFixed = bmResults.fixed;
+                  const bmGreedy = bmResults.greedy;
+
+                  const aiWait = bmAI?.avg_wait_s ?? bmAI?.avg_wait_time;
+                  const fixedWait = bmFixed?.avg_wait_s ?? bmFixed?.avg_wait_time;
+                  const greedyWait = bmGreedy?.avg_wait_s ?? bmGreedy?.avg_wait_time;
+
+                  const winner = session.winner || "ai";
+                  const winnerName =
+                    winner === "ai"
+                      ? "FlowSync DQN AI"
+                      : winner === "greedy"
+                      ? "Greedy Controller"
+                      : "Fixed Timer";
+
+                  return (
+                    <tr
+                      key={session.session_id}
+                      className={`group transition-colors ${
+                        isBenchmark
+                          ? "hover:bg-neutral-900/70"
+                          : "hover:bg-neutral-900/40"
+                      } ${isExpanded ? "bg-neutral-900/80" : ""}`}
+                    >
+                      {/* Column 1: Run */}
+                      <td className="py-5 px-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white leading-tight">
                               {title}
-                            </div>
-                            <div className="flex items-center gap-2">
+                            </span>
+                            {isBenchmark && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
+                                <Sparkles className="h-2.5 w-2.5 text-amber-300" />
+                                Benchmark
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${modeBadge.className}`}
+                            >
+                              {modeBadge.icon}
+                              {modeBadge.label}
+                            </span>
+
+                            {isBenchmark && session.winner && (
                               <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${modeBadge.className}`}
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
+                                  winner === "ai"
+                                    ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                                    : winner === "greedy"
+                                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                                    : "bg-slate-500/10 text-slate-300 border-slate-500/30"
+                                }`}
                               >
-                                {modeBadge.icon}
-                                {modeBadge.label}
+                                <Trophy className="h-2.5 w-2.5 text-amber-400" />
+                                <span>{winnerName} Won</span>
                               </span>
-                              <span className="text-xs text-neutral-500">
-                                {sessionTime.display} · {sessionTime.relative}
-                              </span>
+                            )}
+
+                            <span className="text-xs text-neutral-500">
+                              {sessionTime.display} · {sessionTime.relative}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Column 2: Model */}
+                      <td className="py-5 px-4">
+                        {isBenchmark ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
+                              <Bot className="h-3 w-3" />
+                              {session.model_episodes ? `${session.model_episodes} eps` : "DQN AI"}
+                            </span>
+                            <div className="text-xs text-neutral-400">
+                              vs Fixed vs Greedy
                             </div>
                           </div>
-                        </td>
-
-                        <td className="py-5 px-4">
-                          {isAI ? (
-                            <div className="space-y-1">
-                              <span className="inline-flex items-center rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
-                                {session.model_episodes ?? 300} eps
-                              </span>
-                              <div className="text-xs text-neutral-500 truncate max-w-[120px]">
-                                {session.model_name || "FlowSync DQN"}
-                              </div>
+                        ) : isAI ? (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
+                              {session.model_episodes ?? 300} eps
+                            </span>
+                            <div className="text-xs text-neutral-500 truncate max-w-[120px]">
+                              {session.model_name || "FlowSync DQN"}
                             </div>
-                          ) : (
-                            <span className="text-xs text-neutral-500">Deterministic</span>
-                          )}
-                        </td>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-neutral-500">Deterministic</span>
+                        )}
+                      </td>
 
-                        <td className="py-5 px-4">
+                      {/* Column 3: Throughput */}
+                      <td className="py-5 px-4">
+                        {isBenchmark && (bmAI || bmFixed || bmGreedy) ? (
+                          <div className="space-y-1.5">
+                            <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                              <span className="text-indigo-400 font-medium">
+                                AI: {bmAI?.throughput ?? bmAI?.total_passed ?? "-"}
+                              </span>
+                              <span className="text-neutral-600">|</span>
+                              <span className="text-slate-400 font-medium">
+                                Fix: {bmFixed?.throughput ?? bmFixed?.total_passed ?? "-"}
+                              </span>
+                              <span className="text-neutral-600">|</span>
+                              <span className="text-emerald-400 font-medium">
+                                Gr: {bmGreedy?.throughput ?? bmGreedy?.total_passed ?? "-"}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-neutral-500">
+                              Vehicles cleared
+                            </div>
+                          </div>
+                        ) : (
                           <div className="space-y-1.5">
                             <div className="text-sm font-mono font-medium text-white">
                               {throughput}
-                              <span className="text-neutral-600 font-normal"> / {session.total_vehicles}</span>
+                              <span className="text-neutral-600 font-normal">
+                                {" "}
+                                / {session.total_vehicles}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="h-1 flex-1 max-w-[72px] bg-neutral-800 rounded-full overflow-hidden">
@@ -663,24 +941,63 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                                     throughputPct >= 90
                                       ? "bg-emerald-500"
                                       : throughputPct >= 75
-                                        ? "bg-amber-500"
-                                        : "bg-rose-500"
+                                      ? "bg-amber-500"
+                                      : "bg-rose-500"
                                   }`}
                                   style={{ width: `${Math.min(100, throughputPct)}%` }}
                                 />
                               </div>
-                              <span className="text-xs font-mono text-neutral-500">{throughputPct}%</span>
+                              <span className="text-xs font-mono text-neutral-500">
+                                {throughputPct}%
+                              </span>
                             </div>
                           </div>
-                        </td>
+                        )}
+                      </td>
 
-                        <td className="py-5 px-4">
+                      {/* Column 4: Delay */}
+                      <td className="py-5 px-4">
+                        {isBenchmark && (aiWait !== undefined || fixedWait !== undefined) ? (
+                          <div className="space-y-1">
+                            <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                              <span className="text-indigo-400 font-semibold">
+                                {aiWait !== undefined ? `${aiWait.toFixed(1)}s` : "-"}
+                              </span>
+                              <span className="text-neutral-600">|</span>
+                              <span className="text-slate-400 font-semibold">
+                                {fixedWait !== undefined ? `${fixedWait.toFixed(1)}s` : "-"}
+                              </span>
+                              <span className="text-neutral-600">|</span>
+                              <span className="text-emerald-400 font-semibold">
+                                {greedyWait !== undefined ? `${greedyWait.toFixed(1)}s` : "-"}
+                              </span>
+                            </div>
+                            <div className="text-xs text-neutral-500">
+                              {session.improvements?.ai_wait_pct !== undefined ? (
+                                <span
+                                  className={
+                                    session.improvements.ai_wait_pct > 0
+                                      ? "text-emerald-400 font-medium"
+                                      : "text-neutral-400"
+                                  }
+                                >
+                                  {session.improvements.ai_wait_pct > 0 ? "+" : ""}
+                                  {session.improvements.ai_wait_pct}% AI vs fixed
+                                </span>
+                              ) : (
+                                "avg wait per mode"
+                              )}
+                            </div>
+                          </div>
+                        ) : (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-mono font-medium text-white">
                                 {avgWait.toFixed(1)}s
                               </span>
-                              <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${losClass}`}>
+                              <span
+                                className={`text-xs px-1.5 py-0.5 rounded border font-medium ${losClass}`}
+                              >
                                 {session.level_of_service || "C"}
                               </span>
                             </div>
@@ -690,33 +1007,59 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                                 : "avg delay"}
                             </div>
                           </div>
-                        </td>
+                        )}
+                      </td>
 
-                        <td className="py-5 px-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium border ${rating.className}`}
+                      {/* Column 5: Status */}
+                      <td className="py-5 px-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium border ${rating.className}`}
+                        >
+                          {rating.label}
+                        </span>
+                      </td>
+
+                      {/* Column 6: Queue */}
+                      <td className="py-5 px-4">
+                        <div className="text-sm font-mono text-white">{peakQueue}</div>
+                        <div
+                          className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-xs border ${getCongestionBadge(
+                            session.congestion_level
+                          )}`}
+                        >
+                          {session.congestion_level}
+                        </div>
+                      </td>
+
+                      {/* Column 7: Time */}
+                      <td className="py-5 px-4">
+                        <div className="text-xs font-mono text-white">{formattedDuration}</div>
+                        <div className="text-xs text-neutral-600">
+                          {isBenchmark ? "per mode" : `${session.total_frames} fr`}
+                        </div>
+                      </td>
+
+                      {/* Column 8: Action */}
+                      <td className="py-5 px-6 text-right">
+                        {isBenchmark ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleExpand(session.session_id)}
+                            className={`h-7 rounded-full text-xs px-3 transition-colors ${
+                              isExpanded
+                                ? "bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500"
+                                : "border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                            }`}
                           >
-                            {rating.label}
-                          </span>
-                        </td>
-
-                        <td className="py-5 px-4">
-                          <div className="text-sm font-mono text-white">{peakQueue}</div>
-                          <div
-                            className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-xs border ${getCongestionBadge(
-                              session.congestion_level
-                            )}`}
-                          >
-                            {session.congestion_level}
-                          </div>
-                        </td>
-
-                        <td className="py-5 px-4">
-                          <div className="text-xs font-mono text-white">{formattedDuration}</div>
-                          <div className="text-xs text-neutral-600">{session.total_frames} fr</div>
-                        </td>
-
-                        <td className="py-5 px-6 text-right">
+                            <span>Breakdown</span>
+                            {isExpanded ? (
+                              <ChevronUp className="h-3 w-3 ml-1" />
+                            ) : (
+                              <ChevronDown className="h-3 w-3 ml-1" />
+                            )}
+                          </Button>
+                        ) : (
                           <Button
                             variant="outline"
                             size="sm"
@@ -726,15 +1069,320 @@ export default function HistoricalSessionsTable({ sessions }: Props) {
                             <Play className="h-3 w-3 mr-1" />
                             Replay
                           </Button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+
+          {/* Accordion Details for the Expanded Benchmark */}
+          {expandedBenchmarkId && (
+            <div className="p-4 sm:p-6 bg-neutral-950 border-t border-b border-indigo-500/20 space-y-4 animate-in fade-in-50 duration-200">
+              {(() => {
+                const target = sortedSessions.find((s) => s.session_id === expandedBenchmarkId);
+                if (!target) return null;
+                const bRes = target.benchmark_results || {};
+                const ai = bRes.ai;
+                const fixed = bRes.fixed;
+                const greedy = bRes.greedy;
+
+                const aiWait = ai?.avg_wait_s ?? ai?.avg_wait_time ?? 0;
+                const fixedWait = fixed?.avg_wait_s ?? fixed?.avg_wait_time ?? 0;
+                const greedyWait = greedy?.avg_wait_s ?? greedy?.avg_wait_time ?? 0;
+
+                const aiThru = ai?.throughput ?? ai?.total_passed ?? 0;
+                const fixedThru = fixed?.throughput ?? fixed?.total_passed ?? 0;
+                const greedyThru = greedy?.throughput ?? greedy?.total_passed ?? 0;
+
+                const aiQueue = ai?.peak_queue ?? ai?.max_queue ?? 0;
+                const fixedQueue = fixed?.peak_queue ?? fixed?.max_queue ?? 0;
+                const greedyQueue = greedy?.peak_queue ?? greedy?.max_queue ?? 0;
+
+                const winner = target.winner || "ai";
+                const isAIWinner = winner === "ai";
+                const isFixedWinner = winner === "fixed";
+                const isGreedyWinner = winner === "greedy";
+
+                const aiGain =
+                  target.improvements?.ai_wait_pct ??
+                  (fixedWait > 0 && aiWait > 0
+                    ? Number((((fixedWait - aiWait) / fixedWait) * 100).toFixed(1))
+                    : 0);
+                const greedyGain =
+                  target.improvements?.greedy_wait_pct ??
+                  (fixedWait > 0 && greedyWait > 0
+                    ? Number((((fixedWait - greedyWait) / fixedWait) * 100).toFixed(1))
+                    : 0);
+
+                const children = target.benchmarkRun?.child_sessions || {};
+
+                return (
+                  <div className="space-y-4">
+                    {/* Header Info */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-900/60 p-3 rounded-xl border border-neutral-800">
+                      <div className="flex items-center gap-2.5">
+                        <Trophy className="h-4 w-4 text-amber-400" />
+                        <div>
+                          <div className="text-xs font-semibold text-white">
+                            Benchmark Result:{" "}
+                            {isAIWinner
+                              ? "FlowSync DQN AI Won"
+                              : isGreedyWinner
+                              ? "Greedy Controller Won"
+                              : "Fixed Timer Won"}
+                          </div>
+                          <p className="text-[11px] text-neutral-400">
+                            {aiGain !== 0
+                              ? `FlowSync DQN achieved ${aiGain > 0 ? "+" : ""}${aiGain}% delay reduction vs Fixed Timer baseline`
+                              : "Comprehensive 3-controller performance evaluation on identical traffic seed."}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedBenchmarkId(null)}
+                        className="h-7 text-xs text-neutral-400 hover:text-white"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Close Breakdown
+                      </Button>
+                    </div>
+
+                    {/* 3 Modes Side-by-Side Cards in STRICT Order: 1. DQN AI, 2. Fixed, 3. Greedy */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* 1. FlowSync DQN AI */}
+                      <div
+                        className={`rounded-xl p-4 border transition-all ${
+                          isAIWinner
+                            ? "bg-indigo-950/40 border-indigo-500/50 shadow-lg shadow-indigo-500/10"
+                            : "bg-neutral-900/40 border-neutral-800"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <Cpu className="h-4 w-4 text-indigo-400" />
+                            <span className="text-sm font-semibold text-white">
+                              FlowSync DQN AI
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {target.model_episodes && (
+                              <span className="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-mono">
+                                {target.model_episodes} eps
+                              </span>
+                            )}
+                            {isAIWinner ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                                <Trophy className="h-2.5 w-2.5" />
+                                WINNER
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-neutral-500 font-mono">DQN Agent</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Avg Delay</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {aiWait.toFixed(1)}s
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Throughput</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {aiThru} vehs
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Peak Queue</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {aiQueue} cars
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">vs Fixed Baseline</span>
+                            <span
+                              className={`font-mono font-semibold text-base ${
+                                aiGain > 0
+                                  ? "text-emerald-400"
+                                  : aiGain < 0
+                                  ? "text-rose-400"
+                                  : "text-neutral-400"
+                              }`}
+                            >
+                              {aiGain > 0 ? `+${aiGain}%` : `${aiGain}%`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {children.ai && (
+                          <div className="mt-3 pt-3 border-t border-white/5 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleLaunchReplay(children.ai.session_id)}
+                              className="h-7 text-xs rounded-full border-indigo-500/30 text-indigo-300 hover:bg-indigo-600 hover:text-white"
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Replay AI Run
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Fixed Timer */}
+                      <div
+                        className={`rounded-xl p-4 border transition-all ${
+                          isFixedWinner
+                            ? "bg-slate-900/60 border-slate-500/50 shadow-lg"
+                            : "bg-neutral-900/40 border-neutral-800"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4 text-slate-400" />
+                            <span className="text-sm font-semibold text-white">Fixed Timer</span>
+                          </div>
+                          {isFixedWinner ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                              <Trophy className="h-2.5 w-2.5" />
+                              WINNER
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-neutral-500 font-mono">Baseline</span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Avg Delay</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {fixedWait.toFixed(1)}s
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Throughput</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {fixedThru} vehs
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Peak Queue</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {fixedQueue} cars
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">vs Fixed Baseline</span>
+                            <span className="font-mono font-semibold text-base text-neutral-400">
+                              0.0%
+                            </span>
+                          </div>
+                        </div>
+
+                        {children.fixed && (
+                          <div className="mt-3 pt-3 border-t border-white/5 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleLaunchReplay(children.fixed.session_id)}
+                              className="h-7 text-xs rounded-full border-neutral-700 text-neutral-300 hover:bg-white hover:text-black"
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Replay Fixed Run
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Greedy Controller */}
+                      <div
+                        className={`rounded-xl p-4 border transition-all ${
+                          isGreedyWinner
+                            ? "bg-emerald-950/40 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
+                            : "bg-neutral-900/40 border-neutral-800"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1.5">
+                            <Zap className="h-4 w-4 text-emerald-400" />
+                            <span className="text-sm font-semibold text-white">
+                              Greedy Controller
+                            </span>
+                          </div>
+                          {isGreedyWinner ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                              <Trophy className="h-2.5 w-2.5" />
+                              WINNER
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-neutral-500 font-mono">Actuated</span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Avg Delay</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {greedyWait.toFixed(1)}s
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Throughput</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {greedyThru} vehs
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">Peak Queue</span>
+                            <span className="font-mono font-medium text-white text-base">
+                              {greedyQueue} cars
+                            </span>
+                          </div>
+                          <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                            <span className="text-[10px] text-neutral-500 block">vs Fixed Baseline</span>
+                            <span
+                              className={`font-mono font-semibold text-base ${
+                                greedyGain > 0
+                                  ? "text-emerald-400"
+                                  : greedyGain < 0
+                                  ? "text-rose-400"
+                                  : "text-neutral-400"
+                              }`}
+                            >
+                              {greedyGain > 0 ? `+${greedyGain}%` : `${greedyGain}%`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {children.greedy && (
+                          <div className="mt-3 pt-3 border-t border-white/5 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleLaunchReplay(children.greedy.session_id)}
+                              className="h-7 text-xs rounded-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-600 hover:text-white"
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Replay Greedy Run
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

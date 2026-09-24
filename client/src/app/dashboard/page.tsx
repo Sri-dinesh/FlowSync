@@ -38,6 +38,7 @@ interface DashboardPayload {
     share_pct: number;
   }[];
   sessions: SessionItem[];
+  benchmarks?: any[];
 }
 
 // Fallback data in case backend is offline during first boot
@@ -264,15 +265,17 @@ export default function DashboardPage() {
         )}
 
         {/* Section 4: Historical Sessions & Replays Table */}
-        {(activeTab === "all" || activeTab === "sessions") && (
-          <motion.section
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <HistoricalSessionsTable sessions={data.sessions} />
-          </motion.section>
-        )}
+        <motion.section
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <HistoricalSessionsTable
+            sessions={data.sessions}
+            benchmarks={data.benchmarks}
+            initialModeFilter={activeTab === "benchmarks" ? "BENCHMARKS" : undefined}
+          />
+        </motion.section>
       </main>
     </div>
   );
