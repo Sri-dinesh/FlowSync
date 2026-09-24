@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Bot } from "lucide-react";
 import Header from "@/components/layout/Header";
 import SimulationControls from "@/components/controls/SimulationControls";
 import TrainingControls from "@/components/controls/TrainingControls";
@@ -28,8 +29,8 @@ const TrainingChart = dynamic(
   }
 );
 
-const EpisodeHistory = dynamic(
-  () => import("@/components/dashboard/EpisodeHistory"),
+const SimulationHistoryTab = dynamic(
+  () => import("@/components/simulation/SimulationHistoryTab"),
   {
     ssr: false,
     loading: () => (
@@ -86,6 +87,30 @@ export default function SimulationPage() {
   const [activeTab, setActiveTab] = useState("comparison");
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
 
+  // Available DQN AI Models for benchmark checkpoint selection
+  const [models, setModels] = useState<Array<{ id: string; name: string; version: string; episodes?: number; source?: string }>>([]);
+  const [scenarioModelId, setScenarioModelId] = useState<string>("");
+
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${apiBase}/training/models`);
+        if (res.ok) {
+          const payload = await res.json();
+          const list = payload.models ?? [];
+          setModels(list);
+          if (list.length > 0) {
+            setScenarioModelId((prev) => prev || list[0].id);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    fetchModels();
+  }, []);
+
   // Latest scenario run result (for optimistic ScenarioHistory update)
   const latestScenarioRun = scenarioBenchmarkResults
     ? {
@@ -98,22 +123,33 @@ export default function SimulationPage() {
     : null;
 
   /** Runs benchmark: uses scenario seed if one is selected, otherwise random */
-  const handleRunBenchmark = (durationSeconds: number, modes?: string[]) => {
-    startBenchmark(durationSeconds, modes);
+  const handleRunBenchmark = (
+    durationSeconds: number,
+    modes?: string[],
+    modelId?: string,
+    modelEpisode?: number
+  ) => {
+    startBenchmark(durationSeconds, modes, modelId, modelEpisode);
   };
 
-  /** Runs the locked-seed AI-only scenario benchmark */
+  /** Runs the locked-seed 3-controller scenario benchmark with selected DQN model */
   const handleRunScenarioBenchmark = () => {
     if (!selectedScenario) return;
-    // model_id and model_episode come from the currently loaded model
-    // (app.state.active_model_id / active_model_episode on the server)
+    const chosenModel = models.find((m) => m.id === scenarioModelId);
+    let epNum = 0;
+    if (chosenModel?.episodes) {
+      epNum = Number(chosenModel.episodes);
+    } else if (chosenModel?.version) {
+      const parsed = parseInt(chosenModel.version, 10);
+      if (!isNaN(parsed)) epNum = parsed;
+    }
     startScenarioBenchmark(
       selectedScenario.id,
       selectedScenario.seed,
       selectedScenario.spawn_lambda,
       selectedScenario.duration_seconds,
-      "",  // server falls back to active_model_id
-      0,   // server falls back to active_model_episode
+      scenarioModelId || "",
+      epNum,
     );
   };
 
@@ -244,8 +280,43 @@ export default function SimulationPage() {
                           <div className="pt-2 border-t border-neutral-800 space-y-3">
                             <div>
                               <p className="text-[11px] text-neutral-400 leading-relaxed">
-                                Runs <span className="text-white font-medium">Fixed</span>, <span className="text-white font-medium">Greedy</span>, and <span className="text-white font-medium">DQN</span> on identical seeded conditions (CRN) to evaluate policy consistency.
+                                Runs <span className="text-white font-medium">FlowSync DQN</span>, <span className="text-white font-medium">Fixed Timer</span>, and <span className="text-white font-medium">Greedy</span> on identical seeded conditions (CRN) to evaluate policy consistency.
                               </p>
+                            </div>
+
+                            {/* DQN AI Model Checkpoint Selector */}
+                            <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-neutral-300 font-medium flex items-center gap-1.5">
+                                  <Bot className="w-3.5 h-3.5 text-violet-400" />
+                                  DQN AI Model Checkpoint
+                                </span>
+                                {(() => {
+                                  const selected = models.find((m) => m.id === scenarioModelId);
+                                  return selected ? (
+                                    <span className="font-mono text-[10px] text-violet-300 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full font-medium">
+                                      {selected.episodes ?? selected.version} eps
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
+
+                              <select
+                                value={scenarioModelId}
+                                onChange={(e) => setScenarioModelId(e.target.value)}
+                                disabled={benchmarkRunning}
+                                className="w-full rounded-lg bg-neutral-950 border border-neutral-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500 transition-colors font-medium"
+                              >
+                                {models.length === 0 ? (
+                                  <option value="">Default FlowSync DQN (1000 eps)</option>
+                                ) : (
+                                  models.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                      {m.name} — {m.episodes ?? m.version} eps ({m.source === "remote" ? "Cloud" : "Local"})
+                                    </option>
+                                  ))
+                                )}
+                              </select>
                             </div>
 
                             <div className="flex gap-2">
@@ -428,7 +499,13 @@ export default function SimulationPage() {
                   {activeTab === "training" && <TrainingChart simulationId={simulationId} />}
                 </TabsContent>
                 <TabsContent value="history" className="mt-4 text-sm text-white/70">
-                  {activeTab === "history" && <EpisodeHistory simulationId={simulationId} />}
+                  {activeTab === "history" && (
+                    <SimulationHistoryTab
+                      simulationId={simulationId}
+                      onSwitchToBenchmark={() => setActiveTab("comparison")}
+                      latestBenchmarkResults={benchmarkResults || scenarioBenchmarkResults}
+                    />
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

@@ -286,7 +286,12 @@ export function useSimulationSocket() {
     }
   }, []);
 
-  const startBenchmark = useCallback((durationSeconds: number = 30, modes: string[] = ["ai", "fixed", "greedy"]) => {
+  const startBenchmark = useCallback((
+    durationSeconds: number = 30,
+    modes: string[] = ["ai", "fixed", "greedy"],
+    modelId?: string,
+    modelEpisode?: number,
+  ) => {
     setBenchmarkResults(null);
     setBenchmarkProgress(null);
     setBenchmarkRunning(true);
@@ -296,6 +301,8 @@ export function useSimulationSocket() {
       command: "run_timed_benchmark",
       duration_seconds: durationSeconds,
       modes,
+      model_id: modelId,
+      model_episode: modelEpisode,
     });
   }, [sendCommand, setRunning, setIsBenchmarkRunning]);
 

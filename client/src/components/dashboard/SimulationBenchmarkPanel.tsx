@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -30,38 +30,46 @@ interface SimulationBenchmarkPanelProps {
   running: boolean;
   progress: SimBenchmarkProgress | null;
   results: SimBenchmarkResultsData | null;
-  onStart: (durationSeconds: number, modes?: string[]) => void;
+  onStart: (durationSeconds: number, modes?: string[], modelId?: string, modelEpisode?: number) => void;
   onStop: () => void;
   onReset: () => void;
 }
 
 const PRESET_DURATIONS = [15, 30, 60, 120];
 
+const BENCHMARK_MODES = ["ai", "fixed", "greedy"];
+
 const MODE_CONFIG: Record<
   string,
   { label: string; shortLabel: string; icon: any; barColor: string }
 > = {
+  ai: {
+    label: "FlowSync DQN AI",
+    shortLabel: "DQN AI",
+    icon: Bot,
+    barColor: "#6366F1",
+  },
   fixed: {
     label: "Fixed Timer",
     shortLabel: "FIXED",
     icon: Clock,
-    barColor: "#404040",
+    barColor: "#64748B",
   },
   greedy: {
     label: "Greedy Policy",
     shortLabel: "GREEDY",
     icon: Target,
-    barColor: "#A3A3A3",
-  },
-  ai: {
-    label: "DQN AI Agent",
-    shortLabel: "DQN AI",
-    icon: Bot,
-    barColor: "#FFFFFF",
+    barColor: "#10B981",
   },
 };
 
-const BENCHMARK_MODES = ["ai", "fixed", "greedy"];
+interface RLModelOption {
+  id: string;
+  name: string;
+  version: string;
+  episodes?: number;
+  source?: string;
+}
 
 export default function SimulationBenchmarkPanel({
   running,
@@ -72,6 +80,29 @@ export default function SimulationBenchmarkPanel({
   onReset,
 }: SimulationBenchmarkPanelProps) {
   const [duration, setDuration] = useState<number>(15);
+  const [models, setModels] = useState<RLModelOption[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const res = await fetch(`${API_BASE}/training/models`);
+        if (res.ok) {
+          const payload = await res.json();
+          const list: RLModelOption[] = payload.models ?? [];
+          setModels(list);
+          if (list.length > 0) {
+            setSelectedModelId((prev) => prev || list[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch models for benchmark:", err);
+      }
+    }
+    fetchModels();
+  }, [API_BASE]);
 
   const chartData = useMemo(() => {
     if (!results || !results.results) return [];
@@ -166,7 +197,7 @@ export default function SimulationBenchmarkPanel({
               <span className="font-mono text-neutral-400 font-normal">{BENCHMARK_MODES.length} × {duration}s = {duration * BENCHMARK_MODES.length}s</span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {BENCHMARK_MODES.map((m) => {
                 const cfg = MODE_CONFIG[m];
                 const Icon = cfg.icon;
@@ -184,9 +215,56 @@ export default function SimulationBenchmarkPanel({
             </div>
           </div>
 
+          {/* DQN AI Model Checkpoint Selector */}
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-neutral-300 font-medium flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                DQN AI Model Selection
+              </span>
+              {(() => {
+                const selected = models.find((m) => m.id === selectedModelId);
+                return selected ? (
+                  <span className="font-mono text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-medium">
+                    {selected.episodes ?? selected.version} eps
+                  </span>
+                ) : null;
+              })()}
+            </div>
+
+            <select
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="w-full rounded-lg bg-neutral-950 border border-neutral-800 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors font-medium"
+            >
+              {models.length === 0 ? (
+                <option value="">Default FlowSync DQN (1000 eps checkpoint)</option>
+              ) : (
+                models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} — {m.episodes ?? m.version} eps ({m.source === "remote" ? "Cloud" : "Local"})
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="text-[10px] text-neutral-500 leading-tight">
+              Choose which trained policy checkpoint the DQN AI agent will execute in this benchmark.
+            </p>
+          </div>
+
           <Button
             className="w-full py-6 bg-white text-black hover:bg-neutral-200 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-            onClick={() => onStart(duration, BENCHMARK_MODES)}
+            onClick={() => {
+              const selected = models.find((m) => m.id === selectedModelId);
+              let epNum: number | undefined;
+              if (selected?.episodes) {
+                epNum = Number(selected.episodes);
+              } else if (selected?.version) {
+                const parsed = parseInt(selected.version, 10);
+                if (!isNaN(parsed)) epNum = parsed;
+              }
+              onStart(duration, BENCHMARK_MODES, selectedModelId || undefined, epNum);
+            }}
           >
             <Play className="w-3.5 h-3.5 fill-black" />
             Launch Benchmark ({duration * BENCHMARK_MODES.length}s)
@@ -212,7 +290,7 @@ export default function SimulationBenchmarkPanel({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {BENCHMARK_MODES.map((m) => {
               const isDone = (progress.modes_done ?? []).includes(m);
               const isCurrent = progress.current_mode === m;
@@ -416,7 +494,17 @@ export default function SimulationBenchmarkPanel({
           <div className="flex gap-2 pt-1">
             <Button
               className="flex-1 py-5 bg-white text-black hover:bg-neutral-200 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-sm"
-              onClick={() => onStart(results.duration_seconds || duration)}
+              onClick={() => {
+                const selected = models.find((m) => m.id === selectedModelId);
+                let epNum: number | undefined;
+                if (selected?.episodes) {
+                  epNum = Number(selected.episodes);
+                } else if (selected?.version) {
+                  const parsed = parseInt(selected.version, 10);
+                  if (!isNaN(parsed)) epNum = parsed;
+                }
+                onStart(results.duration_seconds || duration, BENCHMARK_MODES, selectedModelId || undefined, epNum);
+              }}
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Rerun ({results.duration_seconds}s each)
