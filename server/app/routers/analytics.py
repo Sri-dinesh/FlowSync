@@ -378,11 +378,95 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "efficiency_gain_pct": eff_gain,
                 "run_type": run_type,
                 "benchmark_id": benchmark_id,
+                "winner": data.get("winner"),
+                "improvements": data.get("improvements") or {},
+                "benchmark_modes": data.get("benchmark_modes") or (["ai", "fixed", "greedy"] if run_type == "benchmark" else None),
+                "benchmark_results": data.get("benchmark_results") or None,
+                "scenario_id": data.get("scenario_id") or None,
                 "source_label": "CCTV Digital Twin" if (run_type == "cctv_replay" or len(arrivals) > 0) else ("Simulation Benchmark" if run_type == "benchmark" else "Simulation Standalone"),
                 "is_cctv_replay": run_type == "cctv_replay" or len(arrivals) > 0,
             })
         except Exception:
             continue
+
+    # Cross-reference sessions sharing a benchmark_id to construct complete multi-controller benchmark results
+    from collections import defaultdict
+    bm_groups: Dict[str, Dict[str, Any]] = defaultdict(dict)
+    for s in sessions_list:
+        bid = s.get("benchmark_id")
+        if bid:
+            mode_k = (s.get("mode") or "ai").lower()
+            bm_groups[bid][mode_k] = s
+
+    for bid, m_dict in bm_groups.items():
+        fixed_s = m_dict.get("fixed")
+        greedy_s = m_dict.get("greedy")
+        ai_s = m_dict.get("ai")
+
+        f_wait = fixed_s["avg_wait_s"] if fixed_s else 0.0
+        g_wait = greedy_s["avg_wait_s"] if greedy_s else 0.0
+        a_wait = ai_s["avg_wait_s"] if ai_s else 0.0
+
+        composite_results = {}
+        for k in ("ai", "fixed", "greedy"):
+            if k in m_dict:
+                sess_obj = m_dict[k]
+                composite_results[k] = {
+                    "avg_wait_s": sess_obj["avg_wait_s"],
+                    "avg_wait_time": sess_obj["avg_wait_s"],
+                    "throughput": sess_obj["throughput"],
+                    "total_passed": sess_obj["throughput"],
+                    "peak_queue": sess_obj["peak_queue"],
+                    "max_queue": sess_obj["peak_queue"],
+                    "duration_seconds": sess_obj["duration_s"],
+                }
+
+        comp_improvements = {}
+        if f_wait > 0:
+            if a_wait > 0:
+                comp_improvements["ai_wait_pct"] = round(((f_wait - a_wait) / f_wait) * 100.0, 1)
+            if g_wait > 0:
+                comp_improvements["greedy_wait_pct"] = round(((f_wait - g_wait) / f_wait) * 100.0, 1)
+
+        waits_map = {k: v["avg_wait_s"] for k, v in composite_results.items() if v.get("avg_wait_s", 0) > 0}
+        comp_winner = min(waits_map.keys(), key=lambda k: waits_map[k]) if waits_map else "ai"
+
+        for s in m_dict.values():
+            if not s.get("benchmark_results"):
+                s["benchmark_results"] = composite_results
+            if not s.get("winner"):
+                s["winner"] = comp_winner
+            if not s.get("improvements"):
+                s["improvements"] = comp_improvements
+            if not s.get("benchmark_modes"):
+                s["benchmark_modes"] = ["ai", "fixed", "greedy"]
+            if fixed_s and s.get("mode") in ("ai", "greedy") and f_wait > 0:
+                my_wait = s["avg_wait_s"]
+                s["efficiency_gain_pct"] = round(((f_wait - my_wait) / f_wait) * 100.0, 1)
+
+    # Unique consolidated benchmark runs list
+    benchmarks_list = []
+    seen_bids = set()
+    for s in sorted(sessions_list, key=lambda x: x["timestamp_ms"], reverse=True):
+        bid = s.get("benchmark_id")
+        if (s.get("run_type") == "benchmark" or (s.get("session_id") or "").startswith("bench_")) and bid:
+            if bid in seen_bids:
+                continue
+            seen_bids.add(bid)
+            benchmarks_list.append({
+                "benchmark_id": bid,
+                "session_id": s["session_id"],
+                "created_at": s["created_at"],
+                "timestamp_ms": s["timestamp_ms"],
+                "duration_seconds": s["duration_s"],
+                "scenario_id": s.get("scenario_id"),
+                "winner": s.get("winner"),
+                "improvements": s.get("improvements", {}),
+                "modes": s.get("benchmark_modes") or ["ai", "fixed", "greedy"],
+                "modes_results": s.get("benchmark_results") or {},
+                "model_name": s.get("model_name"),
+                "model_episodes": s.get("model_episodes"),
+            })
 
     # Approach direction totals from lane aggregates
     approach_totals = {
@@ -534,6 +618,17 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         "congestion_distribution": congestion_distribution,
         "mode_benchmarks": mode_benchmarks,
         "phase_distribution": phase_distribution,
-        "sessions": sessions_list[:25],
+        "sessions": sessions_list[:60],
+        "benchmarks": benchmarks_list[:30],
+    }
+
+
+@router.get("/benchmarks")
+async def get_benchmarks(request: Request) -> dict:
+    """Return consolidated list of multi-controller benchmark simulation runs with individual mode metrics."""
+    summary = await get_dashboard_summary(request)
+    return {
+        "benchmarks": summary.get("benchmarks", []),
+        "count": len(summary.get("benchmarks", [])),
     }
 

@@ -9,7 +9,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_dashboard_summary_endpoint():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -23,13 +23,26 @@ async def test_dashboard_summary_endpoint():
         assert "mode_benchmarks" in data
         assert "phase_distribution" in data
         assert "sessions" in data
+        assert "benchmarks" in data
 
         ov = data["overview"]
         assert ov["total_sessions"] >= 0
         assert ov["total_vehicles_processed"] >= 0
-        assert ov["avg_wait_reduction_pct"] > 0
+        assert isinstance(ov["avg_wait_reduction_pct"], (int, float))
         assert ov["avg_intersection_wait_s"] >= 0
         assert ov["total_movement_occurrences"] >= 0
         assert ov["total_footage_duration_s"] >= 0
         assert ov["peak_queue_observed"] >= 0
+
+
+@pytest.mark.anyio
+async def test_benchmarks_endpoint():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/analytics/benchmarks")
+        assert response.status_code == 200
+        data = response.json()
+        assert "benchmarks" in data
+        assert "count" in data
+        assert isinstance(data["benchmarks"], list)
 

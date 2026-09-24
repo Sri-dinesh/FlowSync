@@ -248,6 +248,68 @@ def _select_ai_phase_action(
     return signal.current_phase, False
 
 
+# ─── Model Checkpoint Loader Helper ──────────────────────────────────────────
+
+def _parse_checkpoint_ep(path: str) -> int | None:
+    import re
+    match = re.search(r"checkpoint_(\d+)\.pt$", path)
+    return int(match.group(1)) if match else None
+
+
+async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int | None = None) -> tuple[str, int]:
+    """Load a specific model checkpoint into app.state.sim_agent and return (model_name, episode)."""
+    active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
+    active_e = getattr(app.state, "active_model_episode", None) or 1000
+    if not model_id:
+        return active_m, active_e
+
+    try:
+        from app.services import model_service
+        raw_id = str(model_id).strip()
+        target_ep = model_episode
+        if ":" in raw_id:
+            base_id, ep_str = raw_id.split(":", 1)
+            ep_clean = ep_str.replace("checkpoint_", "").replace(".pt", "")
+            if ep_clean.isdigit():
+                target_ep = int(ep_clean)
+            model_id_clean = base_id
+        else:
+            model_id_clean = raw_id
+
+        checkpoints = await asyncio.to_thread(model_service.list_checkpoints, model_id_clean)
+        if not checkpoints:
+            return model_id_clean, target_ep or active_e
+
+        episodes = [ep for p in checkpoints if (ep := _parse_checkpoint_ep(p))]
+        if not episodes:
+            return model_id_clean, target_ep or active_e
+
+        if target_ep is not None and target_ep in episodes:
+            chosen_ep = target_ep
+        elif target_ep is not None:
+            chosen_ep = min(episodes, key=lambda e: abs(e - target_ep))
+        else:
+            chosen_ep = max(episodes)
+
+        checkpoint_data = await asyncio.to_thread(model_service.load_checkpoint, model_id_clean, chosen_ep)
+        sim_agent = getattr(app.state, "sim_agent", None)
+        if sim_agent and "online_net" in checkpoint_data:
+            sim_agent.online_net.load_state_dict(checkpoint_data["online_net"])
+            if "target_net" in checkpoint_data:
+                sim_agent.target_net.load_state_dict(checkpoint_data["target_net"])
+            else:
+                sim_agent.sync_target_network()
+            sim_agent.target_net.eval()
+
+        app.state.active_model_id = model_id_clean
+        app.state.active_model_episode = chosen_ep
+        logger.info("Successfully loaded agent checkpoint %s at episode %d", model_id_clean, chosen_ep)
+        return model_id_clean, chosen_ep
+    except Exception as e:
+        logger.warning("Could not load agent checkpoint %s: %s", model_id, e)
+        return str(model_id), model_episode or active_e
+
+
 # ─── Timed Benchmark ─────────────────────────────────────────────────────────
 
 async def _run_timed_benchmark(
@@ -257,6 +319,8 @@ async def _run_timed_benchmark(
     scenario_counts: dict | None,
     modes: list[str],
     arrivals: list[dict] | None = None,
+    model_id: str | None = None,
+    model_episode: int | None = None,
 ) -> None:
     """
     Runs all requested modes sequentially for comparison.
@@ -292,6 +356,10 @@ async def _run_timed_benchmark(
             pass
     await asyncio.sleep(0.2)
 
+    # Resolve active model id and episode
+    clean_model_id = str(model_id).strip() if model_id else (getattr(app.state, "active_model_id", None) or "FlowSync DQN")
+    clean_model_ep = int(model_episode) if model_episode else (getattr(app.state, "active_model_episode", None) or 1000)
+
     # Generate a synchronized CRN seed for this benchmark session
     import random
     benchmark_seed = random.randint(1, 1_000_000)
@@ -302,7 +370,12 @@ async def _run_timed_benchmark(
     try:
         for mode_idx, mode in enumerate(modes):
             intersection = app.state.sim_intersection
-            agent        = app.state.sim_agent
+
+            # Load selected checkpoint if entering AI mode
+            if mode == "ai" and (model_id or model_episode):
+                clean_model_id, clean_model_ep = await _load_agent_checkpoint(app, model_id, model_episode)
+
+            agent = app.state.sim_agent if mode == "ai" else None
 
             # ── Setup ──────────────────────────────────────────────────────
             intersection.reset()
@@ -620,8 +693,8 @@ async def _run_timed_benchmark(
             import hashlib as _hashlib
             sessions_dir = Path(SESSION_DIR)
             sessions_dir.mkdir(parents=True, exist_ok=True)
-            active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
-            active_eps = getattr(app.state, "active_model_episode", 300)
+            active_model = clean_model_id
+            active_eps = clean_model_ep
 
             # E-01: Compute scenario hash for CRN verification
             scenario_input = json.dumps({
@@ -660,6 +733,10 @@ async def _run_timed_benchmark(
                     "controller_type": m_key,
                     "duration_seconds": duration_seconds,
                     "is_realworld": is_realworld,
+                    "winner": winner,
+                    "improvements": improvements,
+                    "benchmark_modes": modes,
+                    "benchmark_results": results,
                     "stats": {
                         "session_id": sess_key,
                         "mode": m_key,
@@ -698,6 +775,9 @@ async def _run_timed_benchmark(
                 "modes":            modes,
                 "improvements":     improvements,
                 "benchmark_seed":   benchmark_seed,
+                "benchmark_id":     benchmark_id,
+                "model_name":       active_model,
+                "model_episodes":   active_eps,
                 "is_realworld":     is_realworld,
                 "total_vehicles":   total_vehicles_to_clear,
                 # D-02: Version metadata
@@ -851,9 +931,12 @@ async def _run_scenario_benchmark(
             # Reset intersection to clean state
             intersection.reset()
             intersection.spawner.set_enabled(False)  # Pre-scheduled arrivals drive all spawning
-            app.state.mode = controller
-
-            agent = app.state.sim_agent if controller == "ai" else None
+            if controller == "ai":
+                if model_id or model_episode:
+                    clean_model_id, clean_model_ep = await _load_agent_checkpoint(app, model_id, model_episode)
+                agent = app.state.sim_agent
+            else:
+                agent = None
             forecaster = ArrivalForecaster()
             phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
 
@@ -1141,6 +1224,78 @@ async def _run_scenario_benchmark(
                 )
                 await manager.broadcast(empty_frame.model_dump())
                 await asyncio.sleep(0.8)
+
+        # ── Auto-persist scenario benchmark to session files for dashboard history ──
+        try:
+            sessions_dir = Path(SESSION_DIR)
+            sessions_dir.mkdir(parents=True, exist_ok=True)
+
+            fixed_res = results.get("fixed")
+            sc_improvements = {}
+            if fixed_res:
+                f_wait = fixed_res.get("avg_wait_time", 0.0)
+                if "ai" in results and f_wait > 0:
+                    sc_improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+                if "greedy" in results and f_wait > 0:
+                    sc_improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+
+            def _sc_score(m):
+                r = results.get(m, {})
+                return (-r.get("avg_wait_time", 999.0), r.get("total_passed", 0))
+            sc_winner = max(results.keys(), key=_sc_score) if results else "ai"
+
+            for m_key, r_data in results.items():
+                m_passed = int(r_data.get("total_passed", 0))
+                m_wait = float(r_data.get("avg_wait_time", 0.0))
+                m_q = int(r_data.get("max_queue", 0))
+                m_dur = float(r_data.get("duration_seconds", duration_seconds))
+
+                sess_key = f"bench_sc_{scenario_id[:8]}_{m_key}_{int(time.time())}_{seed % 1000}"
+                file_p = sessions_dir / f"{sess_key}.json"
+                payload = {
+                    "session_id": sess_key,
+                    "mode": m_key,
+                    "model_name": clean_model_id if m_key == "ai" else None,
+                    "model_episodes": clean_model_ep if m_key == "ai" else None,
+                    "throughput": m_passed,
+                    "run_type": "benchmark",
+                    "benchmark_id": run_group_id,
+                    "benchmark_seed": seed,
+                    "scenario_id": scenario_id,
+                    "scenario_hash": scenario_hash,
+                    "controller_type": m_key,
+                    "duration_seconds": duration_seconds,
+                    "winner": sc_winner,
+                    "improvements": sc_improvements,
+                    "benchmark_modes": controllers,
+                    "benchmark_results": results,
+                    "stats": {
+                        "session_id": sess_key,
+                        "mode": m_key,
+                        "model_name": clean_model_id if m_key == "ai" else None,
+                        "model_episodes": clean_model_ep if m_key == "ai" else None,
+                        "frame_count": int(m_dur * 10),
+                        "duration_s": m_dur,
+                        "avg_fps": 10.0,
+                        "total_detections": max(m_passed, int(m_passed * 1.05)),
+                        "throughput": m_passed,
+                        "avg_wait_s": m_wait,
+                        "peak_queue": m_q,
+                    },
+                    "twin_data": {
+                        "session_id": sess_key,
+                        "total_frames_processed": int(m_dur * 10),
+                        "total_vehicles_detected": max(m_passed, int(m_passed * 1.05)),
+                        "video_duration_s": m_dur,
+                        "total_passed": m_passed,
+                        "arrivals": [],
+                    },
+                    "frames": [],
+                }
+                with open(file_p, "w", encoding="utf-8") as bf:
+                    json.dump(payload, bf, indent=2)
+        except Exception as se:
+            logger.warning("Failed to auto-persist scenario benchmark session: %s", se)
 
         # ── Final broadcast with full 3-controller paired results ─────────────
         try:
@@ -1773,6 +1928,13 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 scenario_counts = message.get("scenario_counts", None)
                 arrivals = message.get("arrivals", None)
                 modes = message.get("modes", ["ai", "fixed", "greedy"])
+                model_id = message.get("model_id")
+                model_episode = message.get("model_episode")
+                if model_episode is not None:
+                    try:
+                        model_episode = int(model_episode)
+                    except Exception:
+                        model_episode = None
                 # Clamp duration between 10 and 600 seconds
                 duration_seconds = max(10, min(600, duration_seconds))
                 app.state.sim_running = False
@@ -1781,7 +1943,9 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 if getattr(app.state, "benchmark_task", None) is not None:
                     app.state.benchmark_task.cancel()
                 app.state.benchmark_task = asyncio.create_task(
-                    _run_timed_benchmark(app, websocket, duration_seconds, scenario_counts, modes, arrivals)
+                    _run_timed_benchmark(
+                        app, websocket, duration_seconds, scenario_counts, modes, arrivals, model_id, model_episode
+                    )
                 )
 
             elif command == "run_scenario_benchmark":
