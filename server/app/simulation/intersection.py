@@ -98,9 +98,9 @@ class Intersection:
             else:
                 self.emergency_override_lane = None
 
-        # give the signal visibility into lane queues for smarter decisions and
-        # make AI phase changes respect the same clearance timing as fixed mode
-        self.signal.tick(dt, self.lanes, requested_phase=action, is_manual=is_manual)
+        # Tick signal: in fixed mode, cycles strictly sequentially by fixed_duration;
+        # in AI/greedy mode, requested_phase respects min green and yellow/red clearances
+        self.signal.tick(dt, requested_phase=action, is_manual=is_manual)
 
         spawned_vehicles = self.spawner.spawn(dt, self.lanes)
         self._spawned_this_interval += len(spawned_vehicles)

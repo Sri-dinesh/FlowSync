@@ -138,65 +138,14 @@ class TrafficSignal:
         if is_manual:
             return
 
-        # When green: allow a minimum green time and then pick next phase
-        if lanes is not None:
-            # compute waiting counts per phase
-            phase_wait = {}
-            for phase, lane_list in PHASE_GREEN_LANES.items():
-                count = 0
-                for ln in lane_list:
-                    for turn in ["straight", "left", "right"]:
-                        count += len(lanes.get(f"{ln}_{turn}", []))
-                phase_wait[phase] = count
-
-            # If current phase has no waiting vehicles and another phase does, switch early
-            if self.time_in_phase >= self.min_green_duration:
-                current_wait = phase_wait.get(self.current_phase, 0)
-                max_phase = max(phase_wait.items(), key=lambda kv: kv[1])[0]
-                if current_wait == 0 and phase_wait.get(max_phase, 0) > 0:
-                    self.set_phase(max_phase)
-                    return
-
-        # Hard cap: if current phase has exceeded MAX_GREEN_TIME, force a switch
-        # (applies in both fixed and AI mode — prevents starvation from operator error)
-        if self.color == SignalColor.GREEN and self.time_in_phase >= self.MAX_GREEN_TIME:
-            best_phase = self._pick_highest_queue_phase(self.current_phase, lanes)
-            self.set_phase(best_phase)
-            return
-
-        # Normal fixed duration rollover
+        # Fixed Timer mode (classical pre-timed clock-based controller):
+        # Operates strictly by clock timer. Holds green for exactly fixed_duration,
+        # then transitions sequentially: Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 0.
+        # It does NOT inspect lane queues, does NOT skip empty phases, and does NOT
+        # prioritize lanes with more vehicles. It is purely pre-timed.
         if self.time_in_phase >= self.fixed_duration:
-            best_phase = self._pick_highest_queue_phase(self.current_phase, lanes)
-            self.set_phase(best_phase)
-
-    def _pick_highest_queue_phase(self, current_phase: int, lanes: Optional[Dict[str, List]]) -> int:
-        """
-        Returns the phase (excluding current) with the highest total queue count.
-        If lanes data is unavailable or all other phases are empty, falls back to
-        the next sequential phase.
-        """
-        if lanes is None:
-            return (current_phase + 1) % len(SignalPhase)
-
-        best_phase = None
-        best_count = -1
-
-        for phase in range(len(SignalPhase)):
-            if phase == current_phase:
-                continue
-            count = 0
-            for lane_dir in PHASE_GREEN_LANES[phase]:
-                for turn in ["straight", "left", "right"]:
-                    count += len(lanes.get(f"{lane_dir}_{turn}", []))
-            if count > best_count:
-                best_count = count
-                best_phase = phase
-
-        # Fall back to sequential if all other phases are empty
-        if best_phase is None or best_count == 0:
-            return (current_phase + 1) % len(SignalPhase)
-
-        return best_phase
+            next_phase = (self.current_phase + 1) % len(SignalPhase)
+            self.set_phase(next_phase)
 
     def is_green_for(self, lane: str, turn: Optional[str] = None) -> bool:
         """Note: right turns are handled at the intersection level, not signal level."""
