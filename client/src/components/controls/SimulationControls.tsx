@@ -9,6 +9,7 @@ import { useSimulationStore } from "@/store/simulationStore";
 import type { SimulationMode, VehicleState } from "@/types/simulation";
 
 const EMPTY_VEHICLES: VehicleState[] = [];
+const SPEED_OPTIONS = [1.0, 2.0, 4.0, 8.0, 16.0] as const;
 
 interface SimulationControlsProps {
   sendCommand: (command: Record<string, unknown>) => void;
@@ -30,6 +31,16 @@ export default function SimulationControls({
   const [spawnRate, setSpawnRate] = useState(0.5);
   const [simSpeed, setSimSpeed] = useState(1.0);
   const [isSwitching, setIsSwitching] = useState(false);
+
+  const speedIndex = useMemo(() => {
+    const exact = SPEED_OPTIONS.indexOf(simSpeed as (typeof SPEED_OPTIONS)[number]);
+    if (exact !== -1) return exact;
+    return SPEED_OPTIONS.reduce(
+      (bestIdx, val, idx) =>
+        Math.abs(val - simSpeed) < Math.abs(SPEED_OPTIONS[bestIdx] - simSpeed) ? idx : bestIdx,
+      0
+    );
+  }, [simSpeed]);
 
   const runStartTimestepRef = useRef<number | null>(null);
 
@@ -108,7 +119,8 @@ export default function SimulationControls({
   };
 
   const handleSpawnChange = (value: number[]) => {
-    const nextRate = value[0] ?? spawnRate;
+    const raw = value[0] ?? spawnRate;
+    const nextRate = Math.round(raw * 10) / 10;
     setSpawnRate(nextRate);
     sendCommand({ command: "set_spawn_rate", value: nextRate });
   };
@@ -388,10 +400,10 @@ export default function SimulationControls({
             <FastForward className="h-3.5 w-3.5 text-neutral-500" />
             Simulation Speed
           </span>
-          <span className="font-mono text-white font-medium">{simSpeed.toFixed(1)}x</span>
+          <span className="font-mono text-white font-medium">{simSpeed}x</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {[1.0, 2.0, 4.0, 8.0, 16.0].map((speed) => (
+          {SPEED_OPTIONS.map((speed) => (
             <Button
               key={speed}
               size="sm"
@@ -400,7 +412,7 @@ export default function SimulationControls({
               disabled={!isConnected}
               className={`flex-1 h-6 text-[10px] rounded px-0.5 ${
                 Math.abs(simSpeed - speed) < 0.05
-                  ? "bg-neutral-800 text-white border border-neutral-700"
+                  ? "bg-neutral-800 text-white border border-neutral-700 font-semibold"
                   : "text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/50"
               }`}
             >
@@ -409,13 +421,21 @@ export default function SimulationControls({
           ))}
         </div>
         <Slider
-          min={0.5}
-          max={16.0}
-          step={0.5}
-          value={[simSpeed]}
+          min={0}
+          max={SPEED_OPTIONS.length - 1}
+          step={1}
+          value={[speedIndex]}
           disabled={!isConnected}
-          onValueChange={(val) => handleSpeedChange(val[0] ?? 1.0)}
+          onValueChange={(val) => {
+            const idx = Math.max(0, Math.min(SPEED_OPTIONS.length - 1, val[0] ?? 0));
+            handleSpeedChange(SPEED_OPTIONS[idx]);
+          }}
         />
+        <div className="flex justify-between text-[9px] font-mono text-neutral-500 px-0.5">
+          {SPEED_OPTIONS.map((speed) => (
+            <span key={speed}>{speed}x</span>
+          ))}
+        </div>
       </div>
 
       {/* Traffic Density (Arrival Rate λ) slider */}

@@ -412,7 +412,7 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
               step={0.1}
               value={[newLambda]}
               onValueChange={(val) => setNewLambda(val[0] ?? 0.5)}
-              className="w-full h-1.5 bg-neutral-800"
+              className="w-full"
             />
             <div className="flex justify-between text-[10px] text-neutral-600">
               <span>Low 0.1</span>
@@ -432,7 +432,7 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
               step={10}
               value={[newDuration]}
               onValueChange={(val) => setNewDuration(val[0] ?? 60)}
-              className="w-full h-1.5 bg-neutral-800"
+              className="w-full"
             />
             <div className="flex justify-between text-[10px] text-neutral-600">
               <span>10s</span>

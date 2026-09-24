@@ -186,7 +186,7 @@ export default function CityComparisonPanel({
                 step={5}
                 value={[duration]}
                 onValueChange={(val) => setDuration(val[0] ?? 15)}
-                className="w-full h-1 bg-neutral-800"
+                className="w-full"
               />
               <div className="flex justify-between text-[9px] font-mono text-neutral-600 mt-1">
                 <span>10s</span>
