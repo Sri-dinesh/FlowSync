@@ -286,7 +286,7 @@ export function useSimulationSocket() {
     }
   }, []);
 
-  const startBenchmark = useCallback((durationSeconds: number = 30, modes: string[] = ["fixed", "vat", "greedy", "ai"]) => {
+  const startBenchmark = useCallback((durationSeconds: number = 30, modes: string[] = ["fixed", "greedy", "ai"]) => {
     setBenchmarkResults(null);
     setBenchmarkProgress(null);
     setBenchmarkRunning(true);

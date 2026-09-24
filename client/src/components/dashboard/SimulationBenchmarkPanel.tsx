@@ -47,12 +47,6 @@ const MODE_CONFIG: Record<
     icon: Clock,
     barColor: "#404040",
   },
-  vat: {
-    label: "VAT Actuated",
-    shortLabel: "ACTUATED",
-    icon: Activity,
-    barColor: "#A3A3A3",
-  },
   greedy: {
     label: "Greedy Policy",
     shortLabel: "GREEDY",
@@ -67,7 +61,7 @@ const MODE_CONFIG: Record<
   },
 };
 
-const BENCHMARK_MODES = ["fixed", "vat", "greedy", "ai"];
+const BENCHMARK_MODES = ["fixed", "greedy", "ai"];
 
 export default function SimulationBenchmarkPanel({
   running,
