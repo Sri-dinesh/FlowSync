@@ -288,7 +288,16 @@ class DeterministicEvaluator:
                     )
                     for ph in range(4)
                 }
-                best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                current_count = phase_counts.get(signal.current_phase, 0)
+                max_count = max(phase_counts.values()) if phase_counts else 0
+
+                # Pure greedy: prioritize phase with most vehicles.
+                # Maintain current green if it is tied for maximum, or if all queues are empty.
+                if (current_count >= max_count and current_count > 0) or max_count == 0:
+                    best_phase = signal.current_phase
+                else:
+                    best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+
                 action = best_phase if signal.can_switch_phase else signal.current_phase
             else:
                 action = None

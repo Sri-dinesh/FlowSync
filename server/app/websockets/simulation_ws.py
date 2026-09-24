@@ -463,7 +463,16 @@ async def _run_timed_benchmark(
                         )
                         for ph in range(4)
                     }
-                    best_phase   = max(phase_counts, key=lambda p: phase_counts[p])
+                    current_count = phase_counts.get(signal.current_phase, 0)
+                    max_count = max(phase_counts.values()) if phase_counts else 0
+
+                    # Pure greedy: prioritize phase with most vehicles.
+                    # Maintain current green if it is tied for maximum, or if all queues are empty.
+                    if (current_count >= max_count and current_count > 0) or max_count == 0:
+                        best_phase = signal.current_phase
+                    else:
+                        best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+
                     action       = best_phase if signal.can_switch_phase else signal.current_phase
                     last_action  = action
                     intersection.tick(dt=TICK_DT, action=action)
@@ -938,7 +947,16 @@ async def _run_scenario_benchmark(
                         ph: sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
                         for ph in range(4)
                     }
-                    best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                    current_count = phase_counts.get(signal.current_phase, 0)
+                    max_count = max(phase_counts.values()) if phase_counts else 0
+
+                    # Pure greedy: prioritize phase with most vehicles.
+                    # Maintain current green if it is tied for maximum, or if all queues are empty.
+                    if (current_count >= max_count and current_count > 0) or max_count == 0:
+                        best_phase = signal.current_phase
+                    else:
+                        best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+
                     action = best_phase if signal.can_switch_phase else signal.current_phase
                     last_action = action
                     passed = intersection.tick(dt=TICK_DT, action=action)
@@ -1220,15 +1238,24 @@ async def _simulation_loop(app) -> None:
                 elif mode == "greedy":
                     signal = intersection.signal
                     queues = intersection.get_movement_queues()
-                    phase_counts = {}
-                    for ph in range(4):
-                        count = sum(
+                    phase_counts = {
+                        ph: sum(
                             queues.get(f"{d}_{t}", 0)
                             for d in PHASE_DIRS[ph]
                             for t in PHASE_TURNS[ph]
                         )
-                        phase_counts[ph] = count
-                    best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+                        for ph in range(4)
+                    }
+                    current_count = phase_counts.get(signal.current_phase, 0)
+                    max_count = max(phase_counts.values()) if phase_counts else 0
+
+                    # Pure greedy: prioritize phase with most vehicles.
+                    # Maintain current green if it is tied for maximum, or if all queues are empty.
+                    if (current_count >= max_count and current_count > 0) or max_count == 0:
+                        best_phase = signal.current_phase
+                    else:
+                        best_phase = max(phase_counts, key=lambda p: phase_counts[p])
+
                     greedy_action = best_phase if signal.can_switch_phase else signal.current_phase
                     intersection.tick(dt=0.1, action=greedy_action)
                     spawned_this = getattr(intersection, "_spawned_this_interval", 0) - prev_spawned
