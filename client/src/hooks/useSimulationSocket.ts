@@ -5,27 +5,41 @@ import type { SimulationFrame, ScenarioBenchmarkResults } from "@/types/simulati
 import { getFastApiUrls } from "@/lib/utils";
 
 export interface SimBenchmarkResult {
+  key?: string;
+  label?: string;
+  model_id?: string;
+  model_episode?: number;
   total_passed: number;
   avg_wait_time: number;
   max_queue: number;
   duration_seconds: number;
+  clearance_time?: number;
 }
 
 export interface SimBenchmarkResultsData {
   duration_seconds: number;
+  benchmark_type?: "controller_comparison" | "model_comparison";
   results: Record<string, SimBenchmarkResult>;
   winner: string | null;
+  winner_label?: string;
+  winner_episode?: number;
   modes: string[];
   improvements?: Record<string, number>;
+  models?: Array<{ key: string; raw_id: string; episodes: number; name: string }>;
   // Scenario-linked fields (populated when run via run_scenario_benchmark)
   scenario_id?: string;
   model_episode?: number;
   scenario_hash?: string;
   benchmark_seed?: number;
+  benchmark_id?: string;
 }
 
 export interface SimBenchmarkProgress {
   current_mode: string;
+  current_model?: string;
+  current_model_id?: string;
+  current_episode?: number;
+  benchmark_type?: "controller_comparison" | "model_comparison" | "scenario";
   elapsed?: number;
   duration_seconds?: number;
   mode_index?: number;
@@ -36,6 +50,9 @@ export interface SimBenchmarkProgress {
   scenario_id?: string;
   run_group_id?: string;
   benchmark_seed?: number;
+  spawned_count?: number;
+  passed_count?: number;
+  avg_wait?: number;
 }
 
 const MAX_RETRIES = 5;
@@ -94,6 +111,10 @@ export function useSimulationSocket() {
           setIsBenchmarkRunning(true);
           setBenchmarkProgress({
             current_mode: raw.current_mode,
+            current_model: raw.current_model,
+            current_model_id: raw.current_model_id,
+            current_episode: raw.current_episode,
+            benchmark_type: raw.benchmark_type,
             elapsed: raw.elapsed ?? 0,
             duration_seconds: raw.duration_seconds ?? 30,
             mode_index: raw.mode_index ?? 0,
@@ -104,6 +125,9 @@ export function useSimulationSocket() {
             scenario_id: raw.scenario_id,
             run_group_id: raw.run_group_id,
             benchmark_seed: raw.benchmark_seed,
+            spawned_count: raw.spawned_count,
+            passed_count: raw.passed_count,
+            avg_wait: raw.avg_wait,
           });
           return;
         }
@@ -145,7 +169,12 @@ export function useSimulationSocket() {
           "cctv_frame",
         ]);
         if (raw.type && NON_FRAME_TYPES.has(raw.type)) {
-          if (raw.code === "BENCHMARK_FAILED" || raw.code === "SCENARIO_BENCHMARK_FAILED") {
+          if (
+            raw.code === "BENCHMARK_FAILED" ||
+            raw.code === "SCENARIO_BENCHMARK_FAILED" ||
+            raw.code === "MODEL_BENCHMARK_FAILED" ||
+            raw.code === "INVALID_MODELS"
+          ) {
             setBenchmarkRunning(false);
             setIsBenchmarkRunning(false);
             setRunning(false);
@@ -330,6 +359,27 @@ export function useSimulationSocket() {
     });
   }, [sendCommand, setRunning, setIsBenchmarkRunning]);
 
+  const startModelBenchmark = useCallback((
+    durationSeconds: number,
+    models: Array<{ id: string; episodes?: number; version?: string; name?: string }>,
+    scenarioCounts?: Record<string, number>,
+    seed?: number,
+  ) => {
+    setBenchmarkResults(null);
+    setScenarioBenchmarkResults(null);
+    setBenchmarkProgress(null);
+    setBenchmarkRunning(true);
+    setRunning(true);
+    setIsBenchmarkRunning(true);
+    sendCommand({
+      command: "run_model_benchmark",
+      duration_seconds: durationSeconds,
+      models,
+      scenario_counts: scenarioCounts,
+      seed,
+    });
+  }, [sendCommand, setRunning, setIsBenchmarkRunning]);
+
   const stopBenchmark = useCallback(() => {
     setBenchmarkRunning(false);
     setIsBenchmarkRunning(false);
@@ -354,6 +404,7 @@ export function useSimulationSocket() {
     scenarioBenchmarkResults,
     startBenchmark,
     startScenarioBenchmark,
+    startModelBenchmark,
     stopBenchmark,
     resetBenchmark,
   };

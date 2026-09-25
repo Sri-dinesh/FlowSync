@@ -73,6 +73,7 @@ export default function SimulationPage() {
     scenarioBenchmarkResults,
     startBenchmark,
     startScenarioBenchmark,
+    startModelBenchmark,
     stopBenchmark,
     resetBenchmark,
   } = useSimulationSocket();
@@ -256,6 +257,7 @@ export default function SimulationPage() {
                     progress={benchmarkProgress}
                     results={benchmarkResults}
                     onStart={handleRunBenchmark}
+                    onStartModelBenchmark={startModelBenchmark}
                     onStop={stopBenchmark}
                     onReset={resetBenchmark}
                   />

@@ -378,7 +378,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "efficiency_gain_pct": eff_gain,
                 "run_type": run_type,
                 "benchmark_id": benchmark_id,
+                "benchmark_type": data.get("benchmark_type") or ("controller_comparison" if run_type == "benchmark" else None),
                 "winner": data.get("winner"),
+                "winner_label": data.get("winner_label"),
+                "winner_episode": data.get("winner_episode"),
                 "improvements": data.get("improvements") or {},
                 "benchmark_modes": data.get("benchmark_modes") or (["ai", "fixed", "greedy"] if run_type == "benchmark" else None),
                 "benchmark_results": data.get("benchmark_results") or None,
@@ -394,7 +397,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
     bm_groups: Dict[str, Dict[str, Any]] = defaultdict(dict)
     for s in sessions_list:
         bid = s.get("benchmark_id")
-        if bid:
+        # Only group multi-controller benchmarks; model_comparison benchmarks already hold full results
+        if bid and s.get("benchmark_type") != "model_comparison":
             mode_k = (s.get("mode") or "ai").lower()
             bm_groups[bid][mode_k] = s
 
@@ -460,7 +464,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "timestamp_ms": s["timestamp_ms"],
                 "duration_seconds": s["duration_s"],
                 "scenario_id": s.get("scenario_id"),
+                "benchmark_type": s.get("benchmark_type") or "controller_comparison",
                 "winner": s.get("winner"),
+                "winner_label": s.get("winner_label"),
+                "winner_episode": s.get("winner_episode"),
                 "improvements": s.get("improvements", {}),
                 "modes": s.get("benchmark_modes") or ["ai", "fixed", "greedy"],
                 "modes_results": s.get("benchmark_results") or {},

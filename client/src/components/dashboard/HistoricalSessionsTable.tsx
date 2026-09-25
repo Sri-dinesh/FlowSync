@@ -18,6 +18,7 @@ import {
   ChevronUp,
   Trophy,
   Bot,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,12 +44,18 @@ export interface SessionItem {
   efficiency_gain_pct?: number;
   run_type?: "benchmark" | "cctv_replay" | "standalone" | string;
   benchmark_id?: string;
+  benchmark_type?: "controller_comparison" | "model_comparison" | string;
   winner?: string;
+  winner_label?: string;
+  winner_episode?: number;
   improvements?: Record<string, number>;
   benchmark_modes?: string[];
   benchmark_results?: Record<
     string,
     {
+      label?: string;
+      model_id?: string;
+      model_episode?: number;
       avg_wait_s?: number;
       avg_wait_time?: number;
       throughput?: number;
@@ -317,6 +324,66 @@ export default function HistoricalSessionsTable({
         if (!bid) continue;
         groupedBenchmarkIds.add(bid);
         const children = bmChildren[bid] || {};
+
+        const isModelBm =
+          bm.benchmark_type === "model_comparison" ||
+          bid.startsWith("bm_model_") ||
+          (bm.modes && bm.modes.some((m: string) => m.startsWith("model_")));
+
+        if (isModelBm) {
+          const resObj = bm.modes_results || {};
+          const modelCount = Object.keys(resObj).length || 2;
+          const winnerKey = bm.winner || Object.keys(resObj)[0];
+          const winnerStats = resObj[winnerKey] || {};
+          const maxQ = Math.max(
+            ...Object.values(resObj).map((r: any) => r.max_queue ?? r.peak_queue ?? 0),
+            0
+          );
+          const topWait = winnerStats.avg_wait_s ?? winnerStats.avg_wait_time ?? 0;
+          const topVehs = winnerStats.throughput ?? winnerStats.total_passed ?? 0;
+
+          list.push({
+            session_id: bid,
+            created_at: bm.created_at,
+            timestamp_ms: bm.timestamp_ms,
+            duration_s: bm.duration_seconds || 30.0,
+            total_frames: Math.round((bm.duration_seconds || 30.0) * 10),
+            total_vehicles: topVehs || 10,
+            congestion_level: "MODERATE",
+            avg_fps: 10.0,
+            has_arrivals: false,
+            mode: "benchmark",
+            benchmark_type: "model_comparison",
+            model_name: bm.model_name || `DQN Multi-Model Showdown (${modelCount} Checkpoints)`,
+            model_episodes: bm.winner_episode ?? winnerStats.model_episode ?? bm.model_episodes,
+            throughput: topVehs,
+            avg_wait_s: topWait,
+            peak_queue: maxQ,
+            performance_rating: "OPTIMAL",
+            level_of_service: topWait <= 10 ? "A" : topWait <= 20 ? "B" : "C",
+            efficiency_gain_pct: bm.improvements?.[`${winnerKey}_wait_pct`] ?? 0,
+            run_type: "benchmark",
+            benchmark_id: bid,
+            winner: winnerKey,
+            winner_label: bm.winner_label || winnerStats.label,
+            winner_episode: bm.winner_episode ?? winnerStats.model_episode,
+            improvements: bm.improvements || {},
+            benchmark_modes: bm.modes || Object.keys(resObj),
+            benchmark_results: resObj,
+            scenario_id: bm.scenario_id,
+            isBenchmarkGroup: true,
+            benchmarkRun: {
+              benchmark_id: bid,
+              winner: winnerKey,
+              improvements: bm.improvements || {},
+              modes_results: resObj,
+              child_sessions: children,
+            },
+          });
+          continue;
+        }
+
+        // Standard 3-controller showdown
         const aiStats = bm.modes_results?.ai || {};
         const fixedStats = bm.modes_results?.fixed || {};
         const greedyStats = bm.modes_results?.greedy || {};
@@ -341,6 +408,7 @@ export default function HistoricalSessionsTable({
           avg_fps: 10.0,
           has_arrivals: false,
           mode: "benchmark",
+          benchmark_type: "controller_comparison",
           model_name: "FlowSync DQN vs Fixed vs Greedy",
           model_episodes: bm.model_episodes ?? 300,
           throughput: aiStats.throughput ?? aiStats.total_passed ?? 0,
@@ -379,6 +447,48 @@ export default function HistoricalSessionsTable({
         groupedBenchmarkIds.add(s.benchmark_id);
         const children = bmChildren[s.benchmark_id] || {};
         const bResults = s.benchmark_results || {};
+
+        const isModelBm =
+          s.benchmark_type === "model_comparison" ||
+          s.benchmark_id.startsWith("bm_model_") ||
+          Object.keys(bResults).some((k) => k.startsWith("model_"));
+
+        if (isModelBm) {
+          const resObj = bResults;
+          const modelCount = Object.keys(resObj).length || 2;
+          const winnerKey = s.winner || Object.keys(resObj)[0];
+          const winnerStats = resObj[winnerKey] || {};
+          const maxQ = Math.max(
+            ...Object.values(resObj).map((r: any) => r.max_queue ?? r.peak_queue ?? 0),
+            s.peak_queue ?? 0
+          );
+          const topWait = winnerStats.avg_wait_s ?? winnerStats.avg_wait_time ?? s.avg_wait_s ?? 0;
+          const topVehs = winnerStats.throughput ?? winnerStats.total_passed ?? s.throughput ?? 0;
+
+          list.push({
+            ...s,
+            session_id: s.benchmark_id,
+            mode: "benchmark",
+            benchmark_type: "model_comparison",
+            model_name: s.model_name || `DQN Multi-Model Showdown (${modelCount} Checkpoints)`,
+            throughput: topVehs,
+            avg_wait_s: topWait,
+            peak_queue: maxQ,
+            isBenchmarkGroup: true,
+            winner: winnerKey,
+            winner_label: s.winner_label || winnerStats.label,
+            winner_episode: s.winner_episode ?? winnerStats.model_episode,
+            benchmarkRun: {
+              benchmark_id: s.benchmark_id,
+              winner: winnerKey,
+              improvements: s.improvements || {},
+              modes_results: bResults,
+              child_sessions: children,
+            },
+          });
+          continue;
+        }
+
         const aiStats = bResults.ai || children.ai || {};
         const fixedStats = bResults.fixed || children.fixed || {};
         const greedyStats = bResults.greedy || children.greedy || {};
@@ -393,6 +503,7 @@ export default function HistoricalSessionsTable({
           ...s,
           session_id: s.benchmark_id,
           mode: "benchmark",
+          benchmark_type: "controller_comparison",
           peak_queue: maxQ,
           isBenchmarkGroup: true,
           benchmarkRun: {
@@ -809,6 +920,11 @@ export default function HistoricalSessionsTable({
                   const formattedDuration = formatDuration(session.duration_s);
 
                   const bmResults = session.benchmark_results || {};
+                  const isModelBenchmark =
+                    session.benchmark_type === "model_comparison" ||
+                    session.session_id.startsWith("bm_model_") ||
+                    Object.keys(bmResults).some((k) => k.startsWith("model_"));
+
                   const bmAI = bmResults.ai;
                   const bmFixed = bmResults.fixed;
                   const bmGreedy = bmResults.greedy;
@@ -817,13 +933,18 @@ export default function HistoricalSessionsTable({
                   const fixedWait = bmFixed?.avg_wait_s ?? bmFixed?.avg_wait_time;
                   const greedyWait = bmGreedy?.avg_wait_s ?? bmGreedy?.avg_wait_time;
 
-                  const winner = session.winner || "ai";
-                  const winnerName =
-                    winner === "ai"
-                      ? "FlowSync DQN AI"
-                      : winner === "greedy"
-                      ? "Greedy Controller"
-                      : "Fixed Timer";
+                  const winner = session.winner || (isModelBenchmark ? Object.keys(bmResults)[0] : "ai");
+                  const winnerName = isModelBenchmark
+                    ? session.winner_label || (bmResults[winner]?.label ?? `Model ${session.winner_episode ?? winner}`)
+                    : winner === "ai"
+                    ? "FlowSync DQN AI"
+                    : winner === "greedy"
+                    ? "Greedy Controller"
+                    : "Fixed Timer";
+
+                  const bestWait = bmResults[winner]?.avg_wait_time ?? bmResults[winner]?.avg_wait_s ?? avgWait;
+                  const winnerImpKey = `${winner}_wait_pct`;
+                  const winnerImp = session.improvements?.[winnerImpKey];
 
                   return (
                     <tr
@@ -842,10 +963,17 @@ export default function HistoricalSessionsTable({
                               {title}
                             </span>
                             {isBenchmark && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
-                                <Sparkles className="h-2.5 w-2.5 text-amber-300" />
-                                Benchmark
-                              </span>
+                              isModelBenchmark ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                  <Layers className="h-2.5 w-2.5 text-emerald-300" />
+                                  Multi-Model Benchmark
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
+                                  <Sparkles className="h-2.5 w-2.5 text-amber-300" />
+                                  Benchmark
+                                </span>
+                              )
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -859,7 +987,9 @@ export default function HistoricalSessionsTable({
                             {isBenchmark && session.winner && (
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
-                                  winner === "ai"
+                                  isModelBenchmark
+                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                    : winner === "ai"
                                     ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
                                     : winner === "greedy"
                                     ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
@@ -881,15 +1011,27 @@ export default function HistoricalSessionsTable({
                       {/* Column 2: Model */}
                       <td className="py-5 px-4">
                         {isBenchmark ? (
-                          <div className="space-y-1">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
-                              <Bot className="h-3 w-3" />
-                              {session.model_episodes ? `${session.model_episodes} eps` : "DQN AI"}
-                            </span>
-                            <div className="text-xs text-neutral-400">
-                              vs Fixed vs Greedy
+                          isModelBenchmark ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-xs font-mono text-emerald-300">
+                                <Bot className="h-3 w-3" />
+                                DQN Checkpoints
+                              </span>
+                              <div className="text-xs text-neutral-400">
+                                {Object.keys(bmResults).length} models compared
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
+                                <Bot className="h-3 w-3" />
+                                {session.model_episodes ? `${session.model_episodes} eps` : "DQN AI"}
+                              </span>
+                              <div className="text-xs text-neutral-400">
+                                vs Fixed vs Greedy
+                              </div>
+                            </div>
+                          )
                         ) : isAI ? (
                           <div className="space-y-1">
                             <span className="inline-flex items-center rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
@@ -906,25 +1048,40 @@ export default function HistoricalSessionsTable({
 
                       {/* Column 3: Throughput */}
                       <td className="py-5 px-4">
-                        {isBenchmark && (bmAI || bmFixed || bmGreedy) ? (
-                          <div className="space-y-1.5">
-                            <div className="text-xs font-mono text-white flex items-center gap-1.5">
-                              <span className="text-indigo-400 font-medium">
-                                AI: {bmAI?.throughput ?? bmAI?.total_passed ?? "-"}
-                              </span>
-                              <span className="text-neutral-600">|</span>
-                              <span className="text-slate-400 font-medium">
-                                Fix: {bmFixed?.throughput ?? bmFixed?.total_passed ?? "-"}
-                              </span>
-                              <span className="text-neutral-600">|</span>
-                              <span className="text-emerald-400 font-medium">
-                                Gr: {bmGreedy?.throughput ?? bmGreedy?.total_passed ?? "-"}
-                              </span>
+                        {isBenchmark ? (
+                          isModelBenchmark ? (
+                            <div className="space-y-1.5">
+                              <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                                <span className="text-emerald-400 font-medium">
+                                  Top: {bmResults[winner]?.total_passed ?? bmResults[winner]?.throughput ?? throughput} veh
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-neutral-500">
+                                {Object.keys(bmResults).length} models evaluated
+                              </div>
                             </div>
-                            <div className="text-[11px] text-neutral-500">
-                              Vehicles cleared
+                          ) : (bmAI || bmFixed || bmGreedy) ? (
+                            <div className="space-y-1.5">
+                              <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                                <span className="text-indigo-400 font-medium">
+                                  AI: {bmAI?.throughput ?? bmAI?.total_passed ?? "-"}
+                                </span>
+                                <span className="text-neutral-600">|</span>
+                                <span className="text-slate-400 font-medium">
+                                  Fix: {bmFixed?.throughput ?? bmFixed?.total_passed ?? "-"}
+                                </span>
+                                <span className="text-neutral-600">|</span>
+                                <span className="text-emerald-400 font-medium">
+                                  Gr: {bmGreedy?.throughput ?? bmGreedy?.total_passed ?? "-"}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-neutral-500">
+                                Vehicles cleared
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="text-sm font-mono font-medium text-white">{throughput} veh</div>
+                          )
                         ) : (
                           <div className="space-y-1.5">
                             <div className="text-sm font-mono font-medium text-white">
@@ -957,55 +1114,69 @@ export default function HistoricalSessionsTable({
 
                       {/* Column 4: Delay */}
                       <td className="py-5 px-4">
-                        {isBenchmark && (aiWait !== undefined || fixedWait !== undefined) ? (
-                          <div className="space-y-1">
-                            <div className="text-xs font-mono text-white flex items-center gap-1.5">
-                              <span className="text-indigo-400 font-semibold">
-                                {aiWait !== undefined ? `${aiWait.toFixed(1)}s` : "-"}
-                              </span>
-                              <span className="text-neutral-600">|</span>
-                              <span className="text-slate-400 font-semibold">
-                                {fixedWait !== undefined ? `${fixedWait.toFixed(1)}s` : "-"}
-                              </span>
-                              <span className="text-neutral-600">|</span>
-                              <span className="text-emerald-400 font-semibold">
-                                {greedyWait !== undefined ? `${greedyWait.toFixed(1)}s` : "-"}
-                              </span>
-                            </div>
-                            <div className="text-xs text-neutral-500">
-                              {session.improvements?.ai_wait_pct !== undefined ? (
-                                <span
-                                  className={
-                                    session.improvements.ai_wait_pct > 0
-                                      ? "text-emerald-400 font-medium"
-                                      : "text-neutral-400"
-                                  }
-                                >
-                                  {session.improvements.ai_wait_pct > 0 ? "+" : ""}
-                                  {session.improvements.ai_wait_pct}% AI vs fixed
+                        {isBenchmark ? (
+                          isModelBenchmark ? (
+                            <div className="space-y-1">
+                              <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                                <span className="text-amber-400 font-semibold">
+                                  Best: {bestWait.toFixed(1)}s
                                 </span>
-                              ) : (
-                                "avg wait per mode"
-                              )}
+                              </div>
+                              <div className="text-xs text-neutral-500">
+                                {winnerImp !== undefined && winnerImp > 0 ? (
+                                  <span className="text-emerald-400 font-medium">
+                                    +{winnerImp}% vs baseline
+                                  </span>
+                                ) : (
+                                  "DQN checkpoints"
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          ) : (aiWait !== undefined || fixedWait !== undefined) ? (
+                            <div className="space-y-1">
+                              <div className="text-xs font-mono text-white flex items-center gap-1.5">
+                                <span className="text-indigo-400 font-semibold">
+                                  {aiWait !== undefined ? `${aiWait.toFixed(1)}s` : "-"}
+                                </span>
+                                <span className="text-neutral-600">|</span>
+                                <span className="text-slate-400 font-semibold">
+                                  {fixedWait !== undefined ? `${fixedWait.toFixed(1)}s` : "-"}
+                                </span>
+                                <span className="text-neutral-600">|</span>
+                                <span className="text-emerald-400 font-semibold">
+                                  {greedyWait !== undefined ? `${greedyWait.toFixed(1)}s` : "-"}
+                                </span>
+                              </div>
+                              <div className="text-xs text-neutral-500">
+                                {session.improvements?.ai_wait_pct !== undefined ? (
+                                  <span
+                                    className={
+                                      session.improvements.ai_wait_pct > 0
+                                        ? "text-emerald-400 font-medium"
+                                        : "text-neutral-400"
+                                    }
+                                  >
+                                    {session.improvements.ai_wait_pct > 0 ? "+" : ""}
+                                    {session.improvements.ai_wait_pct}% AI vs fixed
+                                  </span>
+                                ) : (
+                                  "avg wait per mode"
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm font-mono font-medium text-white">{avgWait.toFixed(1)}s</div>
+                          )
                         ) : (
                           <div className="space-y-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-mono font-medium text-white">
-                                {avgWait.toFixed(1)}s
-                              </span>
-                              <span
-                                className={`text-xs px-1.5 py-0.5 rounded border font-medium ${losClass}`}
-                              >
-                                {session.level_of_service || "C"}
-                              </span>
+                            <div className="text-sm font-mono font-medium text-white">
+                              {avgWait.toFixed(1)}s
                             </div>
-                            <div className="text-xs text-neutral-500">
-                              {session.efficiency_gain_pct
-                                ? `${session.efficiency_gain_pct > 0 ? "+" : ""}${session.efficiency_gain_pct}% vs fixed`
-                                : "avg delay"}
-                            </div>
+                            <span
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono font-bold border ${losClass}`}
+                            >
+                              LOS {session.level_of_service ?? "C"}
+                            </span>
                           </div>
                         )}
                       </td>
@@ -1085,6 +1256,157 @@ export default function HistoricalSessionsTable({
                 const target = sortedSessions.find((s) => s.session_id === expandedBenchmarkId);
                 if (!target) return null;
                 const bRes = target.benchmark_results || {};
+
+                const isModelComparison =
+                  target.benchmark_type === "model_comparison" ||
+                  target.session_id.startsWith("bm_model_") ||
+                  Object.keys(bRes).some((k) => k.startsWith("model_"));
+
+                const winner = target.winner || (isModelComparison ? Object.keys(bRes)[0] : "ai");
+                const winnerName = isModelComparison
+                  ? target.winner_label || (bRes[winner]?.label ?? `Model ${target.winner_episode ?? winner}`)
+                  : winner === "ai"
+                  ? "FlowSync DQN AI"
+                  : winner === "greedy"
+                  ? "Greedy Controller"
+                  : "Fixed Timer";
+
+                const children = target.benchmarkRun?.child_sessions || {};
+
+                if (isModelComparison) {
+                  const winnerImpKey = `${winner}_wait_pct`;
+                  const winnerImp = target.improvements?.[winnerImpKey];
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Header Info */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-900/60 p-3 rounded-xl border border-neutral-800">
+                        <div className="flex items-center gap-2.5">
+                          <Trophy className="h-4 w-4 text-amber-400" />
+                          <div>
+                            <div className="text-xs font-semibold text-white">
+                              Multi-Model Benchmark Winner: {winnerName}
+                              {target.winner_episode !== undefined && (
+                                <span className="ml-2 font-mono text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-normal">
+                                  {target.winner_episode} eps
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-neutral-400">
+                              {winnerImp !== undefined && winnerImp > 0
+                                ? `Delivered ${winnerImp}% delay reduction vs baseline checkpoint on identical traffic.`
+                                : `Evaluated ${Object.keys(bRes).length} DQN AI model checkpoints under identical vehicle arrivals (CRN seed).`}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpandedBenchmarkId(null)}
+                          className="h-7 text-xs text-neutral-400 hover:text-white"
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Close Breakdown
+                        </Button>
+                      </div>
+
+                      {/* Model Cards in Responsive Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {Object.entries(bRes).map(([mKey, mData]) => {
+                          const isMWin = mKey === winner;
+                          const mWait = mData?.avg_wait_s ?? mData?.avg_wait_time ?? 0;
+                          const mThru = mData?.throughput ?? mData?.total_passed ?? 0;
+                          const mQueue = mData?.peak_queue ?? mData?.max_queue ?? 0;
+                          const mGain = target.improvements?.[`${mKey}_wait_pct`];
+                          const childSess = children[mKey];
+
+                          return (
+                            <div
+                              key={mKey}
+                              className={`rounded-xl p-4 border transition-all ${
+                                isMWin
+                                  ? "bg-amber-950/20 border-amber-500/50 shadow-lg shadow-amber-500/5"
+                                  : "bg-neutral-900/40 border-neutral-800"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Bot className="h-4 w-4 text-emerald-400 shrink-0" />
+                                  <span className="text-sm font-semibold text-white truncate">
+                                    {mData.label || mKey}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {mData.model_episode !== undefined && (
+                                    <span className="text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
+                                      {mData.model_episode} eps
+                                    </span>
+                                  )}
+                                  {isMWin ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                                      <Trophy className="h-2.5 w-2.5" />
+                                      WINNER
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                                  <span className="text-[10px] text-neutral-500 block">Avg Delay</span>
+                                  <span className="font-mono font-medium text-white text-base">
+                                    {mWait.toFixed(1)}s
+                                  </span>
+                                </div>
+                                <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                                  <span className="text-[10px] text-neutral-500 block">Throughput</span>
+                                  <span className="font-mono font-medium text-white text-base">
+                                    {mThru} vehs
+                                  </span>
+                                </div>
+                                <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                                  <span className="text-[10px] text-neutral-500 block">Peak Queue</span>
+                                  <span className="font-mono font-medium text-white text-base">
+                                    {mQueue} cars
+                                  </span>
+                                </div>
+                                <div className="bg-black/50 rounded-lg p-2.5 border border-white/5">
+                                  <span className="text-[10px] text-neutral-500 block">vs Baseline</span>
+                                  <span
+                                    className={`font-mono font-semibold text-base ${
+                                      mGain && mGain > 0
+                                        ? "text-emerald-400"
+                                        : mGain && mGain < 0
+                                        ? "text-rose-400"
+                                        : "text-neutral-400"
+                                    }`}
+                                  >
+                                    {mGain !== undefined ? (mGain > 0 ? `+${mGain}%` : `${mGain}%`) : "Baseline"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {childSess && (
+                                <div className="mt-3 pt-3 border-t border-white/5 flex justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleLaunchReplay(childSess.session_id)}
+                                    className="h-7 text-xs rounded-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-600 hover:text-white"
+                                  >
+                                    <Play className="h-3 w-3 mr-1" />
+                                    Replay
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const ai = bRes.ai;
                 const fixed = bRes.fixed;
                 const greedy = bRes.greedy;
@@ -1101,7 +1423,6 @@ export default function HistoricalSessionsTable({
                 const fixedQueue = fixed?.peak_queue ?? fixed?.max_queue ?? 0;
                 const greedyQueue = greedy?.peak_queue ?? greedy?.max_queue ?? 0;
 
-                const winner = target.winner || "ai";
                 const isAIWinner = winner === "ai";
                 const isFixedWinner = winner === "fixed";
                 const isGreedyWinner = winner === "greedy";
@@ -1116,8 +1437,6 @@ export default function HistoricalSessionsTable({
                   (fixedWait > 0 && greedyWait > 0
                     ? Number((((fixedWait - greedyWait) / fixedWait) * 100).toFixed(1))
                     : 0);
-
-                const children = target.benchmarkRun?.child_sessions || {};
 
                 return (
                   <div className="space-y-4">

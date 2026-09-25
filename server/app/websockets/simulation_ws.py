@@ -811,6 +811,353 @@ async def _run_timed_benchmark(
             pass
 
 
+async def _run_model_benchmark(
+    app,
+    websocket: WebSocket,
+    duration_seconds: int,
+    models_to_test: list[dict],
+    scenario_counts: dict | None = None,
+    seed: int | None = None,
+) -> None:
+    """
+    Runs an automated multi-checkpoint simulation benchmark exclusively in DQN AI mode.
+    Evaluates each requested model checkpoint under identical Common Random Numbers (CRN)
+    traffic conditions to measure policy evolution across training episodes.
+    """
+    TICK_DT = 0.1
+    TICK_SLEEP = 0.10
+
+    if not models_to_test or len(models_to_test) < 2:
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "code": "INVALID_MODELS",
+                "message": "At least 2 model checkpoints are required for a multi-model benchmark."
+            })
+        except Exception:
+            pass
+        return
+
+    results: dict = {}
+    prev_mode = getattr(app.state, "mode", "ai")
+
+    # Pause normal simulation loop
+    app.state.sim_running = False
+    app.state.benchmark_running = True
+    app.state.benchmark_cancelled = False
+    if getattr(app.state, "sim_task", None) is not None:
+        app.state.sim_task.cancel()
+        try:
+            await app.state.sim_task
+        except Exception:
+            pass
+    await asyncio.sleep(0.2)
+
+    import random
+    benchmark_seed = seed if seed is not None else random.randint(1, 1_000_000)
+    benchmark_id = f"bm_model_{benchmark_seed}_{int(time.time())}"
+
+    # Build unique keys and metadata for each model in sequence
+    resolved_models = []
+    for idx, m_spec in enumerate(models_to_test):
+        raw_id = str(m_spec.get("id") or f"model_{idx+1}")
+        ep_val = m_spec.get("episodes") or m_spec.get("version")
+        ep_num = int(ep_val) if ep_val and str(ep_val).isdigit() else 0
+        name = m_spec.get("name") or f"Model {ep_num}eps"
+        key = f"model_{ep_num}" if ep_num > 0 else f"model_{idx+1}"
+        if any(rm["key"] == key for rm in resolved_models):
+            key = f"{key}_{idx+1}"
+        resolved_models.append({
+            "key": key,
+            "raw_id": raw_id,
+            "episodes": ep_num,
+            "name": name,
+        })
+
+    try:
+        for model_idx, m_info in enumerate(resolved_models):
+            if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                break
+
+            m_key = m_info["key"]
+            m_raw_id = m_info["raw_id"]
+            m_target_ep = m_info["episodes"]
+            m_name = m_info["name"]
+
+            # Load selected agent checkpoint into sim_agent
+            clean_id, chosen_ep = await _load_agent_checkpoint(app, m_raw_id, m_target_ep)
+            app.state.active_model_id = clean_id
+            app.state.active_model_episode = chosen_ep
+            app.state.mode = "ai"
+
+            intersection = app.state.sim_intersection
+            intersection.reset()
+            phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
+            benchmark_forecaster = ArrivalForecaster()
+            agent = app.state.sim_agent
+
+            if scenario_counts:
+                intersection.inject_scenario(scenario_counts)
+                try:
+                    intersection.spawner.set_enabled(False)
+                except Exception:
+                    pass
+                spawned_count = sum(scenario_counts.values())
+            else:
+                try:
+                    intersection.spawner.set_seed(benchmark_seed)
+                    intersection.spawner.set_enabled(True)
+                except Exception:
+                    pass
+                spawned_count = 0
+
+            # Notify frontend that this model checkpoint is starting
+            try:
+                await websocket.send_json({
+                    "type": "benchmark_progress",
+                    "benchmark_type": "model_comparison",
+                    "current_mode": m_key,
+                    "current_model": m_name,
+                    "current_model_id": clean_id,
+                    "current_episode": chosen_ep,
+                    "mode_index": model_idx,
+                    "modes_total": len(resolved_models),
+                    "modes_done": list(results.keys()),
+                    "elapsed": 0.0,
+                    "duration_seconds": duration_seconds,
+                    "benchmark_seed": benchmark_seed,
+                    "spawned_count": 0,
+                    "passed_count": 0,
+                })
+            except Exception:
+                pass
+
+            sim_time = 0.0
+            tick_count = 0
+            safety_deadline = asyncio.get_event_loop().time() + max(duration_seconds * 3.0, 120.0)
+
+            while True:
+                if getattr(app.state, "benchmark_cancelled", False) or not getattr(app.state, "benchmark_running", True):
+                    break
+
+                now = asyncio.get_event_loop().time()
+                if sim_time >= float(duration_seconds) or now >= safety_deadline:
+                    break
+
+                tick_start = now
+                tick_count += 1
+                sim_time += TICK_DT
+
+                # DQN AI decision logic
+                signal = intersection.signal
+                benchmark_forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
+                obs = _build_obs_from_intersection(intersection, benchmark_forecaster)
+
+                action, _ = _select_ai_phase_action(
+                    signal=signal,
+                    intersection=intersection,
+                    agent=agent,
+                    obs=obs,
+                    phase_starvation=phase_starvation,
+                    dt=TICK_DT,
+                )
+                intersection.tick(dt=TICK_DT, action=action)
+
+                # Broadcast 3D simulation frame
+                frame = build_frame(
+                    intersection=intersection,
+                    mode="ai",
+                    episode=chosen_ep,
+                    simulation_id=f"bm-model-{chosen_ep}",
+                    agent=agent,
+                    last_reward=0.0,
+                    cumulative_reward=0.0,
+                    epsilon=0.0,
+                    last_action=action,
+                    was_exploring=False,
+                    obs=obs,
+                )
+                await manager.broadcast(frame.model_dump())
+
+                # Send progress updates every 5 ticks (~0.5s)
+                if tick_count % 5 == 0:
+                    mode_elapsed = min(float(duration_seconds), round(sim_time, 1))
+                    try:
+                        await websocket.send_json({
+                            "type": "benchmark_progress",
+                            "benchmark_type": "model_comparison",
+                            "current_mode": m_key,
+                            "current_model": m_name,
+                            "current_model_id": clean_id,
+                            "current_episode": chosen_ep,
+                            "mode_index": model_idx,
+                            "modes_total": len(resolved_models),
+                            "modes_done": list(results.keys()),
+                            "elapsed": mode_elapsed,
+                            "duration_seconds": duration_seconds,
+                            "benchmark_seed": benchmark_seed,
+                            "spawned_count": getattr(intersection, "_spawned_this_interval", 0),
+                            "passed_count": intersection.total_passed,
+                            "avg_wait": round(intersection.get_avg_wait_time(), 2),
+                        })
+                    except Exception:
+                        pass
+
+                elapsed = asyncio.get_event_loop().time() - tick_start
+                await asyncio.sleep(max(0.0, TICK_SLEEP - elapsed))
+
+            # Collect results for this model checkpoint
+            queue_lengths = intersection.get_queue_lengths()
+            final_time = float(duration_seconds)
+            results[m_key] = {
+                "key": m_key,
+                "label": m_name,
+                "model_id": clean_id,
+                "model_episode": chosen_ep,
+                "total_passed": intersection.total_passed,
+                "avg_wait_time": round(intersection.get_avg_wait_time(), 2),
+                "max_queue": max(queue_lengths.values(), default=0),
+                "duration_seconds": duration_seconds,
+                "clearance_time": final_time,
+            }
+
+            # Intermediate progress broadcast
+            try:
+                await websocket.send_json({
+                    "type": "benchmark_progress",
+                    "benchmark_type": "model_comparison",
+                    "current_mode": m_key,
+                    "current_model": m_name,
+                    "mode_index": model_idx,
+                    "completed_mode": m_key,
+                    "result": results[m_key],
+                    "modes_done": list(results.keys()),
+                    "modes_total": len(resolved_models),
+                    "elapsed": final_time,
+                    "duration_seconds": duration_seconds,
+                    "benchmark_seed": benchmark_seed,
+                    "spawned_count": getattr(intersection, "_spawned_this_interval", 0),
+                    "passed_count": intersection.total_passed,
+                })
+            except Exception:
+                pass
+
+        if not results:
+            return
+
+        # ── Winner Determination & Improvements vs Baseline ───────────────────
+        # Baseline model: lowest episode count
+        baseline_key = min(results.keys(), key=lambda k: results[k].get("model_episode", 0))
+        baseline_wait = results[baseline_key].get("avg_wait_time", 0.0)
+
+        improvements: dict = {}
+        for k, r in results.items():
+            if baseline_wait > 0:
+                imp = round(((baseline_wait - r["avg_wait_time"]) / baseline_wait) * 100.0, 1)
+                improvements[f"{k}_wait_pct"] = imp
+
+        # Winner: lowest avg wait time, highest throughput as tiebreaker
+        def _score_model_res(k):
+            r = results[k]
+            return (-r.get("avg_wait_time", 0.0), r.get("total_passed", 0))
+
+        winner_key = max(results.keys(), key=_score_model_res)
+        winner_data = results.get(winner_key, {})
+        winner_label = winner_data.get("label", winner_key)
+        winner_ep = winner_data.get("model_episode", 0)
+
+        # ── Auto-persist sessions for history and analytics ───────────────────
+        try:
+            sessions_dir = Path(SESSION_DIR)
+            sessions_dir.mkdir(parents=True, exist_ok=True)
+            for m_key, r_data in results.items():
+                sess_key = f"bench_model_{r_data.get('model_episode', 0)}_{int(time.time())}_{benchmark_seed % 1000}"
+                file_p = sessions_dir / f"{sess_key}.json"
+
+                payload = {
+                    "session_id": sess_key,
+                    "mode": "ai",
+                    "controller_type": f"DQN ({r_data.get('model_episode', 0)} eps)",
+                    "model_name": r_data.get("label"),
+                    "model_episodes": r_data.get("model_episode", 0),
+                    "throughput": r_data.get("total_passed", 0),
+                    "run_type": "benchmark",
+                    "benchmark_type": "model_comparison",
+                    "benchmark_id": benchmark_id,
+                    "benchmark_seed": benchmark_seed,
+                    "duration_seconds": duration_seconds,
+                    "winner": winner_key,
+                    "winner_label": winner_label,
+                    "winner_episode": winner_ep,
+                    "improvements": improvements,
+                    "benchmark_modes": list(results.keys()),
+                    "benchmark_results": results,
+                    "stats": {
+                        "session_id": sess_key,
+                        "mode": "ai",
+                        "model_name": r_data.get("label"),
+                        "model_episodes": r_data.get("model_episode", 0),
+                        "frame_count": int(duration_seconds * 10),
+                        "duration_s": float(duration_seconds),
+                        "avg_fps": 10.0,
+                        "total_detections": r_data.get("total_passed", 0),
+                        "throughput": r_data.get("total_passed", 0),
+                        "avg_wait_s": r_data.get("avg_wait_time", 0.0),
+                        "peak_queue": r_data.get("max_queue", 0),
+                    },
+                    "twin_data": {
+                        "session_id": sess_key,
+                        "total_frames_processed": int(duration_seconds * 10),
+                        "total_vehicles_detected": r_data.get("total_passed", 0),
+                        "video_duration_s": float(duration_seconds),
+                        "total_passed": r_data.get("total_passed", 0),
+                        "arrivals": [],
+                    },
+                    "frames": [],
+                }
+                with open(file_p, "w", encoding="utf-8") as bf:
+                    json.dump(payload, bf, indent=2)
+        except Exception as be:
+            logger.warning("Failed to auto-persist model benchmark session: %s", be)
+
+        # ── Final Broadcast ──────────────────────────────────────────────────
+        try:
+            await websocket.send_json({
+                "type": "benchmark_results",
+                "benchmark_type": "model_comparison",
+                "duration_seconds": duration_seconds,
+                "results": results,
+                "winner": winner_key,
+                "winner_label": winner_label,
+                "winner_episode": winner_ep,
+                "modes": list(results.keys()),
+                "improvements": improvements,
+                "benchmark_seed": benchmark_seed,
+                "benchmark_id": benchmark_id,
+                "models": resolved_models,
+            })
+        except Exception as e:
+            logger.warning("Failed to send model benchmark_results: %s", e)
+
+    except asyncio.CancelledError:
+        logger.info("Model benchmark cancelled by user")
+    except Exception as e:
+        logger.exception("Model benchmark error: %s", e)
+        try:
+            await websocket.send_json({"type": "error", "code": "MODEL_BENCHMARK_FAILED", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        app.state.mode = prev_mode
+        app.state.sim_running = False
+        app.state.benchmark_running = False
+        app.state.sim_intersection.reset()
+        try:
+            app.state.sim_intersection.spawner.set_seed(None)
+        except Exception:
+            pass
+
+
 # ─── Scenario Benchmark (Fixed + Greedy + AI) with Real-Time 3D Simulation ────
 
 def _generate_scenario_traffic(
@@ -1632,6 +1979,7 @@ VALID_COMMANDS = {
     "emergency_override", "manual_override",
     "run_timed_benchmark",
     "run_scenario_benchmark",
+    "run_model_benchmark",
 }
 
 COMMAND_SCHEMAS = {
@@ -1969,6 +2317,28 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     app.state.benchmark_task = asyncio.create_task(
                         _run_scenario_benchmark(app, websocket, _sc_id, _seed, _lambda, _dur, _model, _ep)
                     )
+
+            elif command == "run_model_benchmark":
+                duration_seconds = int(message.get("duration_seconds", 30))
+                models_to_test = message.get("models", [])
+                scenario_counts = message.get("scenario_counts", None)
+                seed = message.get("seed", None)
+                if seed is not None:
+                    try:
+                        seed = int(seed)
+                    except Exception:
+                        seed = None
+                duration_seconds = max(10, min(600, duration_seconds))
+                app.state.sim_running = False
+                app.state.benchmark_running = True
+                app.state.benchmark_cancelled = False
+                if getattr(app.state, "benchmark_task", None) is not None:
+                    app.state.benchmark_task.cancel()
+                app.state.benchmark_task = asyncio.create_task(
+                    _run_model_benchmark(
+                        app, websocket, duration_seconds, models_to_test, scenario_counts, seed
+                    )
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
