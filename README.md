@@ -21,8 +21,21 @@ FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and
 
 ---
 
+## Key Metrics at a Glance
+
+| Dimension | Quantifiable Metric |
+| :--- | :--- |
+| **Deploy payload (backend)** | ~2.5 GB CUDA bundle → **~192 MB CPU-only** (~13× smaller) via `torch==2.3.1+cpu` pin |
+| **Real-time telemetry** | **10 Hz** WebSocket streaming with 20-frame rolling sparkline history |
+| **Control problem** | **28-D** state vector → **4** signal phases across **12** turning movements |
+| **Fair evaluation** | **3** controllers (Fixed / Greedy / DQN AI) on locked-seed paired runs, DQN evaluated first |
+| **Learning efficiency** | PER buffer of **100k** transitions, batch **128**, $O(\log N)$ SumTree sampling |
+| **Network scale** | **4**-intersection 2×2 grid, **8** boundary demand portals, 3-mode benchmark runner |
+| **Quality gates** | Strict TypeScript (`tsc` clean), pytest suite spanning `api` / `rl` / `simulation` / `realworld` / analytics |
+
 ## Table of Contents
 
+- [Key Metrics at a Glance](#key-metrics-at-a-glance)
 - [1. Executive Overview \& System Engineering](#1-executive-overview--system-engineering)
   - [1.1 What We Are Doing](#11-what-we-are-doing)
   - [1.2 How We Are Doing It](#12-how-we-are-doing-it)
@@ -67,7 +80,8 @@ FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and
 - [9. Installation \& Environment Setup](#9-installation--environment-setup)
 - [10. REST \& WebSocket API Specifications](#10-rest--websocket-api-specifications)
 - [11. Empirical Benchmarks](#11-empirical-benchmarks)
-- [12. License](#12-license)
+- [12. Recent Engineering Updates](#12-recent-engineering-updates)
+- [13. License](#13-license)
 
 ---
 
@@ -927,8 +941,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd client
 
-# Install dependencies
-npm install
+# Install dependencies (pnpm — lockfile is enforced by CI/Vercel via --frozen-lockfile)
+pnpm install
 
 # Configure environment variables in client/.env.local
 cat <<EOF > .env.local
@@ -949,7 +963,7 @@ npx prisma db push
 npx prisma generate
 
 # Start Next.js development server
-npm run dev
+pnpm dev
 ```
 *Open `http://localhost:3000` to launch the platform.*
 
@@ -1046,6 +1060,55 @@ docker compose up --build -d
 
 ---
 
-## 12. License
+## 12. Recent Engineering Updates
+
+### 12.1 Fair, Audited Controller Showdowns (Sept 2026)
+
+**Problem.** Benchmark comparisons were confounded: the greedy controller leaked queue-priority behavior, fixed mode performed early phase-switching instead of true pre-timed control, a legacy VAT actuated mode added noise, and evaluation order biased outcomes.
+
+**Actions.**
+- DQN AI is now evaluated **first**, followed by Fixed and Greedy, across every benchmark runner.
+- Greedy audited to **pure max-queue prioritization with stable tie-breaking**.
+- Fixed mode restored to a **true pre-timed sequential timer** — no queue priority, no early switching.
+- Legacy VAT actuated mode **removed** from benchmark controllers.
+
+**Impact.** Apples-to-apples paired evaluations on identical locked seeds; leadership badges and Δ pills now reflect genuine policy merit rather than harness artifacts.
+
+---
+
+### 12.2 Benchmark Depth, Traceability & Operator Control
+
+- **Dynamic DQN checkpoint selection** across all benchmark modes, backed by a benchmark analytics aggregation API — any trained checkpoint can be evaluated against the baselines.
+- **1-click evaluation preset chips + reset-defaults**, scenario content hashing, queue-area / delay-distribution capture, and watchdog audit metadata on every run.
+- **Benchmark stop button with live countdown**, grouped run history in the history tab, and disambiguated repeated learning-curve runs.
+
+**Impact.** Experiments are reproducible (hashed scenarios, seeded runs), auditable (per-run metadata), and interruptible (operators can halt long benchmarks mid-flight without losing prior results).
+
+---
+
+### 12.3 Deployment & Supply-Chain Hardening
+
+**Problem.** Frontend deploys failed on Vercel (`ERR_PNPM_OUTDATED_LOCKFILE` — a `gsap` specifier had drifted from the lockfile under `--frozen-lockfile`). Backend Render builds resolved `torch>=2.0.0` to torch 2.14 plus the full CUDA toolkit (**~2.5 GB**: 554 MB torch + cuDNN/cuBLAS/NCCL/cuSPARSE/etc. on a CPU host) and then failed on a phantom hash mismatch from a stale, Render-persisted pip HTTP cache.
+
+**Actions.**
+- Regenerated and committed `pnpm-lock.yaml`; installs verified green under `--frozen-lockfile`.
+- Pinned `torch==2.3.1+cpu` / `torchvision==0.18.1+cpu` with the PyTorch CPU index baked into `server/requirements.txt`, so **any** plain `pip install -r` stays CPU-only (verified cp311 wheels: 190 MB + 1.6 MB).
+- Added `--no-cache-dir` to the Render build command (matching the existing `Dockerfile`), making installs hermetic and immune to cache poisoning.
+
+**Impact.** Backend build payload **~2.5 GB → ~192 MB (~13× smaller)**; reproducible builds on both Vercel and Render; no dependence on dashboard build-command ordering.
+
+---
+
+### 12.4 Operator UX Polish
+
+- Controller Benchmark panels: rich hover tooltips with best-performer highlighting, compact Δ pills with inline explainers, tabular-numeral leader cards.
+- Live telemetry cards: trend delta badges (direction-aware good/bad coloring), unit captions, sparklines with scale bars.
+- Simulation sidebar reorder (Controls → Reasoning → Analytics → Telemetry) with wrap-safe scenario headers and stacked controller cards.
+
+**Impact.** Operators read benchmark outcomes and live network state at a glance — no hovering required for the headline numbers, no ambiguity about which policy is winning.
+
+---
+
+## 13. License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more details.
