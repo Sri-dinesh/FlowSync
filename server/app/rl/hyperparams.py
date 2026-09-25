@@ -22,9 +22,9 @@ class HyperParams:
     BATCH_SIZE: int = 128         # larger batch for PER stability
 
     # ── Training schedule ─────────────────────────────────────────────────────
-    TRAIN_EVERY_N_STEPS: int = 2  # train every 2 steps for faster learning
-    MAX_STEPS_PER_EPISODE: int = 1000
-    DEFAULT_EPISODES: int = 1000
+    TRAIN_EVERY_N_STEPS: int = 4  # train every 4 steps for optimal learning & speed
+    MAX_STEPS_PER_EPISODE: int = 500
+    DEFAULT_EPISODES: int = 500
     TARGET_UPDATE_FREQ: int = 300
     CHECKPOINT_EVERY_N_EPISODES: int = 50
 

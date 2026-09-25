@@ -14,11 +14,13 @@ LOCAL_MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
 
 
 def _checkpoint_path(model_id: str, episode: int) -> str:
-    return f"models/{model_id}/checkpoint_{episode}.pt"
+    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
+    return f"models/{clean_id}/checkpoint_{episode}.pt"
 
 
 def _local_checkpoint_path(model_id: str, episode: int) -> Path:
-    return LOCAL_MODELS_DIR / model_id / f"checkpoint_{episode}.pt"
+    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
+    return LOCAL_MODELS_DIR / clean_id / f"checkpoint_{episode}.pt"
 
 
 def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> None:
@@ -68,7 +70,8 @@ def load_checkpoint(model_id: str, episode: int) -> Dict[str, Any]:
 
 
 def list_checkpoints(model_id: str) -> List[str]:
-    folder = f"models/{model_id}"
+    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
+    folder = f"models/{clean_id}"
     try:
         items = supabase_client.storage.from_(BUCKET_NAME).list(
             folder,
@@ -83,7 +86,7 @@ def list_checkpoints(model_id: str) -> List[str]:
     except Exception:
         pass
 
-    local_dir = LOCAL_MODELS_DIR / model_id
+    local_dir = LOCAL_MODELS_DIR / clean_id
     if not local_dir.exists():
         return []
 
@@ -213,9 +216,9 @@ def list_all_models() -> List[Dict[str, Any]]:
             continue
 
         completed_episodes = [max_ep]
-        # For the user's recent training run that completed both 200-ep and 500-ep models under 92cac...
-        if model_id == "92cac2a6-d06b-4bb7-bd01-3a3c42a7c113" and 200 in episodes_found and max_ep != 200:
-            completed_episodes.append(200)
+        for milestone in (2000, 1500, 1000, 500, 300, 200, 100):
+            if milestone in episodes_found and milestone not in completed_episodes:
+                completed_episodes.append(milestone)
 
         for ep in completed_episodes:
             key = f"{model_id}:{ep}"

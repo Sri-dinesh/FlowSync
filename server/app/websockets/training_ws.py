@@ -49,11 +49,7 @@ async def training_socket(websocket: WebSocket) -> None:
 
     # Send current status immediately on connect
     trainer = app.state.trainer
-    await websocket.send_json({
-        "is_training": trainer.is_training,
-        "current_episode": trainer.current_episode,
-        "epsilon": trainer.epsilon,
-    })
+    await websocket.send_json(trainer.get_status())
 
     try:
         while True:
@@ -63,7 +59,19 @@ async def training_socket(websocket: WebSocket) -> None:
             if command == "start_training":
                 num_episodes = int(message.get("num_episodes", 500))
                 simulation_id = message.get("simulation_id")
-                if not simulation_id:
+                resume_model_id = message.get("resume_model_id")
+                resume_episode = message.get("resume_episode")
+                if resume_episode is not None:
+                    try:
+                        resume_episode = int(resume_episode)
+                    except Exception:
+                        resume_episode = None
+
+                if resume_model_id and not simulation_id:
+                    base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
+                    simulation_id = base_id
+                    app.state.current_simulation_id = simulation_id
+                elif not simulation_id:
                     try:
                         simulation_id = await asyncio.to_thread(
                             supabase_service.create_simulation, "ai"
@@ -81,7 +89,12 @@ async def training_socket(websocket: WebSocket) -> None:
 
                 if not trainer.is_training:
                     task = asyncio.create_task(
-                        trainer.train(simulation_id or "", num_episodes)
+                        trainer.train(
+                            simulation_id or "",
+                            num_episodes,
+                            resume_model_id=resume_model_id,
+                            resume_episode=resume_episode,
+                        )
                     )
                     app.state.training_task = task
             elif command == "stop_training":

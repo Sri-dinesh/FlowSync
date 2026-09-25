@@ -39,9 +39,15 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
         return {"status": "already_training"}
 
     simulation_id = payload.simulation_id
+    resume_model_id = payload.resume_model_id
+    resume_episode = payload.resume_episode
 
-    # Always ensure each new training session gets a fresh simulation record
-    if not simulation_id:
+    # If resuming, reuse base model id as simulation_id so checkpoints stay organized
+    if resume_model_id and not simulation_id:
+        base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
+        simulation_id = base_id
+        app.state.current_simulation_id = simulation_id
+    elif not simulation_id:
         try:
             simulation_id = await asyncio.to_thread(
                 supabase_service.create_simulation, "ai"
@@ -62,10 +68,17 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
         trainer.train(
             num_episodes=payload.num_episodes,
             simulation_id=simulation_id,
+            resume_model_id=resume_model_id,
+            resume_episode=resume_episode,
         )
     )
 
-    return {"status": "started", "simulation_id": simulation_id}
+    return {
+        "status": "started",
+        "simulation_id": simulation_id,
+        "is_resumed": bool(resume_model_id),
+        "resume_model_id": resume_model_id,
+    }
 
 
 @router.post("/stop")

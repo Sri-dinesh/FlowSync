@@ -45,6 +45,10 @@ export interface TrainingMetric {
   is_training: boolean;
   steps?: number;
   buffer_ready?: boolean;
+  start_episode?: number;
+  target_episodes?: number;
+  is_resumed?: boolean;
+  resume_model_id?: string | null;
 }
 
 export interface EpisodeRecord {

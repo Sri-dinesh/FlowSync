@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus } from "lucide-react";
+import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus, RotateCcw, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import AIStatusBadge from "@/components/dashboard/AIStatusBadge";
@@ -145,7 +145,10 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const queryClient = useQueryClient();
 
   const [showConfig, setShowConfig] = useState(false);
+  const [trainingMode, setTrainingMode] = useState<"fresh" | "resume">("fresh");
   const [numEpisodes, setNumEpisodes] = useState(500);
+  const [additionalEpisodes, setAdditionalEpisodes] = useState(500);
+  const [resumeModelId, setResumeModelId] = useState<string>("");
   const [targetEpisodes, setTargetEpisodes] = useState<number | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -159,19 +162,47 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const currentEpisode = latest?.episode ?? 0;
   const recentMetrics = useMemo(() => trainingMetrics.slice(-40), [trainingMetrics]);
 
-  // Speed tracking
+  const isResumedRun = latest?.is_resumed ?? (latest?.start_episode ? latest.start_episode > 0 : false);
+  const sessionStartEp = latest?.start_episode ?? 0;
+  const effectiveTargetEpisodes = latest?.target_episodes ?? targetEpisodes;
+
+  const recentEpisodesRef = useRef<{ ep: number; t: number }[]>([]);
+
+  // Speed tracking with smooth rolling window
   useEffect(() => {
-    if (!isTraining) { startTimeRef.current = null; setTimeout(() => setEpsPerMin(0), 0); return; }
-    if (startTimeRef.current === null) startTimeRef.current = Date.now();
-    if (currentEpisode > 0 && startTimeRef.current) {
-      const mins = (Date.now() - startTimeRef.current) / 60_000;
-      setEpsPerMin(mins > 0 ? currentEpisode / mins : 0);
+    if (!isTraining) {
+      recentEpisodesRef.current = [];
+      startTimeRef.current = null;
+      setTimeout(() => setEpsPerMin(0), 0);
+      return;
     }
-  }, [currentEpisode, isTraining]);
+    if (startTimeRef.current === null) startTimeRef.current = Date.now();
+    if (currentEpisode > 0) {
+      const now = Date.now();
+      const history = recentEpisodesRef.current;
+      if (history.length === 0 || history[history.length - 1].ep !== currentEpisode) {
+        history.push({ ep: currentEpisode, t: now });
+      }
+      if (history.length > 10) history.shift();
+
+      if (history.length >= 2) {
+        const oldest = history[0];
+        const deltaEps = currentEpisode - oldest.ep;
+        const deltaMins = (now - oldest.t) / 60_000;
+        if (deltaEps > 0 && deltaMins > 0) {
+          setEpsPerMin(deltaEps / deltaMins);
+        }
+      } else if (startTimeRef.current) {
+        const sessionCompleted = isResumedRun ? Math.max(0, currentEpisode - sessionStartEp) : currentEpisode;
+        if (sessionCompleted > 0) {
+          const mins = (now - startTimeRef.current) / 60_000;
+          if (mins > 0) setEpsPerMin(sessionCompleted / mins);
+        }
+      }
+    }
+  }, [currentEpisode, isTraining, isResumedRun, sessionStartEp]);
 
   // Auto-refresh model list when a checkpoint is saved
-  // The trainer broadcasts { type: "checkpoint_saved" } over the training WS
-  // which lands in trainingMetrics — filter it out here
   useEffect(() => {
     const raw = trainingMetrics[trainingMetrics.length - 1] as unknown as Record<string, unknown> | null;
     if (raw && (raw as Record<string, unknown>).type === "checkpoint_saved") {
@@ -180,15 +211,19 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   }, [trainingMetrics, queryClient]);
 
   const progress = useMemo(() => {
-    if (!targetEpisodes) return 0;
-    return Math.min(1, currentEpisode / targetEpisodes);
-  }, [currentEpisode, targetEpisodes]);
+    if (!effectiveTargetEpisodes) return 0;
+    if (isResumedRun && effectiveTargetEpisodes > sessionStartEp) {
+      return Math.min(1, Math.max(0, (currentEpisode - sessionStartEp) / (effectiveTargetEpisodes - sessionStartEp)));
+    }
+    return Math.min(1, currentEpisode / effectiveTargetEpisodes);
+  }, [currentEpisode, effectiveTargetEpisodes, isResumedRun, sessionStartEp]);
 
   const eta = useMemo(() => {
-    if (!isTraining || !targetEpisodes || epsPerMin === 0) return null;
-    const mins = (targetEpisodes - currentEpisode) / epsPerMin;
+    if (!isTraining || !effectiveTargetEpisodes || epsPerMin === 0) return null;
+    const remaining = Math.max(0, effectiveTargetEpisodes - currentEpisode);
+    const mins = remaining / epsPerMin;
     return mins < 1 ? "<1 min" : `~${Math.round(mins)} min`;
-  }, [isTraining, targetEpisodes, currentEpisode, epsPerMin]);
+  }, [isTraining, effectiveTargetEpisodes, currentEpisode, epsPerMin]);
 
   const rewardHistory = recentMetrics.map((m) => m.total_reward);
   const waitHistory = recentMetrics.map((m) => m.avg_wait_time);
@@ -209,12 +244,57 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
     refetchInterval: 30_000,
   });
 
+  // Calculate resume metadata from selected model
+  const selectedResumeModel = useMemo(() => {
+    return models.find((m) => m.id === resumeModelId) ?? null;
+  }, [models, resumeModelId]);
+
+  const resumeBaseEpisode = useMemo(() => {
+    if (!selectedResumeModel) return 0;
+    const v = parseInt(selectedResumeModel.version, 10);
+    if (!isNaN(v) && v > 0) return v;
+    if (selectedResumeModel.episodes && selectedResumeModel.episodes > 0) {
+      return selectedResumeModel.episodes;
+    }
+    const match = selectedResumeModel.id.match(/:(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+    return 0;
+  }, [selectedResumeModel]);
+
+  const estimatedResumeEpsilon = useMemo(() => {
+    if (!resumeBaseEpisode) return 0.05;
+    return Math.max(0.05, 1.0 * Math.pow(0.994, resumeBaseEpisode));
+  }, [resumeBaseEpisode]);
+
   const startTraining = () => {
-    setTargetEpisodes(numEpisodes);
-    setTraining(true);
-    startTimeRef.current = Date.now();
-    sendCommand({ command: "start_training", num_episodes: numEpisodes, simulation_id: simulationId ?? undefined });
-    setShowConfig(false);
+    if (trainingMode === "resume") {
+      if (!resumeModelId || resumeModelId === "__none") {
+        setLoadError("Please select a checkpoint to resume training.");
+        return;
+      }
+      const totalTarget = resumeBaseEpisode + additionalEpisodes;
+      setTargetEpisodes(totalTarget);
+      setTraining(true);
+      startTimeRef.current = Date.now();
+      sendCommand({
+        command: "start_training",
+        num_episodes: additionalEpisodes,
+        resume_model_id: resumeModelId,
+        resume_episode: resumeBaseEpisode,
+        simulation_id: simulationId ?? undefined,
+      });
+      setShowConfig(false);
+    } else {
+      setTargetEpisodes(numEpisodes);
+      setTraining(true);
+      startTimeRef.current = Date.now();
+      sendCommand({
+        command: "start_training",
+        num_episodes: numEpisodes,
+        simulation_id: simulationId ?? undefined,
+      });
+      setShowConfig(false);
+    }
   };
 
   const stopTraining = () => {
@@ -253,7 +333,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
     <div className="flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <AIStatusBadge isTraining={isTraining} currentEpisode={currentEpisode} targetEpisodes={targetEpisodes} />
+        <AIStatusBadge isTraining={isTraining} currentEpisode={currentEpisode} targetEpisodes={effectiveTargetEpisodes} />
         {isTraining ? (
           <Button size="sm" variant="outline"
             className="border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
@@ -263,7 +343,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
         ) : (
           <Button size="sm" onClick={() => setShowConfig((p) => !p)}
             className="bg-blue-600 hover:bg-blue-700 text-white">
-            Train Agent
+            {showConfig ? "Close Config" : "Train Agent"}
           </Button>
         )}
       </div>
@@ -274,20 +354,205 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
-              <div>
-                <label className="block text-xs text-white/70 mb-1">Episodes</label>
-                <p className="text-[10px] text-white/35 mb-2">
-                  Each episode runs the intersection for up to 500 steps. More episodes = better agent, but takes longer.
-                </p>
-                <input type="number" min={1} max={2000}
-                  className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-                  value={numEpisodes}
-                  onChange={(e) => setNumEpisodes(Number(e.target.value))} />
+              {/* Mode Tabs */}
+              <div className="grid grid-cols-2 p-0.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTrainingMode("fresh")}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md font-medium transition-all ${
+                    trainingMode === "fresh"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Start Fresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrainingMode("resume");
+                    if (!resumeModelId && models.length > 0) {
+                      setResumeModelId(models[0].id);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md font-medium transition-all ${
+                    trainingMode === "resume"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Resume Checkpoint
+                </button>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={startTraining}>Start Training</Button>
-                <Button size="sm" variant="outline" onClick={() => setShowConfig(false)}>Cancel</Button>
-              </div>
+
+              {trainingMode === "fresh" ? (
+                /* Fresh Training Form */
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs text-white/80 font-medium">Number of Episodes</label>
+                      <span className="text-[10px] text-white/40">Default: 500</span>
+                    </div>
+                    <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                      Trains a new model starting from Episode 1. Uses teacher warm-start (greedy transitions) and decays exploration from ε=1.0 down to 0.05.
+                    </p>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      {[100, 300, 500, 1000].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setNumEpisodes(preset)}
+                          className={`px-2 py-1 rounded text-xs transition-colors ${
+                            numEpisodes === preset
+                              ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                              : "bg-white/5 text-white/60 hover:bg-white/10 border border-white/5"
+                          }`}
+                        >
+                          {preset} eps
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="number"
+                      min={10}
+                      max={3000}
+                      step={50}
+                      className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                      value={numEpisodes}
+                      onChange={(e) => setNumEpisodes(Math.max(1, Number(e.target.value)))}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={startTraining} className="bg-blue-600 hover:bg-blue-700 text-white flex-1">
+                      Start Fresh Training ({numEpisodes} eps)
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowConfig(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Resume Checkpoint Form */
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-white/80 font-medium mb-1">
+                      Select Checkpoint to Resume
+                    </label>
+                    <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                      Pick any existing model checkpoint. Resumes training with all learned weights, optimizer state, and continued exploration rate intact.
+                    </p>
+                    {models.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-white/15 bg-white/5 p-3 text-center">
+                        <p className="text-xs text-white/50 mb-2">No existing models available to resume.</p>
+                        <Button size="sm" variant="outline" onClick={() => setTrainingMode("fresh")} className="text-xs">
+                          Switch to Start Fresh
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select
+                        value={resumeModelId}
+                        onValueChange={(v) => setResumeModelId(v)}
+                      >
+                        <SelectTrigger className="w-full border-white/15 bg-black/40 text-white/90 hover:bg-black/50 transition-colors">
+                          <SelectValue placeholder="Choose a checkpoint to resume…" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[100] max-h-[220px] overflow-y-auto" sideOffset={5}>
+                          {models.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name} — ep {m.version}
+                              {m.source === "remote" ? " ☁ Supabase Cloud" : " 💾 Local"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {selectedResumeModel && (
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-white/80 font-medium">Additional Episodes to Train</label>
+                          <span className="text-[10px] text-violet-300 font-mono">+{additionalEpisodes} eps</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          {[100, 300, 500, 1000].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setAdditionalEpisodes(preset)}
+                              className={`px-2 py-1 rounded text-xs transition-colors ${
+                                additionalEpisodes === preset
+                                  ? "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                                  : "bg-white/5 text-white/60 hover:bg-white/10 border border-white/5"
+                              }`}
+                            >
+                              +{preset}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="number"
+                          min={10}
+                          max={2000}
+                          step={50}
+                          className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                          value={additionalEpisodes}
+                          onChange={(e) => setAdditionalEpisodes(Math.max(1, Number(e.target.value)))}
+                        />
+                      </div>
+
+                      {/* Trajectory & Continuity Card */}
+                      <div className="rounded-lg border border-violet-500/25 bg-violet-950/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/50">Trajectory Plan:</span>
+                          <span className="font-semibold text-violet-200">
+                            Ep {resumeBaseEpisode + 1} → {resumeBaseEpisode + additionalEpisodes}
+                            <span className="text-white/40 ml-1 font-normal">(+{additionalEpisodes} eps)</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/50">Exploration Continuity:</span>
+                          <span className="font-mono text-amber-300 font-medium">
+                            ε ≈ {estimatedResumeEpsilon.toFixed(3)}
+                            <span className="text-white/35 font-sans ml-1 text-[10px]">
+                              {estimatedResumeEpsilon <= 0.06 ? "(Exploiting policy)" : "(Refining policy)"}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="pt-1.5 border-t border-white/5 flex flex-wrap gap-1.5 text-[9px]">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                            ✓ Weights & Optimizer Preserved
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-sky-300">
+                            ✓ Warmup Skipped (Starts Instantly)
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                            ✓ Updates Same Model
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={startTraining}
+                          className="bg-violet-600 hover:bg-violet-700 text-white flex-1"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                          Resume Training (Ep {resumeBaseEpisode + 1} → {resumeBaseEpisode + additionalEpisodes})
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowConfig(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -311,12 +576,17 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
               {/* Episode + speed + ETA */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Brain className="h-3.5 w-3.5 text-violet-400" />
                   <span className="text-xs font-medium text-white">
                     Episode <span className="text-violet-300 font-bold">{currentEpisode}</span>
-                    <span className="text-white/35"> / {targetEpisodes ?? "—"}</span>
+                    <span className="text-white/35"> / {effectiveTargetEpisodes ?? "—"}</span>
                   </span>
+                  {isResumedRun && sessionStartEp > 0 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                      Resumed from ep {sessionStartEp}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-white/40">
                   {epsPerMin > 0 && (
@@ -397,7 +667,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               )}
 
               {/* Checkpoint notice */}
-              {targetEpisodes && (
+              {effectiveTargetEpisodes && (
                 <div className="text-[9px] text-white/25 flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3 text-white/20" />
                   Checkpoint saved every 50 episodes and at completion
@@ -406,7 +676,12 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
               {/* Status */}
               {isTraining ? (
-                latest?.buffer_ready === false ? (
+                isResumedRun ? (
+                  <div className="flex items-center gap-1.5 text-[10px] text-violet-300">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+                    Resumed Training{latest?.steps ? ` — ${latest.steps} steps/ep` : " — continuing policy weights"}
+                  </div>
+                ) : latest?.buffer_ready === false ? (
                   <div className="flex items-center gap-1.5 text-[10px] text-amber-400/80">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
                     Warming up replay buffer… ({latest?.steps ?? 0} steps)
@@ -421,6 +696,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                 <div className="flex items-center gap-1.5 text-[10px] text-white/30">
                   <CheckCircle2 className="h-3 w-3" />
                   Complete — {currentEpisode} episode{currentEpisode !== 1 ? "s" : ""} trained
+                  {isResumedRun && sessionStartEp > 0 ? ` (+${Math.max(0, currentEpisode - sessionStartEp)} this run)` : ""}
                 </div>
               ) : null}
             </div>
@@ -455,6 +731,25 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
             )}
           </SelectContent>
         </Select>
+
+        {/* Quick Shortcut: Resume Training This Model */}
+        {selectedModelId && selectedModelId !== "__none" && !isTraining && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full mt-1.5 border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 text-xs flex items-center justify-center gap-1.5 transition-all"
+            onClick={() => {
+              setTrainingMode("resume");
+              setResumeModelId(selectedModelId);
+              setShowConfig(true);
+            }}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Resume Training This Checkpoint
+          </Button>
+        )}
+
         {isLoadingModel && (
           <div className="flex items-center gap-2 text-xs text-white/60">
             <Loader2 className="h-4 w-4 animate-spin" />

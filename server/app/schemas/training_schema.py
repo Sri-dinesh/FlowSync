@@ -16,3 +16,7 @@ class TrainingMetric(BaseModel):
 class StartTrainingRequest(BaseModel):
     num_episodes: int = 500
     simulation_id: Optional[str] = None
+    resume_model_id: Optional[str] = None
+    resume_episode: Optional[int] = None
+
+    model_config = {"protected_namespaces": ()}
