@@ -133,4 +133,80 @@ async def test_start_training_endpoint_with_finetuning():
             finetune_scenario="rush_hour",
             finetune_lr=1e-4,
             finetune_epsilon=0.25,
+            custom_profile=None,
         )
+
+
+@pytest.mark.anyio
+async def test_start_training_endpoint_with_custom_finetuning():
+    """Verify /training/start in finetune mode with custom user-defined traffic profile."""
+    mock_trainer = MagicMock()
+    mock_trainer.is_training = False
+    mock_trainer.train = AsyncMock()
+    app.state.trainer = mock_trainer
+    app.state.training_task = None
+
+    base_model = "089035ea-3b87-4279-8230-00f1c4f10457"
+    custom_profile_data = {
+        "name": "Stadium Rush",
+        "directional_weights": {"north": 2.5, "south": 0.5, "east": 0.5, "west": 0.5},
+        "turn_probs": [0.7, 0.2, 0.1],
+        "base_lambda": 1.2,
+        "lambda_multiplier": 1.3,
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post(
+            "/training/start",
+            json={
+                "mode": "finetune",
+                "num_episodes": 75,
+                "resume_model_id": f"{base_model}:500",
+                "resume_episode": 500,
+                "finetune_scenario": "custom",
+                "finetune_lr": 8e-5,
+                "finetune_epsilon": 0.20,
+                "custom_profile": custom_profile_data,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "started"
+        assert data["mode"] == "finetune"
+        assert data["is_finetuned"] is True
+        assert data["scenario"] == "Stadium Rush"
+        expected_sim_id = f"{base_model}-ft-custom_stadium_rush"
+        assert data["simulation_id"] == expected_sim_id
+
+        mock_trainer.train.assert_called_once_with(
+            num_episodes=75,
+            simulation_id=expected_sim_id,
+            resume_model_id=f"{base_model}:500",
+            resume_episode=500,
+            is_finetune=True,
+            finetune_scenario="custom",
+            finetune_lr=8e-5,
+            finetune_epsilon=0.20,
+            custom_profile=custom_profile_data,
+        )
+
+
+def test_spawner_custom_dict_profile():
+    """Verify PoissonSpawner instantiates and applies a dictionary custom traffic profile."""
+    spawner = PoissonSpawner(lambda_rate=0.5)
+    custom_dict = {
+        "id": "custom",
+        "name": "Arterial Split",
+        "directional_weights": {"north": 0.2, "south": 0.2, "east": 2.0, "west": 2.0},
+        "turn_probs": [0.6, 0.2, 0.2],
+        "base_lambda": 0.8,
+        "lambda_multiplier": 1.1,
+    }
+    spawner.set_profile(custom_dict)
+    assert spawner.profile is not None
+    assert spawner.profile.name == "Arterial Split"
+    assert spawner.profile.directional_weights["east"] == 2.0
+    assert spawner.profile.turn_probs == [0.6, 0.2, 0.2]
+    assert spawner.lambda_rate == 0.8
+

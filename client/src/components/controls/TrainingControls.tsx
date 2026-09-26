@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus, RotateCcw, Sparkles } from "lucide-react";
+import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus, RotateCcw, Sparkles, Sliders, Settings2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import AIStatusBadge from "@/components/dashboard/AIStatusBadge";
@@ -35,6 +35,10 @@ const SCENARIO_PRESETS = [
     tag: "80% NS Surge",
     description: "North-South commuter corridor surge (80% NS volume, 20% EW cross streets). Teaches asymmetric priority.",
     icon: "🚗",
+    defaultDirWeights: { north: 1.8, south: 1.8, east: 0.4, west: 0.4 },
+    defaultTurnProbs: { straight: 60, left: 20, right: 20 },
+    defaultLambda: 0.85,
+    defaultMult: 1.2,
   },
   {
     id: "heavy_left",
@@ -42,6 +46,10 @@ const SCENARIO_PRESETS = [
     tag: "50% Lefts",
     description: "50% left turns across all approaches. Forces the agent to specialize in Phase 2 & 3 protected arrows.",
     icon: "↩️",
+    defaultDirWeights: { north: 1.0, south: 1.0, east: 1.0, west: 1.0 },
+    defaultTurnProbs: { straight: 30, left: 50, right: 20 },
+    defaultLambda: 0.75,
+    defaultMult: 1.0,
   },
   {
     id: "arterial_surge",
@@ -49,6 +57,10 @@ const SCENARIO_PRESETS = [
     tag: "EW Speed Corridor",
     description: "High-speed East-West main thoroughfare with light feeder arrivals. Maximizes green waves.",
     icon: "⚡",
+    defaultDirWeights: { north: 0.35, south: 0.35, east: 1.9, west: 1.9 },
+    defaultTurnProbs: { straight: 70, left: 15, right: 15 },
+    defaultLambda: 0.90,
+    defaultMult: 1.15,
   },
   {
     id: "platoon_burst",
@@ -56,6 +68,21 @@ const SCENARIO_PRESETS = [
     tag: "Near-Gridlock",
     description: "Dense platooned arrival bursts across all approaches demanding quick queue clearance.",
     icon: "🛑",
+    defaultDirWeights: { north: 1.25, south: 1.25, east: 1.25, west: 1.25 },
+    defaultTurnProbs: { straight: 50, left: 25, right: 25 },
+    defaultLambda: 1.25,
+    defaultMult: 1.3,
+  },
+  {
+    id: "custom",
+    name: "Custom Parameters",
+    tag: "Manual Customizer",
+    description: "Configure custom directional volumes, turning probabilities, and arrival rates tailored to any geometry.",
+    icon: "🎛️",
+    defaultDirWeights: { north: 1.5, south: 1.5, east: 0.5, west: 0.5 },
+    defaultTurnProbs: { straight: 50, left: 30, right: 20 },
+    defaultLambda: 0.8,
+    defaultMult: 1.1,
   },
 ];
 
@@ -212,6 +239,22 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const [finetuneLr, setFinetuneLr] = useState<number>(0.0001);
   const [finetuneEpsilon, setFinetuneEpsilon] = useState<number>(0.25);
 
+  // Manual custom profile parameters
+  const [customName, setCustomName] = useState("Custom Corridor");
+  const [customDirWeights, setCustomDirWeights] = useState({
+    north: 1.5,
+    south: 1.5,
+    east: 0.5,
+    west: 0.5,
+  });
+  const [customTurnProbs, setCustomTurnProbs] = useState({
+    straight: 50,
+    left: 30,
+    right: 20,
+  });
+  const [customBaseLambda, setCustomBaseLambda] = useState(0.8);
+  const [customLambdaMult, setCustomLambdaMult] = useState(1.1);
+
   const [targetEpisodes, setTargetEpisodes] = useState<number | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -356,6 +399,24 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
       setTargetEpisodes(finetuneEpisodes);
       setTraining(true);
       startTimeRef.current = Date.now();
+
+      const isCustom = finetuneScenario === "custom";
+      const customProfilePayload = isCustom
+        ? {
+            id: "custom",
+            name: customName.trim() || "Custom Corridor",
+            description: `Custom traffic (${customTurnProbs.straight}% straight, ${customTurnProbs.left}% left, ${customTurnProbs.right}% right).`,
+            directional_weights: customDirWeights,
+            turn_probs: [
+              customTurnProbs.straight / 100,
+              customTurnProbs.left / 100,
+              customTurnProbs.right / 100,
+            ],
+            base_lambda: customBaseLambda,
+            lambda_multiplier: customLambdaMult,
+          }
+        : undefined;
+
       sendCommand({
         command: "start_training",
         mode: "finetune",
@@ -365,6 +426,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
         finetune_scenario: finetuneScenario,
         finetune_lr: finetuneLr,
         finetune_epsilon: finetuneEpsilon,
+        custom_profile: customProfilePayload,
         simulation_id: simulationId ?? undefined,
       });
       setShowConfig(false);
@@ -719,19 +781,30 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                           </label>
                           <span className="text-[10px] text-amber-400/80 font-medium">Specialized Regime</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {SCENARIO_PRESETS.map((preset) => {
                             const isSelected = finetuneScenario === preset.id;
                             return (
                               <button
                                 key={preset.id}
                                 type="button"
-                                onClick={() => setFinetuneScenario(preset.id)}
+                                onClick={() => {
+                                  setFinetuneScenario(preset.id);
+                                  if (preset.id === "custom") {
+                                    setCustomName("Custom Corridor");
+                                  } else {
+                                    setCustomName(preset.name);
+                                    setCustomDirWeights({ ...preset.defaultDirWeights });
+                                    setCustomTurnProbs({ ...preset.defaultTurnProbs });
+                                    setCustomBaseLambda(preset.defaultLambda);
+                                    setCustomLambdaMult(preset.defaultMult);
+                                  }
+                                }}
                                 className={`text-left p-2.5 rounded-lg border transition-all relative overflow-hidden ${
                                   isSelected
                                     ? "border-amber-500 bg-amber-950/40 shadow-sm shadow-amber-500/10"
                                     : "border-white/10 bg-black/30 hover:border-white/20 hover:bg-black/40"
-                                }`}
+                                } ${preset.id === "custom" ? "col-span-2 sm:col-span-1" : ""}`}
                               >
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-xs font-semibold text-white flex items-center gap-1.5">
@@ -752,6 +825,255 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                           })}
                         </div>
                       </div>
+
+                      {/* Manual Customization Panel (shown when Custom Parameters selected) */}
+                      {finetuneScenario === "custom" && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3.5 space-y-3 shadow-inner">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-200">
+                              <Sliders className="h-3.5 w-3.5 text-amber-400" />
+                              Manual Parameter Customizer
+                            </div>
+                            <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">
+                              User Defined Geometry
+                            </span>
+                          </div>
+
+                          {/* Quick baseline prefill buttons */}
+                          <div className="flex flex-wrap items-center gap-1 text-[10px] bg-black/30 p-2 rounded-lg border border-white/5">
+                            <span className="text-white/40 mr-1 text-[10px]">Start from preset:</span>
+                            {SCENARIO_PRESETS.filter((p) => p.id !== "custom").map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setCustomName(p.name);
+                                  setCustomDirWeights({ ...p.defaultDirWeights });
+                                  setCustomTurnProbs({ ...p.defaultTurnProbs });
+                                  setCustomBaseLambda(p.defaultLambda);
+                                  setCustomLambdaMult(p.defaultMult);
+                                }}
+                                className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-colors text-[10px] flex items-center gap-1"
+                              >
+                                <span>{p.icon}</span>
+                                <span>{p.name}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Custom Scenario Name */}
+                          <div>
+                            <label className="text-[10px] text-white/70 block mb-1 font-medium">
+                              Custom Scenario Name
+                            </label>
+                            <input
+                              type="text"
+                              value={customName}
+                              onChange={(e) => setCustomName(e.target.value)}
+                              placeholder="e.g. Airport Highway Surge, Stadium Exit"
+                              className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Directional Traffic Weights */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-[10px] text-white/70 font-medium">
+                                Directional Flow Multipliers
+                              </label>
+                              <span className="text-[9px] text-white/40">Relative arrival volume</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {(["north", "south", "east", "west"] as const).map((dir) => {
+                                const totalW =
+                                  customDirWeights.north +
+                                    customDirWeights.south +
+                                    customDirWeights.east +
+                                    customDirWeights.west || 1;
+                                const pct = Math.round((customDirWeights[dir] / totalW) * 100);
+                                return (
+                                  <div
+                                    key={dir}
+                                    className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1"
+                                  >
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="capitalize font-semibold text-white/80">{dir}</span>
+                                      <span className="font-mono text-amber-300 font-bold">
+                                        {customDirWeights[dir].toFixed(1)}x
+                                      </span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={0.1}
+                                      max={3.0}
+                                      step={0.1}
+                                      value={customDirWeights[dir]}
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        setCustomDirWeights((prev) => ({ ...prev, [dir]: val }));
+                                      }}
+                                      className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                                    />
+                                    <div className="text-[9px] text-white/40 text-right font-mono">
+                                      {pct}% flow
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Turning Movement Distribution */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-[10px] text-white/70 font-medium">
+                                Turning Probabilities (%)
+                              </label>
+                              <span className="text-[10px] text-amber-300 font-mono">
+                                Total: {customTurnProbs.straight + customTurnProbs.left + customTurnProbs.right}%
+                              </span>
+                            </div>
+
+                            {/* Visual stacked distribution bar */}
+                            <div className="h-2 rounded-full overflow-hidden flex w-full mb-2 bg-neutral-800 border border-white/10">
+                              <div
+                                style={{
+                                  width: `${Math.max(
+                                    0,
+                                    (customTurnProbs.straight /
+                                      (customTurnProbs.straight +
+                                        customTurnProbs.left +
+                                        customTurnProbs.right || 1)) *
+                                      100
+                                  )}%`,
+                                }}
+                                className="bg-emerald-500 h-full transition-all"
+                              />
+                              <div
+                                style={{
+                                  width: `${Math.max(
+                                    0,
+                                    (customTurnProbs.left /
+                                      (customTurnProbs.straight +
+                                        customTurnProbs.left +
+                                        customTurnProbs.right || 1)) *
+                                      100
+                                  )}%`,
+                                }}
+                                className="bg-amber-500 h-full transition-all"
+                              />
+                              <div
+                                style={{
+                                  width: `${Math.max(
+                                    0,
+                                    (customTurnProbs.right /
+                                      (customTurnProbs.straight +
+                                        customTurnProbs.left +
+                                        customTurnProbs.right || 1)) *
+                                      100
+                                  )}%`,
+                                }}
+                                className="bg-sky-500 h-full transition-all"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-emerald-300 font-medium">Straight</span>
+                                  <span className="font-mono text-white/80 font-bold">{customTurnProbs.straight}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={customTurnProbs.straight}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    setCustomTurnProbs((p) => ({ ...p, straight: v }));
+                                  }}
+                                  className="w-full accent-emerald-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                                />
+                              </div>
+                              <div className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-amber-300 font-medium">Left Turn</span>
+                                  <span className="font-mono text-white/80 font-bold">{customTurnProbs.left}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={customTurnProbs.left}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    setCustomTurnProbs((p) => ({ ...p, left: v }));
+                                  }}
+                                  className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                                />
+                              </div>
+                              <div className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-sky-300 font-medium">Right Turn</span>
+                                  <span className="font-mono text-white/80 font-bold">{customTurnProbs.right}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={customTurnProbs.right}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    setCustomTurnProbs((p) => ({ ...p, right: v }));
+                                  }}
+                                  className="w-full accent-sky-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Arrival Rates & Intensity */}
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+                            <div className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-white/70">Base Arrival Rate (λ)</span>
+                                <span className="font-mono text-amber-300 font-bold">
+                                  {customBaseLambda.toFixed(2)} veh/s
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0.2}
+                                max={2.0}
+                                step={0.05}
+                                value={customBaseLambda}
+                                onChange={(e) => setCustomBaseLambda(parseFloat(e.target.value))}
+                                className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                              />
+                            </div>
+                            <div className="p-2 rounded-lg bg-black/40 border border-white/5 space-y-1">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-white/70">Surge Multiplier</span>
+                                <span className="font-mono text-amber-300 font-bold">
+                                  {customLambdaMult.toFixed(2)}x
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min={0.8}
+                                max={2.0}
+                                step={0.05}
+                                value={customLambdaMult}
+                                onChange={(e) => setCustomLambdaMult(parseFloat(e.target.value))}
+                                className="w-full accent-amber-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Fine-Tuning Duration */}
                       <div>
@@ -794,19 +1116,55 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                         <div className="p-2.5 rounded-lg border border-white/10 bg-black/30 space-y-1">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] text-white/70 font-medium">Learning Rate (α)</label>
-                            <span className="text-[10px] text-amber-300 font-mono font-bold">1e-4</span>
+                            <span className="text-[10px] text-amber-300 font-mono font-bold">
+                              {finetuneLr.toExponential(1)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 pt-0.5">
+                            {[0.00005, 0.0001, 0.0002].map((lr) => (
+                              <button
+                                key={lr}
+                                type="button"
+                                onClick={() => setFinetuneLr(lr)}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                                  finetuneLr === lr
+                                    ? "bg-amber-500/30 text-amber-200 border border-amber-500/50"
+                                    : "bg-white/5 text-white/50 hover:bg-white/10"
+                                }`}
+                              >
+                                {lr.toExponential(0)}
+                              </button>
+                            ))}
                           </div>
                           <p className="text-[9px] text-white/40 leading-snug">
-                            10x lower than fresh training to prevent catastrophic forgetting.
+                            Conservative rate prevents catastrophic forgetting.
                           </p>
                         </div>
                         <div className="p-2.5 rounded-lg border border-white/10 bg-black/30 space-y-1">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] text-white/70 font-medium">Exploration Reset (ε)</label>
-                            <span className="text-[10px] text-amber-300 font-mono font-bold">0.25 → 0.05</span>
+                            <span className="text-[10px] text-amber-300 font-mono font-bold">
+                              {finetuneEpsilon.toFixed(2)} → 0.05
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 pt-0.5">
+                            {[0.15, 0.25, 0.35].map((eps) => (
+                              <button
+                                key={eps}
+                                type="button"
+                                onClick={() => setFinetuneEpsilon(eps)}
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition-colors ${
+                                  finetuneEpsilon === eps
+                                    ? "bg-amber-500/30 text-amber-200 border border-amber-500/50"
+                                    : "bg-white/5 text-white/50 hover:bg-white/10"
+                                }`}
+                              >
+                                {eps.toFixed(2)}
+                              </button>
+                            ))}
                           </div>
                           <p className="text-[9px] text-white/40 leading-snug">
-                            Warm 25% exploration reset to discover new scenario actions.
+                            Exploration reset discovers new scenario actions.
                           </p>
                         </div>
                       </div>
@@ -816,7 +1174,10 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-white/50">Branched Target:</span>
                           <span className="font-semibold text-amber-200 font-mono text-[11px]">
-                            {selectedFinetuneModel.id.slice(0, 10)}...-ft-{finetuneScenario}
+                            {selectedFinetuneModel.id.slice(0, 10)}...-ft-
+                            {finetuneScenario === "custom"
+                              ? customName.toLowerCase().trim().replace(/[\s\-]+/g, "_") || "custom"
+                              : finetuneScenario}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">

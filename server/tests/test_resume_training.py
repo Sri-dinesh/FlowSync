@@ -123,4 +123,5 @@ async def test_start_training_endpoint_with_resume():
             finetune_scenario="rush_hour",
             finetune_lr=1e-4,
             finetune_epsilon=0.25,
+            custom_profile=None,
         )

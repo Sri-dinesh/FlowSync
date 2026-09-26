@@ -64,11 +64,16 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
     resume_episode = payload.resume_episode
     is_finetune = payload.mode == "finetune"
     finetune_scenario = payload.finetune_scenario or "rush_hour"
+    custom_profile = payload.custom_profile
 
     if is_finetune:
         # Fine-tuning forks from the base model checkpoint into a new scenario-specific model ID
         base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
-        scenario_slug = finetune_scenario.lower().replace(" ", "_")
+        if finetune_scenario == "custom" and custom_profile and custom_profile.get("name"):
+            custom_slug = custom_profile["name"].lower().strip().replace(" ", "_")[:20]
+            scenario_slug = f"custom_{custom_slug}"
+        else:
+            scenario_slug = finetune_scenario.lower().replace(" ", "_")
         simulation_id = f"{base_id}-ft-{scenario_slug}"
         app.state.current_simulation_id = simulation_id
     elif resume_model_id and not simulation_id:
@@ -103,6 +108,7 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
             finetune_scenario=finetune_scenario,
             finetune_lr=payload.finetune_lr or 1e-4,
             finetune_epsilon=payload.finetune_epsilon or 0.25,
+            custom_profile=custom_profile,
         )
     )
 
@@ -112,7 +118,11 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
         "mode": payload.mode,
         "is_resumed": bool(resume_model_id) and not is_finetune,
         "is_finetuned": is_finetune,
-        "scenario": finetune_scenario if is_finetune else None,
+        "scenario": (
+            custom_profile.get("name", "Custom")
+            if finetune_scenario == "custom" and custom_profile
+            else (finetune_scenario if is_finetune else None)
+        ),
         "resume_model_id": resume_model_id,
     }
 

@@ -65,6 +65,7 @@ async def training_socket(websocket: WebSocket) -> None:
                 finetune_scenario = message.get("finetune_scenario", "rush_hour")
                 finetune_lr = float(message.get("finetune_lr", 1e-4))
                 finetune_epsilon = float(message.get("finetune_epsilon", 0.25))
+                custom_profile = message.get("custom_profile")
 
                 if resume_episode is not None:
                     try:
@@ -74,7 +75,11 @@ async def training_socket(websocket: WebSocket) -> None:
 
                 if is_finetune:
                     base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
-                    scenario_slug = finetune_scenario.lower().replace(" ", "_")
+                    if finetune_scenario == "custom" and custom_profile and custom_profile.get("name"):
+                        custom_slug = custom_profile["name"].lower().strip().replace(" ", "_")[:20]
+                        scenario_slug = f"custom_{custom_slug}"
+                    else:
+                        scenario_slug = finetune_scenario.lower().replace(" ", "_")
                     simulation_id = f"{base_id}-ft-{scenario_slug}"
                     app.state.current_simulation_id = simulation_id
                 elif resume_model_id and not simulation_id:
@@ -108,6 +113,7 @@ async def training_socket(websocket: WebSocket) -> None:
                             finetune_scenario=finetune_scenario,
                             finetune_lr=finetune_lr,
                             finetune_epsilon=finetune_epsilon,
+                            custom_profile=custom_profile,
                         )
                     )
                     app.state.training_task = task

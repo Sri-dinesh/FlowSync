@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
@@ -22,5 +22,6 @@ class StartTrainingRequest(BaseModel):
     finetune_scenario: Optional[str] = "rush_hour"
     finetune_lr: Optional[float] = 1e-4
     finetune_epsilon: Optional[float] = 0.25
+    custom_profile: Optional[Dict[str, Any]] = None
 
     model_config = {"protected_namespaces": ()}

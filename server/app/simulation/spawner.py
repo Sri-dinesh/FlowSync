@@ -84,11 +84,35 @@ class PoissonSpawner:
         self.lambda_rate = max(0.0, lambda_rate)
 
     def set_profile(self, profile: Any) -> None:
-        """Assign a traffic profile (either a TrafficProfile object or preset name key)."""
+        """Assign a traffic profile (either a TrafficProfile object, dict, or preset name key)."""
         if isinstance(profile, str):
             self.profile = SCENARIO_PROFILES.get(profile, SCENARIO_PROFILES["uniform"])
         elif isinstance(profile, TrafficProfile):
             self.profile = profile
+        elif isinstance(profile, dict):
+            d_weights = profile.get("directional_weights") or {"north": 1.0, "south": 1.0, "east": 1.0, "west": 1.0}
+            t_probs = profile.get("turn_probs") or [0.5, 0.25, 0.25]
+            # Ensure turn_probs sums to 1.0
+            prob_sum = sum(t_probs)
+            if prob_sum > 0:
+                t_probs = [float(p) / prob_sum for p in t_probs]
+            else:
+                t_probs = [0.5, 0.25, 0.25]
+
+            self.profile = TrafficProfile(
+                id=str(profile.get("id", "custom")),
+                name=str(profile.get("name", "Custom Profile")),
+                description=str(profile.get("description", "Custom user-defined traffic distribution.")),
+                directional_weights={
+                    "north": float(d_weights.get("north", 1.0)),
+                    "south": float(d_weights.get("south", 1.0)),
+                    "east": float(d_weights.get("east", 1.0)),
+                    "west": float(d_weights.get("west", 1.0)),
+                },
+                turn_probs=t_probs,
+                base_lambda=float(profile.get("base_lambda", 0.6)),
+                lambda_multiplier=float(profile.get("lambda_multiplier", 1.0)),
+            )
         else:
             self.profile = None
 

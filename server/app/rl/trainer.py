@@ -83,12 +83,14 @@ class Trainer:
         finetune_scenario: str = "rush_hour",
         finetune_lr: float = 1e-4,
         finetune_epsilon: float = 0.25,
+        custom_profile: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.is_training = True
         self.is_finetune = is_finetune
         self.finetune_scenario = finetune_scenario
         self.finetune_lr = finetune_lr
         self.finetune_epsilon = finetune_epsilon
+        self.custom_profile = custom_profile
         self.is_resumed = bool(resume_model_id) and not is_finetune
         self.resume_model_id = resume_model_id
         self.parent_model_id = None
@@ -97,7 +99,10 @@ class Trainer:
 
         profile = None
         if self.is_finetune:
-            profile = SCENARIO_PROFILES.get(finetune_scenario, SCENARIO_PROFILES["rush_hour"])
+            if finetune_scenario == "custom" and custom_profile:
+                profile = custom_profile
+            else:
+                profile = SCENARIO_PROFILES.get(finetune_scenario, SCENARIO_PROFILES["rush_hour"])
 
         # ── Checkpoint & Resume / Fine-Tune Loading ─────────────────────────
         start_episode = 0
@@ -432,6 +437,12 @@ class Trainer:
 
             is_last_episode = episode_index == num_episodes - 1
 
+            effective_scenario = (
+                self.custom_profile.get("name", "Custom")
+                if self.is_finetune and self.finetune_scenario == "custom" and self.custom_profile
+                else self.finetune_scenario
+            )
+
             # ── Broadcast episode metrics ────────────────────────────────────
             await self.ws_broadcast_fn(
                 {
@@ -441,7 +452,7 @@ class Trainer:
                     "is_resumed":              self.is_resumed,
                     "resume_model_id":         self.resume_model_id,
                     "is_finetuned":            self.is_finetune,
-                    "finetune_scenario":       self.finetune_scenario,
+                    "finetune_scenario":       effective_scenario,
                     "parent_model_id":         self.parent_model_id,
                     "parent_episode":          self.parent_episode,
                     "total_reward":            total_reward,
@@ -499,7 +510,9 @@ class Trainer:
                     chk_state["is_finetuned"] = True
                     chk_state["parent_model_id"] = self.parent_model_id
                     chk_state["parent_episode"] = self.parent_episode
-                    chk_state["scenario"] = self.finetune_scenario
+                    chk_state["scenario"] = effective_scenario
+                    if self.custom_profile:
+                        chk_state["custom_profile"] = self.custom_profile
 
                 await asyncio.to_thread(
                     self.model_service.save_checkpoint,
