@@ -208,7 +208,7 @@ export default function DashboardPage() {
                     : "text-white/50 hover:text-white"
                 }`}
               >
-                Archives
+                History
               </button>
             </div>
 

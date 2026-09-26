@@ -256,6 +256,20 @@ def _parse_checkpoint_ep(path: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def _detect_finetune_info(model_identifier: str | None) -> tuple[bool, str | None]:
+    """Detect whether a model checkpoint is fine-tuned and extract its scenario slug."""
+    if not model_identifier:
+        return False, None
+    raw = str(model_identifier)
+    if "-ft-" in raw:
+        try:
+            scenario = raw.split("-ft-")[1].split(":")[0].strip()
+            return True, scenario
+        except Exception:
+            return True, "specialized"
+    return False, None
+
+
 async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int | None = None) -> tuple[str, int]:
     """Load a specific model checkpoint into app.state.sim_agent and return (model_name, episode)."""
     active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
@@ -719,11 +733,15 @@ async def _run_timed_benchmark(
                 sess_key = f"bench_{m_key}_{int(time.time())}_{benchmark_seed % 1000}"
                 file_p = sessions_dir / f"{sess_key}.json"
 
+                is_ft, ft_scen = _detect_finetune_info(active_model) if m_key == "ai" else (False, None)
+
                 payload = {
                     "session_id": sess_key,
                     "mode": m_key,
                     "model_name": active_model if m_key == "ai" else None,
                     "model_episodes": active_eps if m_key == "ai" else None,
+                    "is_finetuned": is_ft,
+                    "finetune_scenario": ft_scen,
                     "throughput": m_passed,
                     # F-04/E-01: Benchmark metadata for paired comparison & population separation
                     "run_type": "benchmark",
@@ -742,6 +760,8 @@ async def _run_timed_benchmark(
                         "mode": m_key,
                         "model_name": active_model if m_key == "ai" else None,
                         "model_episodes": active_eps if m_key == "ai" else None,
+                        "is_finetuned": is_ft,
+                        "finetune_scenario": ft_scen,
                         "frame_count": int(m_dur * 10),
                         "duration_s": m_dur,
                         "avg_fps": 10.0,
@@ -1074,12 +1094,17 @@ async def _run_model_benchmark(
                 sess_key = f"bench_model_{r_data.get('model_episode', 0)}_{int(time.time())}_{benchmark_seed % 1000}"
                 file_p = sessions_dir / f"{sess_key}.json"
 
+                m_label = r_data.get("label") or r_data.get("model_id") or ""
+                is_ft, ft_scen = _detect_finetune_info(m_label)
+
                 payload = {
                     "session_id": sess_key,
                     "mode": "ai",
                     "controller_type": f"DQN ({r_data.get('model_episode', 0)} eps)",
                     "model_name": r_data.get("label"),
                     "model_episodes": r_data.get("model_episode", 0),
+                    "is_finetuned": is_ft,
+                    "finetune_scenario": ft_scen,
                     "throughput": r_data.get("total_passed", 0),
                     "run_type": "benchmark",
                     "benchmark_type": "model_comparison",
@@ -1097,6 +1122,8 @@ async def _run_model_benchmark(
                         "mode": "ai",
                         "model_name": r_data.get("label"),
                         "model_episodes": r_data.get("model_episode", 0),
+                        "is_finetuned": is_ft,
+                        "finetune_scenario": ft_scen,
                         "frame_count": int(duration_seconds * 10),
                         "duration_s": float(duration_seconds),
                         "avg_fps": 10.0,
@@ -1599,11 +1626,16 @@ async def _run_scenario_benchmark(
 
                 sess_key = f"bench_sc_{scenario_id[:8]}_{m_key}_{int(time.time())}_{seed % 1000}"
                 file_p = sessions_dir / f"{sess_key}.json"
+
+                is_ft, ft_scen = _detect_finetune_info(clean_model_id) if m_key == "ai" else (False, None)
+
                 payload = {
                     "session_id": sess_key,
                     "mode": m_key,
                     "model_name": clean_model_id if m_key == "ai" else None,
                     "model_episodes": clean_model_ep if m_key == "ai" else None,
+                    "is_finetuned": is_ft,
+                    "finetune_scenario": ft_scen,
                     "throughput": m_passed,
                     "run_type": "benchmark",
                     "benchmark_id": run_group_id,
@@ -1621,6 +1653,8 @@ async def _run_scenario_benchmark(
                         "mode": m_key,
                         "model_name": clean_model_id if m_key == "ai" else None,
                         "model_episodes": clean_model_ep if m_key == "ai" else None,
+                        "is_finetuned": is_ft,
+                        "finetune_scenario": ft_scen,
                         "frame_count": int(m_dur * 10),
                         "duration_s": m_dur,
                         "avg_fps": 10.0,
@@ -1920,18 +1954,24 @@ async def _simulation_loop(app) -> None:
                         agg_counts = {k: int(v) for k, v in movement_queues.items()}
                         total_vehs = passed + sum(len(q) for q in intersection.lanes.values())
 
+                        is_ft, ft_scen = _detect_finetune_info(active_model) if active_mode == "ai" else (False, None)
+
                         payload = {
                             "session_id": sess_key,
                             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                             "mode": active_mode,
                             "model_name": active_model if active_mode == "ai" else None,
                             "model_episodes": active_eps if active_mode == "ai" else None,
+                            "is_finetuned": is_ft,
+                            "finetune_scenario": ft_scen,
                             "throughput": passed,
                             "stats": {
                                 "session_id": sess_key,
                                 "mode": active_mode,
                                 "model_name": active_model if active_mode == "ai" else None,
                                 "model_episodes": active_eps if active_mode == "ai" else None,
+                                "is_finetuned": is_ft,
+                                "finetune_scenario": ft_scen,
                                 "frame_count": total_steps,
                                 "duration_s": duration_s,
                                 "avg_fps": 10.0,
@@ -2139,18 +2179,24 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     agg_counts = {k: int(v) for k, v in movement_queues.items()}
                     total_vehs = passed + sum(len(q) for q in intersection.lanes.values())
 
+                    is_ft, ft_scen = _detect_finetune_info(active_model) if active_mode == "ai" else (False, None)
+
                     payload = {
                         "session_id": sess_key,
                         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         "mode": active_mode,
                         "model_name": active_model if active_mode == "ai" else None,
                         "model_episodes": active_eps if active_mode == "ai" else None,
+                        "is_finetuned": is_ft,
+                        "finetune_scenario": ft_scen,
                         "throughput": passed,
                         "stats": {
                             "session_id": sess_key,
                             "mode": active_mode,
                             "model_name": active_model if active_mode == "ai" else None,
                             "model_episodes": active_eps if active_mode == "ai" else None,
+                            "is_finetuned": is_ft,
+                            "finetune_scenario": ft_scen,
                             "frame_count": total_steps,
                             "duration_s": duration_s,
                             "avg_fps": 10.0,

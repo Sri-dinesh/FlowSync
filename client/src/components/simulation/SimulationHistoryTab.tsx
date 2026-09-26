@@ -47,6 +47,8 @@ export interface BenchmarkRecord {
   };
   model_name?: string | null;
   model_episodes?: number | null;
+  is_finetuned?: boolean;
+  finetune_scenario?: string | null;
 }
 
 interface SimulationHistoryTabProps {
@@ -371,6 +373,8 @@ export default function SimulationHistoryTab({
                 const greedyLos = getLos(greedyWait);
 
                 const modelEps = bm.model_episodes ?? 1000;
+                const isBmFinetuned = Boolean(bm.is_finetuned || bm.model_name?.includes("-ft-") || bm.session_id?.includes("-ft-"));
+                const bmScenario = bm.finetune_scenario || (bm.model_name?.includes("-ft-") ? bm.model_name.split("-ft-")[1]?.split(/[\s:_\-]/)[0] : null);
 
                 return (
                   <div
@@ -390,6 +394,17 @@ export default function SimulationHistoryTab({
                                 ? `Scenario Benchmark · ${bm.scenario_id.toUpperCase()}`
                                 : `Standard 3-Controller Benchmark`}
                             </span>
+                            {isBmFinetuned && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300 shadow-sm shadow-amber-500/10">
+                                <Zap className="h-2.5 w-2.5 text-amber-400" />
+                                <span>Fine-Tuned Model</span>
+                                {bmScenario && (
+                                  <span className="text-amber-200/80 font-normal">
+                                    · {bmScenario.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-2.5 py-0.5 text-[10px] font-mono text-indigo-300">
                               <Bot className="h-3 w-3" />
                               DQN Model: {modelEps} eps
@@ -448,9 +463,16 @@ export default function SimulationHistoryTab({
                           <div className="flex items-center gap-2">
                             <Cpu className="h-4 w-4 text-indigo-400" />
                             <div>
-                              <span className="text-xs font-semibold text-white block leading-none">
-                                FlowSync DQN AI
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-semibold text-white block leading-none">
+                                  FlowSync DQN AI
+                                </span>
+                                {isBmFinetuned && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold uppercase tracking-wider">
+                                    Fine-Tuned
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-[10px] text-indigo-300 font-mono mt-0.5 block">
                                 {modelEps} eps checkpoint
                               </span>

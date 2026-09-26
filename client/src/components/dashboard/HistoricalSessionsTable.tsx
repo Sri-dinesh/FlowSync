@@ -68,6 +68,46 @@ export interface SessionItem {
   scenario_id?: string;
   source_label?: string;
   is_cctv_replay?: boolean;
+  is_finetuned?: boolean;
+  finetune_scenario?: string | null;
+}
+
+const SCENARIO_NAMES: Record<string, string> = {
+  rush_hour: "Rush Hour Corridor",
+  heavy_left: "Heavy Left Turns",
+  arterial_surge: "East-West Arterial",
+  platoon_burst: "Platoon Congestion",
+  uniform: "Balanced Grid",
+};
+
+export function formatScenarioName(slug?: string | null): string {
+  if (!slug) return "";
+  const clean = slug.toLowerCase().replace(/[\-_]/g, " ").trim();
+  for (const [k, v] of Object.entries(SCENARIO_NAMES)) {
+    if (clean.includes(k.replace(/_/g, " "))) return v;
+  }
+  return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function checkIsFinetuned(session: SessionItem): { isFinetuned: boolean; scenario: string | null } {
+  if (session.is_finetuned) {
+    return { isFinetuned: true, scenario: session.finetune_scenario || null };
+  }
+  const text = `${session.model_name || ""} ${session.session_id || ""} ${session.winner_label || ""}`;
+  if (text.includes("-ft-")) {
+    const parts = text.split("-ft-")[1]?.split(/[\s:_\-]/)[0];
+    return { isFinetuned: true, scenario: session.finetune_scenario || parts || null };
+  }
+  if (session.benchmark_results) {
+    for (const [key, val] of Object.entries(session.benchmark_results)) {
+      const vText = `${val.label || ""} ${val.model_id || ""} ${key}`;
+      if (vText.includes("-ft-")) {
+        const parts = vText.split("-ft-")[1]?.split(/[\s:_\-]/)[0];
+        return { isFinetuned: true, scenario: parts || null };
+      }
+    }
+  }
+  return { isFinetuned: false, scenario: null };
 }
 
 interface DisplaySessionItem extends SessionItem {
@@ -563,6 +603,8 @@ export default function HistoricalSessionsTable({
     let matchesMode = modeFilter === "ALL";
     if (modeFilter === "BENCHMARKS") {
       matchesMode = isBm;
+    } else if (modeFilter === "FINETUNED") {
+      matchesMode = checkIsFinetuned(s).isFinetuned;
     } else if (modeFilter === "AI") {
       matchesMode = sMode === "ai" || isBm;
     } else if (modeFilter === "GREEDY") {
@@ -742,6 +784,7 @@ export default function HistoricalSessionsTable({
             className="h-8 rounded-full bg-neutral-900 border border-neutral-800 px-3.5 text-xs text-neutral-300 focus:outline-none focus:border-neutral-700 font-medium"
           >
             <option value="ALL">All Modes</option>
+            <option value="FINETUNED">⚡ Fine-Tuned Runs</option>
             <option value="BENCHMARKS">🏆 3-Mode Benchmarks</option>
             <option value="AI">DQN AI</option>
             <option value="GREEDY">Greedy</option>
@@ -945,6 +988,7 @@ export default function HistoricalSessionsTable({
                   const bestWait = bmResults[winner]?.avg_wait_time ?? bmResults[winner]?.avg_wait_s ?? avgWait;
                   const winnerImpKey = `${winner}_wait_pct`;
                   const winnerImp = session.improvements?.[winnerImpKey];
+                  const ftInfo = checkIsFinetuned(session);
 
                   return (
                     <tr
@@ -958,10 +1002,21 @@ export default function HistoricalSessionsTable({
                       {/* Column 1: Run */}
                       <td className="py-5 px-6">
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-white leading-tight">
                               {title}
                             </span>
+                            {ftInfo.isFinetuned && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/35 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300 shadow-sm shadow-amber-500/10">
+                                <Zap className="h-2.5 w-2.5 text-amber-400" />
+                                <span>Fine-Tuned Model</span>
+                                {ftInfo.scenario && (
+                                  <span className="text-amber-200/80 font-normal">
+                                    · {formatScenarioName(ftInfo.scenario)}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             {isBenchmark && (
                               isModelBenchmark ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
@@ -1023,24 +1078,53 @@ export default function HistoricalSessionsTable({
                             </div>
                           ) : (
                             <div className="space-y-1">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
-                                <Bot className="h-3 w-3" />
-                                {session.model_episodes ? `${session.model_episodes} eps` : "DQN AI"}
-                              </span>
+                              {ftInfo.isFinetuned ? (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs font-mono text-amber-300">
+                                    <Zap className="h-2.5 w-2.5 text-amber-400" />
+                                    {session.model_episodes ? `${session.model_episodes} eps` : "FT"}
+                                  </span>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/30 font-semibold uppercase tracking-wider">
+                                    Fine-Tuned
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
+                                  <Bot className="h-3 w-3" />
+                                  {session.model_episodes ? `${session.model_episodes} eps` : "DQN AI"}
+                                </span>
+                              )}
                               <div className="text-xs text-neutral-400">
                                 vs Fixed vs Greedy
                               </div>
                             </div>
                           )
                         ) : isAI ? (
-                          <div className="space-y-1">
-                            <span className="inline-flex items-center rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
-                              {session.model_episodes ?? 300} eps
-                            </span>
-                            <div className="text-xs text-neutral-500 truncate max-w-[120px]">
-                              {session.model_name || "FlowSync DQN"}
+                          ftInfo.isFinetuned ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs font-mono text-amber-300">
+                                  <Zap className="h-2.5 w-2.5 text-amber-400" />
+                                  {session.model_episodes ? `${session.model_episodes} eps` : "FT"}
+                                </span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/30 font-semibold uppercase tracking-wider">
+                                  Fine-Tuned
+                                </span>
+                              </div>
+                              <div className="text-xs text-amber-200/90 truncate max-w-[130px]" title={session.model_name || ""}>
+                                {session.model_name || "Specialized DQN"}
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-xs font-mono text-indigo-300">
+                                {session.model_episodes ?? 300} eps
+                              </span>
+                              <div className="text-xs text-neutral-500 truncate max-w-[120px]">
+                                {session.model_name || "FlowSync DQN"}
+                              </div>
+                            </div>
+                          )
                         ) : (
                           <span className="text-xs text-neutral-500">Deterministic</span>
                         )}
@@ -1255,6 +1339,7 @@ export default function HistoricalSessionsTable({
               {(() => {
                 const target = sortedSessions.find((s) => s.session_id === expandedBenchmarkId);
                 if (!target) return null;
+                const targetFt = checkIsFinetuned(target);
                 const bRes = target.benchmark_results || {};
 
                 const isModelComparison =
@@ -1279,6 +1364,28 @@ export default function HistoricalSessionsTable({
 
                   return (
                     <div className="space-y-4">
+                      {targetFt.isFinetuned && (
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                              <Zap className="h-4 w-4 text-amber-400" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-amber-200">Fine-Tuned Checkpoints Evaluated</span>
+                                {targetFt.scenario && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    {formatScenarioName(targetFt.scenario)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-white/60">
+                                Evaluates specialized scenario-adapted models against baseline checkpoints under identical traffic arrivals.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {/* Header Info */}
                       <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-900/60 p-3 rounded-xl border border-neutral-800">
                         <div className="flex items-center gap-2.5">
@@ -1471,6 +1578,32 @@ export default function HistoricalSessionsTable({
                       </Button>
                     </div>
 
+                    {targetFt.isFinetuned && (
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-7 w-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+                            <Zap className="h-4 w-4 text-amber-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-amber-200">Fine-Tuned Model Active</span>
+                              {targetFt.scenario && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                  {formatScenarioName(targetFt.scenario)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-white/60">
+                              Tested using specialized policy weights adapted with reduced learning rate (1e-4) and warm exploration.
+                            </p>
+                          </div>
+                        </div>
+                        <span className="font-mono text-[10px] text-amber-300/80 bg-black/40 px-2.5 py-1 rounded-md border border-amber-500/20">
+                          {target.model_name || "Specialized Policy"}
+                        </span>
+                      </div>
+                    )}
+
                     {/* 3 Modes Side-by-Side Cards in STRICT Order: 1. DQN AI, 2. Fixed, 3. Greedy */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* 1. FlowSync DQN AI */}
@@ -1488,7 +1621,13 @@ export default function HistoricalSessionsTable({
                               FlowSync DQN AI
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {targetFt.isFinetuned && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                <Zap className="h-2.5 w-2.5 text-amber-400" />
+                                Fine-Tuned
+                              </span>
+                            )}
                             {target.model_episodes && (
                               <span className="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-mono">
                                 {target.model_episodes} eps

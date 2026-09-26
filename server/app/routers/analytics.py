@@ -278,6 +278,18 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if model_episodes is None and mode == "ai":
                 model_episodes = 300
 
+            # Fine-tuning detection for simulation history
+            is_finetuned = bool(data.get("is_finetuned") or stats.get("is_finetuned"))
+            finetune_scenario = data.get("finetune_scenario") or stats.get("finetune_scenario")
+            if not is_finetuned and mode == "ai":
+                raw_check = f"{model_name or ''} {sess_id or ''}"
+                if "-ft-" in raw_check:
+                    is_finetuned = True
+                    try:
+                        finetune_scenario = raw_check.split("-ft-")[1].split(":")[0].split(" ")[0].strip()
+                    except Exception:
+                        finetune_scenario = "specialized"
+
             # F-04: Determine run_type for population separation
             run_type = str(data.get("run_type") or "").lower()
             if not run_type:
@@ -388,6 +400,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "scenario_id": data.get("scenario_id") or None,
                 "source_label": "CCTV Digital Twin" if (run_type == "cctv_replay" or len(arrivals) > 0) else ("Simulation Benchmark" if run_type == "benchmark" else "Simulation Standalone"),
                 "is_cctv_replay": run_type == "cctv_replay" or len(arrivals) > 0,
+                "is_finetuned": is_finetuned,
+                "finetune_scenario": finetune_scenario,
             })
         except Exception:
             continue
@@ -435,6 +449,9 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         waits_map = {k: v["avg_wait_s"] for k, v in composite_results.items() if v.get("avg_wait_s", 0) > 0}
         comp_winner = min(waits_map.keys(), key=lambda k: waits_map[k]) if waits_map else "ai"
 
+        ai_is_ft = bool(ai_s and ai_s.get("is_finetuned"))
+        ai_ft_scen = ai_s.get("finetune_scenario") if ai_s else None
+
         for s in m_dict.values():
             if not s.get("benchmark_results"):
                 s["benchmark_results"] = composite_results
@@ -444,6 +461,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 s["improvements"] = comp_improvements
             if not s.get("benchmark_modes"):
                 s["benchmark_modes"] = ["ai", "fixed", "greedy"]
+            if ai_is_ft:
+                s["is_finetuned"] = True
+                if ai_ft_scen:
+                    s["finetune_scenario"] = ai_ft_scen
             if fixed_s and s.get("mode") in ("ai", "greedy") and f_wait > 0:
                 my_wait = s["avg_wait_s"]
                 s["efficiency_gain_pct"] = round(((f_wait - my_wait) / f_wait) * 100.0, 1)
@@ -473,6 +494,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "modes_results": s.get("benchmark_results") or {},
                 "model_name": s.get("model_name"),
                 "model_episodes": s.get("model_episodes"),
+                "is_finetuned": s.get("is_finetuned", False),
+                "finetune_scenario": s.get("finetune_scenario"),
             })
 
     # Approach direction totals from lane aggregates
