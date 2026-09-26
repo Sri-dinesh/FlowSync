@@ -24,7 +24,40 @@ interface RLModel {
   version: string;
   source?: string;
   episodes?: number;
+  is_finetuned?: boolean;
+  scenario?: string | null;
 }
+
+const SCENARIO_PRESETS = [
+  {
+    id: "rush_hour",
+    name: "Rush Hour Corridor",
+    tag: "80% NS Surge",
+    description: "North-South commuter corridor surge (80% NS volume, 20% EW cross streets). Teaches asymmetric priority.",
+    icon: "🚗",
+  },
+  {
+    id: "heavy_left",
+    name: "Heavy Left Turns",
+    tag: "50% Lefts",
+    description: "50% left turns across all approaches. Forces the agent to specialize in Phase 2 & 3 protected arrows.",
+    icon: "↩️",
+  },
+  {
+    id: "arterial_surge",
+    name: "East-West Arterial",
+    tag: "EW Speed Corridor",
+    description: "High-speed East-West main thoroughfare with light feeder arrivals. Maximizes green waves.",
+    icon: "⚡",
+  },
+  {
+    id: "platoon_burst",
+    name: "Platoon Congestion",
+    tag: "Near-Gridlock",
+    description: "Dense platooned arrival bursts across all approaches demanding quick queue clearance.",
+    icon: "🛑",
+  },
+];
 
 interface TrainingControlsProps {
   sendCommand: (command: Record<string, unknown>) => void;
@@ -65,14 +98,38 @@ function Trend({ values, higherIsBetter }: { values: number[]; higherIsBetter: b
 }
 
 /** Plain-English description of what the agent is currently doing */
-function AgentPhaseDescription({ epsilon, episode }: { epsilon: number; episode: number }) {
+function AgentPhaseDescription({
+  epsilon,
+  episode,
+  isFinetuned,
+  scenario,
+}: {
+  epsilon: number;
+  episode: number;
+  isFinetuned?: boolean;
+  scenario?: string | null;
+}) {
   if (episode === 0) return null;
 
   let phase: string;
   let desc: string;
   let color: string;
 
-  if (epsilon > 0.7) {
+  if (isFinetuned) {
+    if (epsilon > 0.18) {
+      phase = "Scenario Adaptation";
+      desc = `Exploring alternative phase actions on ${scenario ? scenario.replace(/_/g, " ") : "target scenario"} at 10x reduced LR`;
+      color = "text-amber-300";
+    } else if (epsilon > 0.08) {
+      phase = "Policy Specialization";
+      desc = `Blending pre-trained traffic heuristics with specialized ${scenario ? scenario.replace(/_/g, " ") : "scenario"} actions`;
+      color = "text-orange-300";
+    } else {
+      phase = "Specialized Exploitation";
+      desc = `Executing fine-tuned specialized policy on ${scenario ? scenario.replace(/_/g, " ") : "target distribution"}`;
+      color = "text-emerald-300";
+    }
+  } else if (epsilon > 0.7) {
     phase = "Exploring";
     desc = "Taking mostly random actions to learn what's possible";
     color = "text-amber-300";
@@ -145,10 +202,16 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const queryClient = useQueryClient();
 
   const [showConfig, setShowConfig] = useState(false);
-  const [trainingMode, setTrainingMode] = useState<"fresh" | "resume">("fresh");
+  const [trainingMode, setTrainingMode] = useState<"fresh" | "resume" | "finetune">("fresh");
   const [numEpisodes, setNumEpisodes] = useState(500);
   const [additionalEpisodes, setAdditionalEpisodes] = useState(500);
   const [resumeModelId, setResumeModelId] = useState<string>("");
+  const [finetuneModelId, setFinetuneModelId] = useState<string>("");
+  const [finetuneEpisodes, setFinetuneEpisodes] = useState(100);
+  const [finetuneScenario, setFinetuneScenario] = useState<string>("rush_hour");
+  const [finetuneLr, setFinetuneLr] = useState<number>(0.0001);
+  const [finetuneEpsilon, setFinetuneEpsilon] = useState<number>(0.25);
+
   const [targetEpisodes, setTargetEpisodes] = useState<number | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -163,6 +226,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
   const recentMetrics = useMemo(() => trainingMetrics.slice(-40), [trainingMetrics]);
 
   const isResumedRun = latest?.is_resumed ?? (latest?.start_episode ? latest.start_episode > 0 : false);
+  const isFinetuneRun = latest?.is_finetuned ?? false;
   const sessionStartEp = latest?.start_episode ?? 0;
   const effectiveTargetEpisodes = latest?.target_episodes ?? targetEpisodes;
 
@@ -266,8 +330,45 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
     return Math.max(0.05, 1.0 * Math.pow(0.994, resumeBaseEpisode));
   }, [resumeBaseEpisode]);
 
+  // Calculate fine-tune metadata from selected base model
+  const selectedFinetuneModel = useMemo(() => {
+    return models.find((m) => m.id === finetuneModelId) ?? null;
+  }, [models, finetuneModelId]);
+
+  const finetuneBaseEpisode = useMemo(() => {
+    if (!selectedFinetuneModel) return 0;
+    const v = parseInt(selectedFinetuneModel.version, 10);
+    if (!isNaN(v) && v > 0) return v;
+    if (selectedFinetuneModel.episodes && selectedFinetuneModel.episodes > 0) {
+      return selectedFinetuneModel.episodes;
+    }
+    const match = selectedFinetuneModel.id.match(/:(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+    return 0;
+  }, [selectedFinetuneModel]);
+
   const startTraining = () => {
-    if (trainingMode === "resume") {
+    if (trainingMode === "finetune") {
+      if (!finetuneModelId || finetuneModelId === "__none") {
+        setLoadError("Please select a base checkpoint to fine-tune.");
+        return;
+      }
+      setTargetEpisodes(finetuneEpisodes);
+      setTraining(true);
+      startTimeRef.current = Date.now();
+      sendCommand({
+        command: "start_training",
+        mode: "finetune",
+        num_episodes: finetuneEpisodes,
+        resume_model_id: finetuneModelId,
+        resume_episode: finetuneBaseEpisode,
+        finetune_scenario: finetuneScenario,
+        finetune_lr: finetuneLr,
+        finetune_epsilon: finetuneEpsilon,
+        simulation_id: simulationId ?? undefined,
+      });
+      setShowConfig(false);
+    } else if (trainingMode === "resume") {
       if (!resumeModelId || resumeModelId === "__none") {
         setLoadError("Please select a checkpoint to resume training.");
         return;
@@ -278,6 +379,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
       startTimeRef.current = Date.now();
       sendCommand({
         command: "start_training",
+        mode: "resume",
         num_episodes: additionalEpisodes,
         resume_model_id: resumeModelId,
         resume_episode: resumeBaseEpisode,
@@ -290,6 +392,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
       startTimeRef.current = Date.now();
       sendCommand({
         command: "start_training",
+        mode: "fresh",
         num_episodes: numEpisodes,
         simulation_id: simulationId ?? undefined,
       });
@@ -355,7 +458,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
             exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3">
               {/* Mode Tabs */}
-              <div className="grid grid-cols-2 p-0.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+              <div className="grid grid-cols-3 p-0.5 rounded-lg bg-black/40 border border-white/10 text-xs">
                 <button
                   type="button"
                   onClick={() => setTrainingMode("fresh")}
@@ -383,7 +486,24 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                   }`}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  Resume Checkpoint
+                  Resume
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrainingMode("finetune");
+                    if (!finetuneModelId && models.length > 0) {
+                      setFinetuneModelId(models[0].id);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md font-medium transition-all ${
+                    trainingMode === "finetune"
+                      ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm font-semibold"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Zap className="h-3.5 w-3.5 text-amber-300" />
+                  Fine-Tune
                 </button>
               </div>
 
@@ -434,7 +554,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                     </Button>
                   </div>
                 </div>
-              ) : (
+              ) : trainingMode === "resume" ? (
                 /* Resume Checkpoint Form */
                 <div className="space-y-3">
                   <div>
@@ -552,6 +672,188 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                     </>
                   )}
                 </div>
+              ) : (
+                /* Fine-Tuning Form */
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs text-white/80 font-medium mb-1">
+                      1. Select Base Model Checkpoint
+                    </label>
+                    <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                      Select a pre-trained model to adapt. Learned representations will be retained while the model specializes in the selected scenario.
+                    </p>
+                    {models.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-white/15 bg-white/5 p-3 text-center">
+                        <p className="text-xs text-white/50 mb-2">No models available to fine-tune.</p>
+                        <Button size="sm" variant="outline" onClick={() => setTrainingMode("fresh")} className="text-xs">
+                          Start Fresh Training First
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select
+                        value={finetuneModelId}
+                        onValueChange={(v) => setFinetuneModelId(v)}
+                      >
+                        <SelectTrigger className="w-full border-amber-500/20 bg-black/40 text-white/90 hover:bg-black/50 transition-colors">
+                          <SelectValue placeholder="Choose base model to fine-tune…" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-[100] max-h-[220px] overflow-y-auto" sideOffset={5}>
+                          {models.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name} — ep {m.version}
+                              {m.source === "remote" ? " ☁ Supabase Cloud" : " 💾 Local"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {selectedFinetuneModel && (
+                    <>
+                      {/* Scenario Presets Selector */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs text-white/80 font-medium">
+                            2. Target Scenario Distribution
+                          </label>
+                          <span className="text-[10px] text-amber-400/80 font-medium">Specialized Regime</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {SCENARIO_PRESETS.map((preset) => {
+                            const isSelected = finetuneScenario === preset.id;
+                            return (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => setFinetuneScenario(preset.id)}
+                                className={`text-left p-2.5 rounded-lg border transition-all relative overflow-hidden ${
+                                  isSelected
+                                    ? "border-amber-500 bg-amber-950/40 shadow-sm shadow-amber-500/10"
+                                    : "border-white/10 bg-black/30 hover:border-white/20 hover:bg-black/40"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                                    <span>{preset.icon}</span>
+                                    {preset.name}
+                                  </span>
+                                  <span className={`text-[9px] px-1 py-0.2 rounded border ${
+                                    isSelected ? "bg-amber-500/20 text-amber-300 border-amber-500/40" : "bg-white/5 text-white/50 border-white/10"
+                                  }`}>
+                                    {preset.tag}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-white/50 leading-relaxed line-clamp-2">
+                                  {preset.description}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Fine-Tuning Duration */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-white/80 font-medium">3. Fine-Tuning Duration</label>
+                          <span className="text-[10px] text-amber-300 font-mono">{finetuneEpisodes} episodes</span>
+                        </div>
+                        <p className="text-[10px] text-white/40 mb-2 leading-relaxed">
+                          Fine-tuning adapts rapidly (typically 50 to 150 episodes). Checkpoints are saved every 25 episodes.
+                        </p>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          {[50, 100, 150, 200].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setFinetuneEpisodes(preset)}
+                              className={`px-2 py-1 rounded text-xs transition-colors ${
+                                finetuneEpisodes === preset
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                  : "bg-white/5 text-white/60 hover:bg-white/10 border border-white/5"
+                              }`}
+                            >
+                              {preset} eps
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="number"
+                          min={20}
+                          max={500}
+                          step={25}
+                          className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                          value={finetuneEpisodes}
+                          onChange={(e) => setFinetuneEpisodes(Math.max(10, Number(e.target.value)))}
+                        />
+                      </div>
+
+                      {/* Hyperparameter Controls */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="p-2.5 rounded-lg border border-white/10 bg-black/30 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-white/70 font-medium">Learning Rate (α)</label>
+                            <span className="text-[10px] text-amber-300 font-mono font-bold">1e-4</span>
+                          </div>
+                          <p className="text-[9px] text-white/40 leading-snug">
+                            10x lower than fresh training to prevent catastrophic forgetting.
+                          </p>
+                        </div>
+                        <div className="p-2.5 rounded-lg border border-white/10 bg-black/30 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-white/70 font-medium">Exploration Reset (ε)</label>
+                            <span className="text-[10px] text-amber-300 font-mono font-bold">0.25 → 0.05</span>
+                          </div>
+                          <p className="text-[9px] text-white/40 leading-snug">
+                            Warm 25% exploration reset to discover new scenario actions.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Safety & Fork Lineage Card */}
+                      <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/50">Branched Target:</span>
+                          <span className="font-semibold text-amber-200 font-mono text-[11px]">
+                            {selectedFinetuneModel.id.slice(0, 10)}...-ft-{finetuneScenario}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/50">Base Model Lineage:</span>
+                          <span className="text-white/70 text-[11px]">
+                            ep {finetuneBaseEpisode} weights preserved untouched
+                          </span>
+                        </div>
+                        <div className="pt-1.5 border-t border-white/5 flex flex-wrap gap-1.5 text-[9px]">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                            ✓ Original Checkpoint Safe
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                            ✓ Replay Buffer Primed on Scenario
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-sky-300">
+                            ✓ Benchmark Showdown Ready
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={startTraining}
+                          className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold flex-1 shadow-md shadow-amber-600/20"
+                        >
+                          <Zap className="h-3.5 w-3.5 mr-1 text-amber-200" />
+                          Start Fine-Tuning ({finetuneEpisodes} eps)
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowConfig(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>
@@ -582,11 +884,16 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
                     Episode <span className="text-violet-300 font-bold">{currentEpisode}</span>
                     <span className="text-white/35"> / {effectiveTargetEpisodes ?? "—"}</span>
                   </span>
-                  {isResumedRun && sessionStartEp > 0 && (
+                  {latest?.is_finetuned ? (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                      <Zap className="h-2.5 w-2.5 text-amber-400" />
+                      Fine-Tuning: {latest.finetune_scenario ? latest.finetune_scenario.replace(/_/g, " ") : "Specialized"}
+                    </span>
+                  ) : isResumedRun && sessionStartEp > 0 ? (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
                       Resumed from ep {sessionStartEp}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-white/40">
                   {epsPerMin > 0 && (
@@ -606,7 +913,12 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
 
               {/* Agent phase description */}
               {latest && "epsilon" in latest && (
-                <AgentPhaseDescription epsilon={latest.epsilon} episode={currentEpisode} />
+                <AgentPhaseDescription
+                  epsilon={latest.epsilon}
+                  episode={currentEpisode}
+                  isFinetuned={latest.is_finetuned}
+                  scenario={latest.finetune_scenario}
+                />
               )}
 
               {/* Stat cards */}
@@ -667,16 +979,26 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               )}
 
               {/* Checkpoint notice */}
-              {effectiveTargetEpisodes && (
+              {latest?.is_finetuned ? (
+                <div className="text-[9px] text-amber-300/70 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-amber-400/60" />
+                  Fine-tuned checkpoint saved every 25 episodes and at completion
+                </div>
+              ) : effectiveTargetEpisodes ? (
                 <div className="text-[9px] text-white/25 flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3 text-white/20" />
                   Checkpoint saved every 50 episodes and at completion
                 </div>
-              )}
+              ) : null}
 
               {/* Status */}
               {isTraining ? (
-                isResumedRun ? (
+                latest?.is_finetuned ? (
+                  <div className="flex items-center gap-1.5 text-[10px] text-amber-300">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Fine-Tuning on {latest.finetune_scenario ? latest.finetune_scenario.replace(/_/g, " ").toUpperCase() : "SCENARIO"} (α=1e-4) — policy specializing
+                  </div>
+                ) : isResumedRun ? (
                   <div className="flex items-center gap-1.5 text-[10px] text-violet-300">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
                     Resumed Training{latest?.steps ? ` — ${latest.steps} steps/ep` : " — continuing policy weights"}
@@ -695,7 +1017,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
               ) : currentEpisode > 0 ? (
                 <div className="flex items-center gap-1.5 text-[10px] text-white/30">
                   <CheckCircle2 className="h-3 w-3" />
-                  Complete — {currentEpisode} episode{currentEpisode !== 1 ? "s" : ""} trained
+                  Complete — {currentEpisode} episode{currentEpisode !== 1 ? "s" : ""} {latest?.is_finetuned ? "fine-tuned" : "trained"}
                   {isResumedRun && sessionStartEp > 0 ? ` (+${Math.max(0, currentEpisode - sessionStartEp)} this run)` : ""}
                 </div>
               ) : null}
@@ -724,7 +1046,8 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
             ) : (
               models.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
-                  {m.name} — ep {m.version}
+                  {m.is_finetuned ? "⚡ " : ""}{m.name} — ep {m.version}
+                  {m.scenario ? ` [${m.scenario.replace(/_/g, " ")}]` : ""}
                   {m.source === "remote" ? " ☁ Supabase Cloud" : " 💾 Local"}
                 </SelectItem>
               ))
@@ -732,22 +1055,38 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
           </SelectContent>
         </Select>
 
-        {/* Quick Shortcut: Resume Training This Model */}
+        {/* Quick Shortcuts: Resume Training & Fine-Tune This Model */}
         {selectedModelId && selectedModelId !== "__none" && !isTraining && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full mt-1.5 border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 text-xs flex items-center justify-center gap-1.5 transition-all"
-            onClick={() => {
-              setTrainingMode("resume");
-              setResumeModelId(selectedModelId);
-              setShowConfig(true);
-            }}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Resume Training This Checkpoint
-          </Button>
+          <div className="grid grid-cols-2 gap-2 mt-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 text-[11px] flex items-center justify-center gap-1 transition-all"
+              onClick={() => {
+                setTrainingMode("resume");
+                setResumeModelId(selectedModelId);
+                setShowConfig(true);
+              }}
+            >
+              <RotateCcw className="h-3 w-3" />
+              Resume Model
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-[11px] flex items-center justify-center gap-1 transition-all"
+              onClick={() => {
+                setTrainingMode("finetune");
+                setFinetuneModelId(selectedModelId);
+                setShowConfig(true);
+              }}
+            >
+              <Zap className="h-3 w-3 text-amber-400" />
+              Fine-Tune Model
+            </Button>
+          </div>
         )}
 
         {isLoadingModel && (

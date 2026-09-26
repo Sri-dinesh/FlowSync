@@ -49,6 +49,10 @@ export interface TrainingMetric {
   target_episodes?: number;
   is_resumed?: boolean;
   resume_model_id?: string | null;
+  is_finetuned?: boolean;
+  finetune_scenario?: string | null;
+  parent_model_id?: string | null;
+  parent_episode?: number | null;
 }
 
 export interface EpisodeRecord {

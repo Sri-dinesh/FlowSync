@@ -30,6 +30,27 @@ def _parse_episode(path: str) -> Optional[int]:
     return int(episode_text)
 
 
+from ..simulation.spawner import SCENARIO_PROFILES
+
+@router.get("/scenarios")
+async def list_scenarios() -> dict:
+    """Return available fine-tuning scenarios with directional weights and turn distributions."""
+    scenarios = []
+    for key, profile in SCENARIO_PROFILES.items():
+        if key == "uniform":
+            continue
+        scenarios.append({
+            "id": profile.id,
+            "name": profile.name,
+            "description": profile.description,
+            "directional_weights": profile.directional_weights,
+            "turn_probs": profile.turn_probs,
+            "base_lambda": profile.base_lambda,
+            "lambda_multiplier": profile.lambda_multiplier,
+        })
+    return {"scenarios": scenarios}
+
+
 @router.post("/start")
 async def start_training(payload: StartTrainingRequest, request: Request) -> dict:
     app = request.app
@@ -41,9 +62,17 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
     simulation_id = payload.simulation_id
     resume_model_id = payload.resume_model_id
     resume_episode = payload.resume_episode
+    is_finetune = payload.mode == "finetune"
+    finetune_scenario = payload.finetune_scenario or "rush_hour"
 
-    # If resuming, reuse base model id as simulation_id so checkpoints stay organized
-    if resume_model_id and not simulation_id:
+    if is_finetune:
+        # Fine-tuning forks from the base model checkpoint into a new scenario-specific model ID
+        base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
+        scenario_slug = finetune_scenario.lower().replace(" ", "_")
+        simulation_id = f"{base_id}-ft-{scenario_slug}"
+        app.state.current_simulation_id = simulation_id
+    elif resume_model_id and not simulation_id:
+        # If resuming, reuse base model id as simulation_id so checkpoints stay organized
         base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
         simulation_id = base_id
         app.state.current_simulation_id = simulation_id
@@ -70,13 +99,20 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
             simulation_id=simulation_id,
             resume_model_id=resume_model_id,
             resume_episode=resume_episode,
+            is_finetune=is_finetune,
+            finetune_scenario=finetune_scenario,
+            finetune_lr=payload.finetune_lr or 1e-4,
+            finetune_epsilon=payload.finetune_epsilon or 0.25,
         )
     )
 
     return {
         "status": "started",
         "simulation_id": simulation_id,
-        "is_resumed": bool(resume_model_id),
+        "mode": payload.mode,
+        "is_resumed": bool(resume_model_id) and not is_finetune,
+        "is_finetuned": is_finetune,
+        "scenario": finetune_scenario if is_finetune else None,
         "resume_model_id": resume_model_id,
     }
 

@@ -101,6 +101,10 @@ class TrafficEnv(gym.Env):
         self.total_decision_steps: int = 0
         self.passed_vehicle_waits: List[float] = []
 
+    def set_traffic_profile(self, profile: Any) -> None:
+        """Forward traffic profile assignment to underlying intersection."""
+        self.intersection.set_traffic_profile(profile)
+
     # ────────────────────────────────────────────────────────────────────────
     # Reset
     # ────────────────────────────────────────────────────────────────────────

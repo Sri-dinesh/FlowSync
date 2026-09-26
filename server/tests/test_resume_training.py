@@ -119,4 +119,8 @@ async def test_start_training_endpoint_with_resume():
             simulation_id="089035ea-3b87-4279-8230-00f1c4f10457",
             resume_model_id="089035ea-3b87-4279-8230-00f1c4f10457:1000",
             resume_episode=1000,
+            is_finetune=False,
+            finetune_scenario="rush_hour",
+            finetune_lr=1e-4,
+            finetune_epsilon=0.25,
         )

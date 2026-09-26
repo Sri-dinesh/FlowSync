@@ -244,7 +244,17 @@ def list_all_models() -> List[Dict[str, Any]]:
 
             source = "remote" if is_remote else "local"
 
-            label = f"Model {date_part} - {ep}eps"
+            is_finetuned = "-ft-" in model_id
+            scenario_name = None
+            if is_finetuned:
+                parts = model_id.split("-ft-")
+                scenario_raw = parts[-1] if len(parts) > 1 else ""
+                scenario_clean = scenario_raw.replace("_", " ").title()
+                scenario_name = scenario_clean
+                label = f"⚡ FT [{scenario_clean}] - {ep}eps ({date_part})"
+            else:
+                label = f"Model {date_part} - {ep}eps"
+
             if ep == max_ep and row.get("avgReward") is not None:
                 # Calibrated for both legacy positive rewards and modern delay-anchored rewards (-300 is excellent, -600 is fair, <-1000 is failing)
                 r_val = float(row.get("avgReward") or 0)
@@ -254,7 +264,10 @@ def list_all_models() -> List[Dict[str, Any]]:
                     status_word = "Fair"
                 else:
                     status_word = "Needs Tuning"
-                label = f"Model {date_part} - {ep}eps - {status_word}"
+                if is_finetuned:
+                    label = f"⚡ FT [{scenario_name}] - {ep}eps - {status_word}"
+                else:
+                    label = f"Model {date_part} - {ep}eps - {status_word}"
 
             models_dict[key] = {
                 "id": key,
@@ -266,6 +279,8 @@ def list_all_models() -> List[Dict[str, Any]]:
                 "episodes": ep,
                 "avg_reward": row.get("avgReward") if ep == max_ep else None,
                 "is_active": row.get("isActive", False) if ep == max_ep else False,
+                "is_finetuned": is_finetuned,
+                "scenario": scenario_name,
             }
 
     # Sort descending by episode count, then name

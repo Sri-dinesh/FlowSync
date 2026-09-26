@@ -28,6 +28,7 @@ from .hyperparams import HyperParams
 from ..simulation.environment import TrafficEnv
 from ..simulation.greedy_teacher import GreedyTeacher
 from ..simulation.curriculum import TrainingCurriculum
+from ..simulation.spawner import SCENARIO_PROFILES
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,13 @@ class Trainer:
         self.target_episodes = 0
         self.is_resumed = False
         self.resume_model_id: Optional[str] = None
+        self.is_finetune = False
+        self.finetune_scenario: Optional[str] = None
+        self.finetune_lr: float = 1e-4
+        self.finetune_epsilon: float = 0.25
+        self.finetune_decay: float = 0.98
+        self.parent_model_id: Optional[str] = None
+        self.parent_episode: Optional[int] = None
         self.epsilon = self.hyperparams.epsilon_start
         self.enable_curriculum = enable_curriculum
         self.enable_greedy_warmup = enable_greedy_warmup
@@ -71,12 +79,27 @@ class Trainer:
         num_episodes: int,
         resume_model_id: Optional[str] = None,
         resume_episode: Optional[int] = None,
+        is_finetune: bool = False,
+        finetune_scenario: str = "rush_hour",
+        finetune_lr: float = 1e-4,
+        finetune_epsilon: float = 0.25,
     ) -> None:
         self.is_training = True
-        self.is_resumed = bool(resume_model_id)
+        self.is_finetune = is_finetune
+        self.finetune_scenario = finetune_scenario
+        self.finetune_lr = finetune_lr
+        self.finetune_epsilon = finetune_epsilon
+        self.is_resumed = bool(resume_model_id) and not is_finetune
         self.resume_model_id = resume_model_id
+        self.parent_model_id = None
+        self.parent_episode = None
+        self.finetune_decay = 0.98
 
-        # ── Checkpoint & Resume Loading ────────────────────────────────────
+        profile = None
+        if self.is_finetune:
+            profile = SCENARIO_PROFILES.get(finetune_scenario, SCENARIO_PROFILES["rush_hour"])
+
+        # ── Checkpoint & Resume / Fine-Tune Loading ─────────────────────────
         start_episode = 0
         base_model_id = None
         if resume_model_id:
@@ -111,14 +134,14 @@ class Trainer:
                 if isinstance(chk_data, dict) and "online_net" in chk_data:
                     self.agent.online_net.load_state_dict(chk_data["online_net"])
                     self.agent.target_net.load_state_dict(chk_data.get("target_net", chk_data["online_net"]))
-                    if "optimizer" in chk_data and chk_data["optimizer"]:
+                    if not is_finetune and "optimizer" in chk_data and chk_data["optimizer"]:
                         try:
                             self.agent.optimizer.load_state_dict(chk_data["optimizer"])
                         except Exception as opt_err:
                             logger.warning("Could not restore optimizer state: %s", opt_err)
-                    if "step_count" in chk_data:
+                    if not is_finetune and "step_count" in chk_data:
                         self.agent.step_count = chk_data["step_count"]
-                    if "total_train_steps" in chk_data:
+                    if not is_finetune and "total_train_steps" in chk_data:
                         self.agent.total_train_steps = chk_data["total_train_steps"]
                 else:
                     self.agent.online_net.load_state_dict(chk_data)
@@ -133,39 +156,102 @@ class Trainer:
                     self.app_state.active_model_episode = start_episode
 
                 logger.info(
-                    "Successfully loaded checkpoint for model %s (episode %d) to resume training",
+                    "Successfully loaded checkpoint for model %s (episode %d) for %s",
                     base_model_id,
                     start_episode,
+                    "fine-tuning" if is_finetune else "resumed training",
                 )
             except Exception as load_err:
-                logger.error("Failed to load checkpoint for resume model %s (ep %s): %s", base_model_id, start_episode, load_err)
+                logger.error("Failed to load checkpoint for model %s (ep %s): %s", base_model_id, start_episode, load_err)
 
-            # Preserve the model's simulation_id so newly saved checkpoints live under the same model folder
-            if not simulation_id or simulation_id.startswith("local-"):
-                simulation_id = base_model_id
+            if is_finetune:
+                self.parent_model_id = base_model_id
+                self.parent_episode = start_episode
+                # Re-initialize optimizer with reduced LR and reset replay buffer
+                self.agent.prepare_for_finetuning(learning_rate=finetune_lr)
+
+                # Fork simulation_id into branched model name
+                clean_base = base_model_id.split(":")[0] if ":" in base_model_id else base_model_id
+                scenario_slug = finetune_scenario.lower().replace(" ", "_")
+                simulation_id = f"{clean_base}-ft-{scenario_slug}"
+                if self.app_state:
+                    self.app_state.current_simulation_id = simulation_id
+
+                # Assign traffic profile
+                self.env.set_traffic_profile(profile)
+
+                # Episode indexing: fine-tune runs for 1..num_episodes
+                start_episode = 0
+                total_target_episodes = num_episodes
+
+                # Epsilon schedule: warm reset to finetune_epsilon, decaying to 0.05
+                self.epsilon = finetune_epsilon
+                decay_steps = max(1, int(num_episodes * 0.75))
+                self.finetune_decay = (0.05 / max(0.06, finetune_epsilon)) ** (1.0 / decay_steps)
+            else:
+                # Normal resume: preserve simulation_id
+                if not simulation_id or simulation_id.startswith("local-"):
+                    simulation_id = base_model_id
+                self.env.set_traffic_profile(SCENARIO_PROFILES["uniform"])
+                total_target_episodes = start_episode + num_episodes
+                if start_episode > 0:
+                    decayed_eps = self.hyperparams.epsilon_start * (self.hyperparams.epsilon_decay ** start_episode)
+                    self.epsilon = max(self.hyperparams.epsilon_end, decayed_eps)
+                else:
+                    self.epsilon = self.hyperparams.epsilon_start
+        else:
+            # Fresh training
+            self.env.set_traffic_profile(SCENARIO_PROFILES["uniform"])
+            total_target_episodes = num_episodes
+            self.epsilon = self.hyperparams.epsilon_start
 
         self.start_episode = start_episode
         self.current_episode = start_episode
-        total_target_episodes = start_episode + num_episodes
         self.target_episodes = total_target_episodes
-
-        # ── Calculate Epsilon for resumed or fresh training ─────────────────
-        if start_episode > 0:
-            # Continue the mathematical exponential decay from the start episode
-            decayed_eps = self.hyperparams.epsilon_start * (self.hyperparams.epsilon_decay ** start_episode)
-            self.epsilon = max(self.hyperparams.epsilon_end, decayed_eps)
-        else:
-            self.epsilon = self.hyperparams.epsilon_start
 
         # ── Task 5.2: Curriculum setup ─────────────────────────────────────
         curriculum = TrainingCurriculum(
             env=self.env,
             total_episodes=total_target_episodes,
-        ) if self.enable_curriculum else None
+        ) if (self.enable_curriculum and not self.is_finetune) else None
 
-        # ── Task 5.1: Greedy demonstration warm-start ──────────────────────
-        # Only warm up when starting fresh with an empty buffer; skip if resumed
-        if not self.is_resumed and self.enable_greedy_warmup and len(self.agent.replay_buffer) < self.hyperparams.MIN_REPLAY_SIZE:
+        # ── Warm-start Seeding ─────────────────────────────────────────────
+        if self.is_finetune and profile:
+            logger.info("Fine-tuning: seeding replay buffer with base policy on scenario '%s'...", profile.name)
+            state, _ = self.env.reset()
+            seed_steps = min(self.hyperparams.MIN_REPLAY_SIZE, 600)
+            for _ in range(seed_steps):
+                action = self.agent.select_action(state, epsilon=self.epsilon)
+                next_state, reward, terminated, truncated, info = self.env.step(action)
+                executed_action = info.get("executed_action", action)
+                self.agent.replay_buffer.push(
+                    state,
+                    executed_action,
+                    reward,
+                    next_state,
+                    terminated,
+                    valid_action_mask=None,
+                )
+                state = self.env.reset()[0] if (terminated or truncated) else next_state
+
+            await self.ws_broadcast_fn({
+                "type": "warmup_complete",
+                "message": f"Pre-trained policy seeded buffer with {seed_steps} transitions on scenario '{profile.name}'.",
+            })
+            await self.ws_broadcast_fn({
+                "type":                  "training_finetuned",
+                "model_id":              simulation_id,
+                "parent_model_id":       self.parent_model_id,
+                "parent_episode":        self.parent_episode,
+                "scenario":              finetune_scenario,
+                "scenario_name":         profile.name,
+                "num_episodes":          num_episodes,
+                "target_episodes":       num_episodes,
+                "learning_rate":         finetune_lr,
+                "initial_epsilon":       finetune_epsilon,
+                "message":               f"Fine-tuning started for '{profile.name}' ({num_episodes} episodes, α={finetune_lr}, ε={finetune_epsilon}).",
+            })
+        elif not self.is_resumed and self.enable_greedy_warmup and len(self.agent.replay_buffer) < self.hyperparams.MIN_REPLAY_SIZE:
             teacher = GreedyTeacher(env=self.env)
             logger.info("Starting Greedy teacher warm-start...")
             await asyncio.to_thread(
@@ -215,13 +301,19 @@ class Trainer:
             episode_num = start_episode + episode_index + 1
             self.current_episode = episode_num
 
-            # ── Task 5.2: Apply curriculum λ for this episode ───────────────
+            # ── Curriculum or Scenario Status ──────────────────────────────
             curriculum_status = {}
-            if curriculum is not None:
+            if curriculum is not None and not self.is_finetune:
                 stage_name, applied_lambda = curriculum.apply(episode_num)
                 curriculum_status = {
                     "stage": stage_name,
                     "lambda": applied_lambda,
+                }
+            elif self.is_finetune and profile:
+                curriculum_status = {
+                    "stage": f"Fine-Tuning: {profile.name}",
+                    "lambda": getattr(profile, "base_lambda", 0.85),
+                    "scenario": self.finetune_scenario,
                 }
 
             state, _ = self.env.reset()
@@ -288,9 +380,10 @@ class Trainer:
             if stopped_early:
                 break
 
+            current_decay = self.finetune_decay if self.is_finetune else self.hyperparams.epsilon_decay
             self.epsilon = max(
                 self.hyperparams.epsilon_end,
-                self.epsilon * self.hyperparams.epsilon_decay,
+                self.epsilon * current_decay,
             )
 
             avg_wait = self.env.intersection.get_avg_wait_time()
@@ -347,6 +440,10 @@ class Trainer:
                     "target_episodes":         total_target_episodes,
                     "is_resumed":              self.is_resumed,
                     "resume_model_id":         self.resume_model_id,
+                    "is_finetuned":            self.is_finetune,
+                    "finetune_scenario":       self.finetune_scenario,
+                    "parent_model_id":         self.parent_model_id,
+                    "parent_episode":          self.parent_episode,
                     "total_reward":            total_reward,
                     "avg_wait_time":           avg_wait,
                     "throughput":              throughput,
@@ -372,8 +469,9 @@ class Trainer:
             )
 
             is_stopping = not self.is_training
+            save_interval = 25 if self.is_finetune else 50
             should_save_checkpoint = simulation_id and (
-                episode_num % 50 == 0 or is_last_episode or is_stopping
+                episode_num % save_interval == 0 or is_last_episode or is_stopping
             )
 
             # Sync active inference agent immediately whenever a new best or milestone occurs
@@ -397,6 +495,12 @@ class Trainer:
                 chk_state["is_best"] = is_new_best
                 chk_state["best_avg_wait"] = best_avg_wait
                 chk_state["episode"] = episode_num
+                if self.is_finetune:
+                    chk_state["is_finetuned"] = True
+                    chk_state["parent_model_id"] = self.parent_model_id
+                    chk_state["parent_episode"] = self.parent_episode
+                    chk_state["scenario"] = self.finetune_scenario
+
                 await asyncio.to_thread(
                     self.model_service.save_checkpoint,
                     simulation_id,
@@ -439,11 +543,15 @@ class Trainer:
 
     def get_status(self) -> dict:
         return {
-            "current_episode": self.current_episode,
-            "start_episode":   getattr(self, "start_episode", 0),
-            "target_episodes": getattr(self, "target_episodes", 0),
-            "is_resumed":      getattr(self, "is_resumed", False),
-            "resume_model_id": getattr(self, "resume_model_id", None),
-            "epsilon":         self.epsilon,
-            "is_training":     self.is_training,
+            "current_episode":   self.current_episode,
+            "start_episode":     getattr(self, "start_episode", 0),
+            "target_episodes":   getattr(self, "target_episodes", 0),
+            "is_resumed":        getattr(self, "is_resumed", False),
+            "resume_model_id":   getattr(self, "resume_model_id", None),
+            "is_finetuned":      getattr(self, "is_finetune", False),
+            "finetune_scenario": getattr(self, "finetune_scenario", None),
+            "parent_model_id":   getattr(self, "parent_model_id", None),
+            "parent_episode":    getattr(self, "parent_episode", None),
+            "epsilon":           self.epsilon,
+            "is_training":       self.is_training,
         }

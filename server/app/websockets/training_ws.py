@@ -61,13 +61,23 @@ async def training_socket(websocket: WebSocket) -> None:
                 simulation_id = message.get("simulation_id")
                 resume_model_id = message.get("resume_model_id")
                 resume_episode = message.get("resume_episode")
+                is_finetune = message.get("mode") == "finetune" or bool(message.get("is_finetune", False))
+                finetune_scenario = message.get("finetune_scenario", "rush_hour")
+                finetune_lr = float(message.get("finetune_lr", 1e-4))
+                finetune_epsilon = float(message.get("finetune_epsilon", 0.25))
+
                 if resume_episode is not None:
                     try:
                         resume_episode = int(resume_episode)
                     except Exception:
                         resume_episode = None
 
-                if resume_model_id and not simulation_id:
+                if is_finetune:
+                    base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
+                    scenario_slug = finetune_scenario.lower().replace(" ", "_")
+                    simulation_id = f"{base_id}-ft-{scenario_slug}"
+                    app.state.current_simulation_id = simulation_id
+                elif resume_model_id and not simulation_id:
                     base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
                     simulation_id = base_id
                     app.state.current_simulation_id = simulation_id
@@ -94,6 +104,10 @@ async def training_socket(websocket: WebSocket) -> None:
                             num_episodes,
                             resume_model_id=resume_model_id,
                             resume_episode=resume_episode,
+                            is_finetune=is_finetune,
+                            finetune_scenario=finetune_scenario,
+                            finetune_lr=finetune_lr,
+                            finetune_epsilon=finetune_epsilon,
                         )
                     )
                     app.state.training_task = task

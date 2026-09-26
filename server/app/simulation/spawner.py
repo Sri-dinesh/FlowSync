@@ -1,4 +1,5 @@
-from typing import Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -8,14 +9,91 @@ from .vehicle import DEFAULT_SPEED, Vehicle
 MAX_QUEUE = 15
 
 
+@dataclass
+class TrafficProfile:
+    id: str
+    name: str
+    description: str
+    directional_weights: Dict[str, float] = field(
+        default_factory=lambda: {"north": 1.0, "south": 1.0, "east": 1.0, "west": 1.0}
+    )
+    turn_probs: List[float] = field(
+        default_factory=lambda: [0.5, 0.25, 0.25]
+    )  # [straight, left, right]
+    base_lambda: float = 0.5
+    lambda_multiplier: float = 1.0
+
+
+SCENARIO_PROFILES: Dict[str, TrafficProfile] = {
+    "uniform": TrafficProfile(
+        id="uniform",
+        name="Standard Balanced",
+        description="Uniform distribution across all 4 approaches and standard turn ratios (50% straight, 25% left, 25% right).",
+        directional_weights={"north": 1.0, "south": 1.0, "east": 1.0, "west": 1.0},
+        turn_probs=[0.50, 0.25, 0.25],
+        base_lambda=0.5,
+        lambda_multiplier=1.0,
+    ),
+    "rush_hour": TrafficProfile(
+        id="rush_hour",
+        name="Rush Hour Corridor",
+        description="Extreme North-South commuter corridor surge (80% traffic on NS corridor, 20% on EW cross-streets).",
+        directional_weights={"north": 1.8, "south": 1.8, "east": 0.4, "west": 0.4},
+        turn_probs=[0.60, 0.20, 0.20],
+        base_lambda=0.85,
+        lambda_multiplier=1.2,
+    ),
+    "heavy_left": TrafficProfile(
+        id="heavy_left",
+        name="Heavy Left Turns",
+        description="High turning conflict with 50% left turns, demanding optimal protected arrow phase allocations.",
+        directional_weights={"north": 1.0, "south": 1.0, "east": 1.0, "west": 1.0},
+        turn_probs=[0.30, 0.50, 0.20],
+        base_lambda=0.75,
+        lambda_multiplier=1.0,
+    ),
+    "arterial_surge": TrafficProfile(
+        id="arterial_surge",
+        name="East-West Arterial",
+        description="High-speed East-West main thoroughfare with subordinate North-South feeder streets.",
+        directional_weights={"north": 0.35, "south": 0.35, "east": 1.9, "west": 1.9},
+        turn_probs=[0.70, 0.15, 0.15],
+        base_lambda=0.90,
+        lambda_multiplier=1.15,
+    ),
+    "platoon_burst": TrafficProfile(
+        id="platoon_burst",
+        name="Platoon Congestion",
+        description="Heavy platoons and dense arrival bursts across all approaches demanding quick queue clearance.",
+        directional_weights={"north": 1.25, "south": 1.25, "east": 1.25, "west": 1.25},
+        turn_probs=[0.50, 0.25, 0.25],
+        base_lambda=1.25,
+        lambda_multiplier=1.3,
+    ),
+}
+
+
 class PoissonSpawner:
     def __init__(self, lambda_rate: float = 0.5) -> None:
         self.lambda_rate = lambda_rate
         self.enabled = True
         self._rng = np.random.default_rng()
+        self.profile: Optional[TrafficProfile] = None
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
+
+    def set_profile(self, profile: Any) -> None:
+        """Assign a traffic profile (either a TrafficProfile object or preset name key)."""
+        if isinstance(profile, str):
+            self.profile = SCENARIO_PROFILES.get(profile, SCENARIO_PROFILES["uniform"])
+        elif isinstance(profile, TrafficProfile):
+            self.profile = profile
+        else:
+            self.profile = None
+
+        if self.profile and self.profile.base_lambda:
+            self.set_rate(self.profile.base_lambda)
 
     def set_enabled(self, enabled: bool) -> None:
         self.enabled = bool(enabled)
@@ -76,14 +154,23 @@ class PoissonSpawner:
             return spawned
 
         dir_names = ["north", "south", "east", "west"]
-        # Per approach arrival rate
-        per_dir_rate = self.lambda_rate
+
+        # Profile parameters (directional asymmetry and turn probabilities)
+        dir_weights = (
+            self.profile.directional_weights
+            if self.profile
+            else {"north": 1.0, "south": 1.0, "east": 1.0, "west": 1.0}
+        )
+        turn_probs = self.profile.turn_probs if self.profile else [0.5, 0.25, 0.25]
+        lambda_mult = self.profile.lambda_multiplier if self.profile else 1.0
 
         for dir_name in dir_names:
+            weight = dir_weights.get(dir_name, 1.0)
+            per_dir_rate = self.lambda_rate * weight * lambda_mult
+
             num_to_spawn = int(self._rng.poisson(per_dir_rate * dt))
             for _ in range(num_to_spawn):
-                # Decide turn: 50% straight, 25% left, 25% right
-                turn = str(self._rng.choice(["straight", "left", "right"], p=[0.5, 0.25, 0.25]))
+                turn = str(self._rng.choice(["straight", "left", "right"], p=turn_probs))
                 lane_id = f"{dir_name}_{turn}"
                 lane_queue = lanes.get(lane_id, [])
 

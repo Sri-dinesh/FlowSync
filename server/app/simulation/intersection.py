@@ -302,6 +302,9 @@ class Intersection:
     def set_spawn_rate(self, lambda_rate: float) -> None:
         self.spawner.set_rate(lambda_rate)
 
+    def set_traffic_profile(self, profile: Any) -> None:
+        self.spawner.set_profile(profile)
+
     def reset(self) -> None:
         for queue in self.lanes.values():
             queue.clear()

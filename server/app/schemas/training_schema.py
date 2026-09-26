@@ -18,5 +18,9 @@ class StartTrainingRequest(BaseModel):
     simulation_id: Optional[str] = None
     resume_model_id: Optional[str] = None
     resume_episode: Optional[int] = None
+    mode: str = "fresh"  # "fresh" | "resume" | "finetune"
+    finetune_scenario: Optional[str] = "rush_hour"
+    finetune_lr: Optional[float] = 1e-4
+    finetune_epsilon: Optional[float] = 0.25
 
     model_config = {"protected_namespaces": ()}

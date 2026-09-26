@@ -54,6 +54,27 @@ class DQNAgent:
         self.all_masked_fallback_count = 0  # A-03: audit all-masked fallback triggers
         self.latest_q_stats: Dict[str, float] = {}  # P-01/P-02/P-03: Q-value health metrics
 
+    def prepare_for_finetuning(self, learning_rate: float = 1e-4) -> None:
+        """
+        Prepare agent for fine-tuning on a specialized scenario:
+        1. Preserves learned weights in online_net and target_net.
+        2. Re-initializes optimizer with reduced learning rate (default 1e-4) and fresh Adam moments.
+        3. Clears replay buffer to remove stale generic experiences.
+        4. Resets training step counters.
+        """
+        self.optimizer = optim.Adam(
+            self.online_net.parameters(),
+            lr=learning_rate,
+            eps=1e-8,
+        )
+        self.replay_buffer = PrioritizedReplayBuffer(HP.REPLAY_BUFFER_SIZE)
+        self.step_count = 0
+        self.total_train_steps = 0
+        logger.info(
+            "DQNAgent primed for fine-tuning: lr=%.6f, replay buffer reset, online weights preserved",
+            learning_rate,
+        )
+
     def select_action(
         self,
         state: np.ndarray,
