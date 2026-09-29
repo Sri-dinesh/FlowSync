@@ -41,12 +41,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Training agent — used exclusively by Trainer
     training_agent = DQNAgent()
 
-    # Attempt to auto-load the latest trained model checkpoint into agents
+    # Only auto-load checkpoints trained against the corrected v6 semantics.
+    # Legacy weights have matching tensor shapes but learned from a different
+    # reward and demand process, so silently accepting them is unsafe.
+    active_model_id = None
+    active_model_episode = None
     try:
         models = model_service.list_all_models()
-        if models:
-            first_model = models[0]
-            m_id = first_model.get("id")
+        seen_model_ids = set()
+        for model in models:
+            m_id = str(model.get("id", "")).split(":", 1)[0]
+            if not m_id or m_id in seen_model_ids:
+                continue
+            seen_model_ids.add(m_id)
             cps = model_service.list_checkpoints(m_id)
             episodes = [
                 int(p.split("checkpoint_")[1].split(".")[0])
@@ -54,14 +61,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 if "checkpoint_" in p and p.split("checkpoint_")[1].split(".")[0].isdigit()
             ]
             if episodes:
-                best_ep = max(episodes)
+                best_ep = 0 if 0 in episodes else max(episodes)
                 cp_data = model_service.load_checkpoint(m_id, best_ep)
-                if isinstance(cp_data, dict) and "online_net" in cp_data:
+                compatible = (
+                    cp_data.get("obs_version") == "v6_28dim_smdp"
+                    and cp_data.get("reward_version") == "v4_incremental_delay"
+                )
+                if compatible and "online_net" in cp_data:
                     sim_agent.online_net.load_state_dict(cp_data["online_net"])
                     sim_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
                     training_agent.online_net.load_state_dict(cp_data["online_net"])
                     training_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
-                    print(f"[ModelService] Auto-loaded trained model checkpoint: {m_id} (ep {best_ep})")
+                    selected_ep = int(cp_data.get("episode", best_ep))
+                    active_model_id = m_id
+                    active_model_episode = selected_ep
+                    print(f"[ModelService] Auto-loaded trained model checkpoint: {m_id} (ep {selected_ep}, validated best={best_ep == 0})")
+                    break
     except Exception as e:
         print(f"[ModelService] Default checkpoint load skipped: {e}")
 
@@ -88,8 +103,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.current_simulation_id = None
     app.state.sim_task = None
     app.state.training_task = None
-    app.state.active_model_id = None
-    app.state.active_model_episode = None
+    app.state.active_model_id = active_model_id
+    app.state.active_model_episode = active_model_episode
 
     # --- CCTV / Real-World ---
     try:

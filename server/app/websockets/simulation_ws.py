@@ -161,7 +161,7 @@ def _build_obs_from_intersection(intersection, forecaster: Optional[ArrivalForec
     pressure_norm = min(total_pressure / 20.0, 1.0)
 
     max_starv_norm = min(
-        max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
+        max(signal.phase_starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
     )
 
     if forecaster is not None:
@@ -191,7 +191,9 @@ def _select_ai_phase_action(
     Returns: (action, was_watchdog_override)
     """
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    # Right turns are unsignalized in Intersection.tick(), so they must not make
+    # a signal phase appear demanded.
+    PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
 
     queues = intersection.get_movement_queues()
     phase_demands = {
@@ -211,8 +213,11 @@ def _select_ai_phase_action(
     if not (signal.can_switch_phase and signal.color.name == "GREEN"):
         return signal.current_phase, False
 
-    # 1. Starvation Watchdog Guard: any phase with queued vehicles starved >= 12.0s
-    starved_phases = [ph for ph, t in phase_starvation.items() if t >= 12.0 and phase_demands[ph] > 0]
+    # Match the safety envelope used during training.
+    starved_phases = [
+        ph for ph, t in phase_starvation.items()
+        if t >= signal.STARVATION_THRESHOLD and phase_demands[ph] > 0
+    ]
     if starved_phases:
         action = max(starved_phases, key=lambda p: phase_starvation[p])
         return action, True
@@ -221,7 +226,7 @@ def _select_ai_phase_action(
     other_phase_counts = {
         ph: phase_demands[ph] for ph in range(4) if ph != signal.current_phase
     }
-    if (signal.is_max_green_exceeded or signal.time_in_phase >= 18.0) and any(other_phase_counts.values()):
+    if signal.is_max_green_exceeded and any(other_phase_counts.values()):
         action = max(other_phase_counts, key=lambda p: other_phase_counts[p])
         return action, True
 
@@ -230,7 +235,11 @@ def _select_ai_phase_action(
     if valid_phases:
         if agent is not None:
             try:
-                q_values = agent.get_q_values(obs)
+                valid_mask = np.array(
+                    [phase_demands[p] > 0 or p == signal.current_phase for p in range(4)],
+                    dtype=bool,
+                )
+                q_values = agent.get_q_values(obs, valid_action_mask=valid_mask)
                 action = max(valid_phases, key=lambda p: q_values[p])
             except Exception:
                 action = max(valid_phases, key=lambda p: phase_demands[p])
@@ -241,8 +250,7 @@ def _select_ai_phase_action(
     # Fallback when all queues are 0: let agent explore/choose or hold phase
     if agent is not None:
         try:
-            action = agent.select_action(obs, epsilon=0.0)
-            return action, False
+            return signal.current_phase, False
         except Exception:
             pass
     return signal.current_phase, False
@@ -294,7 +302,10 @@ async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int |
         if not checkpoints:
             return model_id_clean, target_ep or active_e
 
-        episodes = [ep for p in checkpoints if (ep := _parse_checkpoint_ep(p))]
+        episodes = [
+            ep for p in checkpoints
+            if (ep := _parse_checkpoint_ep(p)) is not None
+        ]
         if not episodes:
             return model_id_clean, target_ep or active_e
 
@@ -303,9 +314,19 @@ async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int |
         elif target_ep is not None:
             chosen_ep = min(episodes, key=lambda e: abs(e - target_ep))
         else:
-            chosen_ep = max(episodes)
+            # checkpoint_0.pt is the held-out validation winner.
+            chosen_ep = 0 if 0 in episodes else max(episodes)
 
         checkpoint_data = await asyncio.to_thread(model_service.load_checkpoint, model_id_clean, chosen_ep)
+        if (
+            checkpoint_data.get("obs_version") != "v6_28dim_smdp"
+            or checkpoint_data.get("reward_version") != "v4_incremental_delay"
+        ):
+            raise ValueError(
+                "legacy checkpoint is incompatible with the corrected v6 observation/reward semantics; "
+                "retrain it with scripts/train_rl_offline.py"
+            )
+        selected_episode = int(checkpoint_data.get("episode", chosen_ep))
         sim_agent = getattr(app.state, "sim_agent", None)
         if sim_agent and "online_net" in checkpoint_data:
             sim_agent.online_net.load_state_dict(checkpoint_data["online_net"])
@@ -316,12 +337,17 @@ async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int |
             sim_agent.target_net.eval()
 
         app.state.active_model_id = model_id_clean
-        app.state.active_model_episode = chosen_ep
-        logger.info("Successfully loaded agent checkpoint %s at episode %d", model_id_clean, chosen_ep)
-        return model_id_clean, chosen_ep
+        app.state.active_model_episode = selected_episode
+        logger.info(
+            "Successfully loaded agent checkpoint %s at episode %d%s",
+            model_id_clean,
+            selected_episode,
+            " (held-out best)" if chosen_ep == 0 else "",
+        )
+        return model_id_clean, selected_episode
     except Exception as e:
         logger.warning("Could not load agent checkpoint %s: %s", model_id, e)
-        return str(model_id), model_episode or active_e
+        return active_m, active_e
 
 
 # ─── Timed Benchmark ─────────────────────────────────────────────────────────
@@ -352,7 +378,7 @@ async def _run_timed_benchmark(
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
     TICK_SLEEP = 0.10      # wall-clock seconds between ticks (normal 1.0x real-time speed)
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
 
     results: dict = {}
     prev_mode    = getattr(app.state, "mode", "fixed")
@@ -565,7 +591,10 @@ async def _run_timed_benchmark(
                     intersection.tick(dt=TICK_DT, action=action)
                 elif mode == "ai" and agent is not None:
                     signal = intersection.signal
-                    benchmark_forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
+                    benchmark_forecaster.tick(
+                        dt=TICK_DT,
+                        spawned_this_step=max(0, getattr(intersection, "_generated_last_tick", 0)),
+                    )
                     obs = _build_obs_from_intersection(intersection, benchmark_forecaster)
 
                     action, _ = _select_ai_phase_action(
@@ -803,7 +832,7 @@ async def _run_timed_benchmark(
                 # D-02: Version metadata
                 "environment_version": "v1.2",
                 "state_version":       "v1_28d",
-                "reward_version":      "v3_delay_anchored",
+                "reward_version":      "v4_incremental_delay",
                 "controller_version":  "v2.1",
                 # RW-01: Benchmark type labeling
                 "benchmark_type":      "cctv_digital_twin_replay" if is_realworld else "simulation_crn_paired",
@@ -970,7 +999,7 @@ async def _run_model_benchmark(
 
                 # DQN AI decision logic
                 signal = intersection.signal
-                benchmark_forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
+                benchmark_forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_generated_last_tick", 0)))
                 obs = _build_obs_from_intersection(intersection, benchmark_forecaster)
 
                 action, _ = _select_ai_phase_action(
@@ -1243,7 +1272,7 @@ async def _run_scenario_benchmark(
     from ..simulation.vehicle import DEFAULT_SPEED, Vehicle
 
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
     TICK_DT     = 0.1
 
     prev_mode    = getattr(app.state, "mode", "fixed")
@@ -1420,7 +1449,7 @@ async def _run_scenario_benchmark(
 
                 elif controller == "ai":
                     signal = intersection.signal
-                    forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_spawned_this_interval", 0)))
+                    forecaster.tick(dt=TICK_DT, spawned_this_step=max(0, getattr(intersection, "_generated_last_tick", 0)))
                     obs = _build_obs_from_intersection(intersection, forecaster)
 
                     action, was_override = _select_ai_phase_action(
@@ -1732,7 +1761,7 @@ async def _simulation_loop(app) -> None:
         app.state.sim_forecaster = forecaster
 
     PHASE_DIRS = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-    PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+    PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
     phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
 
     try:
@@ -1768,7 +1797,7 @@ async def _simulation_loop(app) -> None:
                 prev_spawned = getattr(intersection, "_spawned_this_interval", 0)
                 if mode in ("fixed", "manual"):
                     intersection.tick(dt=0.1, action=None, is_manual=(mode == "manual"))
-                    spawned_this = getattr(intersection, "_spawned_this_interval", 0) - prev_spawned
+                    spawned_this = getattr(intersection, "_generated_last_tick", 0)
                     forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this))
                     last_reward = 0.0
                 elif mode == "greedy":
@@ -1794,12 +1823,12 @@ async def _simulation_loop(app) -> None:
 
                     greedy_action = best_phase if signal.can_switch_phase else signal.current_phase
                     intersection.tick(dt=0.1, action=greedy_action)
-                    spawned_this = getattr(intersection, "_spawned_this_interval", 0) - prev_spawned
+                    spawned_this = getattr(intersection, "_generated_last_tick", 0)
                     forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this))
                     last_reward = 0.0
                 elif mode == "ai":
                     signal = intersection.signal
-                    spawned_this = getattr(intersection, "_spawned_this_interval", 0) - prev_spawned
+                    spawned_this = getattr(intersection, "_generated_last_tick", 0)
                     forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this))
                     obs = _build_obs_from_intersection(intersection, forecaster)
 
@@ -2431,4 +2460,3 @@ async def simulation_socket(websocket: WebSocket) -> None:
             task = app.state.sim_task
             if task and not task.done():
                 task.cancel()
-

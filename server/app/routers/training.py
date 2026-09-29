@@ -175,7 +175,11 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     if not checkpoints:
         raise HTTPException(status_code=404, detail=f"No checkpoints found for {model_id}")
 
-    episodes = [episode for path in checkpoints if (episode := _parse_episode(path))]
+    episodes = [
+        episode
+        for path in checkpoints
+        if (episode := _parse_episode(path)) is not None
+    ]
     if not episodes:
         raise HTTPException(status_code=404, detail="No valid checkpoints found")
 
@@ -189,6 +193,14 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     checkpoint_data = await asyncio.to_thread(
         model_service.load_checkpoint, model_id, chosen_episode
     )
+    if (
+        checkpoint_data.get("obs_version") != "v6_28dim_smdp"
+        or checkpoint_data.get("reward_version") != "v4_incremental_delay"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Legacy checkpoint is incompatible with corrected v6 training; start fresh.",
+        )
 
     sim_agent = app.state.sim_agent
     training_agent = app.state.training_agent
@@ -217,7 +229,12 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     training_agent.target_net.eval()
 
     app.state.active_model_id = model_id
-    app.state.active_model_episode = chosen_episode
+    actual_episode = int(checkpoint_data.get("episode", chosen_episode))
+    app.state.active_model_episode = actual_episode
 
-    return {"status": "loaded", "model_id": model_id, "episode": chosen_episode}
-
+    return {
+        "status": "loaded",
+        "model_id": model_id,
+        "episode": actual_episode,
+        "checkpoint_episode": chosen_episode,
+    }

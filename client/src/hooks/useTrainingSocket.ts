@@ -14,6 +14,9 @@ export function useTrainingSocket() {
   const setTraining = useSimulationStore(
     (state) => state.setTraining,
   );
+  const setTrainingStatus = useSimulationStore(
+    (state) => state.setTrainingStatus,
+  );
 
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -36,6 +39,7 @@ export function useTrainingSocket() {
 
     socket.onopen = () => {
       retryRef.current = 0;
+      setTrainingStatus("Training service connected");
       console.log("%c[TrainWS] Connected", "color:#22c55e;font-weight:bold", {
         url: `${baseUrl}/ws/training`,
       });
@@ -45,9 +49,25 @@ export function useTrainingSocket() {
       try {
         const payload = JSON.parse(event.data);
 
-        // Filter out event/notification payloads (checkpoint_saved, warmup_complete, etc.)
+        // Handle lifecycle/progress events separately from episode metrics.
         if (payload && typeof payload === "object" && "type" in payload) {
           console.log("[TrainWS] Notification:", payload);
+          const message = typeof payload.message === "string" ? payload.message : null;
+          if (payload.type === "training_error") {
+            setTraining(Boolean(payload.is_training));
+            setTrainingStatus(message, message ?? "Training failed");
+          } else if (
+            payload.type === "training_request_received" ||
+            payload.type === "training_started" ||
+            payload.type === "warmup_progress"
+          ) {
+            setTraining(true);
+            setTrainingStatus(message);
+          } else if (payload.type === "warmup_complete") {
+            setTrainingStatus(message ?? "Warm-up complete; starting episode 1...");
+          } else if (payload.type === "checkpoint_saved") {
+            setTrainingStatus(`Checkpoint saved at episode ${payload.episode ?? "?"}`);
+          }
           return;
         }
 
@@ -65,6 +85,7 @@ export function useTrainingSocket() {
             payload,
           );
           addTrainingMetric(payload as TrainingMetric);
+          setTrainingStatus(`Training episode ${payload.episode}`);
         }
       } catch (err) {
         console.warn("[TrainWS] Failed to parse message:", event.data, err);
@@ -86,6 +107,7 @@ export function useTrainingSocket() {
       if (!shouldReconnectRef.current) {
         return;
       }
+      setTrainingStatus("Training service disconnected", "WebSocket disconnected");
 
       if (retryRef.current >= MAX_RETRIES) {
         return;
@@ -105,7 +127,7 @@ export function useTrainingSocket() {
       );
       socket.close();
     };
-  }, [addTrainingMetric, setTraining]);
+  }, [addTrainingMetric, setTraining, setTrainingStatus]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -124,14 +146,21 @@ export function useTrainingSocket() {
     };
   }, [connect]);
 
-  const sendCommand = useCallback((command: Record<string, unknown>) => {
+  const sendCommand = useCallback((command: Record<string, unknown>): boolean => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       console.log("%c[TrainWS] → SENDING COMMAND:", "color:#94a3b8;font-weight:bold", command);
       socketRef.current.send(JSON.stringify(command));
+      return true;
     } else {
       console.warn("[TrainWS] Cannot send command, socket not open. State:", socketRef.current?.readyState);
+      setTraining(false);
+      setTrainingStatus(
+        "Training command was not sent",
+        "The training WebSocket is not connected. Restart the backend and refresh this page.",
+      );
+      return false;
     }
-  }, []);
+  }, [setTraining, setTrainingStatus]);
 
   return { sendCommand };
 }

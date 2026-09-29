@@ -63,6 +63,7 @@ import { useTrainingSocket } from "@/hooks/useTrainingSocket";
 import { useSimulations } from "@/hooks/useSimulations";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { Scenario } from "@/types/simulation";
+import { getFastApiUrls } from "@/lib/utils";
 
 export default function SimulationPage() {
   const {
@@ -89,17 +90,19 @@ export default function SimulationPage() {
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
 
   // Available DQN AI Models for benchmark checkpoint selection
-  const [models, setModels] = useState<Array<{ id: string; name: string; version: string; episodes?: number; source?: string }>>([]);
+  const [models, setModels] = useState<Array<{ id: string; name: string; version: string; episodes?: number; source?: string; is_best?: boolean }>>([]);
   const [scenarioModelId, setScenarioModelId] = useState<string>("");
 
   useEffect(() => {
+    let cancelled = false;
     async function fetchModels() {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const { httpUrl: apiBase } = getFastApiUrls();
         const res = await fetch(`${apiBase}/training/models`);
         if (res.ok) {
           const payload = await res.json();
           const list = payload.models ?? [];
+          if (cancelled) return;
           setModels(list);
           if (list.length > 0) {
             setScenarioModelId((prev) => prev || list[0].id);
@@ -109,7 +112,12 @@ export default function SimulationPage() {
         // ignore
       }
     }
-    fetchModels();
+    void fetchModels();
+    const refreshTimer = window.setInterval(fetchModels, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   // Latest scenario run result (for optimistic ScenarioHistory update)
@@ -201,7 +209,6 @@ export default function SimulationPage() {
               <SimulationControls sendCommand={sendSimulationCommand} />
               <TrainingControls
                 sendCommand={sendTrainingCommand}
-                simulationId={simulationId}
               />
             </div>
           </div>
@@ -297,7 +304,7 @@ export default function SimulationPage() {
                                   const selected = models.find((m) => m.id === scenarioModelId);
                                   return selected ? (
                                     <span className="font-mono text-[10px] text-violet-300 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full font-medium">
-                                      {selected.episodes ?? selected.version} eps
+                                      {selected.is_best ? "Best validated" : `${selected.episodes ?? selected.version} eps`}
                                     </span>
                                   ) : null;
                                 })()}
@@ -314,7 +321,7 @@ export default function SimulationPage() {
                                 ) : (
                                   models.map((m) => (
                                     <option key={m.id} value={m.id}>
-                                      {m.name} — {m.episodes ?? m.version} eps ({m.source === "remote" ? "Cloud" : "Local"})
+                                      {m.name} — {m.is_best ? "Best validated" : `${m.episodes ?? m.version} eps`} ({m.source === "remote" ? "Cloud" : "Local"})
                                     </option>
                                   ))
                                 )}

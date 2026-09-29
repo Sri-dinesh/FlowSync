@@ -215,6 +215,32 @@ def list_all_models() -> List[Dict[str, Any]]:
         if max_ep <= 0:
             continue
 
+        # checkpoint_0.pt is an alias for the held-out validation winner.  It
+        # must be visible in the website; otherwise the UI can only benchmark
+        # the latest numbered checkpoint, which is not necessarily the best.
+        if 0 in episodes_found:
+            best_is_remote = 0 in remote_eps
+            best_is_local = (
+                LOCAL_MODELS_DIR / model_id / "checkpoint_0.pt"
+            ).exists()
+            models_dict[f"{model_id}:0"] = {
+                "id": f"{model_id}:0",
+                "name": f"{base_name} — Best validated ({date_part})",
+                "version": "best",
+                "source": "remote" if best_is_remote else "local",
+                "in_cloud": best_is_remote,
+                "storage_location": (
+                    "Supabase Cloud" if best_is_remote else "Local Disk"
+                ),
+                "episodes": 0,
+                "checkpoint_episode": 0,
+                "avg_reward": row.get("avgReward"),
+                "is_active": row.get("isActive", False),
+                "is_best": True,
+                "is_finetuned": "-ft-" in model_id,
+                "sort_date": date_part,
+            }
+
         completed_episodes = [max_ep]
         for milestone in (2000, 1500, 1000, 500, 300, 200, 100):
             if milestone in episodes_found and milestone not in completed_episodes:
@@ -281,10 +307,20 @@ def list_all_models() -> List[Dict[str, Any]]:
                 "is_active": row.get("isActive", False) if ep == max_ep else False,
                 "is_finetuned": is_finetuned,
                 "scenario": scenario_name,
+                "sort_date": date_part,
             }
 
     # Sort descending by episode count, then name
-    return sorted(models_dict.values(), key=lambda m: (m["episodes"], m.get("name", "")), reverse=True)
+    return sorted(
+        models_dict.values(),
+        key=lambda m: (
+            bool(m.get("is_best")),
+            m.get("sort_date", "") if m.get("is_best") else "",
+            m["episodes"],
+            m.get("name", ""),
+        ),
+        reverse=True,
+    )
 
 
 def list_local_models() -> List[Dict[str, Any]]:

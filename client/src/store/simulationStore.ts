@@ -16,6 +16,8 @@ interface SimulationStore {
   currentFrame: SimulationFrame | null;
   lastFrameAt: number | null;
   trainingMetrics: TrainingMetric[];
+  trainingStatus: string | null;
+  trainingError: string | null;
   setFrame: (frame: SimulationFrame) => void;
   addTrainingMetric: (metric: TrainingMetric) => void;
   setMode: (mode: SimulationMode) => void;
@@ -24,6 +26,7 @@ interface SimulationStore {
   setRunning: (value: boolean) => void;
   setIsBenchmarkRunning: (value: boolean) => void;
   setTraining: (value: boolean) => void;
+  setTrainingStatus: (message: string | null, error?: string | null) => void;
   resetMetrics: () => void;
   resetSimulation: () => void;
 }
@@ -40,6 +43,8 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   currentFrame: null,
   lastFrameAt: null,
   trainingMetrics: [],
+  trainingStatus: null,
+  trainingError: null,
   setFrame: (frame) =>
     set((state) => ({
       currentFrame: frame,
@@ -64,6 +69,8 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   setRunning: (value) => set({ isRunning: value }),
   setIsBenchmarkRunning: (value) => set({ isBenchmarkRunning: value }),
   setTraining: (value) => set({ isTraining: value }),
+  setTrainingStatus: (message, error = null) =>
+    set({ trainingStatus: message, trainingError: error }),
   resetMetrics: () => set({ trainingMetrics: [] }),
   resetSimulation: () =>
     set({

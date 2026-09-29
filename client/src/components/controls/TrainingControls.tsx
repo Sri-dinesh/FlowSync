@@ -87,8 +87,7 @@ const SCENARIO_PRESETS = [
 ];
 
 interface TrainingControlsProps {
-  sendCommand: (command: Record<string, unknown>) => void;
-  simulationId: string | null;
+  sendCommand: (command: Record<string, unknown>) => boolean;
 }
 
 function MiniSparkline({ values, color, height = 32 }: { values: number[]; color: string; height?: number }) {
@@ -222,10 +221,12 @@ function StatCard({
   );
 }
 
-export default function TrainingControls({ sendCommand, simulationId }: TrainingControlsProps) {
+export default function TrainingControls({ sendCommand }: TrainingControlsProps) {
   const isTraining = useSimulationStore((s) => s.isTraining);
   const trainingMetrics = useSimulationStore((s) => s.trainingMetrics);
   const setTraining = useSimulationStore((s) => s.setTraining);
+  const trainingStatus = useSimulationStore((s) => s.trainingStatus);
+  const trainingError = useSimulationStore((s) => s.trainingError);
   const queryClient = useQueryClient();
 
   const [showConfig, setShowConfig] = useState(false);
@@ -397,7 +398,6 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
         return;
       }
       setTargetEpisodes(finetuneEpisodes);
-      setTraining(true);
       startTimeRef.current = Date.now();
 
       const isCustom = finetuneScenario === "custom";
@@ -417,7 +417,7 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
           }
         : undefined;
 
-      sendCommand({
+      const sent = sendCommand({
         command: "start_training",
         mode: "finetune",
         num_episodes: finetuneEpisodes,
@@ -427,8 +427,9 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
         finetune_lr: finetuneLr,
         finetune_epsilon: finetuneEpsilon,
         custom_profile: customProfilePayload,
-        simulation_id: simulationId ?? undefined,
       });
+      if (!sent) return;
+      setTraining(true);
       setShowConfig(false);
     } else if (trainingMode === "resume") {
       if (!resumeModelId || resumeModelId === "__none") {
@@ -437,27 +438,27 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
       }
       const totalTarget = resumeBaseEpisode + additionalEpisodes;
       setTargetEpisodes(totalTarget);
-      setTraining(true);
       startTimeRef.current = Date.now();
-      sendCommand({
+      const sent = sendCommand({
         command: "start_training",
         mode: "resume",
         num_episodes: additionalEpisodes,
         resume_model_id: resumeModelId,
         resume_episode: resumeBaseEpisode,
-        simulation_id: simulationId ?? undefined,
       });
+      if (!sent) return;
+      setTraining(true);
       setShowConfig(false);
     } else {
       setTargetEpisodes(numEpisodes);
-      setTraining(true);
       startTimeRef.current = Date.now();
-      sendCommand({
+      const sent = sendCommand({
         command: "start_training",
         mode: "fresh",
         num_episodes: numEpisodes,
-        simulation_id: simulationId ?? undefined,
       });
+      if (!sent) return;
+      setTraining(true);
       setShowConfig(false);
     }
   };
@@ -1386,6 +1387,16 @@ export default function TrainingControls({ sendCommand, simulationId }: Training
           </motion.div>
         )}
       </AnimatePresence>
+
+      {(trainingStatus || trainingError) && (
+        <div className={`rounded-md border px-3 py-2 text-[10px] ${
+          trainingError
+            ? "border-red-500/30 bg-red-500/10 text-red-300"
+            : "border-blue-500/20 bg-blue-500/10 text-blue-200"
+        }`}>
+          {trainingError ?? trainingStatus}
+        </div>
+      )}
 
       {/* Load Model */}
       <div className="space-y-2">

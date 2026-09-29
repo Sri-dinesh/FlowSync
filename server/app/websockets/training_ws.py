@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from typing import List
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -43,6 +42,22 @@ async def broadcast_training_metric(data: dict) -> None:
     await training_manager.broadcast(data)
 
 
+async def _run_training_task(trainer, *args, **kwargs) -> None:
+    """Run training without losing background-task exceptions."""
+    try:
+        await trainer.train(*args, **kwargs)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        trainer.is_training = False
+        logger.exception("Training task failed")
+        await broadcast_training_metric({
+            "type": "training_error",
+            "is_training": False,
+            "message": str(exc) or exc.__class__.__name__,
+        })
+
+
 async def training_socket(websocket: WebSocket) -> None:
     await training_manager.connect(websocket)
     app = websocket.app
@@ -57,6 +72,11 @@ async def training_socket(websocket: WebSocket) -> None:
             command = message.get("command")
 
             if command == "start_training":
+                await websocket.send_json({
+                    "type": "training_request_received",
+                    "is_training": True,
+                    "message": "Training request received; preparing the run...",
+                })
                 num_episodes = int(message.get("num_episodes", 500))
                 simulation_id = message.get("simulation_id")
                 resume_model_id = message.get("resume_model_id")
@@ -88,23 +108,34 @@ async def training_socket(websocket: WebSocket) -> None:
                     app.state.current_simulation_id = simulation_id
                 elif not simulation_id:
                     try:
-                        simulation_id = await asyncio.to_thread(
-                            supabase_service.create_simulation, "ai"
+                        simulation_id = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                supabase_service.create_simulation, "ai"
+                            ),
+                            timeout=20.0,
                         )
                         if simulation_id:
                             app.state.current_simulation_id = simulation_id
                         else:
-                            logger.error("Supabase create_simulation returned an empty id for training")
-                            simulation_id = f"local-{int(time.time())}"
-                            app.state.current_simulation_id = simulation_id
+                            raise RuntimeError(
+                                "Supabase create_simulation returned an empty id"
+                            )
                     except Exception:
                         logger.exception("Failed to create training simulation record")
-                        simulation_id = f"local-{int(time.time())}"
-                        app.state.current_simulation_id = simulation_id
+                        await websocket.send_json({
+                            "type": "training_error",
+                            "is_training": False,
+                            "message": (
+                                "Could not create the Supabase training run. "
+                                "Check backend credentials/network and try again."
+                            ),
+                        })
+                        continue
 
                 if not trainer.is_training:
                     task = asyncio.create_task(
-                        trainer.train(
+                        _run_training_task(
+                            trainer,
                             simulation_id or "",
                             num_episodes,
                             resume_model_id=resume_model_id,
@@ -117,6 +148,18 @@ async def training_socket(websocket: WebSocket) -> None:
                         )
                     )
                     app.state.training_task = task
+                    await websocket.send_json({
+                        "type": "training_started",
+                        "is_training": True,
+                        "simulation_id": simulation_id,
+                        "message": "Training started; collecting demonstration transitions...",
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "training_error",
+                        "is_training": True,
+                        "message": "A training run is already active.",
+                    })
             elif command == "stop_training":
                 app.state.trainer.stop()
     except WebSocketDisconnect:
