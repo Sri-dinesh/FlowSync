@@ -4,7 +4,7 @@ hyperparams.py — FlowSync RL Hyperparameters
 Changes:
   - Task 4.2: STATE_DIM updated to 28 (from 20) to accommodate 8 demand-forecast features
   - Task 2.1: Added DECISION_DT = 2.0 seconds (Semi-MDP decision interval reference)
-  - Updated obs_version to v5_28dim_forecast for checkpoint compatibility tracking
+  - Updated obs_version to v6_28dim_smdp for checkpoint compatibility tracking
 """
 from dataclasses import dataclass
 
@@ -18,24 +18,28 @@ class HyperParams:
 
     # ── Learning ──────────────────────────────────────────────────────────────
     LEARNING_RATE: float = 3e-4   # slightly lower for Dueling stability
-    GAMMA: float = 0.97           # higher discount, appropriate for semi-MDP
+    # Discount per DECISION_DT seconds.  Variable-duration signal changes use
+    # GAMMA ** (elapsed_seconds / DECISION_DT) in the replay target.
+    GAMMA: float = 0.99
     BATCH_SIZE: int = 128         # larger batch for PER stability
 
     # ── Training schedule ─────────────────────────────────────────────────────
-    TRAIN_EVERY_N_STEPS: int = 4  # train every 4 steps for optimal learning & speed
-    MAX_STEPS_PER_EPISODE: int = 500
+    TRAIN_EVERY_N_STEPS: int = 1  # one update per causal decision transition
+    # 300 simulated seconds.  The old 500-tick (50 s) horizon ended before a
+    # fixed controller could complete one four-phase cycle (~52 s).
+    MAX_STEPS_PER_EPISODE: int = 3_000
     DEFAULT_EPISODES: int = 500
-    TARGET_UPDATE_FREQ: int = 300
+    TARGET_UPDATE_FREQ: int = 500
     CHECKPOINT_EVERY_N_EPISODES: int = 50
 
     # ── Replay buffer ─────────────────────────────────────────────────────────
     REPLAY_BUFFER_SIZE: int = 100_000
-    MIN_REPLAY_SIZE: int = 500    # warm up in <1 episode (500 steps × 0.1dt = 50s)
+    MIN_REPLAY_SIZE: int = 1_000
 
     # ── Exploration ───────────────────────────────────────────────────────────
     EPSILON_START: float = 1.0
     EPSILON_END: float = 0.05
-    EPSILON_DECAY: float = 0.994  # reaches 0.05 by ~550 episodes (good for 500-ep runs)
+    EPSILON_DECAY: float = 0.997  # reaches 0.05 at roughly 1,000 episodes
 
     # ── PER parameters (Schaul et al. 2016) ──────────────────────────────────
     PER_ALPHA: float = 0.6
@@ -61,7 +65,7 @@ class HyperParams:
     FORECAST_DIMS: int = 8        # dims 20-27 in the 28-D state vector
 
     # ── Observation versioning (for checkpoint compatibility) ─────────────────
-    OBS_VERSION: str = "v5_28dim_forecast"
+    OBS_VERSION: str = "v6_28dim_smdp"
 
     # ── Backward-compatible property mappings ─────────────────────────────────
     @property

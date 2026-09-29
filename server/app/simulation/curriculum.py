@@ -142,6 +142,7 @@ class TrainingCurriculum:
         """
         stage = self._get_stage(episode)
         lambda_val = stage.get_lambda()
+        previous_stage = self._current_stage
         self._current_stage = stage
         self._current_lambda = lambda_val
 
@@ -149,7 +150,7 @@ class TrainingCurriculum:
         self.env.intersection.set_spawn_rate(lambda_val)
 
         # Log stage transitions
-        if self._current_stage is None or stage.name != getattr(self._current_stage, "name", ""):
+        if previous_stage is None or stage.name != previous_stage.name:
             logger.info(
                 "Curriculum stage transition → [%s] at episode %d: λ=%.2f | %s",
                 stage.name,

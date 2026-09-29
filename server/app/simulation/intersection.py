@@ -24,6 +24,10 @@ class Intersection:
         self.emergency_override_lane: Optional[str] = None
         self._spawned_this_interval = 0
         self._passed_this_interval = 0
+        self._spawned_last_tick = 0
+        self._generated_last_tick = 0
+        self._delay_this_tick = 0.0
+        self.completed_wait_times: List[float] = []
 
     def trigger_emergency_override(self, lane: str) -> None:
         if lane not in ["north", "south", "east", "west"]:
@@ -100,10 +104,20 @@ class Intersection:
 
         # Tick signal: in fixed mode, cycles strictly sequentially by fixed_duration;
         # in AI/greedy mode, requested_phase respects min green and yellow/red clearances
-        self.signal.tick(dt, requested_phase=action, is_manual=is_manual)
+        self.signal.tick(
+            dt,
+            lanes=self.lanes,
+            requested_phase=action,
+            is_manual=is_manual,
+        )
 
+        backlog_before = sum(self.spawner.get_backlog_counts().values())
         spawned_vehicles = self.spawner.spawn(dt, self.lanes)
         self._spawned_this_interval += len(spawned_vehicles)
+        self._spawned_last_tick = len(spawned_vehicles)
+        self._generated_last_tick = self.spawner.generated_last_tick
+        # Vehicles outside the finite rendered lane still incur real delay.
+        self._delay_this_tick = backlog_before * dt
 
         STOP_LINE = 0.42
         MIN_DIST = 0.08
@@ -182,11 +196,14 @@ class Intersection:
                                 vehicle.position = STOP_LINE
                                 can_move = False
 
+                wait_before = vehicle.wait_time
                 vehicle.tick(dt, can_move)
+                self._delay_this_tick += max(0.0, vehicle.wait_time - wait_before)
 
             newly_passed = [vehicle for vehicle in lane_queue if vehicle.state == "passed"]
             if newly_passed:
                 passed_vehicles.extend(newly_passed)
+                self.completed_wait_times.extend(v.wait_time for v in newly_passed)
                 self.total_passed += len(newly_passed)
                 self._passed_this_interval += len(newly_passed)
                 self.lanes[lane_id] = [
@@ -219,6 +236,8 @@ class Intersection:
         for lane_key, vehicles in self.lanes.items():
             direction = lane_key.split("_")[0]  # "north_straight" → "north"
             counts[direction] += sum(1 for v in vehicles if v.state != "passed")
+        for lane_key, count in self.spawner.get_backlog_counts().items():
+            counts[lane_key.split("_")[0]] += count
         return counts
 
     def get_movement_queues(self) -> Dict[str, int]:
@@ -228,8 +247,12 @@ class Intersection:
         Counts all non-passed vehicles in each lane.
         """
         queues = {}
+        backlog = self.spawner.get_backlog_counts()
         for lane_key, vehicles in self.lanes.items():
-            queues[lane_key] = sum(1 for v in vehicles if v.state != "passed")
+            queues[lane_key] = (
+                sum(1 for v in vehicles if v.state != "passed")
+                + backlog.get(lane_key, 0)
+            )
         return queues
 
     def get_outgoing_counts(self) -> Dict[str, int]:
@@ -279,25 +302,36 @@ class Intersection:
 
     def get_total_waiting(self) -> int:
         """Total vehicles in ALL lanes not yet passed."""
-        return sum(
+        active = sum(
             1 for vehicles in self.lanes.values()
             for v in vehicles
             if v.state != "passed"
         )
+        return active + sum(self.spawner.get_backlog_counts().values())
 
     def get_total_wait_time(self) -> float:
-        return sum(
+        active_wait = sum(
             vehicle.wait_time for queue in self.lanes.values()
             for vehicle in queue if vehicle.state != "passed"
         )
+        return active_wait + self.spawner.get_backlog_wait_time()
 
     def get_avg_wait_time(self) -> float:
-        waiting = [
+        # Include completed and still-active demand.  Looking only at vehicles
+        # left in the queue lets a controller improve the reported metric merely
+        # by serving its oldest vehicles just before measurement.
+        active_waits = [
             v.wait_time for vehicles in self.lanes.values()
-            for v in vehicles
-            if v.state != "passed"
+            for v in vehicles if v.state != "passed"
         ]
-        return sum(waiting) / len(waiting) if waiting else 0.0
+        backlog_count = sum(self.spawner.get_backlog_counts().values())
+        count = len(self.completed_wait_times) + len(active_waits) + backlog_count
+        total = (
+            sum(self.completed_wait_times)
+            + sum(active_waits)
+            + self.spawner.get_backlog_wait_time()
+        )
+        return total / count if count else 0.0
 
     def set_spawn_rate(self, lambda_rate: float) -> None:
         self.spawner.set_rate(lambda_rate)
@@ -316,3 +350,8 @@ class Intersection:
         self.emergency_override_lane = None
         self._spawned_this_interval = 0
         self._passed_this_interval = 0
+        self._spawned_last_tick = 0
+        self._generated_last_tick = 0
+        self._delay_this_tick = 0.0
+        self.completed_wait_times.clear()
+        self.spawner.reset()

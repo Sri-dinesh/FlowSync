@@ -30,6 +30,13 @@ PHASE_ALLOWED_TURNS: Dict[int, set] = {
     SignalPhase.EW_LEFT.value: {"left"},
 }
 
+PHASE_DEMAND_MOVEMENTS: Dict[int, List[str]] = {
+    0: ["north_straight", "south_straight"],
+    1: ["east_straight", "west_straight"],
+    2: ["north_left", "south_left"],
+    3: ["east_left", "west_left"],
+}
+
 
 class TrafficSignal:
     def __init__(self, red_duration: float = 3.0) -> None:
@@ -51,12 +58,21 @@ class TrafficSignal:
         self.STARVATION_THRESHOLD: float = 45.0  # seconds before starvation penalty
         self.MAX_GREEN_TIME: float = 40.0         # hard cap per phase
         self.MIN_GREEN_TIME: float = 8.0          # minimum before switching allowed
+        self.phase_starvation_timer: Dict[int, float] = {
+            phase: 0.0 for phase in range(4)
+        }
 
     def get_starved_directions(self) -> List[str]:
         """Returns directions that have been waiting longer than STARVATION_THRESHOLD."""
         return [
             d for d, t in self.starvation_timer.items()
             if t >= self.STARVATION_THRESHOLD
+        ]
+
+    def get_starved_phases(self) -> List[int]:
+        return [
+            phase for phase, elapsed in self.phase_starvation_timer.items()
+            if elapsed >= self.STARVATION_THRESHOLD
         ]
 
     @property
@@ -107,6 +123,18 @@ class TrafficSignal:
                 self.starvation_timer[direction] = 0.0
             else:
                 self.starvation_timer[direction] += dt
+
+        if lanes is not None:
+            for phase, movements in PHASE_DEMAND_MOVEMENTS.items():
+                has_demand = any(
+                    any(v.state != "passed" for v in lanes.get(movement, []))
+                    for movement in movements
+                )
+                is_served = self.color == SignalColor.GREEN and phase == self.current_phase
+                if is_served or not has_demand:
+                    self.phase_starvation_timer[phase] = 0.0
+                else:
+                    self.phase_starvation_timer[phase] += dt
         # Yellow handling
         if self.color == SignalColor.YELLOW:
             if self.time_in_phase >= self.yellow_duration:

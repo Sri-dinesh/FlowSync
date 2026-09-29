@@ -23,7 +23,7 @@ All improvements integrated in this version:
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -67,18 +67,26 @@ class TrafficEnv(gym.Env):
     - Demand forecast: ArrivalForecaster provides 8 predictive features for anticipatory control.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        max_steps: Optional[int] = None,
+        red_duration: Optional[float] = None,
+    ) -> None:
         super().__init__()
         self.intersection = Intersection(
             spawn_lambda=HP.TRAINING_LAMBDA,
-            red_duration=settings.signal_red_duration,
+            red_duration=(
+                settings.signal_red_duration if red_duration is None else red_duration
+            ),
         )
         self.observation_space = Box(
-            low=np.zeros(OBS_DIM, dtype=np.float32),
+            # Forecast growth/trend features are signed.
+            low=-np.ones(OBS_DIM, dtype=np.float32),
             high=np.ones(OBS_DIM, dtype=np.float32),
             dtype=np.float32,
         )
         self.action_space = Discrete(4)
+        self.max_steps = int(max_steps or HP.MAX_STEPS_PER_EPISODE)
 
         self._last_reward: float = 0.0
         self._episode: int = 0
@@ -116,6 +124,10 @@ class TrafficEnv(gym.Env):
         super().reset(seed=seed)
         self._episode += 1
         self.intersection.reset()
+        # Gymnasium's seed must control the component that actually samples
+        # arrivals.  Previously reset(seed=...) never reached default_rng().
+        if seed is not None:
+            self.intersection.spawner.set_seed(seed)
         self.intersection.spawner.set_enabled(True)
         self._last_reward = 0.0
 
@@ -131,7 +143,7 @@ class TrafficEnv(gym.Env):
         return self._get_obs(), {}
 
     # ────────────────────────────────────────────────────────────────────────
-    # Reward: Delay-Anchored (Task 3.1)
+    # Reward: incremental delay with pressure shaping
     # ────────────────────────────────────────────────────────────────────────
     def compute_reward(
         self,
@@ -142,53 +154,51 @@ class TrafficEnv(gym.Env):
         signal,
         prev_phase: int | None = None,
         delta_total_wait: float = 0.0,
+        delay_incurred: Optional[float] = None,
+        dt: float = 0.1,
     ) -> Tuple[float, Dict[str, float]]:
         """
         Delay-anchored reward with pressure shaping and component decomposition.
 
-        Components:
-          R_delay     = −Δ(total_wait_time) / 10.0    (BUG-D: amplified from /20 to /10)
-          R_pressure  = (Σprev_p − Σcurr_p) × 0.8    (secondary: pressure reduction)
-          R_throughput= vehicles_passed × 0.25        (BUG-D: raised from 0.15 to 0.25)
-          R_switch    = −0.2 if actual switch AND pressure > 0.5 (BUG-D: threshold 0.3→0.5)
-          R_starvation= −1.5 × n_starved              (penalise queue neglect)
-          R_max_green = −0.8 if max-green exceeded     (penalise phase hogging)
-          R_balance   = +0.15 if balanced              (encourage fairness)
+        The primary term is delay incurred *during this tick*.  The previous
+        reward used the change in wait stored on vehicles still in the scene;
+        removing a long-waiting vehicle therefore created a large positive
+        reward, even though that wait had already happened.
 
         Returns: (total_reward, components_dict)
         """
-        # 1. Delay (primary) — BUG-D: /10.0 makes this the dominant signal
-        delay_reward = -delta_total_wait / 10.0
+        # Backward-compatible fallback is retained for external callers, while
+        # the environment always supplies the exact per-tick delay increment.
+        if delay_incurred is None:
+            delay_incurred = max(0.0, delta_total_wait)
+        delay_reward = -float(delay_incurred) / 10.0
 
         # 2. Pressure differential
-        total_prev = compute_total_pressure(prev_pressures)
         total_curr = compute_total_pressure(curr_pressures)
-        pressure_reward = (total_prev - total_curr) * 0.8
+        # Penalize the pressure level, not only a telescoping difference.  A
+        # pure difference can be gamed at an arbitrary episode boundary.
+        pressure_reward = -total_curr * 0.05 * dt
 
         # 3. Throughput — BUG-D: raised coefficient for clearer signal
-        throughput_reward = vehicles_passed * 0.25
+        throughput_reward = vehicles_passed * 0.10
 
         # 4. Switch penalty — BUG-D: threshold 0.5 (was 0.3) — only penalize high-pressure switches
         if phase_changed and prev_phase is not None:
             prev_phase_pressure = compute_phase_pressure(prev_pressures, prev_phase)
-            switch_penalty = -0.2 if prev_phase_pressure > 0.5 else 0.0
+            switch_penalty = -0.10 if prev_phase_pressure > 0.5 else -0.03
         else:
             switch_penalty = 0.0
 
         # 5. Starvation penalty
-        starved = signal.get_starved_directions()
-        starvation_penalty = -1.5 * len(starved)
+        starved = signal.get_starved_phases()
+        starvation_penalty = -0.10 * len(starved) * dt
 
         # 6. Max-green violation
-        max_green_penalty = -0.8 if signal.is_max_green_exceeded else 0.0
+        max_green_penalty = -0.10 * dt if signal.is_max_green_exceeded else 0.0
 
-        # 7. Balance bonus
-        if total_curr > 0.05:
-            phase_pressures = [compute_phase_pressure(curr_pressures, p) for p in range(4)]
-            imbalance = max(phase_pressures) - min(phase_pressures)
-            balance_bonus = 0.15 if imbalance < 0.2 else 0.0
-        else:
-            balance_bonus = 0.0
+        # Reserved in telemetry for backward compatibility. A positive balance
+        # bonus can reward uniformly high congestion, so it stays disabled.
+        balance_bonus = 0.0
 
         components = {
             "delay":      delay_reward,
@@ -217,30 +227,36 @@ class TrafficEnv(gym.Env):
         self._env_step_count += 1  # BUG-E: increment per-episode counter
 
         # ── Semi-MDP: is this a causal decision step? ────────────────────────
-        # True whenever the signal is GREEN (trainer/teacher may further subsample).
-        # Yellow and all-red intervals are non-causal and always excluded.
-        is_decision_step = (signal.color == SignalColor.GREEN)
+        is_decision_step = (
+            signal.color == SignalColor.GREEN and signal.can_switch_phase
+        )
 
         # ── Watchdog override: max-green ─────────────────────────────────────
         was_overridden = False
         override_reason: Optional[str] = None
-        if signal.is_max_green_exceeded and action == signal.current_phase:
+        if (
+            is_decision_step
+            and signal.is_max_green_exceeded
+            and action == signal.current_phase
+        ):
             action = self._get_best_alternative_phase()
             was_overridden = True
             override_reason = "max_green_exceeded"
             self.watchdog_override_count += 1
 
         # ── Watchdog override: starvation ────────────────────────────────────
-        starved = signal.get_starved_directions()
-        if starved:
-            starved_phase = self._get_phase_for_direction(starved[0])
+        starved = signal.get_starved_phases()
+        if is_decision_step and starved:
+            starved_phase = max(
+                starved, key=lambda phase: signal.phase_starvation_timer[phase]
+            )
             if starved_phase != signal.current_phase:
                 action = starved_phase
                 was_overridden = True
-                override_reason = f"starvation_{starved[0]}"
+                override_reason = f"starvation_phase_{starved_phase}"
                 self.watchdog_override_count += 1
 
-        executed_action = action  # BUG-01: actual applied action
+        requested_action = action
 
         # ── Pre-step snapshots ──────────────────────────────────────────────
         prev_pressures = self._compute_movement_pressures(self.intersection)
@@ -248,10 +264,9 @@ class TrafficEnv(gym.Env):
         prev_phase = self.intersection.signal.current_phase
         prev_actual_phase = self.intersection.signal.current_phase  # BUG-A: track real phase
         prev_wait = self.intersection.get_total_wait_time()
-        prev_spawned = self.intersection._spawned_this_interval
 
         # ── Tick environment ─────────────────────────────────────────────────
-        passed_vehicles = self.intersection.tick(dt=0.1, action=executed_action)
+        passed_vehicles = self.intersection.tick(dt=0.1, action=requested_action)
         for pv in passed_vehicles:
             self.passed_vehicle_waits.append(pv.wait_time)
 
@@ -267,6 +282,11 @@ class TrafficEnv(gym.Env):
         # Fix: check if signal.current_phase actually changed after the tick, OR if
         # a yellow transition was just initiated (pending_phase set for first time).
         new_actual_phase = self.intersection.signal.current_phase
+        executed_action = (
+            self.intersection.signal.pending_phase
+            if self.intersection.signal.pending_phase is not None
+            else new_actual_phase
+        )
         actually_switched = (new_actual_phase != prev_actual_phase)
         switch_just_initiated = (
             self.intersection.signal.pending_phase is not None
@@ -279,7 +299,7 @@ class TrafficEnv(gym.Env):
         delta_total_wait = curr_wait - prev_wait
 
         # ── Task 4.1: Update arrival forecaster ──────────────────────────────
-        spawned_this_step = self.intersection._spawned_this_interval - prev_spawned
+        spawned_this_step = self.intersection._generated_last_tick
         self.forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this_step))
 
         # ── Compute reward ───────────────────────────────────────────────────
@@ -291,6 +311,8 @@ class TrafficEnv(gym.Env):
             signal=self.intersection.signal,
             prev_phase=prev_phase,
             delta_total_wait=delta_total_wait,
+            delay_incurred=self.intersection._delay_this_tick,
+            dt=0.1,
         )
         self._last_reward = reward
 
@@ -304,7 +326,7 @@ class TrafficEnv(gym.Env):
 
         obs = self._get_obs()
         terminated = False
-        truncated = self.intersection.timestep >= HP.MAX_STEPS_PER_EPISODE
+        truncated = self.intersection.timestep >= self.max_steps
 
         override_rate = (
             self.watchdog_override_count / max(self.total_decision_steps, 1) * 100.0
@@ -313,7 +335,7 @@ class TrafficEnv(gym.Env):
         info: Dict[str, Any] = {
             # S-01 / R-01: Explicit version tracking
             "state_version":           "v1_28d",
-            "reward_version":          "v3_delay_anchored",
+            "reward_version":          "v4_incremental_delay",
             # BUG-01: expose executed action for correct replay buffer push
             "executed_action":         executed_action,
             "proposed_action":         proposed_action,
@@ -327,7 +349,7 @@ class TrafficEnv(gym.Env):
             "pressures":               curr_pressures,
             "vehicles_passed":         vehicles_passed_this_step,
             "avg_wait_time":           self.intersection.get_avg_wait_time(),
-            "starved_directions":      starved,
+            "starved_phases":          starved,
             # watchdog telemetry
             "watchdog_override_count": self.watchdog_override_count,
             "total_decision_steps":    self.total_decision_steps,
@@ -337,6 +359,108 @@ class TrafficEnv(gym.Env):
         }
 
         return obs, reward, terminated, truncated, info
+
+    def get_valid_action_mask(self) -> np.ndarray:
+        """Return the action set shared by training, targets and inference.
+
+        The current phase is always legal (holding green).  Other phases become
+        legal when they have controllable demand.  Right turns are excluded
+        because this simulator models them as signal-independent movements.
+        """
+        signal = self.intersection.signal
+        mask = np.zeros(self.action_space.n, dtype=bool)
+        mask[signal.current_phase] = True
+        if signal.color != SignalColor.GREEN or not signal.can_switch_phase:
+            return mask
+
+        queues = self.intersection.get_movement_queues()
+        phase_movements = {
+            0: ("north_straight", "south_straight"),
+            1: ("east_straight", "west_straight"),
+            2: ("north_left", "south_left"),
+            3: ("east_left", "west_left"),
+        }
+        for phase, movements in phase_movements.items():
+            if sum(queues.get(m, 0) for m in movements) > 0:
+                mask[phase] = True
+        return mask
+
+    def advance_to_decision_point(self) -> np.ndarray:
+        """Warm the initial phase until a physically executable decision exists."""
+        while not (
+            self.intersection.signal.color == SignalColor.GREEN
+            and self.intersection.signal.can_switch_phase
+        ):
+            _, _, _, truncated, _ = self.step(self.intersection.signal.current_phase)
+            if truncated:
+                break
+        return self._get_obs()
+
+    def reset_to_decision(
+        self,
+        seed: int | None = None,
+        options: Dict[str, Any] | None = None,
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        self.reset(seed=seed, options=options)
+        return self.advance_to_decision_point(), {
+            "valid_action_mask": self.get_valid_action_mask(),
+        }
+
+    def step_decision(
+        self,
+        action: int,
+    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        """Execute one causal, variable-duration signal-control decision.
+
+        Holding a phase advances by DECISION_DT.  A phase change includes the
+        yellow/all-red clearance and the new minimum green.  Rewards are summed
+        across those micro-ticks and the returned discount captures the actual
+        elapsed duration for a semi-Markov Bellman target.
+        """
+        if not (0 <= int(action) < self.action_space.n):
+            raise ValueError(f"Invalid signal action: {action}")
+        if not (
+            self.intersection.signal.color == SignalColor.GREEN
+            and self.intersection.signal.can_switch_phase
+        ):
+            self.advance_to_decision_point()
+
+        action = int(action)
+        start_phase = self.intersection.signal.current_phase
+        elapsed = 0.0
+        cumulative_reward = 0.0
+        discount_weight = 1.0
+        last_info: Dict[str, Any] = {}
+        terminated = truncated = False
+        committed_action = action
+        first_tick = True
+
+        while True:
+            _, reward, terminated, truncated, last_info = self.step(committed_action)
+            if first_tick:
+                committed_action = int(last_info.get("executed_action", committed_action))
+                first_tick = False
+            cumulative_reward += discount_weight * reward
+            elapsed += 0.1
+            discount_weight *= HP.GAMMA ** (0.1 / HP.DECISION_DT)
+
+            at_next_gate = (
+                elapsed + 1e-9 >= HP.DECISION_DT
+                and self.intersection.signal.color == SignalColor.GREEN
+                and self.intersection.signal.can_switch_phase
+            )
+            if terminated or truncated or at_next_gate:
+                break
+
+        last_info = dict(last_info)
+        last_info.update({
+            "executed_action": committed_action,
+            "decision_start_phase": start_phase,
+            "decision_duration_seconds": elapsed,
+            "bootstrap_discount": HP.GAMMA ** (elapsed / HP.DECISION_DT),
+            "valid_action_mask": self.get_valid_action_mask(),
+        })
+        return self._get_obs(), cumulative_reward, terminated, truncated, last_info
 
     # ────────────────────────────────────────────────────────────────────────
     # Internal helpers
@@ -411,7 +535,7 @@ class TrafficEnv(gym.Env):
         pressure_norm = normalize_total_pressure(total_pressure)
 
         # Dim 19: max starvation timer
-        starv_timers = list(signal.starvation_timer.values())
+        starv_timers = list(signal.phase_starvation_timer.values())
         max_starv_norm = min(max(starv_timers) / signal.STARVATION_THRESHOLD, 1.0)
 
         # Dims 20-27: demand forecast features (Task 4.2)
@@ -445,7 +569,7 @@ class TrafficEnv(gym.Env):
         }
         return {
             "state_version":           "v1_28d",
-            "reward_version":          "v3_delay_anchored",
+            "reward_version":          "v4_incremental_delay",
             "reward_components":       comp_dict,
             "reward_component_stats":  comp_stats,
             "watchdog_override_count": self.watchdog_override_count,

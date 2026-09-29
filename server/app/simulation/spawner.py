@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from collections import deque
+from typing import Any, Deque, Dict, List, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -79,6 +80,17 @@ class PoissonSpawner:
         self.enabled = True
         self._rng = np.random.default_rng()
         self.profile: Optional[TrafficProfile] = None
+        # Demand that cannot yet enter a physically full approach is queued
+        # upstream instead of being silently deleted.  Silent deletion made a
+        # congested controller appear better by reducing the demand it served.
+        self._clock: float = 0.0
+        self._pending: Dict[str, Deque[float]] = {
+            f"{d}_{t}": deque()
+            for d in ["north", "south", "east", "west"]
+            for t in ["straight", "left", "right"]
+        }
+        self.generated_last_tick: int = 0
+        self.total_generated: int = 0
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
@@ -122,11 +134,34 @@ class PoissonSpawner:
     def set_enabled(self, enabled: bool) -> None:
         self.enabled = bool(enabled)
 
+    def reset(self) -> None:
+        """Clear episode-local demand while preserving the configured RNG/profile."""
+        self._clock = 0.0
+        self.generated_last_tick = 0
+        self.total_generated = 0
+        for arrivals in self._pending.values():
+            arrivals.clear()
+
+    def get_backlog_counts(self) -> Dict[str, int]:
+        return {lane: len(arrivals) for lane, arrivals in self._pending.items()}
+
+    def get_backlog_wait_time(self) -> float:
+        return sum(self.get_backlog_waits())
+
+    def get_backlog_waits(self) -> List[float]:
+        return [
+            max(0.0, self._clock - arrival_time)
+            for arrivals in self._pending.values()
+            for arrival_time in arrivals
+        ]
+
     def set_seed(self, seed: int | None = None) -> None:
         """
         Set seed for deterministic benchmark testing (CRN).
         Pass None to restore natural unseeded stochastic generation.
         """
+        # A seeded run defines a fresh demand trace, including upstream backlog.
+        self.reset()
         if seed is not None:
             self._rng = np.random.default_rng(int(seed))
         else:
@@ -168,13 +203,14 @@ class PoissonSpawner:
 
     def spawn(self, dt: float, lanes: Dict[str, List[Vehicle]]) -> List[Vehicle]:
         spawned: List[Vehicle] = []
+        self.generated_last_tick = 0
+        self._clock += max(0.0, dt)
 
         # Do not spawn when disabled or lambda is zero
         if not self.enabled or self.lambda_rate <= 0:
             return spawned
 
-        lane_names = list(lanes.keys())
-        if not lane_names:
+        if not lanes:
             return spawned
 
         dir_names = ["north", "south", "east", "west"]
@@ -188,30 +224,48 @@ class PoissonSpawner:
         turn_probs = self.profile.turn_probs if self.profile else [0.5, 0.25, 0.25]
         lambda_mult = self.profile.lambda_multiplier if self.profile else 1.0
 
+        # lambda_rate is the total junction demand (vehicles/second), as exposed
+        # by the API and curriculum.  The old implementation multiplied it by
+        # every direction weight, silently making balanced demand four times
+        # higher than configured.
+        total_weight = sum(max(0.0, dir_weights.get(d, 0.0)) for d in dir_names)
+        total_weight = max(total_weight, 1e-9)
         for dir_name in dir_names:
-            weight = dir_weights.get(dir_name, 1.0)
-            per_dir_rate = self.lambda_rate * weight * lambda_mult
+            weight = max(0.0, dir_weights.get(dir_name, 0.0))
+            per_dir_rate = self.lambda_rate * lambda_mult * (weight / total_weight)
 
             num_to_spawn = int(self._rng.poisson(per_dir_rate * dt))
             for _ in range(num_to_spawn):
                 turn = str(self._rng.choice(["straight", "left", "right"], p=turn_probs))
                 lane_id = f"{dir_name}_{turn}"
-                lane_queue = lanes.get(lane_id, [])
+                self._pending[lane_id].append(self._clock)
+                self.generated_last_tick += 1
+                self.total_generated += 1
 
-                if len(lane_queue) < MAX_QUEUE:
-                    # Prevent vehicle overlapping at spawn point (clearance length)
-                    if lane_queue and lane_queue[-1].position < 0.05:
-                        continue
-                    vehicle = Vehicle(
-                        id=str(uuid4()),
-                        lane=dir_name,
-                        turn=turn,
-                        position=0.0,
-                        wait_time=0.0,
-                        speed=DEFAULT_SPEED,
-                        state="waiting",
-                    )
-                    lane_queue.append(vehicle)
-                    spawned.append(vehicle)
+        # Admit upstream demand whenever there is physical room at the modelled
+        # lane entrance.  At most one vehicle per lane per tick is enough for the
+        # configured demand range and prevents visual overlap at position zero.
+        for lane_id, arrivals in self._pending.items():
+            if not arrivals:
+                continue
+            lane_queue = lanes.get(lane_id)
+            if lane_queue is None or len(lane_queue) >= MAX_QUEUE:
+                continue
+            if lane_queue and lane_queue[-1].position < 0.05:
+                continue
+
+            arrival_time = arrivals.popleft()
+            dir_name, turn = lane_id.split("_", 1)
+            vehicle = Vehicle(
+                id=str(uuid4()),
+                lane=dir_name,
+                turn=turn,
+                position=0.0,
+                wait_time=max(0.0, self._clock - arrival_time),
+                speed=DEFAULT_SPEED,
+                state="waiting",
+            )
+            lane_queue.append(vehicle)
+            spawned.append(vehicle)
 
         return spawned

@@ -84,6 +84,8 @@ class EpisodeMetrics:
     elapsed_wall_seconds: float = 0.0
     # Starvation: number of times any direction waited > STARVATION_THRESHOLD steps
     starvation_count: int = 0
+    total_arrivals: int = 0
+    service_rate: float = 0.0
 
 
 @dataclass
@@ -106,7 +108,7 @@ class BenchmarkResult:
     checkpoint_hash: str = ""
     environment_version: str = "v1.2"
     state_version: str = "v1_28d"
-    reward_version: str = "v3_delay_anchored"
+    reward_version: str = "v4_incremental_delay"
     hyperparams: Dict[str, Any] = field(default_factory=dict)
     timestamp: str = ""
 
@@ -232,7 +234,7 @@ class DeterministicEvaluator:
         seed_everything(seed)
         self._snapshot_agent_weights()
 
-        env = TrafficEnv()
+        env = TrafficEnv(max_steps=num_steps, red_duration=self.red_duration)
         env.intersection.set_spawn_rate(self.spawn_lambda)
         state, _ = env.reset(seed=seed)
 
@@ -255,11 +257,10 @@ class DeterministicEvaluator:
         max_queue: int = 0
         watchdog_overrides: List[Dict[str, Any]] = []
 
-        # Starvation tracking: count events where a direction is denied green
-        # for >= STARVATION_THRESHOLD consecutive steps (~3 s at 10 Hz)
-        STARVATION_THRESHOLD = 30
-        _ALL_DIRS = ["north", "south", "east", "west"]
-        _per_dir_no_green: Dict[str, int] = {d: 0 for d in _ALL_DIRS}
+        # Track starvation by controllable movement phase.  Direction-only
+        # accounting incorrectly treats a protected-left green as through service.
+        STARVATION_THRESHOLD = 450  # 45 seconds at 10 Hz
+        _per_phase_no_green: Dict[int, int] = {p: 0 for p in range(4)}
         starvation_events: int = 0
 
         vat_controller = None
@@ -268,11 +269,15 @@ class DeterministicEvaluator:
             vat_controller = VATController(env.intersection)
 
         PHASE_DIRS = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-        PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+        PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
 
         for step in range(num_steps):
             if self.mode == "ai":
-                action = self._select_action(state)
+                action = self.agent.select_action(
+                    state,
+                    epsilon=0.0,
+                    valid_action_mask=env.get_valid_action_mask(),
+                )
             elif self.mode in ("fixed", "manual"):
                 action = None
             elif self.mode in ("vat", "actuated"):
@@ -306,7 +311,7 @@ class DeterministicEvaluator:
             if vat_controller is not None:
                 vat_controller.update(
                     dt=0.1,
-                    spawned_this_step=max(0, getattr(env.intersection, "_spawned_this_interval", 0)),
+                    spawned_this_step=max(0, getattr(env.intersection, "_generated_last_tick", 0)),
                 )
             total_reward += reward
 
@@ -316,17 +321,22 @@ class DeterministicEvaluator:
             if step_q > max_queue:
                 max_queue = step_q
 
-            # Starvation tracking: which directions got green this step?
-            active_phase = env.intersection.signal.current_phase
-            green_dirs = PHASE_DIRS.get(active_phase, [])
-            for _d in _ALL_DIRS:
-                if _d not in green_dirs:
-                    _per_dir_no_green[_d] += 1
-                    if _per_dir_no_green[_d] >= STARVATION_THRESHOLD:
+            signal = env.intersection.signal
+            queues = env.intersection.get_movement_queues()
+            for phase in range(4):
+                demand = sum(
+                    queues.get(f"{d}_{t}", 0)
+                    for d in PHASE_DIRS[phase]
+                    for t in PHASE_TURNS[phase]
+                )
+                is_served = signal.color.name == "GREEN" and signal.current_phase == phase
+                if demand > 0 and not is_served:
+                    _per_phase_no_green[phase] += 1
+                    if _per_phase_no_green[phase] >= STARVATION_THRESHOLD:
                         starvation_events += 1
-                        _per_dir_no_green[_d] = 0  # reset counter after event
+                        _per_phase_no_green[phase] = 0
                 else:
-                    _per_dir_no_green[_d] = 0
+                    _per_phase_no_green[phase] = 0
 
             # R-04: Log watchdog override details (requested vs executed action, reason)
             if info.get("was_overridden"):
@@ -349,6 +359,8 @@ class DeterministicEvaluator:
 
         avg_wait = env.intersection.get_avg_wait_time()
         total_passed = env.intersection.total_passed
+        total_arrivals = env.intersection.spawner.total_generated
+        service_rate = total_passed / max(total_arrivals, 1)
         watchdog_count = getattr(env, "watchdog_override_count", 0)
         total_decisions = max(getattr(env, "total_decision_steps", 1), 1)
         override_rate = (watchdog_count / total_decisions) * 100.0
@@ -361,6 +373,7 @@ class DeterministicEvaluator:
             for v in queue:
                 if v.wait_time > 0:
                     all_delays.append(v.wait_time)
+        all_delays.extend(env.intersection.spawner.get_backlog_waits())
 
         if all_delays:
             median_delay = float(np.median(all_delays))
@@ -392,6 +405,8 @@ class DeterministicEvaluator:
             watchdog_overrides=watchdog_overrides,
             elapsed_wall_seconds=elapsed,
             starvation_count=starvation_events,
+            total_arrivals=total_arrivals,
+            service_rate=service_rate,
         )
 
     def run_multi_seed(

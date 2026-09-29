@@ -23,11 +23,12 @@ from typing import Deque, Dict, List, Tuple
 import numpy as np
 
 
-# ── EWMA smoothing factors (α = 1 − e^(−dt/τ)) ────────────────────────────
-# These correspond to exponential smoothing over 5s, 10s, and 20s windows.
-_ALPHA_5S  = 0.18   # fast: responsive to sudden bursts (λ ≈ 5s window)
-_ALPHA_10S = 0.10   # medium: balanced (λ ≈ 10s window)
-_ALPHA_20S = 0.05   # slow: trend-following (λ ≈ 20s window)
+# Time constants in seconds.  Alpha is computed from the actual caller dt;
+# fixed alphas of .18/.10/.05 at 10 Hz were really ~0.5/1/2-second filters,
+# ten times faster than their documented horizons.
+_TAU_5S = 5.0
+_TAU_10S = 10.0
+_TAU_20S = 20.0
 
 # Normalization cap: max expected arrivals/second (Poisson λ=2.0 → extreme scenario)
 _MAX_ARRIVAL_RATE = 2.0
@@ -56,14 +57,14 @@ class ArrivalForecaster:
 
     def __init__(
         self,
-        alpha_5s: float = _ALPHA_5S,
-        alpha_10s: float = _ALPHA_10S,
-        alpha_20s: float = _ALPHA_20S,
+        tau_5s: float = _TAU_5S,
+        tau_10s: float = _TAU_10S,
+        tau_20s: float = _TAU_20S,
         max_arrival_rate: float = _MAX_ARRIVAL_RATE,
     ) -> None:
-        self._alpha_5s = alpha_5s
-        self._alpha_10s = alpha_10s
-        self._alpha_20s = alpha_20s
+        self._tau_5s = tau_5s
+        self._tau_10s = tau_10s
+        self._tau_20s = tau_20s
         self._max_rate = max_arrival_rate
 
         # EWMA state (vehicles/step, then divided by dt to get vehicles/second)
@@ -93,10 +94,12 @@ class ArrivalForecaster:
         self._total_arrivals += spawned_this_step
         self._total_steps += 1
 
-        # EWMA update: ewma ← (1-α)×ewma + α×current
-        self._ewma_5s  = (1 - self._alpha_5s)  * self._ewma_5s  + self._alpha_5s  * instant_rate
-        self._ewma_10s = (1 - self._alpha_10s) * self._ewma_10s + self._alpha_10s * instant_rate
-        self._ewma_20s = (1 - self._alpha_20s) * self._ewma_20s + self._alpha_20s * instant_rate
+        alpha_5s = 1.0 - np.exp(-dt / max(self._tau_5s, 1e-6))
+        alpha_10s = 1.0 - np.exp(-dt / max(self._tau_10s, 1e-6))
+        alpha_20s = 1.0 - np.exp(-dt / max(self._tau_20s, 1e-6))
+        self._ewma_5s  = (1 - alpha_5s)  * self._ewma_5s  + alpha_5s  * instant_rate
+        self._ewma_10s = (1 - alpha_10s) * self._ewma_10s + alpha_10s * instant_rate
+        self._ewma_20s = (1 - alpha_20s) * self._ewma_20s + alpha_20s * instant_rate
 
         # Store recent 10-second EWMA for growth rate
         self._rate_history.append(self._ewma_10s)
