@@ -31,6 +31,8 @@ from ..simulation.traffic_math import MAX_CAP, compute_movement_pressures
 
 logger = logging.getLogger(__name__)
 
+SCENARIO_CONTROLLER_MODES = ("ai", "fixed", "greedy")
+
 # Sample one row every N simulation ticks (1 tick = 0.1 s → 50 ticks = 5 s)
 LOG_SAMPLE_INTERVAL = 50
 # Flush buffered rows to DB every N samples (50 samples × 5 s = ~4 min between flushes)
@@ -60,6 +62,36 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+def _normalize_scenario_modes(modes: Any) -> List[str]:
+    """Return unique, supported scenario controllers in requested order."""
+    if modes is None:
+        return list(SCENARIO_CONTROLLER_MODES)
+    if not isinstance(modes, list):
+        return []
+    normalized: List[str] = []
+    for value in modes:
+        mode = str(value).lower().strip()
+        if mode in SCENARIO_CONTROLLER_MODES and mode not in normalized:
+            normalized.append(mode)
+    return normalized
+
+
+def _controller_winners(results: Dict[str, Dict[str, Any]]) -> List[str]:
+    """Return every controller tied on the displayed ranking metrics."""
+    if not results:
+        return []
+
+    def score(result: Dict[str, Any]) -> tuple[float, int, int]:
+        return (
+            round(float(result.get("avg_wait_time", 0.0)), 2),
+            -int(result.get("total_passed", 0)),
+            int(result.get("max_queue", 0)),
+        )
+
+    best_score = min(score(result) for result in results.values())
+    return [mode for mode, result in results.items() if score(result) == best_score]
 
 
 # ─── Per-simulation buffer for bulk writes ────────────────────────────────────
@@ -478,6 +510,8 @@ async def _run_timed_benchmark(
             episode           = 0
             sim_time          = 0.0
             tick_count        = 0
+            max_queue_seen    = 0
+            queue_area        = 0.0
 
             if is_realworld:
                 # Real-world mode runs until all vehicles clear (safety timeout max 180s)
@@ -613,6 +647,18 @@ async def _run_timed_benchmark(
                     action = None
                     intersection.tick(dt=TICK_DT, action=None)
 
+                # Capture metrics across the entire run.  The previous code
+                # sampled only the final queue, which commonly returns zero
+                # and makes distinct controller trajectories look identical.
+                tick_queues = intersection.get_queue_lengths()
+                max_queue_seen = max(
+                    max_queue_seen,
+                    max(tick_queues.values(), default=0),
+                )
+                queue_area += sum(tick_queues.values()) * TICK_DT
+                if not is_realworld and not scenario_counts:
+                    spawned_count = int(intersection.spawner.total_generated)
+
                 # ── Build & broadcast frame (drives 3-D canvas) ────────────
                 simulation_id = app.state.current_simulation_id or "benchmark"
                 frame = build_frame(
@@ -663,7 +709,6 @@ async def _run_timed_benchmark(
                 await asyncio.sleep(sleep_t)
 
             # ── Collect results ────────────────────────────────────────────
-            queue_lengths = intersection.get_queue_lengths()
             final_time = float(duration_seconds) if not is_realworld else round(sim_time, 1)
             final_active = sum(len(q) for q in intersection.lanes.values())
             final_passed = (
@@ -671,11 +716,20 @@ async def _run_timed_benchmark(
                 if is_realworld and len(pending_arrivals) == 0 and final_active == 0
                 else intersection.total_passed
             )
+            total_arrivals = (
+                total_vehicles_to_clear
+                if is_realworld
+                else int(intersection.spawner.total_generated)
+                if not scenario_counts
+                else spawned_count
+            )
             results[mode] = {
                 "total_passed":    final_passed,
-                "total_vehicles":  total_vehicles_to_clear if is_realworld else final_passed,
+                "total_vehicles":  total_arrivals,
+                "service_rate":    round(final_passed / max(1, total_arrivals), 4),
                 "avg_wait_time":   round(intersection.get_avg_wait_time(), 2),
-                "max_queue":       max(queue_lengths.values(), default=0),
+                "max_queue":       max_queue_seen,
+                "queue_area":      round(queue_area, 2),
                 "duration_seconds": duration_seconds,
                 "clearance_time":  final_time,
             }
@@ -723,12 +777,11 @@ async def _run_timed_benchmark(
                 if f_clear > 0:
                     improvements["vat_clearance_pct"] = round(((f_clear - results["vat"]["clearance_time"]) / f_clear) * 100, 1)
 
-        # Winner: lowest avg wait time, fastest clearance time as tiebreaker
-        def _score_mode(m):
-            r = results[m]
-            return (-r.get("avg_wait_time", 0.0), -r.get("clearance_time", 0.0), r.get("total_passed", 0))
-
-        winner = max(results.keys(), key=_score_mode) if results else None
+        # Do not silently award exact ties to the first-inserted controller.
+        # Rank by the same rounded metrics shown in the UI, and expose every
+        # tied winner so equal DQN/Greedy outcomes are reported honestly.
+        winners = _controller_winners(results)
+        winner = winners[0] if winners else None
 
         # Auto-persist benchmark mode telemetry to session files for dashboard analytics & replay
         # E-01/F-04: Include benchmark metadata for scenario identification and population separation
@@ -757,7 +810,7 @@ async def _run_timed_benchmark(
                 m_wait = float(r_data.get("avg_wait_time", 0.0))
                 m_q = int(r_data.get("max_queue", 0))
                 m_dur = float(r_data.get("clearance_time", duration_seconds))
-                m_vehs = total_vehicles_to_clear if is_realworld else max(m_passed, int(m_passed * 1.05))
+                m_vehs = int(r_data.get("total_vehicles", m_passed))
 
                 sess_key = f"bench_{m_key}_{int(time.time())}_{benchmark_seed % 1000}"
                 file_p = sessions_dir / f"{sess_key}.json"
@@ -781,6 +834,8 @@ async def _run_timed_benchmark(
                     "duration_seconds": duration_seconds,
                     "is_realworld": is_realworld,
                     "winner": winner,
+                    "winners": winners,
+                    "is_tie": len(winners) > 1,
                     "improvements": improvements,
                     "benchmark_modes": modes,
                     "benchmark_results": results,
@@ -821,6 +876,8 @@ async def _run_timed_benchmark(
                 "duration_seconds": results.get(winner, {}).get("clearance_time", duration_seconds) if is_realworld else duration_seconds,
                 "results":          results,
                 "winner":           winner,
+                "winners":          winners,
+                "is_tie":           len(winners) > 1,
                 "modes":            modes,
                 "improvements":     improvements,
                 "benchmark_seed":   benchmark_seed,
@@ -1262,11 +1319,12 @@ async def _run_scenario_benchmark(
     duration_seconds: int,
     model_id: str,
     model_episode: int,
+    modes: List[str] | None = None,
 ) -> None:
     """
-    Real-time 3D multi-controller scenario evaluation.
-    Runs DQN (AI) → Fixed → Greedy sequentially in real-time, driving the 3D Canvas.
-    All controllers receive the identical pre-generated vehicle arrivals under Common Random Numbers (CRN).
+    Real-time scenario evaluation for one or more requested controllers.
+    Multi-controller runs receive the identical pre-generated vehicle arrivals
+    under Common Random Numbers (CRN).
     """
     import hashlib as _hashlib
     from ..simulation.vehicle import DEFAULT_SPEED, Vehicle
@@ -1288,11 +1346,20 @@ async def _run_scenario_benchmark(
             pass
     await asyncio.sleep(0.15)
 
-    # Resolve active model id and episode
-    active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
-    active_e = getattr(app.state, "active_model_episode", None) or 1000
-    clean_model_id = str(model_id).strip() if model_id else active_m
-    clean_model_ep = int(model_episode) if model_episode else active_e
+    controllers = _normalize_scenario_modes(modes)
+    if not controllers:
+        raise ValueError("At least one valid scenario controller is required")
+
+    # Baseline-only runs are independent of a DQN checkpoint.  Store neutral
+    # metadata instead of making a Fixed/Greedy run look tied to an episode.
+    if "ai" in controllers:
+        active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
+        active_e = getattr(app.state, "active_model_episode", None) or 1000
+        clean_model_id = str(model_id).strip() if model_id else active_m
+        clean_model_ep = int(model_episode) if model_episode else active_e
+    else:
+        clean_model_id = ""
+        clean_model_ep = 0
 
     # Unique run group identifier
     run_group_id = f"rg_{scenario_id[:8]}_{seed}_{int(time.time())}"
@@ -1316,7 +1383,6 @@ async def _run_scenario_benchmark(
         total_scheduled_vehicles, scenario_id, seed, spawn_lambda, duration_seconds,
     )
 
-    controllers = ["ai", "fixed", "greedy"]
     results: dict = {}
 
     prev_mode = getattr(app.state, "mode", "fixed")
@@ -1549,6 +1615,8 @@ async def _run_scenario_benchmark(
             ctrl_result = {
                 "avg_wait_time": avg_wait,
                 "total_passed": tot_passed,
+                "total_vehicles": total_scheduled_vehicles,
+                "service_rate": round(tot_passed / max(1, total_scheduled_vehicles), 4),
                 "max_queue": max_queue_seen,
                 "median_delay": med_delay,
                 "p95_delay": p95_d,
@@ -1628,30 +1696,29 @@ async def _run_scenario_benchmark(
                 await manager.broadcast(empty_frame.model_dump())
                 await asyncio.sleep(0.8)
 
+        fixed_res = results.get("fixed")
+        sc_improvements = {}
+        if fixed_res:
+            f_wait = fixed_res.get("avg_wait_time", 0.0)
+            if "ai" in results and f_wait > 0:
+                sc_improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
+            if "greedy" in results and f_wait > 0:
+                sc_improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
+
+        sc_winners = _controller_winners(results)
+        sc_winner = sc_winners[0] if sc_winners else None
+
         # ── Auto-persist scenario benchmark to session files for dashboard history ──
         try:
             sessions_dir = Path(SESSION_DIR)
             sessions_dir.mkdir(parents=True, exist_ok=True)
-
-            fixed_res = results.get("fixed")
-            sc_improvements = {}
-            if fixed_res:
-                f_wait = fixed_res.get("avg_wait_time", 0.0)
-                if "ai" in results and f_wait > 0:
-                    sc_improvements["ai_wait_pct"] = round(((f_wait - results["ai"]["avg_wait_time"]) / f_wait) * 100, 1)
-                if "greedy" in results and f_wait > 0:
-                    sc_improvements["greedy_wait_pct"] = round(((f_wait - results["greedy"]["avg_wait_time"]) / f_wait) * 100, 1)
-
-            def _sc_score(m):
-                r = results.get(m, {})
-                return (-r.get("avg_wait_time", 999.0), r.get("total_passed", 0))
-            sc_winner = max(results.keys(), key=_sc_score) if results else "ai"
 
             for m_key, r_data in results.items():
                 m_passed = int(r_data.get("total_passed", 0))
                 m_wait = float(r_data.get("avg_wait_time", 0.0))
                 m_q = int(r_data.get("max_queue", 0))
                 m_dur = float(r_data.get("duration_seconds", duration_seconds))
+                m_total = int(r_data.get("total_vehicles", m_passed))
 
                 sess_key = f"bench_sc_{scenario_id[:8]}_{m_key}_{int(time.time())}_{seed % 1000}"
                 file_p = sessions_dir / f"{sess_key}.json"
@@ -1674,6 +1741,8 @@ async def _run_scenario_benchmark(
                     "controller_type": m_key,
                     "duration_seconds": duration_seconds,
                     "winner": sc_winner,
+                    "winners": sc_winners,
+                    "is_tie": len(sc_winners) > 1,
                     "improvements": sc_improvements,
                     "benchmark_modes": controllers,
                     "benchmark_results": results,
@@ -1687,7 +1756,7 @@ async def _run_scenario_benchmark(
                         "frame_count": int(m_dur * 10),
                         "duration_s": m_dur,
                         "avg_fps": 10.0,
-                        "total_detections": max(m_passed, int(m_passed * 1.05)),
+                        "total_detections": m_total,
                         "throughput": m_passed,
                         "avg_wait_s": m_wait,
                         "peak_queue": m_q,
@@ -1695,7 +1764,7 @@ async def _run_scenario_benchmark(
                     "twin_data": {
                         "session_id": sess_key,
                         "total_frames_processed": int(m_dur * 10),
-                        "total_vehicles_detected": max(m_passed, int(m_passed * 1.05)),
+                        "total_vehicles_detected": m_total,
                         "video_duration_s": m_dur,
                         "total_passed": m_passed,
                         "arrivals": [],
@@ -1714,10 +1783,15 @@ async def _run_scenario_benchmark(
                 "scenario_id":    scenario_id,
                 "run_group_id":   run_group_id,
                 "model_id":       clean_model_id,
+                "model_episode":  clean_model_ep,
                 "scenario_hash":  scenario_hash,
                 "benchmark_seed": seed,
                 "duration_seconds": duration_seconds,
+                "modes":          controllers,
                 "results":        results,
+                "winner":         sc_winner,
+                "winners":        sc_winners,
+                "is_tie":         len(sc_winners) > 1,
             })
         except Exception as e:
             logger.warning("Final scenario_benchmark_results broadcast failed: %s", e)
@@ -1915,6 +1989,9 @@ async def _simulation_loop(app) -> None:
                     # 1. Immediately halt simulation state
                     app.state.sim_running = False
                     app.state.target_duration = None
+                    # Claim finalization before any await so a concurrent
+                    # browser `stop` cannot persist this same run again.
+                    app.state.simulation_finalized = True
                     try:
                         intersection.spawner.set_enabled(False)
                     except Exception:
@@ -2122,6 +2199,10 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 # Clean reset of intersection to ensure a brand-new, consistent run
                 app.state.sim_intersection.reset()
                 app.state.run_start_step = 0
+                # A timed run can finish before the browser's final `stop`
+                # command arrives.  Reset this guard for the new run so that
+                # either auto-stop or manual stop may persist it exactly once.
+                app.state.simulation_finalized = False
                 app.state.sim_running = True
                 
                 try:
@@ -2158,6 +2239,20 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     app.state.sim_intersection.spawner.set_enabled(False)
                 except Exception:
                     pass
+
+                # The timed loop already persisted this run and cleared its
+                # simulation id.  A browser stop sent in response to the
+                # duration-reached event must therefore be an idempotent no-op;
+                # previously it created a second `sim_ai_*` history record.
+                if getattr(app.state, "simulation_finalized", False):
+                    await manager.broadcast({
+                        "type": "simulation_stopped",
+                        "reason": "already_finalized",
+                        "simulation_id": getattr(
+                            app.state, "current_simulation_id", None
+                        ),
+                    })
+                    continue
 
                 simulation_id = app.state.current_simulation_id
                 intersection = app.state.sim_intersection
@@ -2253,6 +2348,7 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     logger.warning("Failed to write session file on stop: %s", se)
 
                 app.state.current_simulation_id = None
+                app.state.simulation_finalized = True
 
                 # Broadcast stopped confirmation to all connected clients
                 try:
@@ -2275,6 +2371,7 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 # 2. Hard stop execution
                 app.state.sim_running = False
                 app.state.target_duration = None
+                app.state.simulation_finalized = False
                 simulation_id = app.state.current_simulation_id
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
@@ -2378,9 +2475,15 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 _dur     = max(10, min(600, int(message.get("duration_seconds", 60))))
                 _model   = str(message.get("model_id", getattr(app.state, "active_model_id", "")))
                 _ep      = int(message.get("model_episode", getattr(app.state, "active_model_episode", 0)))
+                _modes   = _normalize_scenario_modes(message.get("modes"))
                 if not _sc_id:
                     try:
                         await websocket.send_json({"type": "error", "code": "MISSING_SCENARIO_ID", "message": "scenario_id is required"})
+                    except Exception:
+                        pass
+                elif not _modes:
+                    try:
+                        await websocket.send_json({"type": "error", "code": "INVALID_MODES", "message": "Choose at least one of: ai, fixed, greedy"})
                     except Exception:
                         pass
                 else:
@@ -2390,7 +2493,10 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     if getattr(app.state, "benchmark_task", None) is not None:
                         app.state.benchmark_task.cancel()
                     app.state.benchmark_task = asyncio.create_task(
-                        _run_scenario_benchmark(app, websocket, _sc_id, _seed, _lambda, _dur, _model, _ep)
+                        _run_scenario_benchmark(
+                            app, websocket, _sc_id, _seed, _lambda, _dur,
+                            _model, _ep, _modes,
+                        )
                     )
 
             elif command == "run_model_benchmark":
