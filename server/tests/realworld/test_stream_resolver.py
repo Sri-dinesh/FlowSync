@@ -20,7 +20,7 @@ def test_is_youtube_url():
     assert StreamResolver.is_youtube_url("https://vimeo.com/123456") is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_resolve_passthrough_non_youtube():
     rtsp_url = "rtsp://192.168.1.10:554/h264"
     resolved = await StreamResolver.resolve(rtsp_url)

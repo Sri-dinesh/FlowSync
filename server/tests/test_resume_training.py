@@ -35,13 +35,14 @@ async def test_trainer_resume_state_initialization():
     mock_model_service = MagicMock()
     mock_broadcast = AsyncMock()
 
-    # Create dummy checkpoint
     checkpoint_state = {
         "online_net": mock_agent.online_net.state_dict(),
         "target_net": mock_agent.target_net.state_dict(),
         "optimizer": mock_agent.optimizer.state_dict(),
         "step_count": 12345,
         "total_train_steps": 5432,
+        "obs_version": "v6_28dim_smdp",
+        "reward_version": "v4_incremental_delay",
     }
     mock_model_service.load_checkpoint.return_value = checkpoint_state
 
