@@ -1,4 +1,6 @@
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
 
 from .spawner import PoissonSpawner
 from .traffic_signal import TrafficSignal
