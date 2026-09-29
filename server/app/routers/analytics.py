@@ -9,6 +9,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -21,6 +22,121 @@ from ..services.supabase_service import supabase_client
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+_LEGACY_REWARD_RATING_RE = re.compile(
+    r"\s*-\s*(?:Excellent|Efficient|Fair|Poor|Failing|Needs Tuning)"
+    r"(?=\s*(?:—|$))",
+    re.IGNORECASE,
+)
+
+
+def _clean_legacy_model_label(value: Any) -> Any:
+    """Remove the old raw-reward rating while preserving the model identity."""
+    if not isinstance(value, str):
+        return value
+    return _LEGACY_REWARD_RATING_RE.sub("", value).strip()
+
+
+def _infer_benchmark_winners(
+    results: Dict[str, Dict[str, Any]] | None,
+) -> List[str]:
+    """Infer all tied winners for legacy benchmark files.
+
+    Older files stored only one winner, even when two controllers had the
+    exact same displayed delay, throughput, and peak queue.
+    """
+    if not results:
+        return []
+
+    def score(result: Dict[str, Any]) -> tuple[float, int, int]:
+        wait = result.get("avg_wait_time", result.get("avg_wait_s", 0.0))
+        passed = result.get("total_passed", result.get("throughput", 0))
+        queue = result.get("max_queue", result.get("peak_queue", 0))
+        return (round(float(wait or 0.0), 2), -int(passed or 0), int(queue or 0))
+
+    best_score = min(score(result) for result in results.values())
+    return [mode for mode, result in results.items() if score(result) == best_score]
+
+
+def _session_timestamp_ms(data: Dict[str, Any], path: Path) -> int:
+    raw_ms = data.get("timestamp_ms")
+    if raw_ms is not None:
+        try:
+            return int(raw_ms)
+        except (TypeError, ValueError):
+            pass
+
+    created_at = data.get("created_at")
+    if created_at:
+        try:
+            dt = datetime.datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+            return int(dt.timestamp() * 1000)
+        except (TypeError, ValueError):
+            pass
+    return int(path.stat().st_mtime * 1000)
+
+
+def _session_duplicate_signature(data: Dict[str, Any]) -> tuple[Any, ...]:
+    """Fingerprint fields that were copied by the old auto-stop double save."""
+    stats = data.get("stats") or {}
+    twin = data.get("twin_data") or {}
+    return (
+        str(data.get("mode") or stats.get("mode") or "").lower(),
+        data.get("model_name") or stats.get("model_name"),
+        data.get("model_episodes") or stats.get("model_episodes"),
+        stats.get("frame_count") or twin.get("total_frames_processed"),
+        stats.get("duration_s") or twin.get("video_duration_s"),
+        stats.get("total_detections") or twin.get("total_vehicles_detected"),
+        stats.get("throughput") or twin.get("total_passed") or data.get("throughput"),
+        stats.get("avg_wait_s"),
+        stats.get("peak_queue"),
+    )
+
+
+def _deduplicate_auto_stop_files(session_files: List[Path]) -> List[Path]:
+    """Hide only fallback `sim_*` copies matching a UUID run within 30 seconds.
+
+    Older timed runs were saved once by auto-stop and then again when the
+    browser sent `stop`.  Keeping this repair at read time avoids deleting user
+    data while preventing both duplicate rows and inflated dashboard totals.
+    """
+    records: List[tuple[Path, str, int, tuple[Any, ...]]] = []
+    for path in session_files:
+        try:
+            with open(path, "r", encoding="utf-8") as file_obj:
+                data = json.load(file_obj)
+            session_id = str(data.get("session_id") or path.stem)
+            records.append((
+                path,
+                session_id,
+                _session_timestamp_ms(data, path),
+                _session_duplicate_signature(data),
+            ))
+        except Exception:
+            # Leave malformed/unreadable files in the normal processing path;
+            # its existing error handling decides whether they are usable.
+            continue
+
+    canonical_by_signature: Dict[tuple[Any, ...], List[int]] = {}
+    for _path, session_id, timestamp_ms, signature in records:
+        if not session_id.startswith("sim_"):
+            canonical_by_signature.setdefault(signature, []).append(timestamp_ms)
+
+    duplicate_paths = {
+        path
+        for path, session_id, timestamp_ms, signature in records
+        if session_id.startswith("sim_")
+        and any(
+            abs(timestamp_ms - canonical_ms) <= 30_000
+            for canonical_ms in canonical_by_signature.get(signature, [])
+        )
+    }
+    if duplicate_paths:
+        logger.info(
+            "Filtered %d legacy auto-stop duplicate session record(s)",
+            len(duplicate_paths),
+        )
+    return [path for path in session_files if path not in duplicate_paths]
 
 
 def _calculate_congestion_level(total_count: int, duration_s: float) -> str:
@@ -175,6 +291,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         except Exception as we:
             logger.warning("Failed to write materialized session file %s: %s", file_p, we)
 
+    session_files = _deduplicate_auto_stop_files(session_files)
+
     total_frames = 0
     total_vehicles = 0
     total_duration_s = 0.0
@@ -271,7 +389,9 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
 
             # Mode & Model Telemetry
             mode = str(data.get("mode") or stats.get("mode") or twin.get("mode") or "ai").lower()
-            model_name = data.get("model_name") or stats.get("model_name") or twin.get("model_name")
+            model_name = _clean_legacy_model_label(
+                data.get("model_name") or stats.get("model_name") or twin.get("model_name")
+            )
             model_episodes = data.get("model_episodes") or stats.get("model_episodes") or twin.get("model_episodes")
             if not model_name and mode == "ai":
                 model_name = "FlowSync DQN"
@@ -368,6 +488,15 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             # F-04: Extract benchmark_id for paired comparisons
             benchmark_id = data.get("benchmark_id") or None
 
+            benchmark_results = data.get("benchmark_results") or None
+            inferred_winners = (
+                list(data.get("winners") or [])
+                or _infer_benchmark_winners(benchmark_results)
+            )
+            stored_winner = data.get("winner") or (
+                inferred_winners[0] if inferred_winners else None
+            )
+
             sessions_list.append({
                 "session_id": sess_id,
                 "created_at": created_at_val,
@@ -391,12 +520,14 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "run_type": run_type,
                 "benchmark_id": benchmark_id,
                 "benchmark_type": data.get("benchmark_type") or ("controller_comparison" if run_type == "benchmark" else None),
-                "winner": data.get("winner"),
-                "winner_label": data.get("winner_label"),
+                "winner": stored_winner,
+                "winners": inferred_winners or None,
+                "is_tie": bool(data.get("is_tie", False) or len(inferred_winners) > 1),
+                "winner_label": _clean_legacy_model_label(data.get("winner_label")),
                 "winner_episode": data.get("winner_episode"),
                 "improvements": data.get("improvements") or {},
                 "benchmark_modes": data.get("benchmark_modes") or (["ai", "fixed", "greedy"] if run_type == "benchmark" else None),
-                "benchmark_results": data.get("benchmark_results") or None,
+                "benchmark_results": benchmark_results,
                 "scenario_id": data.get("scenario_id") or None,
                 "source_label": "CCTV Digital Twin" if (run_type == "cctv_replay" or len(arrivals) > 0) else ("Simulation Benchmark" if run_type == "benchmark" else "Simulation Standalone"),
                 "is_cctv_replay": run_type == "cctv_replay" or len(arrivals) > 0,
@@ -446,8 +577,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if g_wait > 0:
                 comp_improvements["greedy_wait_pct"] = round(((f_wait - g_wait) / f_wait) * 100.0, 1)
 
-        waits_map = {k: v["avg_wait_s"] for k, v in composite_results.items() if v.get("avg_wait_s", 0) > 0}
-        comp_winner = min(waits_map.keys(), key=lambda k: waits_map[k]) if waits_map else "ai"
+        composite_winners = _infer_benchmark_winners(composite_results)
+        comp_winner = composite_winners[0] if composite_winners else "ai"
 
         ai_is_ft = bool(ai_s and ai_s.get("is_finetuned"))
         ai_ft_scen = ai_s.get("finetune_scenario") if ai_s else None
@@ -457,6 +588,9 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 s["benchmark_results"] = composite_results
             if not s.get("winner"):
                 s["winner"] = comp_winner
+            if not s.get("winners"):
+                s["winners"] = composite_winners or [comp_winner]
+                s["is_tie"] = len(s["winners"]) > 1
             if not s.get("improvements"):
                 s["improvements"] = comp_improvements
             if not s.get("benchmark_modes"):
@@ -487,6 +621,8 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "scenario_id": s.get("scenario_id"),
                 "benchmark_type": s.get("benchmark_type") or "controller_comparison",
                 "winner": s.get("winner"),
+                "winners": s.get("winners") or None,
+                "is_tie": bool(s.get("is_tie", False)),
                 "winner_label": s.get("winner_label"),
                 "winner_episode": s.get("winner_episode"),
                 "improvements": s.get("improvements", {}),
@@ -661,4 +797,3 @@ async def get_benchmarks(request: Request) -> dict:
         "benchmarks": summary.get("benchmarks", []),
         "count": len(summary.get("benchmarks", [])),
     }
-
