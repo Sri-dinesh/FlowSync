@@ -10,6 +10,8 @@ export interface SimBenchmarkResult {
   model_id?: string;
   model_episode?: number;
   total_passed: number;
+  total_vehicles?: number;
+  service_rate?: number;
   avg_wait_time: number;
   max_queue: number;
   duration_seconds: number;
@@ -21,6 +23,8 @@ export interface SimBenchmarkResultsData {
   benchmark_type?: "controller_comparison" | "model_comparison";
   results: Record<string, SimBenchmarkResult>;
   winner: string | null;
+  winners?: string[];
+  is_tie?: boolean;
   winner_label?: string;
   winner_episode?: number;
   modes: string[];
@@ -173,7 +177,8 @@ export function useSimulationSocket() {
             raw.code === "BENCHMARK_FAILED" ||
             raw.code === "SCENARIO_BENCHMARK_FAILED" ||
             raw.code === "MODEL_BENCHMARK_FAILED" ||
-            raw.code === "INVALID_MODELS"
+            raw.code === "INVALID_MODELS" ||
+            raw.code === "INVALID_MODES"
           ) {
             setBenchmarkRunning(false);
             setIsBenchmarkRunning(false);
@@ -287,7 +292,7 @@ export function useSimulationSocket() {
       );
       socket.close();
     };
-  }, [setConnected, setFrame]);
+  }, [setConnected, setFrame, setIsBenchmarkRunning, setRunning]);
 
   useEffect(() => {
     connectRef.current = connect;
@@ -342,6 +347,7 @@ export function useSimulationSocket() {
     durationSeconds: number,
     modelId: string,
     modelEpisode: number,
+    modes: string[] = ["ai", "fixed", "greedy"],
   ) => {
     setScenarioBenchmarkResults(null);
     setBenchmarkProgress(null);
@@ -356,6 +362,7 @@ export function useSimulationSocket() {
       duration_seconds: durationSeconds,
       model_id: modelId,
       model_episode: modelEpisode,
+      modes,
     });
   }, [sendCommand, setRunning, setIsBenchmarkRunning]);
 

@@ -106,6 +106,8 @@ export interface ScenarioRun {
 export interface ScenarioControllerResult {
   avg_wait_time: number;
   total_passed: number;
+  total_vehicles?: number;
+  service_rate?: number;
   max_queue: number;
   override_rate: number;
   median_delay: number;
@@ -146,7 +148,7 @@ export interface ScenarioAggregateStats {
 }
 
 /** Broadcast result from WS scenario_benchmark_results event */
-export interface ScenarioBenchmarkResult extends ScenarioControllerResult {}
+export type ScenarioBenchmarkResult = ScenarioControllerResult;
 
 export interface ScenarioBenchmarkResults {
   type: "scenario_benchmark_results";
@@ -157,7 +159,9 @@ export interface ScenarioBenchmarkResults {
   scenario_hash: string;
   benchmark_seed: number;
   duration_seconds: number;
+  modes: string[];
   results: Record<string, ScenarioBenchmarkResult>;
+  winner?: string | null;
+  winners?: string[];
+  is_tie?: boolean;
 }
-
-
