@@ -1,5 +1,5 @@
 """
-StateBuilder — Convert YOLO+ROI output → 20-dim RL observation vector.
+StateBuilder — Convert YOLO+ROI output → 28-dim RL observation vector.
 =========================================================================
 BUG-04 Fix: Previously this module computed pressure (Dim 18) as a simple
 sum of all 12 normalized queues / 20.0, while environment.py computed
@@ -35,20 +35,22 @@ from ...simulation.traffic_math import (
     compute_total_pressure,
     normalize_total_pressure,
 )
+from ...simulation.demand_forecast import ArrivalForecaster
 
 
 class StateBuilder:
     """
-    Converts real-world vehicle detections to the same 20-dim observation vector
+    Converts real-world vehicle detections to the same 28-dim observation vector
     used by the simulation's DQN agent. This is the bridge between real-world and RL.
 
-    Observation vector (20 dims) — identical structure to simulation:
+    Observation vector (28 dims) — identical structure to simulation:
     Dims 0-11:  Weighted queue per movement lane (normalized by MAX_QUEUE_CAP=10.0)
     Dims 12-15: One-hot current signal phase (4 dims)
     Dim  16:    Time in current phase / MAX_GREEN_TIME (normalized)
     Dim  17:    Is transitioning (1.0 if yellow/all-red, 0.0 if green)
     Dim  18:    Destination-aware total pressure (BUG-04 fix: uses shared DEST_MAP)
     Dim  19:    Starvation score (max wait time / STARVATION_THRESHOLD)
+    Dims 20-27: Online EWMA demand forecast features
 
     BUG-04 Change:
     - OLD (broken): obs[18] = sum(normalized_queues) / 20.0
@@ -57,7 +59,8 @@ class StateBuilder:
     """
 
     def __init__(self) -> None:
-        pass
+        self._forecaster = ArrivalForecaster()
+        self._previous_total: float = 0.0
 
     def build(
         self,
@@ -67,9 +70,11 @@ class StateBuilder:
         is_transitioning: bool,
         starvation_scores: Optional[Dict[str, float]] = None,
         outgoing_counts: Optional[Dict[str, int]] = None,
+        arrivals_since_last_frame: Optional[int] = None,
+        frame_dt: float = 0.5,
     ) -> np.ndarray:
         """
-        Returns: float32 array of shape (20,), all values in [0.0, 1.0]
+        Returns: float32 array of shape (28,); growth/trend features may be signed.
 
         Args:
             weighted_counts: Per-lane weighted vehicle counts from YOLO pipeline.
@@ -118,11 +123,24 @@ class StateBuilder:
         else:
             obs[19] = 0.0
 
+        # Dims 20-27: same EWMA feature implementation as simulation.  A caller
+        # with tracker crossing events should supply arrivals_since_last_frame;
+        # otherwise positive queue growth is used as a conservative proxy.
+        current_total = float(sum(max(0.0, v) for v in counts_dict.values()))
+        arrivals = (
+            max(0, int(arrivals_since_last_frame))
+            if arrivals_since_last_frame is not None
+            else max(0, round(current_total - self._previous_total))
+        )
+        self._forecaster.tick(dt=max(frame_dt, 1e-3), spawned_this_step=arrivals)
+        obs[20:28] = self._forecaster.get_forecast_features()
+        self._previous_total = current_total
+
         return obs
 
     def _normalize_queue(self, weighted_count: float) -> float:
-        """weighted_count / MAX_QUEUE_CAP, clamped to [0, 1]."""
-        return float(min(1.0, max(0.0, weighted_count / MAX_QUEUE_CAP)))
+        """Match TrafficEnv's smooth queue saturation exactly."""
+        return float(np.tanh(max(0.0, weighted_count) / 15.0))
 
     def get_obs_description(self, obs: np.ndarray) -> Dict[str, float]:
         """Returns labeled dict of observation for debugging/display."""
@@ -136,4 +154,6 @@ class StateBuilder:
         desc["is_transitioning"] = float(obs[17])
         desc["total_pressure"]   = float(obs[18])
         desc["starvation_score"] = float(obs[19])
+        for i, value in enumerate(obs[20:28], start=20):
+            desc[f"forecast_{i - 20}"] = float(value)
         return desc

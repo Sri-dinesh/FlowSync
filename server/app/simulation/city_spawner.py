@@ -89,6 +89,9 @@ class CitySpawner:
         self.lambda_rate = lambda_rate
         self.enabled = False
         self._rng = np.random.default_rng()
+        self.last_spawned_by_intersection: Dict[str, int] = {
+            iid: 0 for iid in ("A", "B", "C", "D")
+        }
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
@@ -113,9 +116,13 @@ class CitySpawner:
         Returns total number of vehicles spawned this tick.
         """
         if not self.enabled or self.lambda_rate <= 0:
+            for iid in self.last_spawned_by_intersection:
+                self.last_spawned_by_intersection[iid] = 0
             return 0
 
         total_spawned = 0
+        for iid in self.last_spawned_by_intersection:
+            self.last_spawned_by_intersection[iid] = 0
         per_entry_rate = self.lambda_rate / len(ENTRY_POINTS)
 
         for entry_name, (inter_id, approach_dir) in ENTRY_POINTS.items():
@@ -152,5 +159,6 @@ class CitySpawner:
                     lane_queue.append(vehicle)
                     intersection._spawned_this_interval += 1
                     total_spawned += 1
+                    self.last_spawned_by_intersection[inter_id] += 1
 
         return total_spawned

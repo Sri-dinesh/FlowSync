@@ -77,7 +77,7 @@ DIRECTION_COLORS_BGR: Dict[str, tuple] = {
 MAX_QUEUE_CAP: float = 10.0             # Same as simulation (normalization denominator)
 MAX_GREEN_TIME: float = 40.0            # Same as simulation
 STARVATION_THRESHOLD: float = 45.0     # Same as simulation
-OBS_DIM: int = 20                       # Observation vector dimension
+OBS_DIM: int = 28                       # Must match the production DQN input
 
 # ── Signal Phases ──────────────────────────────────────────────────────────────
 PHASE_NAMES: Dict[int, str] = {

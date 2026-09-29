@@ -222,6 +222,8 @@ async def _city_simulation_loop(app) -> None:
             try:
                 # Spawn new vehicles
                 city_spawner.spawn(dt=0.1, intersections=city_net.intersections)
+                for iid, count in city_spawner.last_spawned_by_intersection.items():
+                    city_net.forecasters[iid].tick(0.1, count)
 
                 # Tick city network
                 city_net.tick(dt=0.1, mode=mode, shared_agent=agent if mode == "ai" else None)

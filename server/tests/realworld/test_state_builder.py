@@ -21,10 +21,11 @@ def test_state_builder_dimension():
         is_transitioning=False,
     )
 
-    assert len(obs) == 20
-    # Queue values normalized by MAX_QUEUE_CAP (10.0)
-    assert obs[0] == pytest.approx(2.0 / 10.0)  # north_straight
-    assert obs[9] == pytest.approx(4.0 / 10.0)  # west_straight
+    assert len(obs) == 28
+    # Queue values use the same smooth tanh saturation as TrafficEnv.
+    import numpy as np
+    assert obs[0] == pytest.approx(np.tanh(2.0 / 15.0))  # north_straight
+    assert obs[9] == pytest.approx(np.tanh(4.0 / 15.0))  # west_straight
 
 
 def test_state_builder_one_hot_phase():

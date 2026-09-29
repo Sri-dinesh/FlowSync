@@ -168,7 +168,7 @@ class CityNetwork:
 
         # Dims 0-11: queues in canonical MOVEMENT_KEYS order
         movements = [
-            min(1.0, movement_queues.get(k, 0) / MAX_CAP)
+            float(np.tanh(movement_queues.get(k, 0) / 15.0))
             for k in MOVEMENT_KEYS
         ]
 
@@ -189,7 +189,7 @@ class CityNetwork:
 
         # Dim 19: starvation
         max_starv_norm = min(
-            max(signal.starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
+            max(signal.phase_starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
         )
 
         base_obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm]
@@ -211,13 +211,32 @@ class CityNetwork:
         signal = intersection.signal
         queues = intersection.get_movement_queues()
         PHASE_DIRS = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
-        PHASE_TURNS = {0: ["straight", "right"], 1: ["straight", "right"], 2: ["left"], 3: ["left"]}
+        PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
         phase_counts = {}
         for ph in range(4):
             count = sum(queues.get(f"{d}_{t}", 0) for d in PHASE_DIRS[ph] for t in PHASE_TURNS[ph])
             phase_counts[ph] = count
         best_phase = max(phase_counts, key=lambda p: phase_counts[p])
         return best_phase if signal.can_switch_phase else signal.current_phase
+
+    def get_valid_action_mask(self, intersection_id: str) -> np.ndarray:
+        intersection = self.intersections[intersection_id]
+        signal = intersection.signal
+        mask = np.zeros(4, dtype=bool)
+        mask[signal.current_phase] = True
+        if signal.color.name != "GREEN" or not signal.can_switch_phase:
+            return mask
+        queues = intersection.get_movement_queues()
+        phase_movements = {
+            0: ("north_straight", "south_straight"),
+            1: ("east_straight", "west_straight"),
+            2: ("north_left", "south_left"),
+            3: ("east_left", "west_left"),
+        }
+        for phase, movements in phase_movements.items():
+            if sum(queues.get(m, 0) for m in movements) > 0:
+                mask[phase] = True
+        return mask
 
     # ── Tick ───────────────────────────────────────────────────────────────────
 
@@ -235,7 +254,31 @@ class CityNetwork:
         for iid, intersection in self.intersections.items():
             if mode == "ai" and shared_agent is not None:
                 obs = self.build_obs(iid)
-                action = shared_agent.select_action(obs, epsilon=0.0)
+                mask = self.get_valid_action_mask(iid)
+                starved = [p for p in intersection.signal.get_starved_phases() if mask[p]]
+                if starved:
+                    action = max(
+                        starved,
+                        key=lambda p: intersection.signal.phase_starvation_timer[p],
+                    )
+                elif intersection.signal.is_max_green_exceeded and mask.sum() > 1:
+                    candidates = np.flatnonzero(mask)
+                    candidates = candidates[candidates != intersection.signal.current_phase]
+                    queues = intersection.get_movement_queues()
+                    phase_movements = {
+                        0: ("north_straight", "south_straight"),
+                        1: ("east_straight", "west_straight"),
+                        2: ("north_left", "south_left"),
+                        3: ("east_left", "west_left"),
+                    }
+                    action = int(max(
+                        candidates,
+                        key=lambda p: sum(queues.get(m, 0) for m in phase_movements[int(p)]),
+                    ))
+                else:
+                    action = shared_agent.select_action(
+                        obs, epsilon=0.0, valid_action_mask=mask
+                    )
                 passed = intersection.tick(dt=dt, action=action)
             elif mode == "greedy":
                 action = self.get_greedy_action(iid)
