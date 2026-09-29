@@ -1,0 +1,48 @@
+{
+  "kind": "development_smoke_benchmark",
+  "production_claim": false,
+  "training": {
+    "seed": 11,
+    "online_episodes": 100,
+    "greedy_demonstration_decisions": 3000,
+    "dqfd_pretraining_updates": 1000,
+    "best_episode": 100,
+    "checkpoint_hash": "4fde71d1365bb5df",
+    "state_version": "v6_28dim_smdp",
+    "reward_version": "v4_incremental_delay",
+    "demand_version": "v2_total_lambda_with_upstream_backlog"
+  },
+  "evaluation": {
+    "duration_steps": 1200,
+    "tick_seconds": 0.1,
+    "total_demand_lambda_vehicles_per_second": 0.5,
+    "seeds": [104729, 130363, 155921, 181081, 205019],
+    "controllers": {
+      "ai": {
+        "mean_wait_seconds": 10.252133245176603,
+        "mean_p95_delay_seconds": 37.47,
+        "mean_queue_area_vehicle_seconds": 1087.44,
+        "mean_throughput": 52.0,
+        "mean_watchdog_override_rate_pct": 2.9614906112745296
+      },
+      "fixed": {
+        "mean_wait_seconds": 13.25280935794029,
+        "mean_p95_delay_seconds": 39.648,
+        "mean_queue_area_vehicle_seconds": 1273.52,
+        "mean_throughput": 48.6,
+        "mean_watchdog_override_rate_pct": 0.0
+      },
+      "greedy": {
+        "mean_wait_seconds": 10.630249115252244,
+        "mean_p95_delay_seconds": 38.01,
+        "mean_queue_area_vehicle_seconds": 1115.1000000000001,
+        "mean_throughput": 50.6,
+        "mean_watchdog_override_rate_pct": 3.130541407281645
+      }
+    },
+    "ai_queue_area_improvement_pct": {
+      "vs_fixed": 14.611470569759403,
+      "vs_greedy": 2.4804950228679115
+    }
+  }
+}

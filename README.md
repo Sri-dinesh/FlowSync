@@ -2,7 +2,9 @@
 
 > **Autonomous Urban Mobility Control via Dueling Double Deep Q-Networks (D3QN), Prioritized Experience Replay (PER), Online Short-Horizon EWMA Demand Forecasting, Zero-Latency Live Video Ingestion (YOLOv8 + ByteTrack + yt-dlp), and Full-Stack Telemetry Analytics**
 
-FlowSync is an enterprise-grade, real-time traffic simulation, optimization, and digital twin platform. Engineered with a **28-dimensional state space**, **Dueling Double Deep Q-Networks (D3QN)** with **Prioritized Experience Replay (PER)**, destination-aware **Max-Pressure (PressLight/MPLight)** reward formulations, and real-world computer vision ingestion pipelines, FlowSync dynamically optimizes traffic signal phases to eliminate congestion, minimize vehicle delay, and maximize throughput across single 12-movement intersections, multi-intersection 2×2 city grids, and live CCTV / YouTube camera feeds.
+FlowSync is a real-time traffic simulation, optimization, and digital-twin research platform. It combines a **28-dimensional state space**, **Dueling Double Deep Q-Networks (D3QN)** with **Prioritized Experience Replay (PER)**, pressure-aware reward shaping, and computer-vision ingestion pipelines to study adaptive signal control across a single 12-movement intersection, a 2×2 city grid, and recorded/live camera inputs.
+
+> **Deployment status:** FlowSync is a research prototype and digital-twin testbed, not a safety-certified traffic controller. Do not connect it to live signal hardware without an independent traffic-engineering model, conflict-monitor/controller, fail-safe cabinet integration, detector calibration, field trials, and approval from the responsible road authority.
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev/)
@@ -373,27 +375,29 @@ $$a^* = \begin{cases}
 
 ---
 
-### 3.4 Delay-Anchored Max-Pressure Multi-Factor Reward Function
+### 3.4 Incremental-Delay Reward Function
 
-The reward function combines delay reduction, destination-aware Max-Pressure (MPLight), throughput expansion, switching stability, and anti-starvation penalties:
+The reward penalizes delay incurred during the current simulation tick, plus
+pressure, switching and starvation costs. This is deliberately a level cost:
+departing vehicles cannot erase wait accumulated in earlier ticks.
 
 $$R_t = R_{\text{delay}} + R_{\text{pressure}} + R_{\text{throughput}} + R_{\text{switch}} + R_{\text{starv}} + R_{\text{max\_green}} + R_{\text{balance}}$$
 
 ```
 Reward Components:
-  R_delay       = -Δ(Total Wait Time) / 10.0
-  R_pressure    = 0.8 × (∑ P_prev - ∑ P_curr)
-  R_throughput  = 0.25 × N_passed
-  R_switch      = -0.2 (if phase changed and P_prev_phase > 0.5)
-  R_starv       = -1.5 × |D_starved| (for t_wait ≥ 45s)
-  R_max_green   = -0.8 (if t_green ≥ 40s)
-  R_balance     = +0.15 (if imbalance < 0.2 and ∑ P > 0.05)
+  R_delay       = -DelayIncurredThisTick / 10.0
+  R_pressure    = -0.05 × dt × ∑ P_current
+  R_throughput  = +0.10 × N_passed
+  R_switch      = -0.10 at high pressure, otherwise -0.03
+  R_starv       = -0.10 × dt × |Phases_starved|
+  R_max_green   = -0.10 × dt (while exceeded)
+  R_balance     = 0.0 (reserved telemetry field)
 ```
 
-#### 1. Primary Delay-Anchored Term ($R_{\text{delay}}$)
-Penalizes the change in total vehicle waiting time across all 12 movements:
+#### 1. Primary Incremental Delay Term ($R_{\text{delay}}$)
+Penalizes delay newly incurred by stopped vehicles and queued upstream demand:
 
-$$R_{\text{delay}} = -\frac{\Delta W_t}{10.0} = -\frac{\sum_{v} w_{t}(v) - \sum_{v} w_{t-1}(v)}{10.0}$$
+$$R_{\text{delay}} = -\frac{\sum_v \Delta w_t(v)}{10.0}$$
 
 #### 2. Destination-Aware Pressure Differential ($R_{\text{pressure}}$)
 Based on PressLight and MPLight, traffic pressure $P(m)$ measures the difference between incoming lane occupancy and downstream destination lane occupancy:
@@ -406,34 +410,33 @@ Where $\text{dest}(m)$ maps movements to downstream directions via the canonical
 - `east_straight` $\to$ `west`, `east_left` $\to$ `south`, `east_right` $\to$ `north`
 - `west_straight` $\to$ `east`, `west_left` $\to$ `north`, `west_right` $\to$ `south`
 
-The pressure reward rewards a net reduction in intersection pressure:
+The pressure term penalizes current congestion throughout the episode:
 
-$$R_{\text{pressure}} = 0.8 \times \left( \sum_{m=1}^{12} P_{t-1}(m) - \sum_{m=1}^{12} P_{t}(m) \right)$$
+$$R_{\text{pressure}} = -0.05\,\Delta t \sum_{m=1}^{12} P_t(m)$$
 
 #### 3. Throughput Discharge Bonus ($R_{\text{throughput}}$)
 Direct reward for every vehicle that exits the intersection:
 
-$$R_{\text{throughput}} = 0.25 \times N_{\text{passed}, t}$$
+$$R_{\text{throughput}} = 0.10 \times N_{\text{passed}, t}$$
 
 #### 4. Phase Switch Penalty ($R_{\text{switch}}$)
 Penalizes unnecessary phase changes when the current phase still has high pressure ($> 0.5$), preventing loss of green wave momentum:
 
-$$R_{\text{switch}} = \begin{cases} -0.2 & \text{if phase switched and } P(\text{phase}_{\text{prev}}) > 0.5 \\ 0.0 & \text{otherwise} \end{cases}$$
+$$R_{\text{switch}} = \begin{cases} -0.10 & P(\text{phase}_{\text{prev}}) > 0.5 \\ -0.03 & \text{otherwise} \end{cases}$$
 
 #### 5. Starvation Penalty ($R_{\text{starv}}$)
-Severe penalty for any approach waiting longer than $45.0\text{s}$:
+Penalty for each signal phase starved longer than $45.0\text{s}$:
 
-$$R_{\text{starv}} = -1.5 \times |\mathcal{D}_{\text{starved}}|, \quad \mathcal{D}_{\text{starved}} = \{ d \in \{\text{N, S, E, W}\} \mid t_{\text{wait}}(d) \ge 45.0\text{s} \}$$
+$$R_{\text{starv}} = -0.10\,\Delta t\,|\mathcal{P}_{\text{starved}}|$$
 
 #### 6. Maximum Green Violation Penalty ($R_{\text{max\_green}}$)
 Penalizes phase hogging beyond the 40s ceiling:
 
-$$R_{\text{max\_green}} = \begin{cases} -0.8 & \text{if } t_{\text{phase}} \ge 40.0\text{s} \\ 0.0 & \text{otherwise} \end{cases}$$
+$$R_{\text{max\_green}} = \begin{cases} -0.10\,\Delta t & \text{if } t_{\text{phase}} \ge 40.0\text{s} \\ 0.0 & \text{otherwise} \end{cases}$$
 
-#### 7. Cross-Phase Balance Bonus ($R_{\text{balance}}$)
-Rewards balanced queue clearance when the junction is active:
-
-$$R_{\text{balance}} = \begin{cases} +0.15 & \text{if } \left(\max_{p} P(p) - \min_{p} P(p)\right) < 0.2 \land \sum P > 0.05 \\ 0.0 & \text{otherwise} \end{cases}$$
+#### 7. Balance Telemetry ($R_{\text{balance}}$)
+The field remains in metric payloads for compatibility but is fixed at zero;
+rewarding balance can accidentally reward a uniformly congested junction.
 
 ---
 
@@ -903,7 +906,7 @@ FlowSync/
 
 ### Prerequisites
 - **Node.js**: v20.0.0 or higher
-- **Python**: v3.11.0 or higher
+- **Python**: v3.11.x (`runtime.txt` pins 3.11.9; newer major/minor versions are not validated)
 - **Supabase Account** (or local PostgreSQL instance)
 - **Git**
 
@@ -1026,37 +1029,19 @@ docker compose up --build -d
 
 ## 11. Empirical Benchmarks
 
-### 1. Single 4-Way Intersection Benchmark
-*Evaluated across 60-second stochastic bursts ($\lambda = 0.8\text{ veh/s}$, identical Poisson random seeds via CRN):*
+The earlier benchmark tables in this section were not backed by reproducible artifacts and have been removed. Following the 2026-09-28 RL audit, benchmark results are only considered reportable when they include the checkpoint hash, environment/reward/state versions, total offered arrivals, CRN seeds, queue-area, completed-and-active delay distributions, throughput, and watchdog override rate.
 
-| Evaluation Metric | Fixed-Timer Baseline | Greedy (Max-Queue) | FlowSync D3QN AI | AI Improvement vs Baseline |
-| :--- | :---: | :---: | :---: | :---: |
-| **Average Delay** | 24.5s (LOS C) | 14.2s (LOS B) | **8.6s (LOS A)** | **-64.9% Wait Time** |
-| **Throughput** | 320 veh/hr | 410 veh/hr | **530 veh/hr** | **+65.6% Capacity** |
-| **Peak Queue** | 12 vehicles | 7 vehicles | **3 vehicles** | **-75.0% Congestion** |
-| **Approach Starvations** | Periodic | Frequent (low-flow lanes) | **0 (Zero)** | **Guaranteed by Watchdog** |
+### Corrected single-intersection smoke benchmark
 
----
+This is a development smoke test, not a production claim: 120 simulated seconds, total junction demand $\lambda=0.5$ veh/s, five held-out CRN seeds (`104729`, `130363`, `155921`, `181081`, `205019`). The DQN row used 3,000 greedy decision demonstrations, 1,000 DQfD pretraining updates, and 100 online episodes (training seed `11`). The selected checkpoint hash was `4fde71d1365bb5df`.
 
-### 2. Multi-Intersection 2×2 City Grid Benchmark
-*Evaluated across 4 interconnected junctions with inter-intersection arterial routing:*
+| Controller | Mean delay | Queue-area | Mean passed |
+| :--- | ---: | ---: | ---: |
+| Fixed timer | 13.25 s | 1,273.5 veh·s | 48.6 |
+| Greedy max-queue | 10.63 s | 1,115.1 veh·s | 50.6 |
+| D3QN + DQfD warm-start | **10.25 s** | **1,087.4 veh·s** | **52.0** |
 
-| Evaluation Metric | Fixed-Timer Grid | Greedy Decentralized | FlowSync Shared Policy | AI Improvement vs Baseline |
-| :--- | :---: | :---: | :---: | :---: |
-| **Network Mean Delay** | 31.8s (LOS C) | 19.4s (LOS B) | **12.1s (LOS B)** | **-61.9% Delay** |
-| **Total Grid Flow** | 1,120 veh/hr | 1,480 veh/hr | **1,890 veh/hr** | **+68.8% Throughput** |
-| **Corridor Spillback** | Severe (Gridlock) | Moderate | **Minimal** | **Gridlock Eliminated** |
-
----
-
-### 3. Real-World CCTV Digital Twin Showdown
-*Replay of real-world traffic arrival schedules extracted from CCTV footage:*
-
-| Evaluation Metric | Fixed-Timer | Greedy | FlowSync D3QN AI | Real-World Performance Gain |
-| :--- | :---: | :---: | :---: | :---: |
-| **Natural Clearance Time** | 58.2s | 41.5s | **27.4s** | **-52.9% Faster Clearance** |
-| **Average Vehicle Wait** | 21.6s (LOS C) | 13.9s (LOS B) | **7.8s (LOS A)** | **-63.9% Wait Time** |
-| **Discharge Wave** | Stop-and-Go | Irregular | **Continuous Wave** | **Smooth Progression** |
+These five seeds show that the repaired learning path can beat both baselines on this one balanced slice (queue-area: 14.6% better than fixed and 2.5% better than greedy); they are not enough evidence for generalization. Raw summary: [`server/benchmarks/rl_v6_smoke_seed11.json`](server/benchmarks/rl_v6_smoke_seed11.json). A release candidate must pass the multi-seed/multi-demand acceptance protocol in [`docs/RL_AUDIT_AND_RECOVERY.md`](docs/RL_AUDIT_AND_RECOVERY.md). No validated city-grid or live-CCTV performance claim is currently made.
 
 ---
 
