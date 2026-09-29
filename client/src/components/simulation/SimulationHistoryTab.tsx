@@ -11,7 +11,6 @@ import {
   Bot,
   Sparkles,
   Search,
-  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EpisodeHistory from "@/components/dashboard/EpisodeHistory";
@@ -34,6 +33,8 @@ export interface BenchmarkRecord {
   duration_seconds: number;
   scenario_id?: string | null;
   winner?: string;
+  winners?: string[];
+  is_tie?: boolean;
   improvements?: {
     ai_wait_pct?: number;
     greedy_wait_pct?: number;
@@ -54,7 +55,7 @@ export interface BenchmarkRecord {
 interface SimulationHistoryTabProps {
   simulationId: string | null;
   onSwitchToBenchmark?: () => void;
-  latestBenchmarkResults?: any;
+  latestBenchmarkResults?: unknown;
 }
 
 function formatRelativeTime(createdAt?: string, timestampMs?: number): string {
@@ -156,13 +157,15 @@ export default function SimulationHistoryTab({
   }, [API_BASE]);
 
   useEffect(() => {
-    fetchBenchmarks();
+    const timer = window.setTimeout(() => void fetchBenchmarks(), 0);
+    return () => window.clearTimeout(timer);
   }, [fetchBenchmarks]);
 
   // If a new benchmark just finished in the parent, refresh to capture it
   useEffect(() => {
     if (latestBenchmarkResults) {
-      fetchBenchmarks();
+      const timer = window.setTimeout(() => void fetchBenchmarks(), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [latestBenchmarkResults, fetchBenchmarks]);
 
@@ -338,10 +341,15 @@ export default function SimulationHistoryTab({
                 const greedyQueue =
                   greedy?.peak_queue ?? greedy?.max_queue ?? 0;
 
-                const winner = bm.winner || "ai";
-                const isAIWinner = winner === "ai";
-                const isGreedyWinner = winner === "greedy";
-                const isFixedWinner = winner === "fixed";
+                const availableModes = bm.modes?.length
+                  ? bm.modes
+                  : Object.keys(bm.modes_results ?? {});
+                const winner = bm.winner || availableModes[0] || "ai";
+                const winningModes = bm.winners?.length ? bm.winners : [winner];
+                const isTie = Boolean(bm.is_tie || winningModes.length > 1);
+                const isAIWinner = winningModes.includes("ai");
+                const isGreedyWinner = winningModes.includes("greedy");
+                const isFixedWinner = winningModes.includes("fixed");
 
                 const aiImprovement =
                   bm.improvements?.ai_wait_pct ??
@@ -392,7 +400,9 @@ export default function SimulationHistoryTab({
                             <span className="text-sm font-semibold text-white">
                               {bm.scenario_id
                                 ? `Scenario Benchmark · ${bm.scenario_id.toUpperCase()}`
-                                : `Standard 3-Controller Benchmark`}
+                                : availableModes.length === 1
+                                ? `${availableModes[0].toUpperCase()} Single-Controller Run`
+                                : `Standard ${availableModes.length}-Controller Benchmark`}
                             </span>
                             {isBmFinetuned && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300 shadow-sm shadow-amber-500/10">
@@ -405,16 +415,18 @@ export default function SimulationHistoryTab({
                                 )}
                               </span>
                             )}
+                            {availableModes.includes("ai") && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 px-2.5 py-0.5 text-[10px] font-mono text-indigo-300">
                               <Bot className="h-3 w-3" />
                               DQN Model: {modelEps} eps
                             </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-neutral-500 mt-0.5">
                             {timeDisplay} · {relativeTime} ·{" "}
                             <span className="font-mono text-neutral-400">
                               {bm.duration_seconds}s per controller (
-                              {bm.duration_seconds * 3}s total)
+                              {bm.duration_seconds * Math.max(1, availableModes.length)}s total)
                             </span>
                           </p>
                         </div>
@@ -433,13 +445,15 @@ export default function SimulationHistoryTab({
                         >
                           <Trophy className="h-3.5 w-3.5 text-amber-400" />
                           <span>
-                            {isAIWinner
+                            {isTie
+                              ? `${winningModes.map((mode) => mode === "ai" ? "DQN" : mode === "greedy" ? "Greedy" : "Fixed").join(" & ")} Tied`
+                              : isAIWinner
                               ? `FlowSync DQN AI Won (${modelEps} eps)`
                               : isGreedyWinner
                               ? "Greedy Controller Won"
                               : "Fixed Timer Won"}
                           </span>
-                          {aiImprovement !== 0 && isAIWinner && (
+                          {aiImprovement !== 0 && isAIWinner && !isTie && (
                             <span className="font-mono text-emerald-400 font-bold ml-0.5">
                               ({aiImprovement > 0 ? "+" : ""}
                               {aiImprovement}% delay reduction)
@@ -452,6 +466,7 @@ export default function SimulationHistoryTab({
                     {/* 3 Modes Side-by-Side Cards in STRICT Order: 1. DQN AI, 2. Fixed, 3. Greedy */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-0.5">
                       {/* 1. FlowSync DQN AI */}
+                      {availableModes.includes("ai") && (
                       <div
                         className={`rounded-xl p-4 border transition-all space-y-3 ${
                           isAIWinner
@@ -481,7 +496,7 @@ export default function SimulationHistoryTab({
                           {isAIWinner ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                               <Trophy className="h-2.5 w-2.5" />
-                              WINNER
+                              {isTie ? "TIED" : "WINNER"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-neutral-500 font-mono">
@@ -551,8 +566,10 @@ export default function SimulationHistoryTab({
                           </div>
                         </div>
                       </div>
+                      )}
 
                       {/* 2. Fixed Timer */}
+                      {availableModes.includes("fixed") && (
                       <div
                         className={`rounded-xl p-4 border transition-all space-y-3 ${
                           isFixedWinner
@@ -575,7 +592,7 @@ export default function SimulationHistoryTab({
                           {isFixedWinner ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                               <Trophy className="h-2.5 w-2.5" />
-                              WINNER
+                              {isTie ? "TIED" : "WINNER"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-neutral-500 font-mono">
@@ -635,8 +652,10 @@ export default function SimulationHistoryTab({
                           </div>
                         </div>
                       </div>
+                      )}
 
                       {/* 3. Greedy Controller */}
+                      {availableModes.includes("greedy") && (
                       <div
                         className={`rounded-xl p-4 border transition-all space-y-3 ${
                           isGreedyWinner
@@ -659,7 +678,7 @@ export default function SimulationHistoryTab({
                           {isGreedyWinner ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                               <Trophy className="h-2.5 w-2.5" />
-                              WINNER
+                              {isTie ? "TIED" : "WINNER"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-neutral-500 font-mono">
@@ -729,6 +748,7 @@ export default function SimulationHistoryTab({
                           </div>
                         </div>
                       </div>
+                      )}
                     </div>
                   </div>
                 );

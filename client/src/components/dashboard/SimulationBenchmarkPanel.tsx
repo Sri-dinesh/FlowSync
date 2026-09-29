@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Square as SquareIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import type { SimBenchmarkProgress, SimBenchmarkResultsData } from "@/hooks/useSimulationSocket";
@@ -52,7 +53,7 @@ const BENCHMARK_MODES = ["ai", "fixed", "greedy"];
 
 const MODE_CONFIG: Record<
   string,
-  { label: string; shortLabel: string; icon: any; barColor: string }
+  { label: string; shortLabel: string; icon: LucideIcon; barColor: string }
 > = {
   ai: {
     label: "FlowSync DQN AI",
@@ -213,6 +214,12 @@ export default function SimulationBenchmarkPanel({
         results.results[results.winner]?.label ||
         `Model ${results.winner_episode ?? results.winner} eps`
       );
+    }
+    const winners = results.winners?.length ? results.winners : [results.winner];
+    if (winners.length > 1) {
+      return `${winners
+        .map((mode) => MODE_CONFIG[mode]?.label ?? mode.toUpperCase())
+        .join(" & ")} — Tie`;
     }
     return MODE_CONFIG[results.winner]?.label ?? results.winner.toUpperCase();
   }, [results, isModelBenchmark]);
@@ -681,7 +688,11 @@ export default function SimulationBenchmarkPanel({
                       <Trophy className="w-4 h-4" />
                     </span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
-                      {isModelBenchmark ? "Top Performing Model Checkpoint" : "Top Performance Policy"}
+                      {isModelBenchmark
+                        ? "Top Performing Model Checkpoint"
+                        : results.is_tie
+                        ? "Joint Top Performance"
+                        : "Top Performance Policy"}
                     </span>
                   </div>
                   <div className="text-base font-bold text-white tracking-tight flex items-center gap-2">
@@ -702,6 +713,8 @@ export default function SimulationBenchmarkPanel({
                         }
                         return `Delivered the lowest average delay (${results.results[results.winner]?.avg_wait_time ?? 0}s) and highest clearing throughput.`;
                       })()
+                    ) : results.is_tie ? (
+                      `The tied controllers produced identical displayed ranking metrics. No single winner was assigned.`
                     ) : (
                       results.improvements?.ai_wait_pct && results.improvements.ai_wait_pct > 0 && results.winner === "ai"
                         ? `Achieved ${results.improvements.ai_wait_pct}% lower average wait time compared to Fixed Timer baseline.`
@@ -730,7 +743,12 @@ export default function SimulationBenchmarkPanel({
 
             {results.modes.map((modeKey, idx) => {
               const res = results.results[modeKey];
-              const isWinner = modeKey === results.winner;
+              const winningModes = results.winners?.length
+                ? results.winners
+                : results.winner
+                ? [results.winner]
+                : [];
+              const isWinner = winningModes.includes(modeKey);
               const barColor = isModelBenchmark
                 ? MODEL_PALETTE[idx % MODEL_PALETTE.length]
                 : MODE_CONFIG[modeKey]?.barColor ?? "#fff";
@@ -768,7 +786,7 @@ export default function SimulationBenchmarkPanel({
                     {isWinner && (
                       <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400 text-black shadow-sm font-mono flex items-center gap-1">
                         <Trophy className="w-2.5 h-2.5" />
-                        WINNER
+                        {results.is_tie ? "TIED" : "WINNER"}
                       </span>
                     )}
                   </div>
@@ -777,7 +795,11 @@ export default function SimulationBenchmarkPanel({
                     <div className="bg-neutral-900/80 rounded-lg p-2 text-center border border-neutral-800">
                       <div className="text-[8px] uppercase tracking-wider text-neutral-400 font-medium">Passed</div>
                       <div className={`text-xs font-mono font-semibold mt-0.5 ${isWinner ? "text-white" : "text-neutral-200"}`}>
-                        {res?.total_passed ?? 0} <span className="text-[8px] font-normal text-neutral-500">veh</span>
+                        {res?.total_passed ?? 0}
+                        {res?.total_vehicles !== undefined && (
+                          <span className="text-[9px] font-normal text-neutral-500">/{res.total_vehicles}</span>
+                        )}{" "}
+                        <span className="text-[8px] font-normal text-neutral-500">veh</span>
                       </div>
                     </div>
 

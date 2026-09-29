@@ -46,30 +46,52 @@ export interface SessionItem {
   benchmark_id?: string;
   benchmark_type?: "controller_comparison" | "model_comparison" | string;
   winner?: string;
+  winners?: string[];
+  is_tie?: boolean;
   winner_label?: string;
   winner_episode?: number;
   improvements?: Record<string, number>;
   benchmark_modes?: string[];
-  benchmark_results?: Record<
-    string,
-    {
-      label?: string;
-      model_id?: string;
-      model_episode?: number;
-      avg_wait_s?: number;
-      avg_wait_time?: number;
-      throughput?: number;
-      total_passed?: number;
-      peak_queue?: number;
-      max_queue?: number;
-      duration_seconds?: number;
-    }
-  >;
+  benchmark_results?: Record<string, BenchmarkModeResult>;
   scenario_id?: string;
   source_label?: string;
   is_cctv_replay?: boolean;
   is_finetuned?: boolean;
   finetune_scenario?: string | null;
+}
+
+interface BenchmarkModeResult {
+  label?: string;
+  model_id?: string;
+  model_episode?: number;
+  avg_wait_s?: number;
+  avg_wait_time?: number;
+  throughput?: number;
+  total_passed?: number;
+  total_vehicles?: number;
+  service_rate?: number;
+  peak_queue?: number;
+  max_queue?: number;
+  duration_seconds?: number;
+}
+
+interface BenchmarkSummary {
+  benchmark_id: string;
+  benchmark_type?: string;
+  created_at: string;
+  timestamp_ms: number;
+  duration_seconds?: number;
+  model_name?: string;
+  model_episodes?: number;
+  winner?: string;
+  winners?: string[];
+  is_tie?: boolean;
+  winner_label?: string;
+  winner_episode?: number;
+  improvements?: Record<string, number>;
+  modes?: string[];
+  modes_results?: Record<string, BenchmarkModeResult>;
+  scenario_id?: string;
 }
 
 const SCENARIO_NAMES: Record<string, string> = {
@@ -116,14 +138,14 @@ interface DisplaySessionItem extends SessionItem {
     benchmark_id: string;
     winner: string;
     improvements: Record<string, number>;
-    modes_results: Record<string, any>;
+    modes_results: Record<string, BenchmarkModeResult>;
     child_sessions: Record<string, SessionItem>;
   };
 }
 
 interface Props {
   sessions: SessionItem[];
-  benchmarks?: any[];
+  benchmarks?: BenchmarkSummary[];
   initialModeFilter?: string;
 }
 
@@ -337,7 +359,8 @@ export default function HistoricalSessionsTable({
 
   useEffect(() => {
     if (initialModeFilter) {
-      setModeFilter(initialModeFilter);
+      const timer = window.setTimeout(() => setModeFilter(initialModeFilter), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [initialModeFilter]);
 
@@ -376,7 +399,7 @@ export default function HistoricalSessionsTable({
           const winnerKey = bm.winner || Object.keys(resObj)[0];
           const winnerStats = resObj[winnerKey] || {};
           const maxQ = Math.max(
-            ...Object.values(resObj).map((r: any) => r.max_queue ?? r.peak_queue ?? 0),
+            ...Object.values(resObj).map((r) => r.max_queue ?? r.peak_queue ?? 0),
             0
           );
           const topWait = winnerStats.avg_wait_s ?? winnerStats.avg_wait_time ?? 0;
@@ -405,6 +428,8 @@ export default function HistoricalSessionsTable({
             run_type: "benchmark",
             benchmark_id: bid,
             winner: winnerKey,
+            winners: bm.winners,
+            is_tie: bm.is_tie,
             winner_label: bm.winner_label || winnerStats.label,
             winner_episode: bm.winner_episode ?? winnerStats.model_episode,
             improvements: bm.improvements || {},
@@ -423,19 +448,31 @@ export default function HistoricalSessionsTable({
           continue;
         }
 
-        // Standard 3-controller showdown
-        const aiStats = bm.modes_results?.ai || {};
-        const fixedStats = bm.modes_results?.fixed || {};
-        const greedyStats = bm.modes_results?.greedy || {};
-
+        // Controller benchmark (one controller or a comparison set).
+        const controllerResults = bm.modes_results || {};
+        const controllerModes = bm.modes?.length
+          ? bm.modes
+          : Object.keys(controllerResults);
+        const primaryMode = bm.winner || controllerModes[0] || "ai";
+        const primaryStats = controllerResults[primaryMode] || {};
         const maxQ = Math.max(
-          aiStats.peak_queue ?? aiStats.max_queue ?? 0,
-          fixedStats.peak_queue ?? fixedStats.max_queue ?? 0,
-          greedyStats.peak_queue ?? greedyStats.max_queue ?? 0
+          ...Object.values(controllerResults).map(
+            (result) => result.peak_queue ?? result.max_queue ?? 0
+          ),
+          0
         );
-
-        const aiWait = aiStats.avg_wait_s ?? aiStats.avg_wait_time ?? 0;
-        const totalVehs = (aiStats.throughput ?? 0) || 10;
+        const primaryWait = primaryStats.avg_wait_s ?? primaryStats.avg_wait_time ?? 0;
+        const totalVehs =
+          primaryStats.total_vehicles ??
+          primaryStats.throughput ??
+          primaryStats.total_passed ??
+          0;
+        const singleControllerName =
+          primaryMode === "ai"
+            ? "FlowSync DQN AI"
+            : primaryMode === "greedy"
+            ? "Greedy Controller"
+            : "Fixed Timer";
 
         list.push({
           session_id: bid,
@@ -449,27 +486,35 @@ export default function HistoricalSessionsTable({
           has_arrivals: false,
           mode: "benchmark",
           benchmark_type: "controller_comparison",
-          model_name: "FlowSync DQN vs Fixed vs Greedy",
-          model_episodes: bm.model_episodes ?? 300,
-          throughput: aiStats.throughput ?? aiStats.total_passed ?? 0,
-          avg_wait_s: aiWait,
+          model_name:
+            controllerModes.length === 1
+              ? `${singleControllerName} Scenario Run`
+              : "FlowSync DQN vs Fixed vs Greedy",
+          model_episodes: controllerModes.includes("ai")
+            ? bm.model_episodes ?? 300
+            : undefined,
+          throughput: primaryStats.throughput ?? primaryStats.total_passed ?? 0,
+          avg_wait_s: primaryWait,
           peak_queue: maxQ,
           performance_rating: "OPTIMAL",
-          level_of_service: aiWait <= 10 ? "A" : aiWait <= 20 ? "B" : "C",
-          efficiency_gain_pct: bm.improvements?.ai_wait_pct ?? 0,
+          level_of_service: primaryWait <= 10 ? "A" : primaryWait <= 20 ? "B" : "C",
+          efficiency_gain_pct:
+            bm.improvements?.[`${primaryMode}_wait_pct`] ?? 0,
           run_type: "benchmark",
           benchmark_id: bid,
-          winner: bm.winner || "ai",
+          winner: primaryMode,
+          winners: bm.winners,
+          is_tie: bm.is_tie,
           improvements: bm.improvements || {},
-          benchmark_modes: bm.modes || ["ai", "fixed", "greedy"],
-          benchmark_results: bm.modes_results || {},
+          benchmark_modes: controllerModes,
+          benchmark_results: controllerResults,
           scenario_id: bm.scenario_id,
           isBenchmarkGroup: true,
           benchmarkRun: {
             benchmark_id: bid,
-            winner: bm.winner || "ai",
+            winner: primaryMode,
             improvements: bm.improvements || {},
-            modes_results: bm.modes_results || {},
+            modes_results: controllerResults,
             child_sessions: children,
           },
         });
@@ -499,7 +544,7 @@ export default function HistoricalSessionsTable({
           const winnerKey = s.winner || Object.keys(resObj)[0];
           const winnerStats = resObj[winnerKey] || {};
           const maxQ = Math.max(
-            ...Object.values(resObj).map((r: any) => r.max_queue ?? r.peak_queue ?? 0),
+            ...Object.values(resObj).map((r) => r.max_queue ?? r.peak_queue ?? 0),
             s.peak_queue ?? 0
           );
           const topWait = winnerStats.avg_wait_s ?? winnerStats.avg_wait_time ?? s.avg_wait_s ?? 0;
@@ -977,7 +1022,16 @@ export default function HistoricalSessionsTable({
                   const greedyWait = bmGreedy?.avg_wait_s ?? bmGreedy?.avg_wait_time;
 
                   const winner = session.winner || (isModelBenchmark ? Object.keys(bmResults)[0] : "ai");
-                  const winnerName = isModelBenchmark
+                  const winningModes = session.winners?.length ? session.winners : [winner];
+                  const isTie = Boolean(session.is_tie || winningModes.length > 1);
+                  const benchmarkModes = session.benchmark_modes?.length
+                    ? session.benchmark_modes
+                    : Object.keys(bmResults);
+                  const isSingleControllerBenchmark =
+                    !isModelBenchmark && benchmarkModes.length === 1;
+                  const winnerName = isTie
+                    ? winningModes.map((mode) => mode === "ai" ? "DQN" : mode === "greedy" ? "Greedy" : "Fixed").join(" & ")
+                    : isModelBenchmark
                     ? session.winner_label || (bmResults[winner]?.label ?? `Model ${session.winner_episode ?? winner}`)
                     : winner === "ai"
                     ? "FlowSync DQN AI"
@@ -1044,6 +1098,8 @@ export default function HistoricalSessionsTable({
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border ${
                                   isModelBenchmark
                                     ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                    : isTie
+                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
                                     : winner === "ai"
                                     ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
                                     : winner === "greedy"
@@ -1052,7 +1108,14 @@ export default function HistoricalSessionsTable({
                                 }`}
                               >
                                 <Trophy className="h-2.5 w-2.5 text-amber-400" />
-                                <span>{winnerName} Won</span>
+                                <span>
+                                  {winnerName}{" "}
+                                  {isSingleControllerBenchmark
+                                    ? "Evaluated"
+                                    : isTie
+                                    ? "Tied"
+                                    : "Won"}
+                                </span>
                               </span>
                             )}
 
@@ -1348,6 +1411,15 @@ export default function HistoricalSessionsTable({
                   Object.keys(bRes).some((k) => k.startsWith("model_"));
 
                 const winner = target.winner || (isModelComparison ? Object.keys(bRes)[0] : "ai");
+                const availableModes = target.benchmark_modes?.length
+                  ? target.benchmark_modes
+                  : Object.keys(bRes);
+                const winningModes = target.winners?.length
+                  ? target.winners
+                  : [winner];
+                const isTie = Boolean(target.is_tie || winningModes.length > 1);
+                const isSingleControllerBenchmark =
+                  !isModelComparison && availableModes.length === 1;
                 const winnerName = isModelComparison
                   ? target.winner_label || (bRes[winner]?.label ?? `Model ${target.winner_episode ?? winner}`)
                   : winner === "ai"
@@ -1530,9 +1602,9 @@ export default function HistoricalSessionsTable({
                 const fixedQueue = fixed?.peak_queue ?? fixed?.max_queue ?? 0;
                 const greedyQueue = greedy?.peak_queue ?? greedy?.max_queue ?? 0;
 
-                const isAIWinner = winner === "ai";
-                const isFixedWinner = winner === "fixed";
-                const isGreedyWinner = winner === "greedy";
+                const isAIWinner = winningModes.includes("ai");
+                const isFixedWinner = winningModes.includes("fixed");
+                const isGreedyWinner = winningModes.includes("greedy");
 
                 const aiGain =
                   target.improvements?.ai_wait_pct ??
@@ -1553,17 +1625,28 @@ export default function HistoricalSessionsTable({
                         <Trophy className="h-4 w-4 text-amber-400" />
                         <div>
                           <div className="text-xs font-semibold text-white">
-                            Benchmark Result:{" "}
-                            {isAIWinner
-                              ? "FlowSync DQN AI Won"
-                              : isGreedyWinner
-                              ? "Greedy Controller Won"
-                              : "Fixed Timer Won"}
+                            {isSingleControllerBenchmark
+                              ? `${winnerName} evaluation completed`
+                              : isTie
+                              ? `${winningModes
+                                  .map((mode) =>
+                                    mode === "ai"
+                                      ? "FlowSync DQN AI"
+                                      : mode === "greedy"
+                                      ? "Greedy Controller"
+                                      : "Fixed Timer"
+                                  )
+                                  .join(" & ")} tied`
+                              : `Benchmark Result: ${winnerName} Won`}
                           </div>
                           <p className="text-[11px] text-neutral-400">
-                            {aiGain !== 0
+                            {isSingleControllerBenchmark
+                              ? "Single-controller scenario evaluation; no comparative winner was assigned."
+                              : isTie
+                              ? "The top controllers produced identical displayed ranking metrics."
+                              : aiGain !== 0
                               ? `FlowSync DQN achieved ${aiGain > 0 ? "+" : ""}${aiGain}% delay reduction vs Fixed Timer baseline`
-                              : "Comprehensive 3-controller performance evaluation on identical traffic seed."}
+                              : `Compared ${availableModes.length} controllers on identical traffic arrivals.`}
                           </p>
                         </div>
                       </div>
@@ -1604,9 +1687,10 @@ export default function HistoricalSessionsTable({
                       </div>
                     )}
 
-                    {/* 3 Modes Side-by-Side Cards in STRICT Order: 1. DQN AI, 2. Fixed, 3. Greedy */}
+                    {/* Controller cards in stable DQN, Fixed, Greedy order. */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* 1. FlowSync DQN AI */}
+                      {availableModes.includes("ai") && (
                       <div
                         className={`rounded-xl p-4 border transition-all ${
                           isAIWinner
@@ -1636,7 +1720,11 @@ export default function HistoricalSessionsTable({
                             {isAIWinner ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                                 <Trophy className="h-2.5 w-2.5" />
-                                WINNER
+                                {isSingleControllerBenchmark
+                                  ? "EVALUATED"
+                                  : isTie
+                                  ? "TIED"
+                                  : "WINNER"}
                               </span>
                             ) : (
                               <span className="text-[10px] text-neutral-500 font-mono">DQN Agent</span>
@@ -1693,8 +1781,10 @@ export default function HistoricalSessionsTable({
                           </div>
                         )}
                       </div>
+                      )}
 
                       {/* 2. Fixed Timer */}
+                      {availableModes.includes("fixed") && (
                       <div
                         className={`rounded-xl p-4 border transition-all ${
                           isFixedWinner
@@ -1710,7 +1800,11 @@ export default function HistoricalSessionsTable({
                           {isFixedWinner ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                               <Trophy className="h-2.5 w-2.5" />
-                              WINNER
+                              {isSingleControllerBenchmark
+                                ? "EVALUATED"
+                                : isTie
+                                ? "TIED"
+                                : "WINNER"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-neutral-500 font-mono">Baseline</span>
@@ -1758,8 +1852,10 @@ export default function HistoricalSessionsTable({
                           </div>
                         )}
                       </div>
+                      )}
 
                       {/* 3. Greedy Controller */}
+                      {availableModes.includes("greedy") && (
                       <div
                         className={`rounded-xl p-4 border transition-all ${
                           isGreedyWinner
@@ -1777,7 +1873,11 @@ export default function HistoricalSessionsTable({
                           {isGreedyWinner ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
                               <Trophy className="h-2.5 w-2.5" />
-                              WINNER
+                              {isSingleControllerBenchmark
+                                ? "EVALUATED"
+                                : isTie
+                                ? "TIED"
+                                : "WINNER"}
                             </span>
                           ) : (
                             <span className="text-[10px] text-neutral-500 font-mono">Actuated</span>
@@ -1833,6 +1933,7 @@ export default function HistoricalSessionsTable({
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
                 );

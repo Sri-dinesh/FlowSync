@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import type {
   Scenario,
-  ScenarioRun,
   ScenarioRunGroup,
   ScenarioBenchmarkResults,
 } from "@/types/simulation";
@@ -48,9 +47,8 @@ export function ScenarioHistory({
   latestRunResult,
   latestBenchmarkResults,
 }: ScenarioHistoryProps) {
-  const { fetchRuns, fetchGroupedRuns } = useScenarios();
+  const { fetchGroupedRuns } = useScenarios();
   const [groupedRuns, setGroupedRuns] = useState<ScenarioRunGroup[]>([]);
-  const [flatRuns, setFlatRuns]       = useState<ScenarioRun[]>([]);
   const [tab, setTab]                 = useState<Tab>("paired");
   const [expanded, setExpanded]       = useState(true);
   const [loading, setLoading]         = useState(false);
@@ -58,26 +56,22 @@ export function ScenarioHistory({
   const loadData = useCallback(async () => {
     if (!selectedScenario) {
       setGroupedRuns([]);
-      setFlatRuns([]);
       return;
     }
     setLoading(true);
     try {
-      const [grouped, flat] = await Promise.all([
-        fetchGroupedRuns(selectedScenario.id),
-        fetchRuns(selectedScenario.id),
-      ]);
+      const grouped = await fetchGroupedRuns(selectedScenario.id);
       setGroupedRuns(grouped);
-      setFlatRuns(flat);
     } catch (e) {
       console.error("Failed to load scenario history", e);
     } finally {
       setLoading(false);
     }
-  }, [selectedScenario, fetchGroupedRuns, fetchRuns]);
+  }, [selectedScenario, fetchGroupedRuns]);
 
   useEffect(() => {
-    loadData();
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
   useEffect(() => {
@@ -94,19 +88,23 @@ export function ScenarioHistory({
         greedy: bRes?.greedy,
       };
 
-      setGroupedRuns((prev) => {
-        const filtered = prev.filter(
-          (g) => g.run_group_id !== optimisticGroup.run_group_id &&
-                 !(g.model_episode === optimisticGroup.model_episode && Math.abs((g.ai?.avg_wait_time ?? 0) - (optimisticGroup.ai?.avg_wait_time ?? 0)) < 0.01)
-        );
-        return [...filtered, optimisticGroup].sort((a, b) => a.model_episode - b.model_episode);
-      });
+      const optimisticTimer = window.setTimeout(() => {
+        setGroupedRuns((prev) => {
+          const filtered = prev.filter(
+            (g) => g.run_group_id !== optimisticGroup.run_group_id
+          );
+          return [...filtered, optimisticGroup].sort((a, b) => a.model_episode - b.model_episode);
+        });
+      }, 0);
 
-      const timer = setTimeout(() => loadData(), 2000);
-      return () => clearTimeout(timer);
+      const refreshTimer = window.setTimeout(() => void loadData(), 2000);
+      return () => {
+        window.clearTimeout(optimisticTimer);
+        window.clearTimeout(refreshTimer);
+      };
     } else if (latestRunResult) {
-      const timer = setTimeout(() => loadData(), 2000);
-      return () => clearTimeout(timer);
+      const timer = window.setTimeout(() => void loadData(), 2000);
+      return () => window.clearTimeout(timer);
     }
   }, [latestBenchmarkResults, latestRunResult, selectedScenario, loadData]);
 
@@ -116,8 +114,8 @@ export function ScenarioHistory({
 
   const chartData = useMemo(() => {
     return sortedGroups.map((g, idx) => ({
-      runKey: `R${idx + 1}·ep${g.model_episode}`,
-      runLabel: `Run #${idx + 1} (ep ${g.model_episode})`,
+      runKey: g.ai ? `R${idx + 1}·ep${g.model_episode}` : `R${idx + 1}·base`,
+      runLabel: g.ai ? `Run #${idx + 1} (ep ${g.model_episode})` : `Run #${idx + 1} (baseline only)`,
       episode: g.model_episode,
       dqn: g.ai ? Number(g.ai.avg_wait_time.toFixed(2)) : undefined,
       greedy: g.greedy ? Number(g.greedy.avg_wait_time.toFixed(2)) : undefined,
@@ -141,6 +139,7 @@ export function ScenarioHistory({
     }
     return {
       totalGroups: sortedGroups.length,
+      comparisonGroups: total,
       dqnWins,
       winRate: total > 0 ? (dqnWins / total) * 100 : 0,
     };
@@ -163,9 +162,9 @@ export function ScenarioHistory({
           <span className="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">
             Scenario Multi-Run Evaluation
           </span>
-          {stats.totalGroups > 0 && (
+          {stats.comparisonGroups > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-neutral-800 text-neutral-300 border border-neutral-700">
-              DQN Win Rate: {stats.winRate.toFixed(0)}% ({stats.dqnWins}/{stats.totalGroups})
+              DQN Win Rate: {stats.winRate.toFixed(0)}% ({stats.dqnWins}/{stats.comparisonGroups})
             </span>
           )}
         </div>
@@ -294,8 +293,13 @@ export function ScenarioHistory({
                     if (gWait !== undefined) candidates.push({ name: "Greedy", wait: gWait });
                     if (dWait !== undefined) candidates.push({ name: "DQN", wait: dWait });
 
-                    candidates.sort((a, b) => a.wait - b.wait);
-                    const winner = candidates[0]?.name;
+                    const bestWait = candidates.length
+                      ? Math.min(...candidates.map((candidate) => candidate.wait))
+                      : null;
+                    const tiedWinners = bestWait === null
+                      ? []
+                      : candidates.filter((candidate) => Math.abs(candidate.wait - bestWait) < 0.005);
+                    const winner = tiedWinners.length > 1 ? "Tie" : tiedWinners[0]?.name;
                     const isDqnWinner = winner === "DQN";
 
                     const deltaGreedy = (dWait !== undefined && gWait !== undefined)
@@ -311,7 +315,7 @@ export function ScenarioHistory({
                       >
                         <td className="px-3 py-2">
                           <span className="inline-flex items-center px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono text-[10px] font-medium border border-neutral-700">
-                            ep{group.model_episode}
+                            {group.ai ? `ep${group.model_episode}` : "baseline"}
                           </span>
                         </td>
 

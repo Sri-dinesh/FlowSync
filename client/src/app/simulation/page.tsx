@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot } from "lucide-react";
+import { Bot, Play } from "lucide-react";
 import Header from "@/components/layout/Header";
 import SimulationControls from "@/components/controls/SimulationControls";
 import TrainingControls from "@/components/controls/TrainingControls";
@@ -65,6 +65,14 @@ import { useSimulationStore } from "@/store/simulationStore";
 import type { Scenario } from "@/types/simulation";
 import { getFastApiUrls } from "@/lib/utils";
 
+type ScenarioRunScope = "all" | "ai" | "fixed" | "greedy";
+
+const SCENARIO_MODE_LABELS: Record<string, string> = {
+  ai: "DQN Policy",
+  fixed: "Fixed Timer",
+  greedy: "Greedy",
+};
+
 export default function SimulationPage() {
   const {
     sendCommand: sendSimulationCommand,
@@ -88,6 +96,7 @@ export default function SimulationPage() {
   // Tabs and Scenario state
   const [activeTab, setActiveTab] = useState("comparison");
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
+  const [scenarioRunScope, setScenarioRunScope] = useState<ScenarioRunScope>("all");
 
   // Available DQN AI Models for benchmark checkpoint selection
   const [models, setModels] = useState<Array<{ id: string; name: string; version: string; episodes?: number; source?: string; is_best?: boolean }>>([]);
@@ -121,15 +130,22 @@ export default function SimulationPage() {
   }, []);
 
   // Latest scenario run result (for optimistic ScenarioHistory update)
-  const latestScenarioRun = scenarioBenchmarkResults
+  const latestScenarioControllerResult = scenarioBenchmarkResults
+    ? scenarioBenchmarkResults.results?.ai ?? Object.values(scenarioBenchmarkResults.results ?? {})[0]
+    : null;
+  const latestScenarioRun = scenarioBenchmarkResults && latestScenarioControllerResult
     ? {
         model_episode: scenarioBenchmarkResults.model_episode,
-        avg_wait_time: scenarioBenchmarkResults.results?.ai?.avg_wait_time ?? 0,
-        total_passed: scenarioBenchmarkResults.results?.ai?.total_passed ?? 0,
-        max_queue: scenarioBenchmarkResults.results?.ai?.max_queue ?? 0,
-        override_rate: scenarioBenchmarkResults.results?.ai?.override_rate ?? 0,
+        avg_wait_time: latestScenarioControllerResult.avg_wait_time ?? 0,
+        total_passed: latestScenarioControllerResult.total_passed ?? 0,
+        max_queue: latestScenarioControllerResult.max_queue ?? 0,
+        override_rate: latestScenarioControllerResult.override_rate ?? 0,
       }
     : null;
+
+  const scenarioControllers = scenarioRunScope === "all"
+    ? ["ai", "fixed", "greedy"]
+    : [scenarioRunScope];
 
   /** Runs benchmark: uses scenario seed if one is selected, otherwise random */
   const handleRunBenchmark = (
@@ -159,6 +175,7 @@ export default function SimulationPage() {
       selectedScenario.duration_seconds,
       scenarioModelId || "",
       epNum,
+      scenarioControllers,
     );
   };
 
@@ -289,11 +306,42 @@ export default function SimulationPage() {
                           <div className="pt-2 border-t border-neutral-800 space-y-3">
                             <div>
                               <p className="text-[11px] text-neutral-400 leading-relaxed">
-                                Runs <span className="text-white font-medium">FlowSync DQN</span>, <span className="text-white font-medium">Fixed Timer</span>, and <span className="text-white font-medium">Greedy</span> on identical seeded conditions (CRN) to evaluate policy consistency.
+                                {scenarioRunScope === "all"
+                                  ? "Compares all three controllers on identical seeded arrivals (CRN)."
+                                  : `Runs only ${SCENARIO_MODE_LABELS[scenarioRunScope]} on this scenario.`}
                               </p>
                             </div>
 
+                            <fieldset className="space-y-1.5" disabled={benchmarkRunning}>
+                              <legend className="text-[11px] text-neutral-400 font-medium">
+                                Controllers to run
+                              </legend>
+                              <div className="grid grid-cols-4 gap-1 rounded-lg border border-neutral-800 bg-neutral-950 p-1">
+                                {([
+                                  ["all", "All 3"],
+                                  ["ai", "DQN"],
+                                  ["fixed", "Fixed"],
+                                  ["greedy", "Greedy"],
+                                ] as const).map(([value, label]) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    aria-pressed={scenarioRunScope === value}
+                                    onClick={() => setScenarioRunScope(value)}
+                                    className={`min-h-9 rounded-md px-2 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      scenarioRunScope === value
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </fieldset>
+
                             {/* DQN AI Model Checkpoint Selector */}
+                            {(scenarioRunScope === "all" || scenarioRunScope === "ai") && (
                             <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 space-y-1.5">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-neutral-300 font-medium flex items-center gap-1.5">
@@ -327,6 +375,7 @@ export default function SimulationPage() {
                                 )}
                               </select>
                             </div>
+                            )}
 
                             <div className="flex gap-2">
                               <button
@@ -343,11 +392,16 @@ export default function SimulationPage() {
                                   <>
                                     <span className="h-2 w-2 rounded-full bg-violet-400 animate-pulse" />
                                     <span>
-                                      Evaluating: {benchmarkProgress?.current_mode?.toUpperCase() ?? "CRN BENCHMARK"}… ({((benchmarkProgress?.mode_index ?? 0) + 1)}/3)
+                                      Evaluating: {benchmarkProgress?.current_mode?.toUpperCase() ?? "SCENARIO"}… ({Math.min((benchmarkProgress?.mode_index ?? 0) + 1, scenarioControllers.length)}/{scenarioControllers.length})
                                     </span>
                                   </>
                                 ) : (
-                                  <>▶ Run 3-Controller Benchmark (DQN · Fixed · Greedy)</>
+                                  <>
+                                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                                    {scenarioRunScope === "all"
+                                      ? "Run 3-Controller Benchmark"
+                                      : `Run ${SCENARIO_MODE_LABELS[scenarioRunScope]}`}
+                                  </>
                                 )}
                               </button>
 
@@ -368,11 +422,14 @@ export default function SimulationPage() {
                             {benchmarkRunning && benchmarkProgress && (
                               <div className="p-2.5 rounded-lg bg-black/40 border border-white/10 space-y-2">
                                 <div className="flex items-center justify-between text-[10px] text-white/40">
-                                  <span>Multi-Controller Execution</span>
-                                  <span className="font-mono text-violet-300">Phase {(benchmarkProgress.mode_index ?? 0) + 1} of 3</span>
+                                  <span>{scenarioControllers.length > 1 ? "Multi-Controller Execution" : "Single-Controller Execution"}</span>
+                                  <span className="font-mono text-violet-300">Phase {Math.min((benchmarkProgress.mode_index ?? 0) + 1, scenarioControllers.length)} of {scenarioControllers.length}</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-1.5 text-center font-mono">
-                                  {["ai", "fixed", "greedy"].map((mode) => {
+                                <div
+                                  className="grid gap-1.5 text-center font-mono"
+                                  style={{ gridTemplateColumns: `repeat(${scenarioControllers.length}, minmax(0, 1fr))` }}
+                                >
+                                  {scenarioControllers.map((mode) => {
                                     const isDone = benchmarkProgress.modes_done?.includes(mode);
                                     const isCurrent = benchmarkProgress.current_mode === mode;
                                     return (
@@ -441,49 +498,52 @@ export default function SimulationPage() {
                               </div>
                             )}
 
-                            {/* Show latest 3-controller paired result for this scenario */}
+                            {/* Show the latest result for the selected run scope */}
                             {scenarioBenchmarkResults?.scenario_id === selectedScenario.id && (
                               <div className="p-3 rounded-xl border border-violet-500/30 bg-violet-500/[0.06] space-y-2">
                                 <div className="flex items-center justify-between text-xs">
                                   <span className="font-semibold text-violet-200">Latest Benchmark Results</span>
                                   <span className="font-mono text-[10px] text-white/40">
-                                    ep{scenarioBenchmarkResults.model_episode}
+                                    {scenarioBenchmarkResults.modes?.includes("ai")
+                                      ? `ep${scenarioBenchmarkResults.model_episode}`
+                                      : "Baseline only"}
                                   </span>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
-                                  {/* DQN */}
-                                  <div className="p-2 rounded-lg bg-violet-950/40 border border-violet-500/40">
-                                    <div className="text-[10px] text-violet-300 font-bold">DQN Policy</div>
-                                    <div className="text-violet-200 font-bold mt-0.5">
-                                      {scenarioBenchmarkResults.results?.ai?.avg_wait_time?.toFixed(1) ?? "—"}s
-                                    </div>
-                                    <div className="text-[9px] text-violet-300/60 mt-0.5">
-                                      {scenarioBenchmarkResults.results?.ai?.total_passed ?? "—"} veh
-                                    </div>
-                                  </div>
-
-                                  {/* Fixed */}
-                                  <div className="p-2 rounded-lg bg-black/40 border border-blue-500/20">
-                                    <div className="text-[10px] text-blue-400 font-semibold">Fixed</div>
-                                    <div className="text-white font-bold mt-0.5">
-                                      {scenarioBenchmarkResults.results?.fixed?.avg_wait_time?.toFixed(1) ?? "—"}s
-                                    </div>
-                                    <div className="text-[9px] text-white/40 mt-0.5">
-                                      {scenarioBenchmarkResults.results?.fixed?.total_passed ?? "—"} veh
-                                    </div>
-                                  </div>
-
-                                  {/* Greedy */}
-                                  <div className="p-2 rounded-lg bg-black/40 border border-emerald-500/20">
-                                    <div className="text-[10px] text-emerald-400 font-semibold">Greedy</div>
-                                    <div className="text-white font-bold mt-0.5">
-                                      {scenarioBenchmarkResults.results?.greedy?.avg_wait_time?.toFixed(1) ?? "—"}s
-                                    </div>
-                                    <div className="text-[9px] text-white/40 mt-0.5">
-                                      {scenarioBenchmarkResults.results?.greedy?.total_passed ?? "—"} veh
-                                    </div>
-                                  </div>
+                                <div
+                                  className="grid gap-2 text-[11px] font-mono"
+                                  style={{
+                                    gridTemplateColumns: `repeat(${Math.max(1, scenarioBenchmarkResults.modes?.length ?? Object.keys(scenarioBenchmarkResults.results ?? {}).length)}, minmax(0, 1fr))`,
+                                  }}
+                                >
+                                  {(scenarioBenchmarkResults.modes ?? Object.keys(scenarioBenchmarkResults.results ?? {})).map((controller) => {
+                                    const controllerResult = scenarioBenchmarkResults.results?.[controller];
+                                    return (
+                                      <div
+                                        key={controller}
+                                        className={`p-2 rounded-lg border ${
+                                          controller === "ai"
+                                            ? "bg-violet-950/40 border-violet-500/40"
+                                            : controller === "greedy"
+                                            ? "bg-black/40 border-emerald-500/20"
+                                            : "bg-black/40 border-blue-500/20"
+                                        }`}
+                                      >
+                                        <div className="text-[10px] text-neutral-300 font-bold">
+                                          {SCENARIO_MODE_LABELS[controller] ?? controller.toUpperCase()}
+                                        </div>
+                                        <div className="text-white font-bold mt-0.5">
+                                          {controllerResult?.avg_wait_time?.toFixed(1) ?? "—"}s
+                                        </div>
+                                        <div className="text-[9px] text-white/40 mt-0.5">
+                                          {controllerResult?.total_passed ?? "—"}
+                                          {controllerResult?.total_vehicles !== undefined
+                                            ? `/${controllerResult.total_vehicles}`
+                                            : ""} veh
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
