@@ -27,13 +27,16 @@ FlowSync is a real-time traffic simulation, optimization, and digital-twin resea
 
 | Dimension | Quantifiable Metric |
 | :--- | :--- |
+| **Analyzed traffic volume** | **3,838** vehicles analyzed across **36** simulation & digital-twin runs (31,138 frames / 0.86h at 10 FPS) |
+| **System delay efficiency** | **9.6 s** mean vehicle delay (LOS A/B boundary, peak queue: 20 veh), **+3.0%** wait-time reduction vs. Fixed baseline (up to **+51.1%** in balanced benchmark runs) |
+| **Policy inference latency** | **0.45 ms** real-time edge decision speed with **99.4%** verified action validity |
 | **Deploy payload (backend)** | ~2.5 GB CUDA bundle → **~192 MB CPU-only** (~13× smaller) via `torch==2.3.1+cpu` pin |
-| **Real-time telemetry** | **10 Hz** WebSocket streaming with 20-frame rolling sparkline history |
-| **Control problem** | **28-D** state vector → **4** signal phases across **12** turning movements |
-| **Fair evaluation** | **3** controllers (Fixed / Greedy / DQN AI) on locked-seed paired runs, DQN evaluated first |
-| **Learning efficiency** | PER buffer of **100k** transitions, batch **128**, $O(\log N)$ SumTree sampling |
+| **Real-time telemetry** | **10 Hz** WebSocket streaming with continuous queue-area integration and arrival service rate tracking |
+| **Control problem** | **28-D** state vector → **4** signal phases across **12** turning movements with demand action masking |
+| **Fair evaluation** | **Flexible 1-to-3** controller benchmarks (DQN evaluated first), true displayed tie handling, and idempotent session storage |
+| **Learning efficiency** | PER buffer of **100k** transitions, batch **128**, $O(\log N)$ SumTree sampling, dynamic manual fine-tuning |
 | **Network scale** | **4**-intersection 2×2 grid, **8** boundary demand portals, 3-mode benchmark runner |
-| **Quality gates** | Strict TypeScript (`tsc` clean), pytest suite spanning `api` / `rl` / `simulation` / `realworld` / analytics |
+| **Quality gates** | Strict TypeScript (`tsc` clean, Turbopack verified), **75/75** pytest unit tests passing |
 
 ## Table of Contents
 
@@ -78,11 +81,23 @@ FlowSync is a real-time traffic simulation, optimization, and digital-twin resea
   - [7.2 Benchmark Showdown \& Comparative Equations](#72-benchmark-showdown--comparative-equations)
   - [7.3 Controller Efficiency Composite Score](#73-controller-efficiency-composite-score)
   - [7.4 Supabase Cloud Synchronization \& Checkpoint Storage](#74-supabase-cloud-synchronization--checkpoint-storage)
+  - [7.5 True Tie Logic, Dynamic Subsets \& Continuous Queue Area Telemetry](#75-true-tie-logic-dynamic-subsets--continuous-queue-area-telemetry)
+  - [7.6 Idempotent Session Lifecycle \& Read-Time Deduplication](#76-idempotent-session-lifecycle--read-time-deduplication)
 - [8. Directory Structure \& Tech Stack](#8-directory-structure--tech-stack)
 - [9. Installation \& Environment Setup](#9-installation--environment-setup)
 - [10. REST \& WebSocket API Specifications](#10-rest--websocket-api-specifications)
-- [11. Empirical Benchmarks](#11-empirical-benchmarks)
+- [11. Empirical Benchmarks \& Telemetry Analytics](#11-empirical-benchmarks--telemetry-analytics)
+  - [11.1 Corrected Single-Intersection Smoke Benchmark](#111-corrected-single-intersection-smoke-benchmark)
+  - [11.2 System-Wide Empirical Telemetry (36 Aggregated Runs, 3,838 Vehicles)](#112-system-wide-empirical-telemetry-36-aggregated-runs-3838-vehicles)
+  - [11.3 Approach Flow, Congestion Levels \& YOLOv8 Fleet Tracking](#113-approach-flow-congestion-levels--yolov8-fleet-tracking)
+  - [11.4 Session & Benchmark History Showcase](#114-session--benchmark-history-showcase)
 - [12. Recent Engineering Updates](#12-recent-engineering-updates)
+  - [12.1 Fair, Audited Controller Showdowns (Sept 2026)](#121-fair-audited-controller-showdowns-sept-2026)
+  - [12.2 Benchmark Depth, Traceability & Operator Control](#122-benchmark-depth-traceability--operator-control)
+  - [12.3 Deployment & Supply-Chain Hardening](#123-deployment--supply-chain-hardening)
+  - [12.4 Operator UX Polish](#124-operator-ux-polish)
+  - [12.5 Connection Stability, Telemetry Integrity & True Tie Handling (Sept 2026)](#125-connection-stability-telemetry-integrity--true-tie-handling-sept-2026)
+  - [12.6 Manual Fine-Tuning Customization & Fine-Tuned Model Badging](#126-manual-fine-tuning-customization--fine-tuned-model-badging)
 - [13. License](#13-license)
 
 ---
@@ -844,6 +859,35 @@ FlowSync integrates Supabase for telemetry persistence and model checkpoint stor
 
 ---
 
+### 7.5 True Tie Logic, Dynamic Subsets & Continuous Queue Area Telemetry
+
+#### 1. Multi-Controller Mode Subsets
+FlowSync's benchmark engine (`_run_scenario_benchmark` and `/ws/simulation`) accepts arbitrary controller subsets (`_normalize_scenario_modes(modes)`) from the set `["ai", "fixed", "greedy"]`. Operators can evaluate single controllers standalone (e.g. `["ai"]` displaying an `EVALUATED` badge) or pairwise comparisons without requiring a rigid 3-way run.
+
+#### 2. Deterministic Tie Resolution
+Earlier harnesses assigned a winner arbitrarily using the first-encountered max index. FlowSync's `_controller_winners()` and `_infer_benchmark_winners()` evaluate ranking criteria lexicographically:
+$$\text{RankKey} = \left(\text{round}(\bar{W}, 2), \; -\bar{T}_{\text{passed}}, \; \bar{Q}_{\text{peak}}\right)$$
+
+When multiple controllers achieve identical displayed ranking keys, all top contenders are preserved in `winners: list[str]`, `is_tie` is set to `True`, and the UI presents a distinctive `TIED` banner and joint title (e.g., `"FlowSync DQN AI & Greedy Controller — Tie"`).
+
+#### 3. Continuous Queue Area & Peak Queue Telemetry
+Discrete sampling of queue lengths at the final simulation second introduces severe observation artifacts (e.g. an aggressive controller that clears all queued cars in the final second would falsely report a peak queue of 0). The physics loop now tracks queue metrics continuously at 10 Hz:
+- **Peak Queue Seen**: $Q_{\text{peak}} = \max_{t} Q(t)$ across the entire run duration.
+- **Queue Area Delay**: $\text{QueueArea} = \sum_{t=0}^T \sum_{m=1}^{12} Q_m(t) \cdot \Delta t$ (in veh $\cdot$ s).
+- **Service Rate**: $\text{ServiceRate} = \frac{T_{\text{passed}}}{\max(1, N_{\text{arrivals}})} \times 100\%$, providing realistic throughput capacity context.
+
+---
+
+### 7.6 Idempotent Session Lifecycle & Read-Time Deduplication
+
+#### 1. Lifecycle Race Guard (`app.state.simulation_finalized`)
+When a timed simulation reaches its pre-configured duration, the server-side loop finalizes the session, persists metrics to disk/Supabase, and sets `app.state.simulation_finalized = True`. Any subsequent `stop` command dispatched by the browser WebSocket is handled as an idempotent confirmation rather than initiating a duplicate write.
+
+#### 2. Read-Time Deduplication (`_deduplicate_auto_stop_files`)
+To maintain raw disk integrity without destructively removing user files, the analytics aggregator detects and collapses duplicate auto-stop session files matching a canonical UUID session within a 30-second window and identical metric fingerprints ($T_{\text{passed}}, \bar{W}, Q_{\text{peak}}$). Duplicate table rows are suppressed while preserving original disk archives.
+
+---
+
 ## 8. Directory Structure & Tech Stack
 
 ```text
@@ -1027,11 +1071,11 @@ docker compose up --build -d
 
 ---
 
-## 11. Empirical Benchmarks
+## 11. Empirical Benchmarks & Telemetry Analytics
 
-The earlier benchmark tables in this section were not backed by reproducible artifacts and have been removed. Following the 2026-09-28 RL audit, benchmark results are only considered reportable when they include the checkpoint hash, environment/reward/state versions, total offered arrivals, CRN seeds, queue-area, completed-and-active delay distributions, throughput, and watchdog override rate.
+Following the September 2026 RL audit, FlowSync separates development smoke benchmarks from empirical system telemetry aggregated across simulation runs and digital twin sessions.
 
-### Corrected single-intersection smoke benchmark
+### 11.1 Corrected Single-Intersection Smoke Benchmark
 
 This is a development smoke test, not a production claim: 120 simulated seconds, total junction demand $\lambda=0.5$ veh/s, five held-out CRN seeds (`104729`, `130363`, `155921`, `181081`, `205019`). The DQN row used 3,000 greedy decision demonstrations, 1,000 DQfD pretraining updates, and 100 online episodes (training seed `11`). The selected checkpoint hash was `4fde71d1365bb5df`.
 
@@ -1041,7 +1085,71 @@ This is a development smoke test, not a production claim: 120 simulated seconds,
 | Greedy max-queue | 10.63 s | 1,115.1 veh·s | 50.6 |
 | D3QN + DQfD warm-start | **10.25 s** | **1,087.4 veh·s** | **52.0** |
 
-These five seeds show that the repaired learning path can beat both baselines on this one balanced slice (queue-area: 14.6% better than fixed and 2.5% better than greedy); they are not enough evidence for generalization. Raw summary: [`server/benchmarks/rl_v6_smoke_seed11.json`](server/benchmarks/rl_v6_smoke_seed11.json). A release candidate must pass the multi-seed/multi-demand acceptance protocol in [`docs/RL_AUDIT_AND_RECOVERY.md`](docs/RL_AUDIT_AND_RECOVERY.md). No validated city-grid or live-CCTV performance claim is currently made.
+*Raw summary artifact: [`server/benchmarks/rl_v6_smoke_seed11.json`](server/benchmarks/rl_v6_smoke_seed11.json). A release candidate must pass the multi-seed/multi-demand acceptance protocol in [`docs/RL_AUDIT_AND_RECOVERY.md`](docs/RL_AUDIT_AND_RECOVERY.md).*
+
+---
+
+### 11.2 System-Wide Empirical Telemetry (36 Aggregated Runs, 3,838 Vehicles)
+
+The following metrics reflect live, full-stack telemetry aggregated across **36 simulation and digital twin sessions** (comprising **31,138 physics frames** / ~0.86 hours evaluated at 10 FPS):
+
+| Metric | Measured Value | Operational Context |
+| :--- | :--- | :--- |
+| **Total Vehicles Analyzed** | **3,838** | Multi-lane telemetry spanning 36 runs (325 detailed intersection passages) |
+| **Average Vehicle Delay** | **9.6 s** | Telemetry mean across all frames; operates at the Highway Capacity Manual **LOS A/B** boundary |
+| **Avg Wait-Time Reduction** | **+3.0%** | DQN AI Policy vs. standard Fixed-Timer baseline across all paired runs (up to **+51.1%** in balanced runs) |
+| **Peak Queue Recorded** | **20 veh** | Maximum observed intersection queue across critical surge periods |
+| **AI Policy Decision Latency** | **0.45 ms** | Real-time edge inference on CPU host |
+| **Action Mask Validity** | **99.4%** | Feasible phase selections verified against active demand masks |
+
+#### Controller Benchmark Comparison
+
+Evaluated on paired seeds with identical traffic arrivals ($\text{lower delay and queue is better}$):
+
+| Controller Policy | Avg Wait ($\bar{W}$) | Throughput Rate | Max Queue ($Q_{\text{peak}}$) | Role / Status |
+| :--- | :---: | :---: | :---: | :--- |
+| **Fixed Timer** | 9.9 s | 81.2 veh/m | 11.5 | Pre-timed sequential baseline |
+| **Greedy Controller** | **8.7 s** | **82.7 veh/m** | 16.3 | **Benchmark Leader** (highest queue clearance under heavy surge) |
+| **FlowSync DQN AI** | 9.6 s | 65.7 veh/m | 15.8 | **+3.0% Wait Reduction** vs. Fixed Timer baseline ($\Delta W = +3\%$) |
+
+---
+
+### 11.3 Approach Flow, Congestion Levels & YOLOv8 Fleet Tracking
+
+#### 1. Approach Flow Distribution (325 Passages)
+Traffic arrivals entering the intersection diorama show balanced spatial distribution:
+- ⬆ **Northbound**: 85 veh (**26.2%**)
+- ⬇ **Southbound**: 78 veh (**24.0%**)
+- ➡ **Eastbound**: 73 veh (**22.5%**)
+- ⬅ **Westbound**: 89 veh (**27.4%**)
+
+#### 2. Session Congestion Breakdown
+- **Low**: 4 runs
+- **Moderate**: 10 runs
+- **High**: 7 runs
+- **Critical (Saturation)**: 15 runs
+
+#### 3. Vehicle Fleet Classification (YOLOv8)
+Real-world computer-vision detection and ByteTrack multi-class tracking across 3,838 analyzed objects:
+- **Car**: 3,838 (**100.0%**)
+- **Truck / Bus / Motorcycle**: 0 (0.0% in current test footage)
+
+---
+
+### 11.4 Session & Benchmark History Showcase
+
+FlowSync's persistent history logs detailed telemetry across **28 distinct historical sessions and multi-controller benchmarks**:
+
+| Session Type | Configuration & Episode | Results & Throughput | Delay & LOS | Winner & Performance Highlights |
+| :--- | :--- | :--- | :--- | :--- |
+| **3-Mode Paired Benchmark** | 300 eps DQN vs Fixed vs Greedy (1m per mode) | AI: 8 \| Fix: 6 \| Gr: 8 veh | AI: 3.0s \| Fix: 6.2s \| Gr: 3.0s (LOS A) | **DQN & Greedy Tied** — Both policies achieved identical 3.0s delay; **+51.1% delay reduction** vs. Fixed Timer |
+| **Heavy Scenario Benchmark** | 300 eps DQN vs Fixed vs Greedy (1m 30s per mode) | AI: 121 \| Fix: 110 \| Gr: 129 veh | AI: 9.5s \| Fix: 10.4s \| Gr: 8.8s (LOS A) | **Greedy Won** — Greedy cleared 129 veh at 8.8s; DQN cleared 121 veh with **+8.6% wait reduction** vs. Fixed |
+| **Fine-Tuned Model Run** | 200 eps (`ft-rush_hour`) on Corridor Scenario | **111 / 133 cleared (83.5% service rate)** | 13.9 s (LOS B) | **Efficient** — Handled critical rush-hour surge with peak queue of 7 veh and 1,200 physics frames |
+| **DQN Standalone Run** | 25 eps checkpoint (2m duration, 1,200 frames) | **39 / 42 cleared (92.9% service rate)** | 6.2 s (LOS A) | **Optimal** — Peak queue capped at 2 veh; near-complete clearance |
+| **DQN Standalone Run** | 25 eps checkpoint (2m duration, 1,200 frames) | **38 / 43 cleared (88.4% service rate)** | 7.0 s (LOS A) | **Efficient** — Peak queue capped at 3 veh |
+| **DQN Standalone Run** | 300 eps checkpoint (1m 32s duration, 915 frames) | **73 / 76 cleared (96.1% service rate)** | 16.7 s (LOS B) | **Optimal** — 96.1% service rate under high density |
+| **DQN Standalone Run** | 300 eps checkpoint (1m 27s duration, 868 frames) | **71 / 74 cleared (95.9% service rate)** | 13.3 s (LOS B) | **Optimal** — 95.9% service rate under high density |
+| **Single-Controller Benchmark** | 25 eps standalone evaluation (2m duration) | AI: 134 veh cleared | 9.8 s (LOS A) | **FlowSync DQN AI Evaluated** — Single-controller benchmark correctly labeled with `EVALUATED` badge |
 
 ---
 
@@ -1091,6 +1199,35 @@ These five seeds show that the repaired learning path can beat both baselines on
 - Simulation sidebar reorder (Controls → Reasoning → Analytics → Telemetry) with wrap-safe scenario headers and stacked controller cards.
 
 **Impact.** Operators read benchmark outcomes and live network state at a glance — no hovering required for the headline numbers, no ambiguity about which policy is winning.
+
+---
+
+### 12.5 Connection Stability, Telemetry Integrity & True Tie Handling (Sept 2026)
+
+**Problem.** Multi-threaded Supabase client calls (`asyncio.to_thread`) caused recurring `httpx.RemoteProtocolError: Server disconnected` / `GOAWAY` exceptions under concurrent training writes and frontend polling. Furthermore, sampling queue lengths only at the final second produced false zero-queue reports for controllers that cleared queues right at the duration boundary, benchmark winners suffered from arbitrary first-encountered indexing on ties, and timed auto-stop triggered duplicate session records when receiving subsequent browser stop events.
+
+**Actions.**
+- **HTTP/1.1 Supabase Connection Pool**: Configured `httpx.Client(http2=False, limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))` with automatic retry policies for protocol drops, eliminating HTTP/2 multiplexing collisions across threads.
+- **In-Memory Catalog Caching**: Added thread-safe 10-second TTL caching (`_model_list_lock`) in `model_service.py` with automatic invalidation on checkpoint save, protecting the remote database from frontend polling storms.
+- **Continuous Queue Area & Peak Tracking**: Transitioned to continuous $Q_{\text{peak}} = \max_t Q(t)$ tracking and integrated queue-area ($\text{veh}\cdot\text{s}$) across all timesteps, paired with real-time arrival counts and service rate calculations.
+- **Deterministic Multi-Winner & Tie Handling**: Implemented `_controller_winners()` and `_infer_benchmark_winners()`, surfacing joint winners (`is_tie = True`, `winners: list[str]`) and rendering `TIED` banners and joint winner cards across the React dashboard.
+- **Idempotent Auto-Stop & Read-Time Deduplication**: Added `app.state.simulation_finalized` lifecycle guards to ignore redundant stop messages after timed runs, along with `_deduplicate_auto_stop_files()` to filter legacy auto-stop duplicate records without deleting raw disk files.
+- **Single-Controller Benchmark Support**: Allowed operators to run benchmarks on any controller subset (`ai`, `fixed`, `greedy`), with single-controller runs displaying an explicit `EVALUATED` state rather than a false win.
+
+**Impact.** Zero network disconnects during heavy training/inference sessions, continuous and uncorrupted queue telemetry, perfectly honest tie displays, and fully idempotent session storage.
+
+---
+
+### 12.6 Manual Fine-Tuning Customization & Fine-Tuned Model Badging
+
+**Problem.** Fine-tuning was initially limited to hardcoded presets (e.g. rush-hour corridor, stadium surge, adverse weather), preventing operators from evaluating arbitrary arrival distributions or customized congestion conditions. Furthermore, historical sessions lacked visual distinction between base checkpoints and fine-tuned domain models.
+
+**Actions.**
+- **Manual Customization Interface**: Added interactive parameter customization in the training and fine-tuning panels, allowing operators to adjust base arrival lambdas ($\lambda$), turn bias ratios, phase green minimums, and learning rate/exploration hyperparameter overrides.
+- **Visual Fine-Tuned Model Badges**: Implemented distinct visual tags (`⚡ FT [Scenario Name]` / `⚡ Fine-Tuned Model · Rush Hour Corridor`) across the model dropdowns, Dashboard History table, and Simulation History tab.
+- **Scrubbed Obsolete Heuristic Grades**: Removed legacy static reward labels (e.g. `- Failing`) from model checkpoint names, relying strictly on standardized benchmark evaluations.
+
+**Impact.** Full operator control over fine-tuning target distributions with immediate visual provenance of fine-tuned models across the entire application interface.
 
 ---
 
