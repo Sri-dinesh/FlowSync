@@ -28,6 +28,10 @@ async def test_trainer_resume_state_initialization():
     mock_env = MagicMock()
     mock_agent = DQNAgent()
     mock_supabase = MagicMock()
+    # Plain callables avoid exercising MagicMock concurrently from the
+    # trainer's background persistence thread and checkpoint metadata thread.
+    mock_supabase.save_episode = lambda *args, **kwargs: None
+    mock_supabase.save_model_metadata = lambda *args, **kwargs: None
     mock_model_service = MagicMock()
     mock_broadcast = AsyncMock()
 
@@ -47,11 +51,27 @@ async def test_trainer_resume_state_initialization():
         supabase_service=mock_supabase,
         model_service=mock_model_service,
         ws_broadcast_fn=mock_broadcast,
+        enable_greedy_warmup=False,
     )
 
     # Mock environment reset and step to stop immediately
-    mock_env.reset.return_value = (torch.zeros(28).numpy(), {})
-    mock_env.step.return_value = (torch.zeros(28).numpy(), 0.0, True, False, {})
+    mask = torch.ones(4, dtype=torch.bool).numpy()
+    mock_env.reset_to_decision.return_value = (
+        torch.zeros(28).numpy(), {"valid_action_mask": mask}
+    )
+    mock_env.step_decision.return_value = (
+        torch.zeros(28).numpy(),
+        0.0,
+        True,
+        False,
+        {
+            "executed_action": 0,
+            "valid_action_mask": mask,
+            "bootstrap_discount": 0.99,
+        },
+    )
+    mock_env.max_steps = 1
+    mock_env.intersection.timestep = 0
     mock_env.get_episode_telemetry.return_value = {}
     mock_env.intersection.get_avg_wait_time.return_value = 12.5
     mock_env.intersection.total_passed = 10
@@ -69,8 +89,8 @@ async def test_trainer_resume_state_initialization():
     assert trainer.is_resumed is True
     assert trainer.resume_model_id == "model-abc:1000"
     assert trainer.current_episode == 1001
-    # Epsilon at 1000 episodes must be at minimum (0.05)
-    assert abs(trainer.epsilon - trainer.hyperparams.epsilon_end) < 1e-4
+    # Resume deliberately re-opens exploration because replay is not serialized.
+    assert trainer.epsilon >= 0.19
 
     # Verify model_service.load_checkpoint was called with clean id and episode 1000
     mock_model_service.load_checkpoint.assert_called_once_with("model-abc", 1000)

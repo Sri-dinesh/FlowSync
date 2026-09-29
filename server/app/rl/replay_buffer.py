@@ -115,6 +115,9 @@ class PrioritizedReplayBuffer:
         next_state,
         done: bool,
         valid_action_mask: Optional[np.ndarray] = None,
+        next_valid_action_mask: Optional[np.ndarray] = None,
+        bootstrap_discount: Optional[float] = None,
+        is_demo: bool = False,
     ) -> None:
         """
         Add transition with maximum-priority guarantee (ensures new transitions
@@ -126,6 +129,10 @@ class PrioritizedReplayBuffer:
         # Default action mask: all 4 actions valid (if no mask provided)
         if valid_action_mask is None:
             valid_action_mask = np.ones(HP.ACTION_DIM, dtype=bool)
+        if next_valid_action_mask is None:
+            next_valid_action_mask = np.ones(HP.ACTION_DIM, dtype=bool)
+        if bootstrap_discount is None:
+            bootstrap_discount = HP.GAMMA
 
         transition = (
             np.array(state, dtype=np.float32),
@@ -133,7 +140,10 @@ class PrioritizedReplayBuffer:
             float(reward),
             np.array(next_state, dtype=np.float32),
             float(done),
-            valid_action_mask.astype(bool),   # Task 1.3: mask stored per transition
+            valid_action_mask.astype(bool),
+            next_valid_action_mask.astype(bool),
+            float(bootstrap_discount),
+            float(is_demo),
         )
 
         # BUG-03 CORRECTED: max_priority is raw, apply alpha here exactly once
@@ -145,8 +155,8 @@ class PrioritizedReplayBuffer:
         Sample batch_size transitions proportional to priority.
 
         Returns:
-            (states, actions, rewards, next_states, dones, weights, indices, action_masks)
-            action_masks: bool tensor [batch, 4] for masked Double-DQN (Task 1.3)
+            (states, actions, rewards, next_states, dones, weights, indices,
+             action_masks, next_action_masks, bootstrap_discounts, demo_flags)
         """
         indices = []
         priorities = []
@@ -172,7 +182,10 @@ class PrioritizedReplayBuffer:
         weights = (self.tree.n_entries * sampling_probs) ** (-self.beta)
         weights /= weights.max()  # normalize to [0, 1]
 
-        states, actions, rewards, next_states, dones, masks = zip(*transitions)
+        (
+            states, actions, rewards, next_states, dones,
+            masks, next_masks, discounts, demo_flags,
+        ) = zip(*transitions)
 
         return (
             torch.FloatTensor(np.array(states)),
@@ -182,7 +195,10 @@ class PrioritizedReplayBuffer:
             torch.FloatTensor(np.array(dones)),
             torch.FloatTensor(weights),
             indices,
-            torch.BoolTensor(np.array(masks)),   # Task 1.3: action masks
+            torch.BoolTensor(np.array(masks)),
+            torch.BoolTensor(np.array(next_masks)),
+            torch.FloatTensor(np.array(discounts)),
+            torch.FloatTensor(np.array(demo_flags)),
         )
 
     def update_priorities(self, indices: list, td_errors: np.ndarray) -> None:

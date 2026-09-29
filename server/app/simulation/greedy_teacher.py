@@ -23,7 +23,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 
@@ -90,6 +90,7 @@ class GreedyTeacher:
         replay_buffer: "PrioritizedReplayBuffer",
         n_steps: int = 5000,
         seed: int = 42,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> int:
         """
         Run the Greedy policy and populate the replay buffer with transitions.
@@ -106,7 +107,8 @@ class GreedyTeacher:
         Returns:
             Number of transitions successfully pushed.
         """
-        state, _ = self.env.reset(seed=seed)
+        state, reset_info = self.env.reset_to_decision(seed=seed)
+        action_mask = reset_info["valid_action_mask"]
         transitions_pushed = 0
 
         logger.info(
@@ -114,30 +116,41 @@ class GreedyTeacher:
             n_steps,
         )
 
-        for step in range(n_steps):
+        while transitions_pushed < n_steps:
             action = self.select_greedy_action(state)
-            next_state, reward, terminated, truncated, info = self.env.step(action)
+            if not action_mask[action]:
+                valid = np.flatnonzero(action_mask)
+                action = int(valid[0])
+            next_state, reward, terminated, truncated, info = self.env.step_decision(action)
             done = terminated or truncated
 
             # Push using executed action (handles watchdog overrides correctly)
             executed_action = info.get("executed_action", action)
-            is_decision_step = info.get("is_decision_step", True)
-
-            # Only store causal transitions (Semi-MDP: skip yellow/all-red)
-            if is_decision_step:
-                replay_buffer.push(
-                    state,
-                    executed_action,
-                    reward,
-                    next_state,
-                    float(terminated),
-                    valid_action_mask=None,  # all actions valid for greedy
-                )
-                transitions_pushed += 1
+            next_action_mask = info["valid_action_mask"]
+            replay_buffer.push(
+                state,
+                executed_action,
+                reward,
+                next_state,
+                float(terminated),
+                valid_action_mask=action_mask,
+                next_valid_action_mask=next_action_mask,
+                bootstrap_discount=info["bootstrap_discount"],
+                is_demo=True,
+            )
+            transitions_pushed += 1
+            if progress_callback and (
+                transitions_pushed == 1
+                or transitions_pushed % 100 == 0
+                or transitions_pushed == n_steps
+            ):
+                progress_callback(transitions_pushed, n_steps)
 
             state = next_state
+            action_mask = next_action_mask
             if done:
-                state, _ = self.env.reset()
+                state, reset_info = self.env.reset_to_decision()
+                action_mask = reset_info["valid_action_mask"]
 
         logger.info(
             "GreedyTeacher: Buffer seeded with %d causal Greedy transitions (%.1f%% of steps).",

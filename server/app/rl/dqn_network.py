@@ -35,7 +35,7 @@ class DuelingDQNNetwork(nn.Module):
         action_dim: Number of actions (4 signal phases).
     """
 
-    def __init__(self, state_dim: int = 20, action_dim: int = 4):
+    def __init__(self, state_dim: int = HP.STATE_DIM, action_dim: int = HP.ACTION_DIM):
         super().__init__()
         self.action_dim = action_dim
 

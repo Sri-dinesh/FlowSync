@@ -75,6 +75,21 @@ class DQNAgent:
             learning_rate,
         )
 
+    def reset_for_fresh_training(self) -> None:
+        """Discard weights, optimizer moments and replay for a genuinely fresh run."""
+        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+        self.target_net.load_state_dict(self.online_net.state_dict())
+        self.target_net.eval()
+        self.optimizer = optim.Adam(
+            self.online_net.parameters(), lr=HP.LEARNING_RATE, eps=1e-8
+        )
+        self.replay_buffer = PrioritizedReplayBuffer(HP.REPLAY_BUFFER_SIZE)
+        self.step_count = 0
+        self.total_train_steps = 0
+        self.all_masked_fallback_count = 0
+        self.latest_q_stats = {}
+
     def select_action(
         self,
         state: np.ndarray,
@@ -160,7 +175,10 @@ class DQNAgent:
 
         Returns: (loss_value, td_errors) — td_errors used to update PER priorities.
         """
-        states, actions, rewards, next_states, dones, weights, indices, action_masks = batch
+        (
+            states, actions, rewards, next_states, dones, weights, indices,
+            action_masks, next_action_masks, bootstrap_discounts, demo_flags,
+        ) = batch
 
         # ── Current Q-values (online net) with masked centering ─────────────
         current_q_all = self.online_net(states, valid_action_mask=action_masks)
@@ -168,28 +186,52 @@ class DQNAgent:
 
         with torch.no_grad():
             # ── Double DQN: online net selects next action, masked by valid actions ──
-            # Use action_masks as a proxy for next-state validity (conservative: same mask)
-            next_q_online = self.online_net(next_states, valid_action_mask=action_masks)
+            next_q_online = self.online_net(
+                next_states, valid_action_mask=next_action_masks
+            )
 
             # BUG-05 CORRECTED: mask invalid actions before argmax
             next_q_masked = next_q_online.clone()
             # Set invalid action Q-values to -inf so they cannot be selected
-            next_q_masked[~action_masks] = float("-inf")
+            next_q_masked[~next_action_masks] = float("-inf")
             next_actions = next_q_masked.argmax(1)
 
             # ── Target net evaluates selected action ─────────────────────────
-            next_q_target = self.target_net(next_states, valid_action_mask=action_masks)
+            next_q_target = self.target_net(
+                next_states, valid_action_mask=next_action_masks
+            )
             next_q = next_q_target.gather(1, next_actions.unsqueeze(1)).squeeze(1)
 
             # ── Bellman target ───────────────────────────────────────────────
-            target_q = rewards + HP.GAMMA * next_q * (1 - dones)
+            target_q = rewards + bootstrap_discounts * next_q * (1 - dones)
 
         # ── Per-sample loss (needed for PER priority update) ─────────────────
         td_errors = (target_q - current_q).detach().cpu().numpy()
         per_sample_loss = self.loss_fn(current_q, target_q)
 
         # ── Weight loss by importance sampling weights (PER correction) ──────
-        weighted_loss = (per_sample_loss * weights).mean()
+        td_loss = (per_sample_loss * weights).mean()
+
+        # DQfD-style large-margin term for greedy warm-start transitions.  A
+        # replay warm-up without this term does not actually teach the network
+        # the demonstrator's action; unseen actions can remain arbitrarily
+        # overestimated and immediately erase the benefit of seeding.
+        other_q = current_q_all.clone()
+        other_q[~action_masks] = float("-inf")
+        other_q.scatter_(1, actions.unsqueeze(1), float("-inf"))
+        has_alternative = action_masks.sum(dim=1) > 1
+        best_other_q = other_q.max(dim=1).values
+        margin_loss_per_sample = torch.where(
+            has_alternative,
+            torch.relu(0.5 + best_other_q - current_q),
+            torch.zeros_like(current_q),
+        )
+        demo_weight = demo_flags * has_alternative.float()
+        demo_loss = (
+            (margin_loss_per_sample * demo_weight).sum()
+            / demo_weight.sum().clamp(min=1.0)
+        )
+        weighted_loss = td_loss + 0.10 * demo_loss
 
         self.optimizer.zero_grad()
         weighted_loss.backward()
@@ -214,6 +256,8 @@ class DQNAgent:
             "td_error_mean": round(float(np.mean(np.abs(td_errors))), 4),
             "td_error_max": round(float(np.max(np.abs(td_errors))), 4),
             "loss": round(float(weighted_loss.item()), 5),
+            "td_loss": round(float(td_loss.item()), 5),
+            "demo_margin_loss": round(float(demo_loss.item()), 5),
         }
 
         # ── Update PER priorities with new TD errors ─────────────────────────
@@ -231,7 +275,9 @@ class DQNAgent:
             "optimizer":         self.optimizer.state_dict(),
             "step_count":        self.step_count,
             "total_train_steps": self.total_train_steps,  # BUG-B: diagnostic
-            "obs_version":       "v5_28dim_forecast",     # BUG-C fix: correct version
+            "obs_version":       HP.OBS_VERSION,
+            "reward_version":    "v4_incremental_delay",
+            "demand_version":    "v2_total_lambda_with_upstream_backlog",
         }
 
     def save(self, path: str):

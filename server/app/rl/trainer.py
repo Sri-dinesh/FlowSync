@@ -19,7 +19,7 @@ All improvements integrated in this version:
 """
 import asyncio
 import logging
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 import numpy as np
 
@@ -29,11 +29,13 @@ from ..simulation.environment import TrafficEnv
 from ..simulation.greedy_teacher import GreedyTeacher
 from ..simulation.curriculum import TrainingCurriculum
 from ..simulation.spawner import SCENARIO_PROFILES
+from ..simulation.benchmark_harness import DeterministicEvaluator
 
 logger = logging.getLogger(__name__)
 
 # Greedy warm-start: number of demonstration transitions to collect before RL
 _GREEDY_WARMUP_STEPS = 3000
+_GREEDY_PRETRAIN_UPDATES = 500
 
 
 class Trainer:
@@ -73,6 +75,35 @@ class Trainer:
         self.enable_curriculum = enable_curriculum
         self.enable_greedy_warmup = enable_greedy_warmup
 
+    def _pretrain_on_demonstrations(self, updates: int) -> None:
+        """Fit the initialized Q-network to demonstration transitions first."""
+        if not self.agent.replay_buffer.is_ready:
+            return
+        for _ in range(max(0, updates)):
+            batch = self.agent.replay_buffer.sample(self.hyperparams.BATCH_SIZE)
+            self.agent.train_step(batch)
+            if self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0:
+                self.agent.sync_target_network()
+
+    async def _broadcast_warmup_progress(
+        self,
+        phase: str,
+        completed: int,
+        total: int,
+    ) -> None:
+        await self.ws_broadcast_fn({
+            "type": "warmup_progress",
+            "phase": phase,
+            "completed": completed,
+            "total": total,
+            "is_training": True,
+            "message": (
+                f"Collecting demonstrations: {completed}/{total}"
+                if phase == "collect"
+                else f"Pretraining network: {completed}/{total}"
+            ),
+        })
+
     async def train(
         self,
         simulation_id: str,
@@ -103,6 +134,14 @@ class Trainer:
                 profile = custom_profile
             else:
                 profile = SCENARIO_PROFILES.get(finetune_scenario, SCENARIO_PROFILES["rush_hour"])
+        profile_name = (
+            profile.get("name", "Custom") if isinstance(profile, dict)
+            else getattr(profile, "name", "Custom")
+        )
+        profile_lambda = (
+            float(profile.get("base_lambda", 0.85)) if isinstance(profile, dict)
+            else float(getattr(profile, "base_lambda", 0.85))
+        )
 
         # ── Checkpoint & Resume / Fine-Tune Loading ─────────────────────────
         start_episode = 0
@@ -136,6 +175,13 @@ class Trainer:
             # Load checkpoint state into training agent and sync sim_agent
             try:
                 chk_data = await asyncio.to_thread(self.model_service.load_checkpoint, base_model_id, start_episode)
+                if (
+                    chk_data.get("obs_version") != self.hyperparams.OBS_VERSION
+                    or chk_data.get("reward_version") != "v4_incremental_delay"
+                ):
+                    raise ValueError(
+                        "legacy checkpoint is incompatible with corrected v6 training"
+                    )
                 if isinstance(chk_data, dict) and "online_net" in chk_data:
                     self.agent.online_net.load_state_dict(chk_data["online_net"])
                     self.agent.target_net.load_state_dict(chk_data.get("target_net", chk_data["online_net"]))
@@ -148,6 +194,9 @@ class Trainer:
                         self.agent.step_count = chk_data["step_count"]
                     if not is_finetune and "total_train_steps" in chk_data:
                         self.agent.total_train_steps = chk_data["total_train_steps"]
+                    # checkpoint_0.pt is an alias; continue numbering from the
+                    # real winning episode stored inside the checkpoint.
+                    start_episode = int(chk_data.get("episode", start_episode))
                 else:
                     self.agent.online_net.load_state_dict(chk_data)
                     self.agent.sync_target_network()
@@ -167,7 +216,11 @@ class Trainer:
                     "fine-tuning" if is_finetune else "resumed training",
                 )
             except Exception as load_err:
-                logger.error("Failed to load checkpoint for model %s (ep %s): %s", base_model_id, start_episode, load_err)
+                self.is_training = False
+                raise RuntimeError(
+                    f"Cannot resume model {base_model_id!r} at episode "
+                    f"{start_episode}: checkpoint load failed"
+                ) from load_err
 
             if is_finetune:
                 self.parent_model_id = base_model_id
@@ -206,6 +259,7 @@ class Trainer:
                     self.epsilon = self.hyperparams.epsilon_start
         else:
             # Fresh training
+            self.agent.reset_for_fresh_training()
             self.env.set_traffic_profile(SCENARIO_PROFILES["uniform"])
             total_target_episodes = num_episodes
             self.epsilon = self.hyperparams.epsilon_start
@@ -222,26 +276,37 @@ class Trainer:
 
         # ── Warm-start Seeding ─────────────────────────────────────────────
         if self.is_finetune and profile:
-            logger.info("Fine-tuning: seeding replay buffer with base policy on scenario '%s'...", profile.name)
-            state, _ = self.env.reset()
+            logger.info("Fine-tuning: seeding replay buffer with base policy on scenario '%s'...", profile_name)
+            state, reset_info = self.env.reset_to_decision()
+            action_mask = reset_info["valid_action_mask"]
             seed_steps = min(self.hyperparams.MIN_REPLAY_SIZE, 600)
             for _ in range(seed_steps):
-                action = self.agent.select_action(state, epsilon=self.epsilon)
-                next_state, reward, terminated, truncated, info = self.env.step(action)
+                action = self.agent.select_action(
+                    state, epsilon=self.epsilon, valid_action_mask=action_mask
+                )
+                next_state, reward, terminated, truncated, info = self.env.step_decision(action)
                 executed_action = info.get("executed_action", action)
+                next_action_mask = info["valid_action_mask"]
                 self.agent.replay_buffer.push(
                     state,
                     executed_action,
                     reward,
                     next_state,
                     terminated,
-                    valid_action_mask=None,
+                    valid_action_mask=action_mask,
+                    next_valid_action_mask=next_action_mask,
+                    bootstrap_discount=info["bootstrap_discount"],
                 )
-                state = self.env.reset()[0] if (terminated or truncated) else next_state
+                if terminated or truncated:
+                    state, reset_info = self.env.reset_to_decision()
+                    action_mask = reset_info["valid_action_mask"]
+                else:
+                    state = next_state
+                    action_mask = next_action_mask
 
             await self.ws_broadcast_fn({
                 "type": "warmup_complete",
-                "message": f"Pre-trained policy seeded buffer with {seed_steps} transitions on scenario '{profile.name}'.",
+                "message": f"Pre-trained policy seeded buffer with {seed_steps} transitions on scenario '{profile_name}'.",
             })
             await self.ws_broadcast_fn({
                 "type":                  "training_finetuned",
@@ -249,29 +314,68 @@ class Trainer:
                 "parent_model_id":       self.parent_model_id,
                 "parent_episode":        self.parent_episode,
                 "scenario":              finetune_scenario,
-                "scenario_name":         profile.name,
+                "scenario_name":         profile_name,
                 "num_episodes":          num_episodes,
                 "target_episodes":       num_episodes,
                 "learning_rate":         finetune_lr,
                 "initial_epsilon":       finetune_epsilon,
-                "message":               f"Fine-tuning started for '{profile.name}' ({num_episodes} episodes, α={finetune_lr}, ε={finetune_epsilon}).",
+                "message":               f"Fine-tuning started for '{profile_name}' ({num_episodes} episodes, α={finetune_lr}, ε={finetune_epsilon}).",
             })
         elif not self.is_resumed and self.enable_greedy_warmup and len(self.agent.replay_buffer) < self.hyperparams.MIN_REPLAY_SIZE:
             teacher = GreedyTeacher(env=self.env)
             logger.info("Starting Greedy teacher warm-start...")
+            loop = asyncio.get_running_loop()
+
+            def report_collection(completed: int, total: int) -> None:
+                asyncio.run_coroutine_threadsafe(
+                    self._broadcast_warmup_progress(
+                        "collect", completed, total
+                    ),
+                    loop,
+                )
+
             await asyncio.to_thread(
                 teacher.fill_buffer,
                 self.agent.replay_buffer,
                 _GREEDY_WARMUP_STEPS,
+                42,
+                report_collection,
             )
+            for completed in range(0, _GREEDY_PRETRAIN_UPDATES, 25):
+                batch_updates = min(25, _GREEDY_PRETRAIN_UPDATES - completed)
+                await asyncio.to_thread(
+                    self._pretrain_on_demonstrations,
+                    batch_updates,
+                )
+                await self._broadcast_warmup_progress(
+                    "pretrain",
+                    completed + batch_updates,
+                    _GREEDY_PRETRAIN_UPDATES,
+                )
             await self.ws_broadcast_fn({
                 "type":    "warmup_complete",
                 "message": f"Greedy teacher seeded buffer with {_GREEDY_WARMUP_STEPS} transitions.",
             })
         elif self.is_resumed:
+            if (
+                self.enable_greedy_warmup
+                and len(self.agent.replay_buffer) < self.hyperparams.MIN_REPLAY_SIZE
+            ):
+                teacher = GreedyTeacher(env=self.env)
+                await asyncio.to_thread(
+                    teacher.fill_buffer,
+                    self.agent.replay_buffer,
+                    self.hyperparams.MIN_REPLAY_SIZE,
+                )
+                await asyncio.to_thread(
+                    self._pretrain_on_demonstrations,
+                    _GREEDY_PRETRAIN_UPDATES,
+                )
+            self.epsilon = max(0.20, self.epsilon)
             logger.info(
-                "Skipping greedy warmup: Resuming from episode %d with pre-trained agent.",
+                "Resumed episode %d with replay re-warm and epsilon %.2f.",
                 start_episode,
+                self.epsilon,
             )
         elif self.enable_greedy_warmup:
             logger.info(
@@ -297,6 +401,7 @@ class Trainer:
 
         # TR-03: Best-checkpoint tracking by validation delay
         best_avg_wait: float = float("inf")
+        best_validation_queue_area: float = float("inf")
         best_episode: int = 0
 
         for episode_index in range(num_episodes):
@@ -316,12 +421,13 @@ class Trainer:
                 }
             elif self.is_finetune and profile:
                 curriculum_status = {
-                    "stage": f"Fine-Tuning: {profile.name}",
-                    "lambda": getattr(profile, "base_lambda", 0.85),
+                    "stage": f"Fine-Tuning: {profile_name}",
+                    "lambda": profile_lambda,
                     "scenario": self.finetune_scenario,
                 }
 
-            state, _ = self.env.reset()
+            state, reset_info = self.env.reset_to_decision()
+            action_mask = reset_info["valid_action_mask"]
             total_reward = 0.0
             loss_value: Optional[float] = None
             steps = 0
@@ -330,15 +436,18 @@ class Trainer:
             # Anneal PER beta over training with global target
             self.agent.replay_buffer.anneal_beta(episode_num, total_target_episodes)
 
-            for step in range(self.hyperparams.MAX_STEPS_PER_EPISODE):
+            decision_step = 0
+            while self.env.intersection.timestep < self.env.max_steps:
                 if not self.is_training:
                     stopped_early = True
                     break
 
-                action = self.agent.select_action(state, self.epsilon)
+                action = self.agent.select_action(
+                    state, self.epsilon, valid_action_mask=action_mask
+                )
 
                 # ── Step environment (fast in-thread execution) ─────────────
-                next_state, reward, terminated, truncated, info = self.env.step(action)
+                next_state, reward, terminated, truncated, info = self.env.step_decision(action)
                 done = terminated or truncated
 
                 # ── BUG-01 FIX: Use executed_action for replay buffer push ──
@@ -348,35 +457,40 @@ class Trainer:
                 # BUG-E FIX: subsample GREEN steps — store 1 per 10 (1 simulated second).
                 # Old: push every GREEN step (~680/ep) — redundant near-identical transitions.
                 # Now: push every 10th GREEN step (~65/ep) — informative, diverse transitions.
-                is_decision_step = info.get("is_decision_step", True)
-
-                if is_decision_step and (step % 10 == 0):
-                    self.agent.replay_buffer.push(
-                        state,
-                        executed_action,   # BUG-01: actual executed action
-                        reward,
-                        next_state,
-                        terminated,
-                        valid_action_mask=None,
-                    )
+                next_action_mask = info["valid_action_mask"]
+                self.agent.replay_buffer.push(
+                    state,
+                    executed_action,
+                    reward,
+                    next_state,
+                    terminated,
+                    valid_action_mask=action_mask,
+                    next_valid_action_mask=next_action_mask,
+                    bootstrap_discount=info["bootstrap_discount"],
+                )
 
                 # ── Train step ───────────────────────────────────────────────
                 if (
                     self.agent.replay_buffer.is_ready
-                    and step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
+                    and decision_step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
                 ):
                     batch = self.agent.replay_buffer.sample(self.hyperparams.BATCH_SIZE)
                     loss_value, td_errors = self.agent.train_step(batch)
 
-                if self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0:
+                if (
+                    self.agent.step_count > 0
+                    and self.agent.step_count % self.hyperparams.TARGET_UPDATE_FREQ == 0
+                ):
                     self.agent.sync_target_network()
 
                 total_reward += reward
                 state = next_state
-                steps = step + 1
+                action_mask = next_action_mask
+                decision_step += 1
+                steps = self.env.intersection.timestep
 
                 # Periodically yield to event loop so WebSocket keep-alives and commands process smoothly
-                if step % 25 == 0:
+                if decision_step % 10 == 0:
                     await asyncio.sleep(0)
 
                 if done:
@@ -394,17 +508,37 @@ class Trainer:
             avg_wait = self.env.intersection.get_avg_wait_time()
             throughput = self.env.intersection.total_passed
 
-            # TR-03: Track best-checkpoint by minimum average wait time
+            is_last_episode = episode_index == num_episodes - 1
+            validation_metrics: Dict[str, Any] = {}
             is_new_best = False
-            if avg_wait > 0 and avg_wait < best_avg_wait and episode_num >= 10:
-                best_avg_wait = avg_wait
-                best_episode = episode_num
-                is_new_best = True
-                logger.info(
-                    "New best validation delay: %.2fs at episode %d",
-                    best_avg_wait,
-                    best_episode,
+            if episode_num % 25 == 0 or is_last_episode:
+                evaluator = DeterministicEvaluator(
+                    agent=self.agent,
+                    mode="ai",
+                    spawn_lambda=0.5,
                 )
+                validation = await asyncio.to_thread(
+                    evaluator.run_multi_seed,
+                    1200,
+                    [104729, 130363, 155921],
+                )
+                validation_metrics = {
+                    "mean_queue_area": validation.mean_queue_area,
+                    "mean_avg_wait": validation.mean_avg_wait,
+                    "mean_p95_delay": validation.mean_p95_delay,
+                    "mean_throughput": validation.mean_throughput,
+                }
+                if validation.mean_queue_area < best_validation_queue_area:
+                    best_validation_queue_area = validation.mean_queue_area
+                    best_avg_wait = validation.mean_avg_wait
+                    best_episode = episode_num
+                    is_new_best = True
+                    logger.info(
+                        "New held-out best: queue_area=%.2f wait=%.2fs at episode %d",
+                        best_validation_queue_area,
+                        best_avg_wait,
+                        best_episode,
+                    )
 
             # ── Task 0.2: Collect reward component telemetry ─────────────────
             episode_telemetry = self.env.get_episode_telemetry()
@@ -434,8 +568,6 @@ class Trainer:
                         steps,
                     )
                 )
-
-            is_last_episode = episode_index == num_episodes - 1
 
             effective_scenario = (
                 self.custom_profile.get("name", "Custom")
@@ -476,13 +608,17 @@ class Trainer:
                     "best_avg_wait":           best_avg_wait if best_avg_wait < float("inf") else None,
                     "best_episode":            best_episode if best_episode > 0 else None,
                     "is_new_best":             is_new_best,
+                    "validation":              validation_metrics,
                 }
             )
 
             is_stopping = not self.is_training
             save_interval = 25 if self.is_finetune else 50
             should_save_checkpoint = simulation_id and (
-                episode_num % save_interval == 0 or is_last_episode or is_stopping
+                episode_num % save_interval == 0
+                or is_last_episode
+                or is_stopping
+                or is_new_best
             )
 
             # Sync active inference agent immediately whenever a new best or milestone occurs
@@ -501,10 +637,12 @@ class Trainer:
                     "target_net":  self.agent.target_net.state_dict(),
                     "optimizer":   self.agent.optimizer.state_dict(),
                     "step_count":  self.agent.step_count,
-                    "obs_version": "v5_28dim_forecast",
+                    "obs_version": self.hyperparams.OBS_VERSION,
                 }
                 chk_state["is_best"] = is_new_best
                 chk_state["best_avg_wait"] = best_avg_wait
+                chk_state["best_validation_queue_area"] = best_validation_queue_area
+                chk_state["validation_metrics"] = validation_metrics
                 chk_state["episode"] = episode_num
                 if self.is_finetune:
                     chk_state["is_finetuned"] = True
