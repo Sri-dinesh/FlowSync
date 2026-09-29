@@ -14,16 +14,30 @@ from functools import wraps
 from typing import Any, Dict, List, Optional, Callable
 from uuid import uuid4
 import datetime
+import httpx
 import numpy as np
 from supabase import Client, create_client
+from supabase.lib.client_options import SyncClientOptions
 
 from ..config import settings
 
 logger = logging.getLogger(__name__)
 
+# Supabase's default transport enables HTTP/2.  The singleton client is shared
+# by several asyncio.to_thread callers, and the server has observed HTTP/2
+# GOAWAY/ConnectionTerminated failures when model polling overlaps training
+# writes.  HTTP/1.1 pooling is thread-safe in httpx and avoids multiplexing
+# unrelated requests over one fragile connection.
+_supabase_http_client = httpx.Client(
+    http2=False,
+    timeout=httpx.Timeout(30.0, connect=10.0),
+    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+)
+
 supabase_client: Client = create_client(
     settings.supabase_url,
     settings.supabase_service_key,
+    options=SyncClientOptions(httpx_client=_supabase_http_client),
 )
 
 
@@ -48,7 +62,10 @@ def retry_on_transient_error(max_retries: int = 3, base_delay: float = 0.5):
                         "timeout" in error_msg or
                         "connection refused" in error_msg or
                         "network unreachable" in error_msg or
-                        "errno -3" in error_msg
+                        "errno -3" in error_msg or
+                        "connectionterminated" in error_msg or
+                        "remoteprotocolerror" in error_msg or
+                        "server disconnected" in error_msg
                     )
                     
                     if not is_transient or attempt == max_retries - 1:
@@ -243,18 +260,6 @@ def save_performance_metric(
 
 # ─── RL model metadata ────────────────────────────────────────────────────────
 
-def _get_rating(avg_reward: float) -> str:
-    if avg_reward > 10.0:
-        return "Excellent"
-    elif avg_reward > 0.0:
-        return "Efficient"
-    elif avg_reward > -10.0:
-        return "Fair"
-    elif avg_reward > -30.0:
-        return "Poor"
-    else:
-        return "Failing"
-
 def save_model_metadata(
     simulation_id: str,
     episode: int,
@@ -282,8 +287,6 @@ def _save_model_metadata_impl(
     model_id = simulation_id  # reuse simulation UUID as model identifier
     storage_path = f"models/{simulation_id}/checkpoint_{episode}.pt"
     version = str(episode)
-    rating = _get_rating(avg_reward)
-
     try:
         # Check if a row already exists for this simulation
         existing = (
@@ -300,7 +303,10 @@ def _save_model_metadata_impl(
             else:
                 date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
             
-            new_name = f"{date_part} - {episode}eps - {rating}"
+            # Raw cumulative reward changes with episode length and reward
+            # versions, so it is not a valid quality grade.  Validation
+            # benchmarks are the source of truth for model quality.
+            new_name = f"{date_part} - {episode}eps"
 
             # Update in place
             supabase_client.table("rl_models").update({
@@ -313,7 +319,7 @@ def _save_model_metadata_impl(
             }).eq("id", model_id).execute()
         else:
             date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            new_name = f"{date_part} - {episode}eps - {rating}"
+            new_name = f"{date_part} - {episode}eps"
             
             supabase_client.table("rl_models").insert({
                 "id": model_id,
@@ -660,4 +666,3 @@ def get_aggregate_stats() -> Dict[str, Any]:
         "dqn_vs_greedy_delta": round(ai_mean - gr_mean, 3) if (ai_mean and gr_mean) else None,
         "dqn_vs_fixed_delta":  round(ai_mean - fx_mean, 3) if (ai_mean and fx_mean) else None,
     }
-

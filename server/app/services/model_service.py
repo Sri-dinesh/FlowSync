@@ -1,6 +1,8 @@
 import datetime
 import io
 from pathlib import Path
+import re
+import threading
 from typing import Any, Dict, List
 import time
 from functools import wraps
@@ -11,6 +13,27 @@ from .supabase_service import supabase_client, retry_on_transient_error
 
 BUCKET_NAME = "model-checkpoints"
 LOCAL_MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+_MODEL_LIST_CACHE_TTL_SECONDS = 10.0
+_model_list_lock = threading.Lock()
+_model_list_cache: List[Dict[str, Any]] = []
+_model_list_cache_deadline = 0.0
+_LEGACY_REWARD_RATING_RE = re.compile(
+    r"\s*-\s*(?:Excellent|Efficient|Fair|Poor|Failing|Needs Tuning)"
+    r"(?=\s*(?:—|$))",
+    re.IGNORECASE,
+)
+
+
+def _clean_model_name(value: Any, fallback: str) -> str:
+    """Strip obsolete ratings derived from non-comparable raw rewards."""
+    if not isinstance(value, str) or not value.strip():
+        return fallback
+    return _LEGACY_REWARD_RATING_RE.sub("", value).strip()
+
+
+def _invalidate_model_list_cache() -> None:
+    global _model_list_cache_deadline
+    _model_list_cache_deadline = 0.0
 
 
 def _checkpoint_path(model_id: str, episode: int) -> str:
@@ -27,6 +50,7 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
     local_path = _local_checkpoint_path(model_id, episode)
     local_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(state_dict, local_path)
+    _invalidate_model_list_cache()
 
     path = _checkpoint_path(model_id, episode)
     buffer = io.BytesIO()
@@ -101,7 +125,7 @@ def _fetch_rl_models_from_db() -> List[Dict[str, Any]]:
     return getattr(result, "data", []) or []
 
 
-def list_all_models() -> List[Dict[str, Any]]:
+def _list_all_models_uncached() -> List[Dict[str, Any]]:
     """List all available model checkpoints from rl_models DB, Supabase Storage, and local disk."""
     import logging
     logger = logging.getLogger(__name__)
@@ -115,8 +139,8 @@ def list_all_models() -> List[Dict[str, Any]]:
             mid = row.get("id")
             if mid:
                 db_meta[mid] = row
-    except Exception:
-        logger.warning("rl_models table query failed", exc_info=True)
+    except Exception as exc:
+        logger.warning("rl_models table query failed: %s", exc)
 
     # 2. Collect all model IDs across DB, local disk, and remote storage
     all_model_ids = set(db_meta.keys())
@@ -138,7 +162,9 @@ def list_all_models() -> List[Dict[str, Any]]:
     # 3. For each model ID, discover all checkpoints
     for model_id in all_model_ids:
         row = db_meta.get(model_id, {})
-        base_name = row.get("name") or f"Model {model_id[:8]}"
+        base_name = _clean_model_name(
+            row.get("name"), f"Model {model_id[:8]}"
+        )
         created_at_str = row.get("createdAt")
 
         date_part = ""
@@ -281,20 +307,6 @@ def list_all_models() -> List[Dict[str, Any]]:
             else:
                 label = f"Model {date_part} - {ep}eps"
 
-            if ep == max_ep and row.get("avgReward") is not None:
-                # Calibrated for both legacy positive rewards and modern delay-anchored rewards (-300 is excellent, -600 is fair, <-1000 is failing)
-                r_val = float(row.get("avgReward") or 0)
-                if r_val >= 150 or r_val >= -350:
-                    status_word = "Excellent"
-                elif r_val >= -600:
-                    status_word = "Fair"
-                else:
-                    status_word = "Needs Tuning"
-                if is_finetuned:
-                    label = f"⚡ FT [{scenario_name}] - {ep}eps - {status_word}"
-                else:
-                    label = f"Model {date_part} - {ep}eps - {status_word}"
-
             models_dict[key] = {
                 "id": key,
                 "name": label,
@@ -321,6 +333,28 @@ def list_all_models() -> List[Dict[str, Any]]:
         ),
         reverse=True,
     )
+
+
+def list_all_models() -> List[Dict[str, Any]]:
+    """Return a short-lived, serialized model catalog.
+
+    Multiple website panels poll this endpoint. Coalescing those reads prevents
+    concurrent DB/storage discovery from hammering one Supabase connection.
+    """
+    global _model_list_cache, _model_list_cache_deadline
+    now = time.monotonic()
+    if _model_list_cache and now < _model_list_cache_deadline:
+        return [dict(model) for model in _model_list_cache]
+
+    with _model_list_lock:
+        now = time.monotonic()
+        if _model_list_cache and now < _model_list_cache_deadline:
+            return [dict(model) for model in _model_list_cache]
+
+        models = _list_all_models_uncached()
+        _model_list_cache = [dict(model) for model in models]
+        _model_list_cache_deadline = now + _MODEL_LIST_CACHE_TTL_SECONDS
+        return [dict(model) for model in models]
 
 
 def list_local_models() -> List[Dict[str, Any]]:
