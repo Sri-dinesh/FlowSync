@@ -1,17 +1,96 @@
-venv/
-env/
-.venv/
-.env
-.env.production
-.env.development
-.env.local
-.coverage
-htmlcov/
+# ==============================================================================
+# FlowSync Server .gitignore
+# ==============================================================================
+
+# Python Bytecode & Compilation Caches
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & Coverage
 .pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type Checking & Linting
+.mypy_cache/
+.ruff_cache/
+
+# Profiling Artifacts
+*.prof
+*.pstats
+
+# Packaging & Distribution
+build/
+dist/
+*.egg-info/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Logs
 *.log
+logs/
+
+# SQLite & Local Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary Directories
+tmp/
+temp/
+uploads/
+
+# Model Checkpoints, Weights & Training Artifacts
+checkpoints/
+models/checkpoints/
+models/*.pt
+models/*.pth
+models/*.ckpt
+models/*.onnx
+runs/
+wandb/
+
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.tflite
+
+# Simulation Runtime & CV Caches
+runtime/
+telemetry/
+experiment_runs/
+benchmark_runs/
+detector_cache/
+tracker_cache/
+frames/
+captures/
+
+# Simulation Data Sessions & Local Uploads (preserve data/migrations)
+data/sessions/
+data/sessions_archive/
+data/uploads/
+data/roi_configs/
+data/flow_params.json
+
+# OS & Editor
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
