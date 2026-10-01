@@ -18,13 +18,12 @@ const PHASE_GLOW = [
   "shadow-rose-500/40",
 ];
 
-function computeConfidence(qValues: number[]): number {
+function computeValueMargin(qValues: number[]): number {
   if (qValues.length < 2) return 0;
   const sorted = [...qValues].sort((a, b) => b - a);
   const max = sorted[0]!;
   const second = sorted[1]!;
-  if (Math.abs(max) < 1e-6) return 0;
-  return Math.min(100, Math.max(0, ((max - second) / Math.abs(max)) * 100));
+  return Math.max(0, max - second);
 }
 
 interface QValueBarProps {
@@ -54,7 +53,7 @@ function QValueBar({ label, qValue, maxQ, isActive, colorClass, glowClass }: QVa
         <div className="flex items-center gap-1.5">
           {isActive && (
             <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 bg-emerald-500/20 text-emerald-300 text-[8px] font-semibold uppercase tracking-wide">
-              Active
+              Selected Phase
             </span>
           )}
           <span className={`text-[10px] font-mono tabular-nums ${isActive ? "text-white/90" : "text-white/35"}`}>
@@ -79,42 +78,28 @@ interface QValuePanelProps {
 export default function QValuePanel({ rl }: QValuePanelProps) {
   const currentPhase = useSimulationStore((s) => s.currentFrame?.signal_phase ?? 0);
 
-  const { maxQ, confidence } = useMemo(() => {
-    if (!rl) return { maxQ: 1, confidence: 0 };
+  const { maxQ, valueMargin } = useMemo(() => {
+    if (!rl) return { maxQ: 1, valueMargin: 0 };
     const maxQ = Math.max(...rl.q_values, 1e-6);
-    const confidence = computeConfidence(rl.q_values);
-    return { maxQ, confidence };
+    const valueMargin = computeValueMargin(rl.q_values);
+    return { maxQ, valueMargin };
   }, [rl]);
 
   if (!rl) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 p-4 gap-1.5 text-center min-h-[120px]">
-        <span className="text-2xl">🧠</span>
-        <p className="text-xs text-white/35">Switch to AI mode to see agent reasoning</p>
+        <span className="text-2xl">⚡</span>
+        <p className="text-xs text-white/35">Awaiting Policy Decision Telemetry</p>
       </div>
     );
   }
-
-  const confidenceColor =
-    confidence >= 40
-      ? "text-emerald-400"
-      : confidence >= 20
-      ? "text-amber-400"
-      : "text-rose-400";
-
-  const confidenceBg =
-    confidence >= 40
-      ? "bg-emerald-500/10 border-emerald-500/25"
-      : confidence >= 20
-      ? "bg-amber-500/10 border-amber-500/25"
-      : "bg-rose-500/10 border-rose-500/25";
 
   return (
     <div className="space-y-2">
       {/* Header row */}
       <div className="flex items-center justify-between">
         <p className="text-[9px] uppercase tracking-[0.12em] text-white/30 font-semibold">
-          Q-Values per Phase
+          Policy Value Estimates (Q-Values)
         </p>
         <span className="text-[9px] font-mono text-white/35">
           ε = {rl.epsilon.toFixed(3)}
@@ -136,41 +121,31 @@ export default function QValuePanel({ rl }: QValuePanelProps) {
         ))}
       </div>
 
-      {/* Footer: confidence + exploration status */}
+      {/* Footer: Value Margin + Policy Selection mode */}
       <div className="flex items-center gap-2 pt-0.5">
-        {/* Confidence score */}
-        <div className={`flex-1 rounded border px-2 py-1 ${confidenceBg}`}>
+        <div className="flex-1 rounded border border-white/10 bg-white/[0.02] px-2 py-1">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-white/40">Confidence</span>
-            <span className={`text-[11px] font-bold tabular-nums ${confidenceColor}`}>
-              {confidence.toFixed(0)}%
+            <span className="text-[9px] text-white/40">Action Value Margin (ΔQ)</span>
+            <span className="text-[11px] font-bold font-mono tabular-nums text-indigo-300">
+              +{valueMargin.toFixed(3)}
             </span>
-          </div>
-          <div className="mt-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                confidence >= 40 ? "bg-emerald-500" : confidence >= 20 ? "bg-amber-500" : "bg-rose-500"
-              }`}
-              style={{ width: `${confidence}%` }}
-            />
           </div>
         </div>
 
-        {/* Exploration / Exploitation badge */}
         {rl.is_exploring ? (
           <div className="flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5">
-            <span className="text-sm">🎲</span>
+            <span className="text-xs">🎲</span>
             <div>
-              <p className="text-[8px] font-bold text-amber-300 uppercase tracking-wide">Exploring</p>
-              <p className="text-[8px] text-amber-300/60">Random action</p>
+              <p className="text-[8px] font-bold text-amber-300 uppercase tracking-wide">Exploration</p>
+              <p className="text-[8px] text-amber-300/60">ε-Greedy Action</p>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5">
-            <span className="text-sm">🧠</span>
+            <span className="text-xs">🎯</span>
             <div>
-              <p className="text-[8px] font-bold text-emerald-300 uppercase tracking-wide">Exploiting</p>
-              <p className="text-[8px] text-emerald-300/60">Learned policy</p>
+              <p className="text-[8px] font-bold text-emerald-300 uppercase tracking-wide">Greedy Policy</p>
+              <p className="text-[8px] text-emerald-300/60">Argmax Q-Value</p>
             </div>
           </div>
         )}
