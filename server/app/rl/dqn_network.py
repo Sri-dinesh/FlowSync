@@ -108,3 +108,40 @@ class DuelingDQNNetwork(nn.Module):
             q_values = value + advantage - advantage.mean(dim=1, keepdim=True)
 
         return q_values  # (batch, action_dim)
+
+
+class PlainDQNNetwork(nn.Module):
+    """
+    Standard Deep Q-Network (Mnih et al. 2015) without dueling streams.
+    Serves as an essential ablation baseline to measure dueling architecture benefit.
+    """
+
+    def __init__(self, state_dim: int = HP.STATE_DIM, action_dim: int = HP.ACTION_DIM):
+        super().__init__()
+        self.action_dim = action_dim
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, 256),
+            nn.LayerNorm(256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.LayerNorm(256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
+                nn.init.zeros_(module.bias)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        valid_action_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        q_values = self.network(x)
+        return q_values

@@ -142,6 +142,12 @@ class TrafficEnv(gym.Env):
 
         return self._get_obs(), {}
 
+    @property
+    def is_decision_step(self) -> bool:
+        """True only when signal is GREEN and has passed min_green clearance."""
+        signal = self.intersection.signal
+        return signal.color == SignalColor.GREEN and signal.can_switch_phase
+
     # ────────────────────────────────────────────────────────────────────────
     # Reward: incremental delay with pressure shaping
     # ────────────────────────────────────────────────────────────────────────
