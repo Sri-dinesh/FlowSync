@@ -1,47 +1,193 @@
-.kiro/
-.vscode/
-.agents/
-.claude/
+# OS & Editor Artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
 .idea/
-node_modules/
-__pycache__/
-*.py[cod]
+.vscode/
+.history/
+
+# AI Assistant Caches & Local Context
+.agents/
+.codex/
+.claude/
+.kiro/
+.cursor/
+.gemini/
+
+# Environment Variables & Secrets
 .env
 .env.*
 !.env.example
-*.pt
-models/
-!client/src/app/api/models/
-server/venv/
-server/env/
-server/.venv/
-plans/
-!plans/*.md
-
-# Mac/OS
-.DS_Store
-Thumbs.db
-
-# Docker local overrides (may contain secrets)
+*.pem
+*.key
+*.crt
 docker-compose.override.yml
-pnpm-workspace.yaml
 
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Python Bytecode & Caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Python Testing, Profiling & Type Checking
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.prof
+*.pstats
+
+# Python Packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+server/venv/
+server/.venv/
+backend/venv/
+backend/.venv/
+
+# Node.js & Frontend Build Outputs
+node_modules/
+.next/
+out/
+coverage/
+.turbo/
+.vercel/
+*.tsbuildinfo
+package-lock.json
+
+# Temporary Files & System Caches
+tmp/
+temp/
+.cache/
+.cache-loader/
+*.tmp
+*.temp
+
+# SQLite & Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Supabase Local Temp & Branches
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# ML Checkpoints, Weights & Training Runs
+checkpoints/
+models/checkpoints/
+trained_models/
+/runs/
+/server/runs/
+server/experiment_runs/
+server/benchmark_runs/
+wandb/
+
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.tflite
+
+!**/model_manifest.json
+!**/model_lineage.json
+
+# Explicitly protect frontend routes from matching generic rules
+!client/src/app/api/models/
+!client/src/app/api/models/**
+!client/src/app/research/runs/
+!client/src/app/research/runs/**
+
+# Raw Video & CV Ingestion Datasets
 data/raw/
-data/processed/
-data/uploads/
+datasets/raw/
+videos/raw/
+recordings/
+uploads/
+
+# Runtime Simulation Session Data & Local CV Caches
 data/sessions/
+data/sessions_archive/
+data/uploads/
 data/roi_configs/
 data/flow_params.json
-models/yolo/
-validation_samples/
-augmentation_samples/
-runs/
+server/data/sessions/
+server/data/sessions_archive/
+server/data/uploads/
+server/data/roi_configs/
+server/data/flow_params.json
+server/detector_cache/
+server/tracker_cache/
 
-FlowSync_YOLO-20260802T121525Z-1-001/
-data/
-# YOLO model weights (large binary, stored in server/models/)
-best.onnx
-*.onnx
-*.pt
+# Video Media Files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
 
-!server/app/realworld/models/
+# Image & Frame Extractions
+frames/
+extracted_frames/
+captures/
+
+# Whitelist Research Configs, Scenarios, Manifests & Documentation
+!docs/research/**
+!research/manifests/**
+!research/calibration/**
+!research/configs/**
+!research/scenarios/**
+
+# Research Results (ignore ephemeral raw runs, preserve frozen publication deliverables)
+results/*
+research/results/*
+research/output/*
+research/outputs/*
+research/tmp/*
+research/cache/*
+
+!results/final/
+!results/final/**
+!results/tables/
+!results/tables/**
+
+# LaTeX Paper Build Artifacts (preserve source .tex and .bib)
+research-paper/*.aux
+research-paper/*.bbl
+research-paper/*.blg
+research-paper/*.log
+research-paper/*.out
+research-paper/*.toc
+research-paper/*.synctex.gz
+research-paper/*.fdb_latexmk
+research-paper/*.fls
+research-paper/*.pdf
+
+!research-paper/*.tex
+!research-paper/*.bib
+
+# Local Dev Artifacts
+.local/
+artifacts/local/
+scratch/
+
+plans/*
