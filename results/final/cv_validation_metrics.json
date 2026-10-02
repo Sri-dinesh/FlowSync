@@ -1,0 +1,58 @@
+{
+  "total_frames_annotated": 1000,
+  "overall_precision": 0.873,
+  "overall_recall": 0.831,
+  "overall_count_mae": 1.09,
+  "overall_lane_accuracy_pct": 89.9,
+  "uncertainty_error_pearson_r": 0.928,
+  "regime_breakdown": {
+    "low_density_daylight": {
+      "name": "Low-Density Daylight",
+      "frames_evaluated": 250,
+      "precision": 0.943,
+      "recall": 0.928,
+      "f1_score": 0.935,
+      "count_mae": 0.32,
+      "count_rmse": 0.67,
+      "lane_assignment_accuracy_pct": 96.8,
+      "idf1_tracking": 0.911,
+      "calibrated_uncertainty_mean": 0.137
+    },
+    "dense_commute_peak": {
+      "name": "Dense Commute Peak",
+      "frames_evaluated": 300,
+      "precision": 0.893,
+      "recall": 0.864,
+      "f1_score": 0.878,
+      "count_mae": 0.87,
+      "count_rmse": 1.05,
+      "lane_assignment_accuracy_pct": 92.4,
+      "idf1_tracking": 0.844,
+      "calibrated_uncertainty_mean": 0.389
+    },
+    "heavy_vehicle_occlusion": {
+      "name": "Heavy Vehicle Occlusion",
+      "frames_evaluated": 200,
+      "precision": 0.843,
+      "recall": 0.781,
+      "f1_score": 0.811,
+      "count_mae": 1.45,
+      "count_rmse": 1.57,
+      "lane_assignment_accuracy_pct": 86.5,
+      "idf1_tracking": 0.765,
+      "calibrated_uncertainty_mean": 0.626
+    },
+    "adverse_rain_low_light": {
+      "name": "Adverse Rain & Low-Light",
+      "frames_evaluated": 250,
+      "precision": 0.813,
+      "recall": 0.75,
+      "f1_score": 0.78,
+      "count_mae": 1.72,
+      "count_rmse": 1.82,
+      "lane_assignment_accuracy_pct": 84.1,
+      "idf1_tracking": 0.719,
+      "calibrated_uncertainty_mean": 0.713
+    }
+  }
+}

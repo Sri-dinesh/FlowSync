@@ -1,0 +1,758 @@
+{
+  "fixed": [
+    {
+      "miss_rate": 0.0,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.05,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.1,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.15,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.2,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.25,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.3,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.35,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.4,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.45,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    },
+    {
+      "miss_rate": 0.5,
+      "mean_delay": 15.12,
+      "ci_95": [
+        14.58,
+        15.65
+      ],
+      "p95_delay": 42.02,
+      "mean_max_queue": 26.0,
+      "total_starvations": 0,
+      "failures": 10,
+      "failure_rate": 0.5,
+      "failure_rate_ci_95": [
+        0.299,
+        0.701
+      ]
+    }
+  ],
+  "max_pressure": [
+    {
+      "miss_rate": 0.0,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.05,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.1,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.15,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.2,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.25,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.3,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.35,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.4,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.45,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    },
+    {
+      "miss_rate": 0.5,
+      "mean_delay": 11.3,
+      "ci_95": [
+        10.77,
+        11.83
+      ],
+      "p95_delay": 46.4,
+      "mean_max_queue": 21.9,
+      "total_starvations": 57,
+      "failures": 8,
+      "failure_rate": 0.4,
+      "failure_rate_ci_95": [
+        0.219,
+        0.613
+      ]
+    }
+  ],
+  "d3qn": [
+    {
+      "miss_rate": 0.0,
+      "mean_delay": 15.3,
+      "ci_95": [
+        13.96,
+        16.61
+      ],
+      "p95_delay": 53.98,
+      "mean_max_queue": 26.0,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.05,
+      "mean_delay": 15.5,
+      "ci_95": [
+        14.08,
+        16.91
+      ],
+      "p95_delay": 54.05,
+      "mean_max_queue": 25.9,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.1,
+      "mean_delay": 15.42,
+      "ci_95": [
+        13.99,
+        16.83
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.9,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.15,
+      "mean_delay": 15.52,
+      "ci_95": [
+        14.12,
+        16.91
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 26.0,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.2,
+      "mean_delay": 15.14,
+      "ci_95": [
+        13.8,
+        16.51
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.8,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.25,
+      "mean_delay": 15.35,
+      "ci_95": [
+        14.03,
+        16.7
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.6,
+      "total_starvations": 80,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.3,
+      "mean_delay": 15.38,
+      "ci_95": [
+        14.04,
+        16.73
+      ],
+      "p95_delay": 54.07,
+      "mean_max_queue": 26.1,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.35,
+      "mean_delay": 15.35,
+      "ci_95": [
+        14.04,
+        16.68
+      ],
+      "p95_delay": 54.05,
+      "mean_max_queue": 25.7,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.4,
+      "mean_delay": 15.33,
+      "ci_95": [
+        14.0,
+        16.67
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.8,
+      "total_starvations": 79,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.45,
+      "mean_delay": 15.28,
+      "ci_95": [
+        13.96,
+        16.64
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.6,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.5,
+      "mean_delay": 15.37,
+      "ci_95": [
+        14.04,
+        16.72
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.9,
+      "total_starvations": 75,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    }
+  ],
+  "flowsync_uq": [
+    {
+      "miss_rate": 0.0,
+      "mean_delay": 15.24,
+      "ci_95": [
+        13.91,
+        16.55
+      ],
+      "p95_delay": 53.98,
+      "mean_max_queue": 26.1,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.05,
+      "mean_delay": 15.43,
+      "ci_95": [
+        14.02,
+        16.85
+      ],
+      "p95_delay": 54.05,
+      "mean_max_queue": 26.1,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.1,
+      "mean_delay": 15.37,
+      "ci_95": [
+        13.96,
+        16.78
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 26.1,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.15,
+      "mean_delay": 15.46,
+      "ci_95": [
+        14.07,
+        16.85
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 26.1,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.2,
+      "mean_delay": 15.1,
+      "ci_95": [
+        13.76,
+        16.46
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.9,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.25,
+      "mean_delay": 15.24,
+      "ci_95": [
+        13.93,
+        16.6
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.6,
+      "total_starvations": 80,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.3,
+      "mean_delay": 15.28,
+      "ci_95": [
+        13.96,
+        16.65
+      ],
+      "p95_delay": 54.07,
+      "mean_max_queue": 26.1,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.35,
+      "mean_delay": 15.24,
+      "ci_95": [
+        13.93,
+        16.57
+      ],
+      "p95_delay": 54.05,
+      "mean_max_queue": 25.6,
+      "total_starvations": 78,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.4,
+      "mean_delay": 15.16,
+      "ci_95": [
+        13.82,
+        16.53
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.6,
+      "total_starvations": 80,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.45,
+      "mean_delay": 15.19,
+      "ci_95": [
+        13.88,
+        16.55
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.5,
+      "total_starvations": 77,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    },
+    {
+      "miss_rate": 0.5,
+      "mean_delay": 15.36,
+      "ci_95": [
+        14.02,
+        16.7
+      ],
+      "p95_delay": 54.04,
+      "mean_max_queue": 25.9,
+      "total_starvations": 75,
+      "failures": 17,
+      "failure_rate": 0.85,
+      "failure_rate_ci_95": [
+        0.64,
+        0.948
+      ]
+    }
+  ]
+}

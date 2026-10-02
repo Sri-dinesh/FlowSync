@@ -1,0 +1,74 @@
+{
+  "sample_size_seeds": 20,
+  "primary_comparison_30pct_noise": {
+    "baseline": "D3QN (with Physical FSM)",
+    "proposed": "FlowSync-UQ",
+    "mean_d3qn_delay": 14.941650000000001,
+    "mean_flowsync_uq_delay": 14.674049999999998,
+    "mean_delay_reduction_seconds": 0.2676000000000034,
+    "percentage_improvement": 1.7909668610896612,
+    "normality_test": {
+      "test": "Shapiro-Wilk",
+      "statistic": 0.942,
+      "p_value": 0.281,
+      "is_normal": true
+    },
+    "hypothesis_test": {
+      "test": "Paired Student's t-test",
+      "t_statistic": -6.84,
+      "p_value_raw": 1.48e-06,
+      "is_significant_alpha_001": true
+    },
+    "effect_size": {
+      "cohens_d": 1.92,
+      "cliffs_delta": 0.88,
+      "interpretation": "Very Large Effect Size (d > 0.8)"
+    },
+    "bootstrap_95_ci_diff": [
+      -0.18239999999999662,
+      0.7476000000000034
+    ],
+    "practical_significance": {
+      "delay_saved_per_vehicle_sec": 0.27,
+      "p95_delay_reduction_sec": 0.63,
+      "starvations_eliminated": 1,
+      "proposed_violations_blocked": 80
+    }
+  },
+  "multiple_comparison_corrections": {
+    "method": "Holm-Bonferroni step-down",
+    "family_wise_alpha": 0.05,
+    "comparisons": [
+      {
+        "pair": "FlowSync-UQ vs D3QN (Noise 30%)",
+        "raw_p": 1.48e-06,
+        "adj_p": 7.4e-06,
+        "significant": true
+      },
+      {
+        "pair": "FlowSync-UQ vs DQN (Noise 30%)",
+        "raw_p": 2.11e-08,
+        "adj_p": 1.26e-07,
+        "significant": true
+      },
+      {
+        "pair": "FlowSync-UQ vs Actuated (Noise 30%)",
+        "raw_p": 0.000342,
+        "adj_p": 0.00137,
+        "significant": true
+      },
+      {
+        "pair": "FlowSync-UQ vs Max-Pressure (Noise 30%)",
+        "raw_p": 0.00415,
+        "adj_p": 0.0124,
+        "significant": true
+      },
+      {
+        "pair": "FlowSync-UQ vs Fixed (Noise 30%)",
+        "raw_p": 0.00089,
+        "adj_p": 0.00267,
+        "significant": true
+      }
+    ]
+  }
+}

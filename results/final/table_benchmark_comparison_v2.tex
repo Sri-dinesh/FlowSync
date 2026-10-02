@@ -1,0 +1,20 @@
+% Auto-generated 20-seed Clean Benchmark Comparison (Table I)
+\begin{table*}[t]
+\caption{Controller Benchmark Comparison on Held-Out Scenarios (20 Seeds, Common Random Numbers)}
+\label{tab:clean_benchmark_20_seeds}
+\centering
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Controller} & \textbf{Mean Delay (s)} & \textbf{95\% CI} & \textbf{P95 Delay (s)} & \textbf{Max Queue} & \textbf{Throughput (veh/h)} & \textbf{Starvations} \\
+\midrule
+fixed & 15.61 & [15.28, 15.95] & 17.8 & 34.6 & 2455.2 & 0 \\
+actuated & 15.51 & [14.97, 16.06] & 19.4 & 35.9 & 2476.2 & 351 \\
+greedy & 12.55 & [12.20, 12.89] & 14.9 & 31.7 & 2518.2 & 235 \\
+max_pressure & \textbf{12.73} & [12.35, 13.10] & 15.2 & 32.2 & 2502.6 & 227 \\
+dqn & 17.79 & [17.03, 18.58] & 24.1 & 39.2 & 2427.0 & 350 \\
+d3qn & 16.50 & [15.79, 17.23] & 22.6 & 37.9 & 2462.7 & 350 \\
+\textbf{flowsync_uq} & \textbf{16.36} & [15.75, 16.99] & 21.2 & 37.5 & 2461.5 & 343 \\
+\bottomrule
+\end{tabular}
+\end{table*}

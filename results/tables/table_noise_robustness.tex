@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\caption{Robustness Analysis Under Controlled Perception Faults}
+\label{tab:robustness_eval}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Controller} & \textbf{Clean Delay} & \textbf{Miss 10\%} & \textbf{Miss 20\%} & \textbf{Latency 250ms} & \textbf{Combined} & \textbf{Max Degradation (\%)} \\
+\midrule
+fixed & 15.29 & 0.00 & 15.29 & 15.29 & 0.00 & 0.0\% \\
+greedy & 10.73 & 0.00 & 10.73 & 10.73 & 0.00 & 0.0\% \\
+max_pressure & 10.11 & 0.00 & 10.11 & 10.11 & 0.00 & 0.0\% \\
+d3qn & 14.60 & 0.00 & 14.60 & 14.05 & 0.00 & 0.0\% \\
+\textbf{flowsync_uq} & \textbf{14.60} & \textbf{0.00} & \textbf{15.31} & \textbf{14.05} & \textbf{0.00} & \textbf{4.8\%} \\
+\bottomrule
+\end{tabular}
+\end{table*}
