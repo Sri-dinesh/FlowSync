@@ -1,0 +1,60 @@
+# FlowSync Research Training Protocol Configuration (Frozen)
+protocol_version: "1.0.0"
+algorithm: "Dueling Double DQN (D3QN) with Prioritized Experience Replay (PER)"
+
+hyperparameters:
+  state_dim: 28
+  action_dim: 4
+  learning_rate: 0.0003
+  adam_epsilon: 1.0e-8
+  gamma: 0.97
+  batch_size: 128
+  replay_buffer_size: 100000
+  per_alpha: 0.6
+  per_beta_start: 0.4
+  per_beta_end: 1.0
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay_episodes: 600
+  target_update_frequency: 200
+  grad_clip_norm: 10.0
+  decision_dt: 1.0
+  min_green_time: 8.0
+  max_green_time: 40.0
+  red_duration: 3.0
+  demonstration_warmup_steps: 3000
+  demonstration_pretrain_updates: 500
+
+training_seeds:
+  - 101
+  - 202
+  - 303
+  - 404
+  - 505
+
+training_scenarios:
+  - train_low_balanced_01
+  - train_mod_balanced_01
+  - train_high_balanced_01
+  - train_ns_asymmetric_01
+  - train_ew_asymmetric_01
+  - train_platoon_burst_01
+
+validation_scenarios_for_checkpoint_selection:
+  - val_oversaturated_01
+  - val_turning_heavy_01
+  - val_rush_hour_ramp_01
+
+checkpoint_selection_rule:
+  metric: "validation_mean_control_delay"
+  higher_is_better: false
+  eval_frequency_episodes: 50
+  forbid_final_test_set_access: true
+
+domain_randomization:
+  enabled: true
+  arrival_lambda_range: [0.3, 1.1]
+  directional_imbalance_max_ratio: 3.0
+  perception_miss_rate_max: 0.25
+  perception_latency_ms_choices: [0, 100, 250]
+  false_positive_lambda_max: 0.30
