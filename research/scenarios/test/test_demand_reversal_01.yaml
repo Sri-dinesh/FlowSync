@@ -1,0 +1,46 @@
+scenario_id: test_demand_reversal_01
+split: test
+name: Test Commuter Demand Reversal
+description: Morning inbound NS surge shifts abruptly to evening outbound EW surge.
+duration_steps: 1500
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.6
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events:
+  - start_step: 0
+    end_step: 750
+    multiplier: 2.2
+    directions:
+    - north
+    - south
+  - start_step: 750
+    end_step: 1500
+    multiplier: 2.2
+    directions:
+    - east
+    - west
+  incident_events: []
+scenario_hash: 6fb01aa285fd8a8d

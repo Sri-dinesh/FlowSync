@@ -1,0 +1,42 @@
+scenario_id: val_rush_hour_ramp_01
+split: validation
+name: Validation Rush Hour Ramp
+description: Traffic volume progressively ramps from 0.3 to 0.9 veh/s.
+duration_steps: 1200
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.6
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events:
+  - start_step: 200
+    end_step: 1000
+    multiplier: 1.8
+    directions:
+    - north
+    - south
+    - east
+    - west
+  incident_events: []
+scenario_hash: 2511f4cd38d3d140

@@ -1,0 +1,38 @@
+{
+  "manifest_name": "video_sessions_manifest_v2",
+  "version": "2.0.0",
+  "created_at": "2026-09-30T12:07:00Z",
+  "purpose": "Diverse empirical real-world video session manifest for passive shadow-mode replay",
+  "sessions": [
+    {
+      "session_id": "cctv_session_01_midday",
+      "description": "Urban 4-way arterial intersection, midday daylight, clear visibility, balanced moderate flow",
+      "duration_frames": 1200,
+      "fps": 10.0,
+      "estimated_flow_veh_hr": 780.0,
+      "occlusion_level": "Low (< 10% overlap)",
+      "weather_lighting": "Overcast daylight, dry pavement",
+      "source": "Municipal DOT traffic camera stream sample (anonymized)"
+    },
+    {
+      "session_id": "cctv_session_02_rush_commute",
+      "description": "Heavy morning peak commute, directional corridor surge, high queuing, bus/truck presence",
+      "duration_frames": 1200,
+      "fps": 10.0,
+      "estimated_flow_veh_hr": 1150.0,
+      "occlusion_level": "Moderate-High (15-25% overlap)",
+      "weather_lighting": "Direct morning sunlight, glare on East-West approach",
+      "source": "Municipal DOT traffic camera stream sample (anonymized)"
+    },
+    {
+      "session_id": "cctv_session_03_adverse_rain",
+      "description": "Evening dusk, wet road surface, headlight reflections, light rain droplets on camera housing",
+      "duration_frames": 1200,
+      "fps": 10.0,
+      "estimated_flow_veh_hr": 840.0,
+      "occlusion_level": "Moderate (reduced contrast & tracking dropouts)",
+      "weather_lighting": "Dusk / wet pavement reflections",
+      "source": "Municipal DOT traffic camera stream sample (anonymized)"
+    }
+  ]
+}

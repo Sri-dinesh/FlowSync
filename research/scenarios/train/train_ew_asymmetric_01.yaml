@@ -1,0 +1,34 @@
+scenario_id: train_ew_asymmetric_01
+split: train
+name: East-West Arterial Priority
+description: EW approaches carry 3x more traffic than NS cross streets.
+duration_steps: 1200
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.5
+  directional_weights:
+    north: 0.5
+    south: 0.5
+    east: 1.5
+    west: 1.5
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events: []
+  incident_events: []
+scenario_hash: da16aabc1f7374b0
