@@ -46,6 +46,12 @@ class ControllerCapabilities:
             "uses_camera_observable_state_only": self.uses_camera_observable_state_only,
             "is_learning_based": self.is_learning_based,
             "description": self.description,
+            # Frontend contract compatibility aliases
+            "uses_uncertainty_estimation": self.supports_uncertainty,
+            "supports_hysteretic_fallback": self.supports_fallback,
+            "supports_safety_shield": True if self.supports_fallback or "flowsync" in self.name.lower() else False,
+            "produces_q_values": self.is_learning_based,
+            "handles_continuous_obs": True,
         }
 
 

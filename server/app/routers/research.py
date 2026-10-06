@@ -81,7 +81,7 @@ def list_controllers() -> Dict[str, Any]:
     for name in unique_names:
         try:
             ctrl = get_controller(name)
-            caps = ctrl.capabilities.to_dict()
+            caps = ctrl.get_capabilities().to_dict()
             display_name = {
                 "fixed": "Fixed-Time (Webster)",
                 "greedy": "Greedy (Max-Queue)",
