@@ -215,19 +215,27 @@ def list_runs(limit: int = Query(50, ge=1, le=500)) -> Dict[str, Any]:
                 metrics = {}
                 if (sub / "metrics.json").exists():
                     metrics = json.loads((sub / "metrics.json").read_text(encoding="utf-8"))
-                
+
+                num_steps = int(meta.get("num_steps", 0) or 0)
+                has_trajectory = (sub / "trajectory.jsonl").exists()
+
                 runs.append({
                     "experiment_id": meta.get("experiment_id", sub.name),
                     "scenario_id": meta.get("scenario_id", ""),
-                    "controller_name": meta.get("controller_name", ""),
+                    "scenario_hash": meta.get("scenario_hash", ""),
+                    "controller_name": meta.get("controller", meta.get("controller_name", "")),
                     "seed": meta.get("seed", 0),
+                    "noise_preset": meta.get("noise_preset") or _read_run_noise_preset(sub),
+                    "num_steps": num_steps,
+                    "duration_s": round(num_steps * 0.1, 1),
+                    "status": meta.get("status", "COMPLETED" if has_trajectory else "UNKNOWN"),
                     "timestamp": meta.get("timestamp", ""),
                     "git_commit": meta.get("git_commit", ""),
                     "avg_delay": metrics.get("avg_delay", 0.0),
                     "p95_delay": metrics.get("p95_delay", 0.0),
-                    "throughput": metrics.get("total_vehicles_passed", 0),
+                    "throughput": metrics.get("throughput", metrics.get("total_vehicles_passed", 0)),
                     "starvation_count": metrics.get("starvation_count", 0),
-                    "has_trajectory": (sub / "trajectory.jsonl").exists(),
+                    "has_trajectory": has_trajectory,
                     "has_events": (sub / "events.jsonl").exists(),
                 })
             except Exception:
@@ -238,6 +246,28 @@ def list_runs(limit: int = Query(50, ge=1, le=500)) -> Dict[str, Any]:
         "total_runs": len(runs),
         "runs": sorted(runs, key=lambda r: r.get("timestamp", ""), reverse=True)[:limit],
     }
+
+
+def _read_run_noise_preset(run_dir: Path) -> str:
+    """Recover the perception noise preset from the first recorded frame.
+
+    Live-run metadata does not store the fault profile, but every streamed
+    frame carries ``perception.noise_type``.
+    """
+    traj_path = run_dir / "trajectory.jsonl"
+    try:
+        with open(traj_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                frame = json.loads(line)
+                if isinstance(frame, dict):
+                    perception = frame.get("perception", {}) or {}
+                    noise = str(perception.get("noise_type", "clean") or "clean")
+                    return noise
+    except Exception:
+        pass
+    return "clean"
 
 
 @router.get("/runs/{experiment_id}")
