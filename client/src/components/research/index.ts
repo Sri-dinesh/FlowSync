@@ -14,3 +14,7 @@ export { Research3DScene } from "./Research3DScene";
 export { ResearchCanvas } from "./ResearchCanvas";
 export { ResearchExportModal } from "./ResearchExportModal";
 export { ResearchPresentationMode } from "./ResearchPresentationMode";
+export { ResearchSubNav } from "./ResearchSubNav";
+export { ResearchConnectionBanner } from "./ResearchConnectionBanner";
+export { ResearchRunSummary } from "./ResearchRunSummary";
+export { RCard, RCardHeader, REmpty, RStat, StatusBadge, StatusDot } from "./research-ui";
