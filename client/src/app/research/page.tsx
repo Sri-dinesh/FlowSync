@@ -7,6 +7,7 @@ import Header from "@/components/layout/Header";
 import { ResearchSubNav } from "@/components/research/ResearchSubNav";
 import { ResearchPresentationMode } from "@/components/research/ResearchPresentationMode";
 import { ResearchExportModal } from "@/components/research/ResearchExportModal";
+import { ResearchRunsDashboard } from "@/components/research/ResearchRunsDashboard";
 import {
   ArrowRight,
   CheckCircle2,
@@ -287,6 +288,9 @@ export default function ResearchDashboardPage() {
             </Link>
           </div>
         </section>
+
+        {/* All saved simulation runs with per-run detail */}
+        <ResearchRunsDashboard />
 
         {/* Frozen Publication Results Table */}
         <section className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-5 flex flex-col gap-4">

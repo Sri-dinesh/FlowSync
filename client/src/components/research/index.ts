@@ -18,3 +18,4 @@ export { ResearchSubNav } from "./ResearchSubNav";
 export { ResearchConnectionBanner } from "./ResearchConnectionBanner";
 export { ResearchRunSummary } from "./ResearchRunSummary";
 export { RCard, RCardHeader, REmpty, RStat, StatusBadge, StatusDot } from "./research-ui";
+export { ResearchRunsDashboard } from "./ResearchRunsDashboard";
