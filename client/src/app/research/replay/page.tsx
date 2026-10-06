@@ -1,18 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Play, History, Database, CheckCircle2, AlertCircle, FileCode, Layers } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import Header from "@/components/layout/Header";
+import { ResearchSubNav } from "@/components/research/ResearchSubNav";
+import {
+  Database,
+  Play,
+  AlertTriangle,
+} from "lucide-react";
 import {
   ReplayTimeline,
   ResearchMetricsPanel,
   UncertaintyPanel,
   DecisionInspector,
   ProvenanceDrawer,
+  ResearchConnectionBanner,
+  ResearchRunSummary,
 } from "@/components/research";
 import { useResearchStore } from "@/store/researchStore";
 import { useResearchSocket } from "@/hooks/useResearchSocket";
+import { getFastApiUrls } from "@/lib/utils";
 
 const ResearchCanvas = dynamic(
   () => import("@/components/research/ResearchCanvas").then((mod) => mod.ResearchCanvas),
@@ -31,223 +40,306 @@ interface SavedRun {
   throughput: number;
   status: string;
   timestamp: string;
+  /** True for built-in demo rows shown while the backend is offline (not replayable). */
+  demo?: boolean;
 }
 
-export default function ResearchReplayPage() {
-  const [runs, setRuns] = useState<SavedRun[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+/** Map the FastAPI /research/runs shape onto the replay catalog rows. */
+function mapBackendRuns(payload: { runs?: unknown }): SavedRun[] {
+  const list = Array.isArray(payload?.runs) ? payload.runs : [];
+  return (list as Record<string, unknown>[]).map((r) => ({
+    run_id: String(r.experiment_id ?? r.run_id ?? ""),
+    scenario: String(r.scenario_id ?? r.scenario ?? ""),
+    controller: String(r.controller_name ?? r.controller ?? ""),
+    seed: Number(r.seed ?? 0),
+    steps: Number(r.num_steps ?? r.steps ?? 0),
+    duration_s: Number(r.duration_s ?? Number(r.num_steps ?? r.steps ?? 0) * 0.1),
+    avg_delay: Number(r.avg_delay ?? 0),
+    p95_delay: Number(r.p95_delay ?? 0),
+    throughput: Number(r.throughput ?? 0),
+    status: String(r.status ?? (r.has_trajectory ? "COMPLETED" : "UNKNOWN")),
+    timestamp: String(r.timestamp ?? ""),
+  })).filter((r: SavedRun) => r.run_id);
+}
 
-  const { isConnected, sendCommand } = useResearchSocket();
+function ResearchReplayContent({ initialRunId }: { initialRunId?: string }) {
+  const searchParams = useSearchParams();
+  const runFromUrl = searchParams?.get("run") ?? undefined;
+  const effectiveInitial = initialRunId ?? runFromUrl;
+  const [runs, setRuns] = useState<SavedRun[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(effectiveInitial ?? null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const { replayRun } = useResearchSocket();
   const toggleProvenanceDrawer = useResearchStore((s) => s.toggleProvenanceDrawer);
-  const setExperimentId = useResearchStore((s) => s.setExperimentId);
-  const setRunStatus = useResearchStore((s) => s.setRunStatus);
+  const runStatus = useResearchStore((s) => s.runStatus);
+  const currentFrame = useResearchStore((s) => s.currentFrame);
+  const isConnected = useResearchStore((s) => s.isWsConnected);
 
   useEffect(() => {
-    // Fetch stored runs from authoritative backend
-    fetch("/api/research/runs")
+    const { httpUrl } = getFastApiUrls();
+    // Authoritative backend catalog (previously this hit a non-existent
+    // Next.js route /api/research/runs, so the list was always mock data).
+    fetch(`${httpUrl}/research/runs?limit=100`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load runs");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
-        setRuns(data.runs || []);
-        if (data.runs && data.runs.length > 0) {
-          setSelectedRunId(data.runs[0].run_id);
+        const mapped = mapBackendRuns(data);
+        setRuns(mapped);
+        setCatalogError(null);
+        if (!selectedRunId && mapped.length > 0) {
+          setSelectedRunId(mapped[0].run_id);
         }
         setIsLoading(false);
       })
       .catch((err) => {
-        console.warn("Backend runs fetch fallback:", err);
-        // Default frozen runs catalog for research demonstration
-        const mockRuns: SavedRun[] = [
+        console.warn("Backend runs fetch failed, showing demo preview:", err);
+        setCatalogError(
+          `Cannot reach backend catalog at ${httpUrl}/research/runs. Showing a read-only demo preview — start the backend to replay real runs.`
+        );
+        // Clearly-labelled demo rows (not replayable) instead of silent mock data.
+        const demoRuns: SavedRun[] = [
           {
-            run_id: "run_flowsync_uq_seed42_clean",
-            scenario: "canonical_4way_arterial",
+            run_id: "demo_flowsync_uq_clean",
+            scenario: "test_clean_balanced_01",
             controller: "FlowSync-UQ (Ours)",
-            seed: 42,
-            steps: 3600,
-            duration_s: 360.0,
-            avg_delay: 24.3,
-            p95_delay: 38.1,
-            throughput: 842,
-            status: "COMPLETED",
-            timestamp: "2026-09-30T18:22:10Z",
+            seed: 1101,
+            steps: 1200,
+            duration_s: 120.0,
+            avg_delay: 16.36,
+            p95_delay: 18.79,
+            throughput: 2462,
+            status: "DEMO",
+            timestamp: "2026-10-01T10:00:00Z",
+            demo: true,
           },
           {
-            run_id: "run_flowsync_uq_seed42_corrupted30",
-            scenario: "canonical_4way_arterial",
-            controller: "FlowSync-UQ (Ours)",
-            seed: 42,
-            steps: 3600,
-            duration_s: 360.0,
-            avg_delay: 27.8,
-            p95_delay: 43.5,
-            throughput: 810,
-            status: "COMPLETED",
-            timestamp: "2026-09-30T19:04:15Z",
-          },
-          {
-            run_id: "run_d3qn_baseline_seed42_corrupted30",
-            scenario: "canonical_4way_arterial",
+            run_id: "demo_d3qn_corrupted30",
+            scenario: "test_clean_balanced_01",
             controller: "D3QN (Unshielded)",
-            seed: 42,
-            steps: 3600,
-            duration_s: 360.0,
-            avg_delay: 58.2,
-            p95_delay: 94.6,
-            throughput: 620,
-            status: "COMPLETED",
-            timestamp: "2026-09-30T19:40:00Z",
+            seed: 1101,
+            steps: 1200,
+            duration_s: 120.0,
+            avg_delay: 18.21,
+            p95_delay: 24.4,
+            throughput: 2410,
+            status: "DEMO",
+            timestamp: "2026-10-01T11:00:00Z",
+            demo: true,
           },
         ];
-        setRuns(mockRuns);
-        setSelectedRunId(mockRuns[0].run_id);
+        setRuns(demoRuns);
+        if (!selectedRunId) setSelectedRunId(demoRuns[0].run_id);
         setIsLoading(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSelectRun = (runId: string) => {
-    setSelectedRunId(runId);
-    setExperimentId(runId);
-    setRunStatus("running");
-    sendCommand({
-      command: "replay_run",
-      run_id: runId,
-      speed: 1.0,
-    });
+  const handleSelectRun = (run: SavedRun) => {
+    if (run.demo) return; // demo rows carry no backend trajectory
+    setSelectedRunId(run.run_id);
+    replayRun(run.run_id, 1.0);
   };
 
+  // Deep-link support: auto-stream the requested run once the catalog arrives.
+  // selectedRunId is already initialised to effectiveInitial, so this effect
+  // only kicks off the stream (an external-system update, not a render sync).
+  const didAutoReplay = React.useRef(false);
+  useEffect(() => {
+    if (isLoading || !effectiveInitial || didAutoReplay.current) return;
+    const target = runs.find((r) => r.run_id === effectiveInitial);
+    if (target && !target.demo && !useResearchStore.getState().currentFrame) {
+      didAutoReplay.current = true;
+      replayRun(target.run_id, 1.0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, runs]);
+
   const activeRun = runs.find((r) => r.run_id === selectedRunId);
+  const isReplayingSelected =
+    !!currentFrame && currentFrame.experiment_id === selectedRunId &&
+    (runStatus === "running" || runStatus === "paused" || runStatus === "starting");
 
   return (
-    <div className="min-h-screen bg-[#090b10] text-slate-100 flex flex-col">
-      {/* Top Navbar */}
-      <header className="h-16 border-b border-white/10 bg-[#0d1017]/95 px-6 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/research/experiment"
-            className="flex items-center gap-2 text-xs font-mono text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Single Experiment</span>
-          </Link>
-          <div className="h-5 w-[1px] bg-white/10" />
-          <div>
-            <h1 className="text-sm font-bold text-white tracking-wide">
-              Deterministic Run Replay & Time-Travel
-            </h1>
-            <p className="text-[11px] font-mono text-slate-400">
-              Trace-driven physical inspection (Zero physics recomputation)
-            </p>
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Global Application Header */}
+      <Header />
+
+      {/* Research Mode Sub-Navigation Bar */}
+      <ResearchSubNav showActions={false} />
+
+      {/* Main Container */}
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1440px] mx-auto w-full flex flex-col gap-4">
+        <ResearchConnectionBanner />
+        <ResearchRunSummary />
+
+        {catalogError && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-4 flex items-start gap-2.5 text-xs text-amber-200/90">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+            <span>{catalogError}</span>
           </div>
-        </div>
+        )}
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleProvenanceDrawer}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors"
-          >
-            <Database className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Provenance</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Grid */}
-      <main className="flex-1 p-6 max-w-[1920px] mx-auto w-full grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left Column: Replay Catalog & Selector */}
-        <div className="xl:col-span-4 flex flex-col gap-4">
-          <div className="bg-[#12151c]/90 border border-white/10 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-              <History className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                Completed Research Runs Catalog
-              </h2>
-            </div>
-
-            <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
-              {runs.map((run) => {
-                const isSelected = run.run_id === selectedRunId;
-                return (
-                  <div
-                    key={run.run_id}
-                    onClick={() => handleSelectRun(run.run_id)}
-                    className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      isSelected
-                        ? "bg-indigo-600/20 border-indigo-500/50 shadow-lg shadow-indigo-900/20"
-                        : "bg-black/30 border-white/5 hover:border-white/20 hover:bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold text-white font-mono">{run.controller}</span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {run.status}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] font-mono text-slate-400 truncate mb-2">
-                      {run.run_id}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[10px] font-mono">
-                      <div>
-                        <span className="text-slate-500 block">DELAY</span>
-                        <span className="text-white font-bold">{run.avg_delay.toFixed(1)}s</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">P95</span>
-                        <span className="text-sky-300 font-bold">{run.p95_delay.toFixed(1)}s</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">PASSED</span>
-                        <span className="text-slate-200 font-bold">{run.throughput}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Active Replay 3D Scene, Timeline & Telemetry */}
-        <div className="xl:col-span-8 flex flex-col gap-5">
-          {/* Active Replay Metadata Bar */}
-          <div className="bg-[#12151c]/90 border border-white/10 rounded-xl px-5 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />
-              <div className="font-mono text-xs">
-                <span className="text-slate-400">Replaying: </span>
-                <span className="text-white font-bold">{activeRun?.run_id}</span>
+        {/* Main Grid: Catalog / 3D Canvas / Telemetry */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 w-full">
+          {/* Left Column: Replay Catalog & Selector */}
+          <div className="xl:col-span-4 flex flex-col gap-4">
+            <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                <h2 className="text-sm font-medium text-white">
+                  Saved runs ({runs.length})
+                </h2>
+                <button
+                  onClick={toggleProvenanceDrawer}
+                  className="flex items-center gap-1 text-[11px] text-neutral-500 hover:text-white transition-colors"
+                  title="View deterministic experiment provenance and hashes"
+                >
+                  <Database className="w-3 h-3" />
+                  <span>Provenance</span>
+                </button>
               </div>
+
+              {isLoading ? (
+                <div className="text-center py-12 text-xs font-mono text-white/40 animate-pulse">
+                  Loading saved runs...
+                </div>
+              ) : runs.length === 0 ? (
+                <div className="text-center py-12 px-4 space-y-2">
+                  <p className="text-xs font-bold text-white">No saved runs yet</p>
+                  <p className="text-xs text-white/50 leading-relaxed">
+                    Run a simulation on the <span className="text-indigo-300 font-semibold">Live 3D Experiment</span> page
+                    first — finished runs are saved automatically and appear here for replay.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  {runs.map((run) => {
+                    const isSelected = run.run_id === selectedRunId;
+                    return (
+                      <button
+                        key={run.run_id}
+                        onClick={() => handleSelectRun(run)}
+                        disabled={run.demo}
+                        title={run.demo ? "Demo preview only — start the backend to replay real runs" : `Replay ${run.run_id}`}
+                        className={`w-full text-left p-3 rounded-md border transition-colors flex flex-col gap-1.5 ${
+                          isSelected
+                            ? "bg-white/[0.06] border-neutral-500"
+                            : run.demo
+                              ? "bg-transparent border-neutral-800/60 opacity-50 cursor-not-allowed"
+                              : "bg-transparent border-neutral-800 hover:border-neutral-600 hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-mono tabular-nums text-white truncate">
+                            {run.run_id}
+                          </span>
+                          <span
+                            className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] ${
+                              run.status === "COMPLETED"
+                                ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+                                : run.demo || run.status === "DEMO"
+                                  ? "text-neutral-500 border-neutral-800"
+                                  : "text-amber-300 border-amber-500/30 bg-amber-500/10"
+                            }`}
+                          >
+                            {run.status === "COMPLETED" ? "Done" : run.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-neutral-500">
+                          <span className="truncate">{run.controller}</span>
+                          <span className="font-mono tabular-nums shrink-0">seed {run.seed}</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] font-mono tabular-nums text-neutral-500 pt-1.5 border-t border-neutral-800/70">
+                          <span>{run.avg_delay}s avg</span>
+                          <span>{run.throughput} cleared</span>
+                          {isSelected && !run.demo && (
+                            <span className="ml-auto flex items-center gap-1 text-neutral-300">
+                              <Play className="w-3 h-3" />
+                              {isReplayingSelected ? "Playing" : "Replay"}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="text-xs font-mono text-slate-400 hidden sm:block">
-              Seed: <strong className="text-amber-400">{activeRun?.seed}</strong> | Duration:{" "}
-              <strong className="text-slate-200">{activeRun?.duration_s}s</strong>
-            </div>
+
+            {/* Selected run details */}
+            {activeRun && (
+              <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 text-xs flex flex-col gap-2">
+                <h3 className="text-sm font-medium text-white pb-2 border-b border-neutral-800">Run details</h3>
+
+                <div className="space-y-1.5 text-neutral-500 text-[11px]">
+                  <div className="flex justify-between gap-2">
+                    <span>Scenario</span>
+                    <span className="text-neutral-200 font-mono truncate">{activeRun.scenario}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Length</span>
+                    <span className="text-neutral-200 font-mono tabular-nums">{activeRun.duration_s}s · {activeRun.steps} steps</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Worst 5%</span>
+                    <span className="text-neutral-200 font-mono tabular-nums">{activeRun.p95_delay}s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Saved</span>
+                    <span className="text-neutral-200">
+                      {activeRun.timestamp ? new Date(activeRun.timestamp).toLocaleString() : "—"}
+                    </span>
+                  </div>
+                  {!isConnected && (
+                    <div className="pt-1 text-amber-300/90">
+                      Offline — replay starts on reconnect.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 3D Canvas */}
-          <div className="h-[460px] relative rounded-2xl overflow-hidden border border-white/10">
-            <ResearchCanvas quality="performance" label={`Replay: ${activeRun?.controller || "Trace"}`} />
-          </div>
+          {/* Right Column: Canvas, Scrubber & Telemetry */}
+          <div className="xl:col-span-8 flex flex-col gap-4">
+            {/* Scrubber Timeline */}
+            <ReplayTimeline />
 
-          {/* Replay Scrubbing Timeline */}
-          <ReplayTimeline totalSteps={activeRun?.steps || 3600} />
+            {/* Canvas */}
+            <div className="h-[420px] w-full rounded-lg overflow-hidden border border-neutral-800 bg-neutral-900/60 relative">
+              <ResearchCanvas quality="performance" />
+              {!currentFrame && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 p-6 pointer-events-none">
+                  <p className="text-xs text-neutral-400 text-center max-w-sm leading-relaxed bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3">
+                    Pick a saved run on the left to play its recording here, then drag the timeline to jump around.
+                  </p>
+                </div>
+              )}
+            </div>
 
-          {/* Decision Inspector & Uncertainty */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Decision Inspector and Uncertainty Panel */}
             <DecisionInspector />
             <UncertaintyPanel />
+            <ResearchMetricsPanel />
           </div>
-
-          {/* Metrics */}
-          <ResearchMetricsPanel />
         </div>
       </main>
 
+      {/* Provenance Drawer */}
       <ProvenanceDrawer />
     </div>
+  );
+}
+
+export default function ResearchReplayPage({ initialRunId }: { initialRunId?: string }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center text-xs font-mono text-white/40">Loading replay…</div>}>
+      <ResearchReplayContent initialRunId={initialRunId} />
+    </Suspense>
   );
 }
