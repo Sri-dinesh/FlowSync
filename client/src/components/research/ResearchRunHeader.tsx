@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Pause, Play, RotateCcw, Eye, Monitor, FileText, Check, ShieldCheck } from "lucide-react";
+import { Copy, Pause, Play, RotateCcw, Eye, Monitor, FileText, Check } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useResearchStore } from "@/store/researchStore";
@@ -25,7 +25,13 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
   const { pause, resume, stop } = useResearchSocket();
   const [copied, setCopied] = useState(false);
 
-  const experimentId = currentFrame?.experiment_id || `exp_${activeScenario?.scenario_id || "test"}_${activeController}_s${activeSeed}`;
+  const ctrlKey =
+    typeof activeController === "object" && activeController !== null
+      ? activeController.id || "flowsync_uq"
+      : activeController || "flowsync_uq";
+  const experimentId =
+    currentFrame?.experiment_id ||
+    `exp_${activeScenario?.scenario_id || "test"}_${ctrlKey}_s${activeSeed}`;
   const totalSteps = activeScenario?.duration_steps || 1200;
   const currentStep = currentFrame?.step ?? 0;
   const progressPct = Math.min(100, (currentStep / totalSteps) * 100);
@@ -36,65 +42,64 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const statusTone =
+    runStatus === "running"
+      ? "bg-emerald-400 animate-pulse"
+      : runStatus === "paused"
+        ? "bg-amber-400"
+        : runStatus === "completed"
+          ? "bg-indigo-400"
+          : runStatus === "error"
+            ? "bg-red-400"
+            : "bg-neutral-600";
+
+  const statusLabel =
+    runStatus === "idle" ? "Idle — no run yet" : runStatus.charAt(0).toUpperCase() + runStatus.slice(1);
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-4 backdrop-blur-xl shadow-xl flex flex-col gap-3 text-white">
-      {/* Top row: ID, Badges, Actions */}
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 px-4 py-3 flex flex-col gap-2.5 text-white">
+      {/* Top row: run identity + actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Experiment ID & controller badge */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs font-mono">
-            <span className="text-white/40">ID:</span>
-            <span className="text-indigo-300 font-medium truncate max-w-[200px]">{experimentId}</span>
-            <button
-              onClick={handleCopyId}
-              title="Copy Experiment ID"
-              className="text-white/40 hover:text-white transition-colors"
-            >
-              {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-            </button>
-          </div>
-
-          <div className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs font-bold uppercase tracking-wider">
+        {/* Left: status + run config */}
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="inline-flex items-center gap-1.5 font-medium text-white">
+            <span className={`h-1.5 w-1.5 rounded-full ${statusTone}`} />
+            {statusLabel}
+          </span>
+          <span className="text-neutral-700">|</span>
+          <span className="rounded-full border border-neutral-700 bg-white/[0.03] px-2 py-0.5 text-[11px] text-neutral-300">
             {String(typeof activeController === "object" ? activeController?.name || activeController?.id : activeController || "flowsync-uq").replace(/_/g, "-")}
-          </div>
-
+          </span>
           {activeScenario && (
-            <div className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-white/70">
-              {activeScenario.scenario_id} ({activeScenario.split})
-            </div>
+            <span className="font-mono text-[11px] text-neutral-500">
+              {activeScenario.scenario_id} · seed {activeSeed} · {activeNoisePreset === "clean" ? "clean cameras" : activeNoisePreset}
+            </span>
           )}
-
-          <div className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-white/60">
-            Seed {activeSeed}
-          </div>
-
-          <div
-            className={`px-2 py-1 rounded-lg text-xs font-mono border ${
-              activeNoisePreset === "clean"
-                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
-                : "bg-amber-500/10 border-amber-500/25 text-amber-300"
-            }`}
+          <button
+            onClick={handleCopyId}
+            title={`Copy run ID: ${experimentId}`}
+            className="text-neutral-600 hover:text-white transition-colors"
           >
-            Noise: {activeNoisePreset}
-          </div>
+            {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          </button>
         </div>
 
-        {/* Right: Controls & Mode Toggles */}
-        <div className="flex items-center gap-2">
+        {/* Right: view toggles + run controls */}
+        <div className="flex items-center gap-1.5">
           {/* Debug Overlay Toggle */}
           <Button
             size="sm"
             variant="ghost"
             onClick={() => toggleDebugOverlay()}
-            className={`text-xs h-8 gap-1.5 border ${
+            className={`text-xs h-7 gap-1.5 border ${
               debugOverlay
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
-                : "border-white/10 text-white/60 hover:text-white"
+                ? "bg-white/10 border-white/20 text-white"
+                : "border-transparent text-neutral-500 hover:text-white hover:bg-white/5"
             }`}
-            title="Toggle Oracle Perception Debug Overlay (Detected vs Ghost Vehicles)"
+            title="Toggle perception debug overlay (detected vs missed vehicles)"
           >
             <Eye className="h-3.5 w-3.5" />
-            <span>Perception Debug</span>
+            <span className="hidden lg:inline">Debug</span>
           </Button>
 
           {/* Presentation Mode Toggle */}
@@ -102,27 +107,27 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
             size="sm"
             variant="ghost"
             onClick={() => togglePresentationMode()}
-            className={`text-xs h-8 gap-1.5 border ${
+            className={`text-xs h-7 gap-1.5 border ${
               presentationMode
-                ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25"
-                : "border-white/10 text-white/60 hover:text-white"
+                ? "bg-white/10 border-white/20 text-white"
+                : "border-transparent text-neutral-500 hover:text-white hover:bg-white/5"
             }`}
-            title="Toggle High-Contrast Academic Presentation Mode"
+            title="Toggle high-contrast presentation mode"
           >
             <Monitor className="h-3.5 w-3.5" />
-            <span>Presentation</span>
+            <span className="hidden lg:inline">Present</span>
           </Button>
 
           {/* Provenance Drawer Trigger */}
           {onOpenProvenance && (
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               onClick={onOpenProvenance}
-              className="text-xs h-8 gap-1.5 border-white/10 text-white/70 hover:text-white"
+              className="text-xs h-7 gap-1.5 border border-transparent text-neutral-500 hover:text-white hover:bg-white/5"
             >
               <FileText className="h-3.5 w-3.5" />
-              <span>Provenance</span>
+              <span className="hidden lg:inline">Provenance</span>
             </Button>
           )}
 
@@ -132,7 +137,7 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
               size="sm"
               variant="outline"
               onClick={pause}
-              className="text-xs h-8 gap-1.5 border-white/10 text-white hover:bg-white/10"
+              className="text-xs h-7 gap-1.5 border-neutral-700 text-neutral-300 hover:bg-white/5"
             >
               <Pause className="h-3.5 w-3.5" /> Pause
             </Button>
@@ -142,18 +147,18 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
             <Button
               size="sm"
               onClick={resume}
-              className="text-xs h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="text-xs h-7 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
             >
               <Play className="h-3.5 w-3.5 fill-current" /> Resume
             </Button>
           )}
 
-          {(runStatus === "running" || runStatus === "paused") && (
+          {(runStatus === "running" || runStatus === "paused" || runStatus === "starting") && (
             <Button
               size="sm"
-              variant="destructive"
+              variant="ghost"
               onClick={stop}
-              className="text-xs h-8 gap-1.5"
+              className="text-xs h-7 gap-1.5 text-neutral-500 hover:text-white hover:bg-white/5"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Stop
             </Button>
@@ -161,36 +166,20 @@ export default function ResearchRunHeader({ onOpenProvenance }: Props) {
         </div>
       </div>
 
-      {/* Bottom row: Time Progress bar */}
-      <div className="flex items-center gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              runStatus === "running"
-                ? "bg-emerald-400 animate-pulse"
-                : runStatus === "paused"
-                ? "bg-amber-400"
-                : runStatus === "completed"
-                ? "bg-indigo-400"
-                : "bg-neutral-600"
-            }`}
-          />
-          <span className="font-bold text-white uppercase">{runStatus}</span>
-          <span className="text-white/40">|</span>
-          <span className="text-white/70">
-            t = {(currentStep * 0.1).toFixed(1)}s / {(totalSteps * 0.1).toFixed(1)}s
-          </span>
-          <span className="text-white/40">({currentStep} / {totalSteps} steps)</span>
-        </div>
+      {/* Bottom row: time progress */}
+      <div className="flex items-center gap-3">
+        <span className="text-[11px] font-mono tabular-nums text-neutral-500 whitespace-nowrap">
+          {(currentStep * 0.1).toFixed(1)}s / {(totalSteps * 0.1).toFixed(1)}s
+        </span>
 
         {/* Progress bar */}
-        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+        <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
           <div
             className="h-full rounded-full bg-indigo-500 transition-all duration-150"
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <span className="text-[10px] font-mono text-white/40">{progressPct.toFixed(0)}%</span>
+        <span className="text-[11px] font-mono tabular-nums text-neutral-500">{progressPct.toFixed(0)}%</span>
       </div>
     </div>
   );

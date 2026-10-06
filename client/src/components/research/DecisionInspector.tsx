@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ShieldAlert, ShieldCheck, Cpu, AlertCircle, Clock, Zap } from "lucide-react";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useResearchStore } from "@/store/researchStore";
 
 const PHASE_NAMES = [
@@ -17,8 +17,8 @@ export default function DecisionInspector() {
 
   if (!currentFrame) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl text-center text-xs text-white/30 font-mono">
-        Awaiting live controller telemetry...
+      <div className="rounded-lg border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-500">
+        Waiting for controller telemetry — run a simulation to see the decision pipeline.
       </div>
     );
   }
@@ -34,149 +34,134 @@ export default function DecisionInspector() {
   const executedPhase = signal.executed_phase;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl shadow-xl flex flex-col gap-4 text-white">
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex flex-col gap-3 text-white">
       {/* Title */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-amber-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-            FlowSync-UQ Decision Pipeline
-          </h3>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] font-mono">
-          <span className="text-white/40">Authority:</span>
-          <span
-            className={`px-2 py-0.5 rounded-full font-bold uppercase ${
-              isFallbackActive
-                ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-            }`}
-          >
-            {isFallbackActive ? "Max-Pressure Fallback" : "D3QN Neural Policy"}
-          </span>
-        </div>
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <h3 className="text-sm font-medium text-white">
+          Decision pipeline
+        </h3>
+        <span
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            isFallbackActive
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+              : "border-neutral-700 bg-white/[0.03] text-neutral-300"
+          }`}
+        >
+          {isFallbackActive ? "Fallback in control" : "Neural policy in control"}
+        </span>
       </div>
 
       {/* Action Flow Pipeline */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         {/* Step 1: D3QN Proposed */}
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase font-bold text-white/40">1. D3QN Proposed</span>
-          <div className="text-xs font-bold text-indigo-300 font-mono">
+        <div className="rounded-md border border-neutral-800 bg-black/30 p-2.5 flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-neutral-500">AI proposes</span>
+          <div className="text-[13px] font-semibold text-white font-mono tabular-nums">
             {PHASE_SHORT[d3qnAction] ?? `P${d3qnAction}`}
           </div>
-          <span className="text-[10px] text-white/50 truncate">
+          <span className="text-[11px] text-neutral-500 truncate">
             {PHASE_NAMES[d3qnAction] ?? ""}
           </span>
         </div>
 
         {/* Step 2: Fallback Proposed */}
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase font-bold text-white/40">2. Fallback (MP)</span>
-          <div className="text-xs font-bold font-mono text-cyan-300">
-            {fallbackAction !== null ? (PHASE_SHORT[fallbackAction] ?? `P${fallbackAction}`) : "Standby"}
+        <div className="rounded-md border border-neutral-800 bg-black/30 p-2.5 flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-neutral-500">Fallback proposes</span>
+          <div className="text-[13px] font-semibold font-mono tabular-nums text-neutral-200">
+            {fallbackAction !== null ? (PHASE_SHORT[fallbackAction] ?? `P${fallbackAction}`) : "—"}
           </div>
-          <span className="text-[10px] text-white/50 truncate">
-            {fallbackAction !== null ? (PHASE_NAMES[fallbackAction] ?? "") : "Not invoked"}
+          <span className="text-[11px] text-neutral-500 truncate">
+            {fallbackAction !== null ? (PHASE_NAMES[fallbackAction] ?? "") : "Standby"}
           </span>
         </div>
 
         {/* Step 3: Supervisor Selection */}
         <div
-          className={`rounded-xl border p-3 flex flex-col gap-1.5 ${
+          className={`rounded-md border p-2.5 flex flex-col gap-1 ${
             isFallbackActive
-              ? "bg-rose-500/10 border-rose-500/30"
-              : "bg-emerald-500/10 border-emerald-500/30"
+              ? "border-amber-500/30 bg-amber-500/[0.07]"
+              : "border-neutral-800 bg-black/30"
           }`}
         >
-          <span className="text-[9px] uppercase font-bold text-white/40">3. Supervisor</span>
-          <div className="text-xs font-bold font-mono text-white">
+          <span className="text-[11px] font-medium text-neutral-500">Supervisor picks</span>
+          <div className="text-[13px] font-semibold font-mono tabular-nums text-white">
             {PHASE_SHORT[supervisorAction] ?? `P${supervisorAction}`}
           </div>
-          <span className="text-[10px] text-white/60 truncate">
-            {isFallbackActive ? "Triggered Fallback" : "Approved D3QN"}
+          <span className="text-[11px] text-neutral-500 truncate">
+            {isFallbackActive ? "Fallback chosen" : "AI approved"}
           </span>
         </div>
 
         {/* Step 4: Safety Shield */}
         <div
-          className={`rounded-xl border p-3 flex flex-col gap-1.5 ${
+          className={`rounded-md border p-2.5 flex flex-col gap-1 ${
             shieldOverride
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-              : "bg-white/[0.02] border-white/10 text-white"
+              ? "border-amber-500/30 bg-amber-500/[0.07]"
+              : "border-neutral-800 bg-black/30"
           }`}
         >
-          <span className="text-[9px] uppercase font-bold text-white/40">4. Safety Shield</span>
-          <div className="text-xs font-bold font-mono flex items-center gap-1">
+          <span className="text-[11px] font-medium text-neutral-500">Safety check</span>
+          <div className="text-[13px] font-semibold font-mono flex items-center gap-1 text-white">
             {shieldOverride ? (
               <>
                 <ShieldAlert className="h-3 w-3 text-amber-400" /> Override
               </>
             ) : (
               <>
-                <ShieldCheck className="h-3 w-3 text-emerald-400" /> Passed
+                <ShieldCheck className="h-3 w-3 text-emerald-400" /> Pass
               </>
             )}
           </div>
-          <span className="text-[10px] text-white/50 truncate">
-            {shieldOverride ? "Anti-starvation" : "Invariant valid"}
+          <span className="text-[11px] text-neutral-500 truncate">
+            {shieldOverride ? "Corrected action" : "Within limits"}
           </span>
         </div>
 
         {/* Step 5: Physical FSM */}
         <div
-          className={`rounded-xl border p-3 flex flex-col gap-1.5 ${
+          className={`rounded-md border p-2.5 flex flex-col gap-1 ${
             fsmDeferred
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-              : "bg-white/[0.02] border-white/10 text-white"
+              ? "border-amber-500/30 bg-amber-500/[0.07]"
+              : "border-neutral-800 bg-black/30"
           }`}
         >
-          <span className="text-[9px] uppercase font-bold text-white/40">5. Physical FSM</span>
-          <div className="text-xs font-bold font-mono">
-            {fsmDeferred ? "Deferred" : "Accepted"}
+          <span className="text-[11px] font-medium text-neutral-500">Signal rules</span>
+          <div className="text-[13px] font-semibold font-mono text-white">
+            {fsmDeferred ? "Wait" : "Go"}
           </div>
-          <span className="text-[10px] text-white/50 truncate">
+          <span className="text-[11px] text-neutral-500 truncate">
             {fsmDeferred ? safety.reason : signal.fsm_state}
           </span>
         </div>
 
         {/* Step 6: Final Executed Phase */}
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase font-bold text-emerald-400">6. Executed Phase</span>
-          <div className="text-sm font-bold font-mono text-emerald-300">
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/[0.07] p-2.5 flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-emerald-300/80">Executed</span>
+          <div className="text-[13px] font-semibold font-mono tabular-nums text-emerald-300">
             {PHASE_SHORT[executedPhase] ?? `Phase ${executedPhase}`}
           </div>
-          <span className="text-[10px] text-emerald-200/60 truncate">
+          <span className="text-[11px] text-emerald-200/50 truncate">
             {signal.fsm_state}
           </span>
         </div>
       </div>
 
       {/* Decision Metadata Banner */}
-      <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-white/40">Uncertainty Status:</span>
-          <span className="font-mono font-bold text-white">
-            U(s) = {uncertainty.score.toFixed(3)}
+      <div className="rounded-md bg-black/30 border border-neutral-800 p-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
+        <span>
+          Uncertainty <span className="font-mono tabular-nums text-neutral-200">𝒰 = {uncertainty.score.toFixed(3)}</span>
+          <span className="text-neutral-600"> (fallback above {uncertainty.threshold_high.toFixed(2)})</span>
+        </span>
+        <span>
+          Reason: <span className="text-neutral-300 capitalize">
+            {supervisor?.reason ? String(supervisor.reason).replace(/_/g, " ") : "Nominal"}
           </span>
-          <span className="text-white/30">|</span>
-          <span className="text-white/40">Thresholds:</span>
-          <span className="font-mono text-white/70">
-            τ_high = {uncertainty.threshold_high.toFixed(2)}, τ_low = {uncertainty.threshold_low.toFixed(2)}
+        </span>
+        {supervisor.dwell_remaining_s > 0 && (
+          <span className="text-amber-300/90">
+            Cooldown {supervisor.dwell_remaining_s.toFixed(1)}s
           </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-white/40">Supervisor Dwell Timer:</span>
-          <span className="font-mono text-amber-300">
-            {supervisor.dwell_remaining_s > 0 ? `${supervisor.dwell_remaining_s.toFixed(1)}s` : "Inactive"}
-          </span>
-          <span className="text-white/30">|</span>
-          <span className="text-white/40">Reason:</span>
-          <span className="font-mono text-white/80 capitalize">
-            {supervisor?.reason ? String(supervisor.reason).replace(/_/g, " ") : "Nominal Execution"}
-          </span>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -1,22 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { Cpu, CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Lock } from "lucide-react";
 import { useResearchStore } from "@/store/researchStore";
 
 const PHASE_LABELS = [
-  "Phase 0: NS Straight",
-  "Phase 1: EW Straight",
-  "Phase 2: NS Left-Turn",
-  "Phase 3: EW Left-Turn",
+  "NS straight",
+  "EW straight",
+  "NS left turn",
+  "EW left turn",
 ];
 
-const PHASE_COLORS = [
-  "from-emerald-500 to-emerald-400",
-  "from-sky-500 to-sky-400",
-  "from-violet-500 to-violet-400",
-  "from-rose-500 to-rose-400",
-];
+const PHASE_BAR = "bg-neutral-300";
 
 export default function QValuePanel() {
   const currentFrame = useResearchStore((s) => s.currentFrame);
@@ -49,26 +44,22 @@ export default function QValuePanel() {
 
   if (!policy) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl text-center text-xs text-white/30 font-mono">
-        Awaiting D3QN Q-value estimates...
+      <div className="rounded-lg border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-500">
+        Waiting for Q-values — run a simulation to see what the AI policy prefers.
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl shadow-xl flex flex-col gap-4 text-white">
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex flex-col gap-3 text-white">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-        <div className="flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-indigo-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-            Policy Value Estimates (Q-Values)
-          </h3>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] font-mono">
-          <span className="text-white/40">Exploration Rate:</span>
-          <span className="text-indigo-300 font-bold">ε = {policy.epsilon.toFixed(3)}</span>
-        </div>
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <h3 className="text-sm font-medium text-white">
+          Policy values
+        </h3>
+        <span className="text-[11px] font-mono tabular-nums text-neutral-500" title="Random-action probability. 0 means the AI always picks its best guess.">
+          ε = {policy.epsilon.toFixed(3)}
+        </span>
       </div>
 
       {/* 4 Q-Value Bars */}
@@ -82,43 +73,44 @@ export default function QValuePanel() {
           return (
             <div
               key={i}
-              className={`rounded-xl p-3 border transition-all ${
+              className={`rounded-md p-2.5 border transition-colors ${
                 isSelected
-                  ? "bg-indigo-500/10 border-indigo-500/30 shadow-lg shadow-indigo-500/10"
+                  ? "bg-white/[0.04] border-neutral-600"
                   : !isValid
-                  ? "bg-white/[0.01] border-white/[0.04] opacity-50"
-                  : "bg-white/[0.02] border-white/[0.06]"
+                  ? "bg-transparent border-neutral-800/60 opacity-50"
+                  : "bg-black/30 border-neutral-800"
               }`}
             >
               <div className="flex items-center justify-between mb-1.5 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className={`font-semibold ${isSelected ? "text-indigo-200" : "text-white/70"}`}>
+                  <span className="font-mono tabular-nums text-neutral-500">P{i}</span>
+                  <span className={`font-medium ${isSelected ? "text-white" : "text-neutral-400"}`}>
                     {PHASE_LABELS[i]}
                   </span>
                   {!isValid && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      <Lock className="h-2.5 w-2.5" /> Masked
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] text-neutral-500 border border-neutral-800">
+                      <Lock className="h-2.5 w-2.5" /> Blocked
                     </span>
                   )}
                   {isSelected && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      <CheckCircle2 className="h-2.5 w-2.5" /> Max Action
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] text-indigo-300 border border-indigo-500/30 bg-indigo-500/10">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> AI pick
                     </span>
                   )}
                   {isCurrent && !isSelected && (
-                    <span className="text-[9px] text-white/40 font-mono">Active Phase</span>
+                    <span className="text-[11px] text-neutral-600">on road now</span>
                   )}
                 </div>
 
-                <div className="font-mono text-xs font-bold tabular-nums">
+                <div className="font-mono text-xs tabular-nums text-neutral-200">
                   {q.toFixed(3)}
                 </div>
               </div>
 
               {/* Progress bar */}
-              <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
                 <div
-                  className={`h-full rounded-full bg-gradient-to-r ${PHASE_COLORS[i] || "from-indigo-500 to-indigo-400"} transition-all duration-150`}
+                  className={`h-full rounded-full transition-all duration-150 ${isSelected ? "bg-indigo-400" : PHASE_BAR}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -128,18 +120,13 @@ export default function QValuePanel() {
       </div>
 
       {/* Footer Metrics */}
-      <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-white/40">Action Margin (ΔQ):</span>
-          <span className="font-mono font-bold text-indigo-300">+{valueMargin.toFixed(3)}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-white/40">Action Source:</span>
-          <span className="font-mono text-white/80">
-            {policy.is_exploring ? "ε-Greedy Exploration" : "Greedy Exploitation"}
-          </span>
-        </div>
+      <div className="rounded-md bg-black/30 border border-neutral-800 p-2.5 flex items-center justify-between text-xs text-neutral-500">
+        <span>
+          Lead over runner-up: <span className="font-mono tabular-nums text-neutral-200">+{valueMargin.toFixed(3)}</span>
+        </span>
+        <span>
+          {policy.is_exploring ? "Exploring randomly" : "Using best guess"}
+        </span>
       </div>
     </div>
   );

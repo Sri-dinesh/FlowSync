@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import { Eye, ShieldAlert, Video, Camera, Activity, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useResearchStore } from "@/store/researchStore";
 
 export const PerceptionHealthPanel = memo(function PerceptionHealthPanel() {
@@ -23,141 +23,113 @@ export const PerceptionHealthPanel = memo(function PerceptionHealthPanel() {
   const cvLatency = perception?.cv_latency_ms ?? 0;
   const trackConfidence = perception?.track_confidence_avg ?? 1.0;
 
+  const healthTone = isHealthy
+    ? "border-neutral-700 bg-white/[0.03] text-neutral-300"
+    : isDegraded
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+      : "border-red-500/30 bg-red-500/10 text-red-300";
+
+  const healthDot = isHealthy ? "bg-emerald-400" : isDegraded ? "bg-amber-400" : "bg-red-400";
+
   return (
-    <div className="bg-[#12151c]/90 border border-white/10 rounded-xl p-4 shadow-xl backdrop-blur-md flex flex-col gap-3">
+    <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Camera className="w-4 h-4 text-sky-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-            Perception & Sensor Health
-          </span>
-        </div>
+      <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+        <h3 className="text-sm font-medium text-white">
+          Cameras
+        </h3>
         <button
-          onClick={togglePerceptionDebug}
-          className={`px-2.5 py-1 rounded text-[10px] font-semibold tracking-wide border transition-all ${
+          onClick={() => togglePerceptionDebug()}
+          className={`rounded-md px-2.5 py-1 text-[11px] font-medium border transition-colors ${
             showPerceptionDebug
-              ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/10"
-              : "bg-white/5 text-slate-400 border-white/10 hover:text-white"
+              ? "bg-white/10 text-white border-white/20"
+              : "bg-transparent text-neutral-500 border-neutral-800 hover:text-white hover:border-neutral-700"
           }`}
-          title="Toggle oracle debug overlay (Detected vs Ground-truth ghosts)"
+          title="Show missed vs detected vehicles in the 3D view"
         >
-          {showPerceptionDebug ? "Oracle Overlay: ON" : "Oracle Overlay: OFF"}
+          Overlay {showPerceptionDebug ? "on" : "off"}
         </button>
       </div>
 
       {/* Sensor Status Indicator */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="flex items-center gap-2.5 bg-black/40 border border-white/5 rounded-lg p-2.5">
-          <div
-            className={`w-3 h-3 rounded-full flex items-center justify-center animate-pulse ${
-              isHealthy
-                ? "bg-emerald-500/20 text-emerald-400"
-                : isDegraded
-                ? "bg-amber-500/20 text-amber-400"
-                : "bg-rose-500/20 text-rose-400"
-            }`}
-          >
-            <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                isHealthy ? "bg-emerald-400" : isDegraded ? "bg-amber-400" : "bg-rose-400"
-              }`}
-            />
-          </div>
+        <div className={`flex items-center gap-2.5 rounded-md border p-2.5 ${healthTone}`}>
+          <span className={`h-2 w-2 rounded-full ${healthDot} ${!isOffline ? "animate-pulse" : ""}`} />
           <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400">Stream Status</div>
-            <div
-              className={`text-xs font-bold font-mono ${
-                isHealthy ? "text-emerald-400" : isDegraded ? "text-amber-400" : "text-rose-400"
-              }`}
-            >
-              {perception?.camera_health ?? "ONLINE (NOMINAL)"}
+            <div className="text-[11px] text-neutral-500">Cameras</div>
+            <div className="text-xs font-medium">
+              {isHealthy ? "Healthy" : isDegraded ? "Degraded" : isOccluded ? "Occluded" : isOffline ? "Offline" : (perception?.camera_health ?? "Healthy")}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 bg-black/40 border border-white/5 rounded-lg p-2.5">
-          <Activity className="w-3.5 h-3.5 text-sky-400" />
+        <div className="flex items-center gap-2.5 bg-black/30 border border-neutral-800 rounded-md p-2.5">
           <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400">Vision Latency</div>
-            <div className="text-xs font-bold font-mono text-slate-200">
-              {cvLatency > 0 ? `${cvLatency.toFixed(1)} ms` : "< 8.5 ms"}
+            <div className="text-[11px] text-neutral-500">Vision latency</div>
+            <div className="text-xs font-medium font-mono tabular-nums text-neutral-200">
+              {cvLatency > 0 ? `${cvLatency.toFixed(1)} ms` : "—"}
             </div>
           </div>
         </div>
       </div>
 
       {/* Detection Counts vs Oracle Truth */}
-      <div className="bg-black/30 rounded-lg p-3 border border-white/5">
-        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-2">
-          <span>Observed Vehicles (Policy Input):</span>
-          <span className="text-emerald-400 font-bold text-xs">{detected}</span>
+      <div className="bg-black/30 rounded-md p-3 border border-neutral-800">
+        <div className="flex items-center justify-between text-xs text-neutral-400">
+          <span>Cars the AI sees</span>
+          <span className="text-sm font-semibold font-mono tabular-nums text-white">{detected}</span>
         </div>
 
         {showPerceptionDebug ? (
-          <div className="space-y-1.5 pt-2 border-t border-white/10 font-mono text-[10px]">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="flex items-center gap-1.5 text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                Ground Truth Total:
-              </span>
-              <span className="text-slate-200 font-bold">{groundTruth}</span>
-            </div>
-            <div className="flex items-center justify-between text-rose-400">
+          <div className="space-y-1.5 pt-2 mt-2 border-t border-neutral-800 font-mono text-[11px] tabular-nums">
+            <div className="flex items-center justify-between text-neutral-400">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-500/80" />
-                Missed Detections (Red):
+                <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
+                Actually on road
               </span>
-              <span className="font-bold">{missed}</span>
+              <span className="text-neutral-200 font-medium">{groundTruth}</span>
             </div>
-            <div className="flex items-center justify-between text-amber-400">
+            <div className="flex items-center justify-between text-neutral-400">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400/80" />
-                False Positives (Yellow):
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                Missed by cameras
               </span>
-              <span className="font-bold">{falsePositives}</span>
+              <span className="font-medium text-red-300">{missed}</span>
             </div>
-            <div className="flex items-center justify-between text-indigo-300">
+            <div className="flex items-center justify-between text-neutral-400">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-indigo-400/80" />
-                Occluded / Border (Blue):
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                Ghost detections
               </span>
-              <span className="font-bold">{occluded}</span>
+              <span className="font-medium text-amber-300">{falsePositives}</span>
+            </div>
+            <div className="flex items-center justify-between text-neutral-400">
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                Occluded
+              </span>
+              <span className="font-medium text-indigo-300">{occluded}</span>
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 pt-2 border-t border-white/5 text-[10px] text-slate-500">
-            <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
-            <span>Enable Oracle Overlay above to inspect missed/false tracks.</span>
+          <div className="flex items-center gap-2 pt-2 mt-2 border-t border-neutral-800 text-[11px] text-neutral-500">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Turn the overlay on to compare against ground truth.</span>
           </div>
         )}
       </div>
 
-      {/* Multi-cue Perception Quality Breakdown */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-[10px] font-mono">
-          <span className="text-slate-400">Mean Track Confidence:</span>
-          <span
-            className={`font-bold ${
-              trackConfidence >= 0.8
-                ? "text-emerald-400"
-                : trackConfidence >= 0.6
-                ? "text-amber-400"
-                : "text-rose-400"
-            }`}
-          >
-            {(trackConfidence * 100).toFixed(1)}%
+      {/* Track confidence */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-neutral-500">Track confidence</span>
+          <span className="font-mono tabular-nums font-medium text-neutral-200">
+            {(trackConfidence * 100).toFixed(0)}%
           </span>
         </div>
-        <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-300 ${
-              trackConfidence >= 0.8
-                ? "bg-emerald-500"
-                : trackConfidence >= 0.6
-                ? "bg-amber-500"
-                : "bg-rose-500"
-            }`}
+            className="h-full rounded-full bg-neutral-300 transition-all duration-300"
             style={{ width: `${Math.min(100, Math.max(0, trackConfidence * 100))}%` }}
           />
         </div>

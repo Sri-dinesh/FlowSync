@@ -86,26 +86,23 @@ Fixed-Time & 42.1 & 66.3 & 710 & 0 \\\\
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-      <div className="bg-[#0f131c] border border-white/10 rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4">
+      <div className="bg-neutral-950 border border-neutral-800 rounded-lg max-w-2xl w-full p-6 flex flex-col gap-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/10">
-          <div className="flex items-center gap-2.5">
-            <Download className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base font-bold text-white font-mono">Export Research Artifacts</h2>
-          </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10">
-            <X className="w-5 h-5" />
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+          <h2 className="text-sm font-medium text-white">Export tables</h2>
+          <button onClick={onClose} className="p-1.5 rounded-md text-neutral-500 hover:text-white hover:bg-white/5">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex items-center gap-2 font-mono text-xs">
+        <div className="flex items-center gap-1.5 text-xs">
           <button
             onClick={() => setActiveTab("json")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-colors ${
               activeTab === "json"
-                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500/50"
-                : "bg-white/5 text-slate-400 border-white/5 hover:text-white"
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-transparent text-neutral-500 border-neutral-800 hover:text-white"
             }`}
           >
             <Code2 className="w-3.5 h-3.5" />
@@ -113,10 +110,10 @@ Fixed-Time & 42.1 & 66.3 & 710 & 0 \\\\
           </button>
           <button
             onClick={() => setActiveTab("csv")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-colors ${
               activeTab === "csv"
-                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500/50"
-                : "bg-white/5 text-slate-400 border-white/5 hover:text-white"
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-transparent text-neutral-500 border-neutral-800 hover:text-white"
             }`}
           >
             <Table className="w-3.5 h-3.5" />
@@ -124,37 +121,37 @@ Fixed-Time & 42.1 & 66.3 & 710 & 0 \\\\
           </button>
           <button
             onClick={() => setActiveTab("latex")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border transition-colors ${
               activeTab === "latex"
-                ? "bg-indigo-600/30 text-indigo-300 border-indigo-500/50"
-                : "bg-white/5 text-slate-400 border-white/5 hover:text-white"
+                ? "bg-white/10 text-white border-white/20"
+                : "bg-transparent text-neutral-500 border-neutral-800 hover:text-white"
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>LaTeX Table</span>
+            <span>LaTeX table</span>
           </button>
         </div>
 
         {/* Code Content Preview */}
-        <pre className="p-4 bg-black/60 border border-white/10 rounded-xl text-xs font-mono text-slate-300 max-h-64 overflow-auto">
+        <pre className="p-4 bg-black/60 border border-neutral-800 rounded-md text-xs font-mono text-slate-300 max-h-64 overflow-auto">
           {currentContent}
         </pre>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-white/10">
+        <div className="flex items-center justify-between pt-3 border-t border-neutral-800">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 rounded-xl text-xs font-mono transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-white/5 border border-neutral-800 text-neutral-300 rounded-md text-xs transition-colors"
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? "Copied" : "Copy to Clipboard"}</span>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? "Copied" : "Copy"}</span>
           </button>
           <button
             onClick={handleDownload}
-            className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-mono font-bold tracking-wider uppercase transition-all shadow-lg shadow-indigo-600/30"
+            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-medium transition-colors"
           >
-            <Download className="w-4 h-4" />
-            <span>Download File</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Download</span>
           </button>
         </div>
       </div>

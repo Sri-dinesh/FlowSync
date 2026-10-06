@@ -24,7 +24,7 @@ export const ResearchCanvas = memo(function ResearchCanvas({
   const isPerformance = quality === "performance";
 
   return (
-    <div className="relative w-full h-full min-h-[380px] rounded-xl overflow-hidden border border-white/10 bg-[#0d111a]">
+    <div className="relative w-full h-full min-h-[380px] rounded-md overflow-hidden border border-neutral-800 bg-[#0d111a]">
       {/* Top Overlay Controls */}
       <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
         <button

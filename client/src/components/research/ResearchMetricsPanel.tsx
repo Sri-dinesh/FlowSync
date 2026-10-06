@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { Clock, TrendingUp, AlertOctagon, CheckCircle2, BarChart2, Activity } from "lucide-react";
 import { useResearchStore } from "@/store/researchStore";
 
 interface SparklineProps {
@@ -65,106 +64,97 @@ export default function ResearchMetricsPanel() {
 
   if (!metrics) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl text-center text-xs text-white/30 font-mono">
-        Awaiting authoritative research metrics...
+      <div className="rounded-lg border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-500">
+        Waiting for metrics — run a simulation to see delay, queues and throughput.
       </div>
     );
   }
 
   const cards = [
     {
-      label: "Mean Delay",
+      label: "Avg delay",
       value: `${metrics.mean_delay_s.toFixed(2)}s`,
-      sub: "Average per-vehicle delay",
+      sub: "per vehicle",
       spark: delayHistory,
-      color: "#6366f1",
     },
     {
-      label: "P95 Tail Delay",
+      label: "Worst 5%",
       value: `${metrics.p95_delay_s.toFixed(2)}s`,
-      sub: "95th percentile delay",
+      sub: "p95 wait",
       spark: delayHistory,
-      color: "#ec4899",
     },
     {
-      label: "Queue Area",
-      value: `${metrics.queue_area_veh_s.toFixed(1)}`,
-      sub: "veh·s cumulative backlog",
+      label: "Queue area",
+      value: `${metrics.queue_area_veh_s.toFixed(0)}`,
+      sub: "veh·s total",
       spark: queueHistory,
-      color: "#f59e0b",
     },
     {
-      label: "Peak Queue",
-      value: `${metrics.max_queue} veh`,
-      sub: "Instantaneous max backlog",
+      label: "Peak queue",
+      value: `${metrics.max_queue}`,
+      sub: "vehicles",
       spark: queueHistory,
-      color: "#06b6d4",
     },
     {
-      label: "Throughput",
+      label: "Cleared",
       value: `${metrics.throughput}`,
-      sub: "Total vehicles cleared",
+      sub: "vehicles",
       spark: throughputHistory,
-      color: "#10b981",
     },
     {
-      label: "Service Rate",
-      value: `${(metrics.service_rate * 100).toFixed(1)}%`,
-      sub: "Cleared / Total Demand",
+      label: "Served",
+      value: `${(metrics.service_rate * 100).toFixed(0)}%`,
+      sub: "of demand",
       spark: [],
-      color: "#8b5cf6",
     },
     {
-      label: "Starvation Events",
+      label: "Starved",
       value: `${metrics.starvation_events}`,
-      sub: "Wait time > 45.0s",
+      sub: "wait > 45s",
       spark: [],
-      color: metrics.starvation_events > 0 ? "#f43f5e" : "#10b981",
+      alert: metrics.starvation_events > 0,
     },
     {
-      label: "Spillback Incidents",
+      label: "Gridlocks",
       value: `${metrics.spillback_incidents}`,
-      sub: "Downstream gridlock blocks",
+      sub: "spillbacks",
       spark: [],
-      color: metrics.spillback_incidents > 0 ? "#f43f5e" : "#10b981",
+      alert: metrics.spillback_incidents > 0,
     },
   ];
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-5 backdrop-blur-xl shadow-xl flex flex-col gap-4 text-white">
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex flex-col gap-3 text-white">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-        <div className="flex items-center gap-2">
-          <BarChart2 className="h-4 w-4 text-indigo-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-            Authoritative Research Metrics
-          </h3>
-        </div>
-        <div className="text-[10px] font-mono text-white/40">
-          Backend Source of Truth · Zero Client Derivations
-        </div>
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <h3 className="text-sm font-medium text-white">
+          Results
+        </h3>
+        <span className="text-[11px] text-neutral-600">
+          Live from backend
+        </span>
       </div>
 
       {/* Grid of 8 Research Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {cards.map((card) => (
           <div
             key={card.label}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 flex flex-col justify-between gap-2"
+            className="rounded-md border border-neutral-800 bg-black/30 p-2.5 flex flex-col justify-between gap-1.5"
           >
             <div>
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+              <span className="text-[11px] font-medium text-neutral-500">
                 {card.label}
               </span>
-              <div className="font-mono text-xl font-bold text-white mt-1 tabular-nums">
+              <div className={`font-mono text-lg font-semibold mt-0.5 tabular-nums ${"alert" in card && card.alert ? "text-amber-300" : "text-white"}`}>
                 {card.value}
               </div>
-              <p className="text-[10px] text-white/40 mt-0.5">{card.sub}</p>
+              <p className="text-[11px] text-neutral-600">{card.sub}</p>
             </div>
 
             {card.spark.length > 0 && (
-              <div className="pt-1">
-                <MiniSparkline data={card.spark} color={card.color} />
+              <div className="pt-0.5">
+                <MiniSparkline data={card.spark} color="#71717a" />
               </div>
             )}
           </div>

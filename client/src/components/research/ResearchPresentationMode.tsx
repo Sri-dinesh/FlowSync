@@ -29,7 +29,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
   return (
     <div className="fixed inset-0 z-50 bg-[#07090e] text-white flex flex-col p-6 overflow-y-auto">
       {/* Top Presentation Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">
+      <div className="flex items-center justify-between pb-4 border-b border-neutral-800 mb-6">
         <div className="flex items-center gap-4">
           <div className="px-3 py-1 bg-indigo-600 text-white font-mono text-xs font-bold rounded-lg tracking-wider uppercase">
             Viva & Conference Presentation Mode
@@ -59,7 +59,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 font-mono">
         {/* Authority / Fallback Status */}
         <div
-          className={`p-5 rounded-2xl border flex items-center justify-between shadow-2xl transition-all ${
+          className={`p-5 rounded-lg border flex items-center justify-between transition-all ${
             isFallback
               ? "bg-amber-950/40 border-amber-500/50 text-amber-300 shadow-amber-950/30 animate-pulse"
               : "bg-emerald-950/30 border-emerald-500/40 text-emerald-300 shadow-emerald-950/20"
@@ -75,7 +75,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
         </div>
 
         {/* Composite Uncertainty */}
-        <div className="p-5 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-between shadow-2xl">
+        <div className="p-5 rounded-lg border border-neutral-800 bg-black/40 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase text-slate-400">Composite Uncertainty U(st)</div>
             <div
@@ -90,7 +90,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
         </div>
 
         {/* Mean Delay */}
-        <div className="p-5 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-between shadow-2xl">
+        <div className="p-5 rounded-lg border border-neutral-800 bg-black/40 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase text-slate-400">Mean Delay / Vehicle</div>
             <div className="text-2xl font-black text-white mt-1">{delayMean.toFixed(1)}s</div>
@@ -99,7 +99,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
         </div>
 
         {/* Safety Violations */}
-        <div className="p-5 rounded-2xl border border-white/10 bg-black/40 flex items-center justify-between shadow-2xl">
+        <div className="p-5 rounded-lg border border-neutral-800 bg-black/40 flex items-center justify-between">
           <div>
             <div className="text-xs uppercase text-slate-400">Physical FSM Violations</div>
             <div className="text-2xl font-black text-emerald-400 mt-1">0 (PROVABLY SAFE)</div>
