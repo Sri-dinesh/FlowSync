@@ -43,7 +43,12 @@ export type NoisePresetKey =
   | "miss_30"
   | "miss_40"
   | "burst_occlusion"
+  | "false_positives"
+  | "latency_250ms"
   | "latency_500ms"
+  | "latency_1000ms"
+  | "combined_moderate"
+  | "combined_severe"
   | "combined_stress";
 
 export interface NoisePreset {

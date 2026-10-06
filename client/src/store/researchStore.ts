@@ -7,7 +7,7 @@ import type {
   ExperimentSummary,
 } from "@/types/research";
 
-export type RunStatus = "idle" | "running" | "paused" | "completed" | "error" | "stopped";
+export type RunStatus = "idle" | "starting" | "running" | "paused" | "completed" | "error" | "stopped";
 
 export interface ActiveNoise {
   id: string;
@@ -33,6 +33,9 @@ interface ResearchState {
   activeNoise: ActiveNoise;
   speedMultiplier: number;
   experimentId: string;
+  
+  // Connection State
+  isWsConnected: boolean;
   
   // Execution State
   runStatus: RunStatus;
@@ -87,25 +90,26 @@ interface ResearchState {
   setReplayIndex: (index: number) => void;
   setIsReplaying: (val: boolean) => void;
   setReplayState: (patch: Partial<ReplayState>) => void;
+  setIsWsConnected: (connected: boolean) => void;
   resetRun: () => void;
 }
 
 const MAX_HISTORY = 300;
 
 const defaultScenario: ResearchScenario = {
-  id: "canonical_4way_arterial",
-  scenario_id: "canonical_4way_arterial",
-  name: "Canonical 4-Way Arterial",
+  id: "test_clean_balanced_01",
+  scenario_id: "test_clean_balanced_01",
+  name: "Test: Clean Balanced Arterial",
   split: "test",
-  scenario_hash: "sha256:canonical_arterial_hash",
-  duration_steps: 3600,
-  duration_seconds: 360,
-  yaml_file: "canonical_4way_arterial.yaml",
+  scenario_hash: "sha256:test_clean_balanced_01",
+  duration_steps: 1200,
+  duration_seconds: 120,
+  yaml_file: "test_clean_balanced_01.yaml",
   exists: true,
-  traffic_density: "high",
+  traffic_density: "medium",
   red_duration: 3.0,
   base_lambda: 0.4,
-  description: "Standard balanced arterial intersection with protected turning phases",
+  description: "Balanced 4-way test arterial with nominal demand (frozen IEEE test split)",
 };
 
 export const useResearchStore = create<ResearchState>((set) => ({
@@ -123,6 +127,7 @@ export const useResearchStore = create<ResearchState>((set) => ({
   speedMultiplier: 1.0,
   experimentId: "exp_live_active",
 
+  isWsConnected: false,
   runStatus: "idle",
   errorMessage: null,
   currentFrame: null,
@@ -179,10 +184,11 @@ export const useResearchStore = create<ResearchState>((set) => ({
         nextHistory.length > MAX_HISTORY
           ? nextHistory.slice(-MAX_HISTORY)
           : nextHistory;
+      const shouldPromote = state.runStatus === "idle" || state.runStatus === "starting";
       return {
         currentFrame: frame,
         history: trimmed,
-        runStatus: state.runStatus === "idle" ? "running" : state.runStatus,
+        runStatus: shouldPromote ? "running" : state.runStatus,
       };
     }),
 
@@ -193,10 +199,11 @@ export const useResearchStore = create<ResearchState>((set) => ({
         nextPaired.length > MAX_HISTORY
           ? nextPaired.slice(-MAX_HISTORY)
           : nextPaired;
+      const shouldPromote = state.runStatus === "idle" || state.runStatus === "starting";
       return {
         pairedFrame: frame,
         pairedHistory: trimmed,
-        runStatus: state.runStatus === "idle" ? "running" : state.runStatus,
+        runStatus: shouldPromote ? "running" : state.runStatus,
       };
     }),
 
@@ -259,6 +266,8 @@ export const useResearchStore = create<ResearchState>((set) => ({
     set((state) => ({
       replayState: { ...state.replayState, ...patch },
     })),
+
+  setIsWsConnected: (connected) => set({ isWsConnected: connected }),
 
   resetRun: () =>
     set({
