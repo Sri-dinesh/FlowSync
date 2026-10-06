@@ -3,19 +3,14 @@
 import React, { memo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  GitCompare,
   Play,
   Pause,
   RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
   Minus,
   ArrowDown,
   ArrowUp,
   Layers,
   Sparkles,
-  Shield,
-  Activity,
 } from "lucide-react";
 import { useResearchSocket } from "@/hooks/useResearchSocket";
 import { useResearchStore } from "@/store/researchStore";
@@ -83,7 +78,7 @@ function toTelemetryFrame(ctrl: PairedControllerState | undefined, step: number,
 }
 
 export const ControllerComparison = memo(function ControllerComparison() {
-  const { isConnected, sendCommand } = useResearchSocket();
+  const { isConnected, startPairedComparison, pause, resume, stop } = useResearchSocket();
   const pairedFrame = useResearchStore((s) => s.pairedFrame);
   const activeScenario = useResearchStore((s) => s.activeScenario);
   const activeSeed = useResearchStore((s) => s.activeSeed);
@@ -91,49 +86,40 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const runStatus = useResearchStore((s) => s.runStatus);
   const setRunStatus = useResearchStore((s) => s.setRunStatus);
 
-  const [controllerA, setControllerA] = useState("d3qn_baseline");
+  const [controllerA, setControllerA] = useState("d3qn");
   const [controllerB, setControllerB] = useState("flowsync_uq");
 
   const ctrlA = pairedFrame?.controller_a;
   const ctrlB = pairedFrame?.controller_b;
   const deltas = pairedFrame?.deltas;
+  const hasPairedData = !!pairedFrame;
 
   const isRunning = runStatus === "running";
+  const isStarting = runStatus === "starting";
   const step = pairedFrame?.step ?? 0;
   const simTime = pairedFrame?.sim_time_s ?? 0;
-  const traceHash = pairedFrame?.trace_hash ?? `crn_seed_${activeSeed}_${activeScenario.id}`;
+  const traceHash = pairedFrame?.trace_hash ?? `crn_seed_${activeSeed}_${activeScenario?.id || "arterial"}`;
 
   const frameA = toTelemetryFrame(ctrlA, step, simTime);
   const frameB = toTelemetryFrame(ctrlB, step, simTime);
 
   const handleStartComparison = () => {
-    setRunStatus("running");
-    sendCommand({
-      command: "start_paired_comparison",
-      scenario_id: activeScenario.id,
-      seed: activeSeed,
-      controller_a: controllerA,
-      controller_b: controllerB,
-      noise_type: activeNoise.type,
-      noise_intensity: activeNoise.intensity,
-      num_steps: activeScenario.duration_steps || 3600,
-      speed: 1.0,
-    });
+    const scId = activeScenario?.scenario_id || activeScenario?.id || "test_clean_balanced_01";
+    // activeNoise.id is synced to backend FAULT_PRESETS keys by the compare page pills.
+    const presetKey = (activeNoise?.id || "miss_30") as any;
+    startPairedComparison(scId, controllerA, controllerB, activeSeed, presetKey);
   };
 
   const handlePauseResume = () => {
     if (isRunning) {
-      setRunStatus("paused");
-      sendCommand({ command: "pause" });
+      pause();
     } else {
-      setRunStatus("running");
-      sendCommand({ command: "resume" });
+      resume();
     }
   };
 
   const handleStop = () => {
-    setRunStatus("stopped");
-    sendCommand({ command: "stop" });
+    stop();
   };
 
   // Deltas evaluation: delay_delta = delay_b - delay_a
@@ -150,55 +136,96 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const isDelayTie = Math.abs(delayDelta) <= 0.2;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Synchronized Shared Experiment Header */}
-      <div className="bg-[#12151c]/90 border border-white/10 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <GitCompare className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base font-bold text-white tracking-wide">
-              Synchronized Paired CRN Comparison
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-medium text-white">
+              Paired comparison
             </h2>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              Identical Trace Lockstep
+            <span className="rounded-full border border-neutral-700 bg-white/[0.03] px-2 py-0.5 text-[11px] text-neutral-400">
+              Identical traffic
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs font-mono text-slate-400">
-            <span>Scenario: <strong className="text-slate-200">{activeScenario.id}</strong></span>
-            <span>Seed: <strong className="text-amber-400">{activeSeed}</strong></span>
-            <span>Noise: <strong className="text-sky-300">{activeNoise.name} ({activeNoise.intensity * 100}%)</strong></span>
-            <span className="truncate max-w-[280px]">Trace Hash: <strong className="text-purple-300">{traceHash}</strong></span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-neutral-500">
+            <span>Scenario: <strong className="text-neutral-200 font-medium">{activeScenario?.scenario_id ?? activeScenario?.id}</strong></span>
+            <span>Seed: <strong className="text-neutral-200 font-medium font-mono">{activeSeed}</strong></span>
+            <span>Fault: <strong className="text-neutral-200 font-medium">{activeNoise.name}</strong></span>
+            <span className="truncate max-w-[280px] font-mono">Trace: <strong className="text-neutral-300">{traceHash}</strong></span>
+          </div>
+          {/* Controller pickers */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+            <label className="flex items-center gap-1.5 text-neutral-500">
+              <span className="text-[11px]">Left (A)</span>
+              <select
+                value={controllerA}
+                onChange={(e) => setControllerA(e.target.value)}
+                disabled={isRunning || isStarting}
+                className="rounded-md border border-neutral-800 bg-black/30 px-2 py-1 text-xs text-white focus:outline-none focus:border-neutral-600"
+              >
+                {["d3qn", "dqn", "flowsync_uq", "max_pressure", "greedy", "actuated", "fixed"].map((c) => (
+                  <option key={c} value={c} className="bg-neutral-900">{c}</option>
+                ))}
+              </select>
+            </label>
+            <span className="text-neutral-600 text-[11px]">vs</span>
+            <label className="flex items-center gap-1.5 text-neutral-500">
+              <span className="text-[11px]">Right (B)</span>
+              <select
+                value={controllerB}
+                onChange={(e) => setControllerB(e.target.value)}
+                disabled={isRunning || isStarting}
+                className="rounded-md border border-neutral-800 bg-black/30 px-2 py-1 text-xs text-white focus:outline-none focus:border-neutral-600"
+              >
+                {["flowsync_uq", "d3qn", "dqn", "max_pressure", "greedy", "actuated", "fixed"].map((c) => (
+                  <option key={c} value={c} className="bg-neutral-900">{c}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
         {/* Global Lockstep Controls */}
         <div className="flex items-center gap-3">
-          <div className="text-right font-mono pr-2 border-r border-white/10 hidden sm:block">
-            <div className="text-[10px] text-slate-500 uppercase">Sim Time</div>
-            <div className="text-sm font-bold text-white">{simTime.toFixed(1)}s ({step} st)</div>
+          <div className="text-right pr-3 border-r border-neutral-800 hidden sm:block">
+            <div className="text-[11px] text-neutral-500">Sim time</div>
+            <div className="text-sm font-semibold font-mono text-white">{simTime.toFixed(1)}s <span className="text-neutral-500 font-normal">· {step} steps</span></div>
           </div>
 
           {!isRunning && runStatus !== "paused" ? (
-            <button
-              onClick={handleStartComparison}
-              disabled={!isConnected}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold tracking-wider uppercase transition-all shadow-lg shadow-indigo-600/30"
-            >
-              <Play className="w-4 h-4 fill-white" />
-              <span>Launch Paired Run</span>
-            </button>
+            <div className="flex flex-col items-end gap-1.5">
+              <button
+                onClick={handleStartComparison}
+                disabled={isStarting}
+                title={
+                  isConnected
+                    ? "Start both controllers on identical traffic"
+                    : "Backend offline — the paired run will queue and start on reconnect"
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white rounded-md text-xs font-medium transition-colors"
+              >
+                <Play className="w-3.5 h-3.5 fill-white" />
+                <span>{isStarting ? "Connecting…" : "Launch paired run"}</span>
+              </button>
+              {!isConnected && !isStarting && (
+                <span className="text-[11px] text-amber-300/90">
+                  Offline — run queues and starts on reconnect
+                </span>
+              )}
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePauseResume}
-                className="flex items-center gap-1.5 px-4 py-2 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-200 rounded-xl text-xs font-semibold tracking-wide transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-white/5 border border-neutral-700 text-neutral-300 rounded-md text-xs font-medium transition-colors"
               >
                 {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{isRunning ? "Pause" : "Resume"}</span>
               </button>
               <button
                 onClick={handleStop}
-                className="flex items-center gap-1.5 px-4 py-2 bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/40 text-rose-200 rounded-xl text-xs font-semibold tracking-wide transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-white/5 border border-neutral-700 text-neutral-300 hover:text-white rounded-md text-xs font-medium transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Stop</span>
@@ -208,183 +235,169 @@ export const ControllerComparison = memo(function ControllerComparison() {
         </div>
       </div>
 
-      {/* Delta Verdict Banner (Transparent & Unbiased) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Result deltas — neutral cards, color only on values */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Mean Delay Delta */}
-        <div
-          className={`border rounded-xl p-4 flex items-center justify-between shadow-lg transition-all ${
-            flowSyncWinsDelay
-              ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
-              : baselineWinsDelay
-              ? "bg-rose-950/20 border-rose-500/30 text-rose-300"
-              : "bg-slate-900/60 border-white/10 text-slate-300"
-          }`}
-        >
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-              Delay Advantage (FlowSync-UQ vs D3QN)
+            <div className="text-[11px] font-medium text-neutral-500">
+              Delay delta · {controllerB} vs {controllerA}
             </div>
-            <div className="text-xl font-bold font-mono flex items-center gap-2 mt-1">
+            <div className="text-xl font-semibold font-mono tabular-nums flex items-center gap-2 mt-1 text-white">
               <span>{delayDelta > 0 ? `+${delayDelta.toFixed(2)}s` : `${delayDelta.toFixed(2)}s`}</span>
-              {flowSyncWinsDelay && <span className="text-xs bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">FlowSync Leads (-{Math.abs(delayDelta).toFixed(1)}s)</span>}
-              {baselineWinsDelay && <span className="text-xs bg-rose-500/20 px-2 py-0.5 rounded border border-rose-500/30">D3QN Baseline Leads (+{delayDelta.toFixed(1)}s)</span>}
-              {isDelayTie && <span className="text-xs bg-slate-500/20 px-2 py-0.5 rounded border border-slate-500/30">Parity / Tie</span>}
+              {flowSyncWinsDelay && <span className="text-[11px] font-medium text-emerald-300">B leads</span>}
+              {baselineWinsDelay && <span className="text-[11px] font-medium text-red-300">A leads</span>}
+              {isDelayTie && <span className="text-[11px] font-medium text-neutral-400">Tie</span>}
             </div>
           </div>
-          <div className="p-2.5 rounded-full bg-white/5">
-            {flowSyncWinsDelay ? (
-              <ArrowDown className="w-5 h-5 text-emerald-400" />
-            ) : baselineWinsDelay ? (
-              <ArrowUp className="w-5 h-5 text-rose-400" />
-            ) : (
-              <Minus className="w-5 h-5 text-slate-400" />
-            )}
-          </div>
+          {flowSyncWinsDelay ? (
+            <ArrowDown className="w-4 h-4 text-emerald-400" />
+          ) : baselineWinsDelay ? (
+            <ArrowUp className="w-4 h-4 text-red-400" />
+          ) : (
+            <Minus className="w-4 h-4 text-neutral-500" />
+          )}
         </div>
 
         {/* Queue Area Delta */}
-        <div
-          className={`border rounded-xl p-4 flex items-center justify-between shadow-lg transition-all ${
-            queueDelta < -5
-              ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
-              : queueDelta > 5
-              ? "bg-rose-950/20 border-rose-500/30 text-rose-300"
-              : "bg-slate-900/60 border-white/10 text-slate-300"
-          }`}
-        >
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-              Queue Area Delta (veh·s)
+            <div className="text-[11px] font-medium text-neutral-500">
+              Queue area delta
             </div>
-            <div className="text-xl font-bold font-mono flex items-center gap-2 mt-1">
+            <div className="text-xl font-semibold font-mono tabular-nums flex items-center gap-2 mt-1 text-white">
               <span>{queueDelta > 0 ? `+${queueDelta.toFixed(1)}` : queueDelta.toFixed(1)}</span>
-              <span className="text-xs text-slate-400">veh·s</span>
+              <span className="text-[11px] font-normal text-neutral-500">veh·s</span>
             </div>
           </div>
-          <div className="p-2.5 rounded-full bg-white/5">
-            <Layers className="w-5 h-5 text-indigo-400" />
-          </div>
+          <Layers className="w-4 h-4 text-neutral-500" />
         </div>
 
         {/* Throughput Delta */}
-        <div
-          className={`border rounded-xl p-4 flex items-center justify-between shadow-lg transition-all ${
-            tpDelta > 0
-              ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-300"
-              : tpDelta < 0
-              ? "bg-rose-950/20 border-rose-500/30 text-rose-300"
-              : "bg-slate-900/60 border-white/10 text-slate-300"
-          }`}
-        >
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-              Throughput Advantage (Vehicles Cleared)
+            <div className="text-[11px] font-medium text-neutral-500">
+              Throughput delta
             </div>
-            <div className="text-xl font-bold font-mono flex items-center gap-2 mt-1">
+            <div className="text-xl font-semibold font-mono tabular-nums flex items-center gap-2 mt-1 text-white">
               <span>{tpDelta > 0 ? `+${tpDelta}` : `${tpDelta}`}</span>
-              <span className="text-xs text-slate-400">vehicles</span>
+              <span className="text-[11px] font-normal text-neutral-500">vehicles</span>
             </div>
           </div>
-          <div className="p-2.5 rounded-full bg-white/5">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-          </div>
+          <Sparkles className="w-4 h-4 text-neutral-500" />
         </div>
       </div>
 
-      {/* Synchronized Dual Scenes (Side-by-Side 3D Canvases) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Side: Controller A (D3QN Baseline) */}
-        <div className="bg-[#12151c]/90 border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+      {/* Side-by-side 3D views */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left: Controller A */}
+        <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
             <div>
-              <span className="text-[10px] font-mono uppercase text-slate-400">Baseline Controller</span>
-              <h3 className="text-sm font-bold text-slate-200">
-                {ctrlA?.name ?? "D3QN (Canonical Baseline)"}
+              <div className="text-[11px] text-neutral-500">Controller A</div>
+              <h3 className="text-sm font-medium text-white font-mono">
+                {ctrlA?.name ?? controllerA}
               </h3>
             </div>
-            <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Unshielded Policy
+            <span className="rounded-full border border-neutral-700 bg-white/[0.03] px-2 py-0.5 text-[11px] text-neutral-400">
+              Baseline
             </span>
           </div>
 
-          <div className="h-[420px] rounded-xl overflow-hidden relative">
+          <div className="h-[420px] rounded-md overflow-hidden relative">
             <ResearchCanvas frameOverride={frameA} label="D3QN Baseline" quality="performance" />
+            {!hasPairedData && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 p-6 pointer-events-none">
+                <p className="text-xs text-white/70 text-center max-w-xs leading-relaxed bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3">
+                  Left view shows <span className="font-mono text-white">{controllerA}</span> once you press{" "}
+                  <span className="font-semibold text-white">Launch Paired Run</span>.
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Controller A Key Telemetry */}
-          <div className="grid grid-cols-3 gap-2 text-center font-mono">
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Mean Delay</div>
-              <div className="text-base font-bold text-white mt-1">
+          {/* Controller A telemetry */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Mean delay</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
                 {ctrlA?.mean_delay !== undefined ? `${ctrlA.mean_delay.toFixed(1)}s` : "-"}
               </div>
             </div>
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Queue Area</div>
-              <div className="text-base font-bold text-white mt-1">
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Queue area</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
                 {ctrlA?.queue_area !== undefined ? ctrlA.queue_area.toFixed(0) : "-"}
               </div>
             </div>
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Throughput</div>
-              <div className="text-base font-bold text-white mt-1">
-                {ctrlA?.throughput !== undefined ? `${ctrlA.throughput} veh` : "-"}
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Throughput</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
+                {ctrlA?.throughput !== undefined ? `${ctrlA.throughput}` : "-"}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Controller B (FlowSync-UQ) */}
-        <div className="bg-[#12151c]/90 border border-indigo-500/30 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 shadow-indigo-950/20">
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+        {/* Right: Controller B */}
+        <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
             <div>
-              <span className="text-[10px] font-mono uppercase text-indigo-400">Research System</span>
-              <h3 className="text-sm font-bold text-indigo-200">
-                {ctrlB?.name ?? "FlowSync-UQ (Ours)"}
+              <div className="text-[11px] text-neutral-500">Controller B</div>
+              <h3 className="text-sm font-medium text-white font-mono">
+                {ctrlB?.name ?? controllerB}
               </h3>
             </div>
             <div className="flex items-center gap-2">
               {ctrlB?.fallback_active ? (
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
-                  FALLBACK ACTIVE
+                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                  Fallback active
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  D3QN ACTIVE
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                  Nominal
                 </span>
               )}
             </div>
           </div>
 
-          <div className="h-[420px] rounded-xl overflow-hidden relative">
+          <div className="h-[420px] rounded-md overflow-hidden relative">
             <ResearchCanvas frameOverride={frameB} label="FlowSync-UQ (Ours)" quality="performance" />
+            {!hasPairedData && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 p-6 pointer-events-none">
+                <p className="text-xs text-white/70 text-center max-w-xs leading-relaxed bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3">
+                  Right view shows <span className="font-mono text-white">{controllerB}</span> once you press{" "}
+                  <span className="font-semibold text-white">Launch Paired Run</span>.
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Controller B Key Telemetry */}
-          <div className="grid grid-cols-4 gap-2 text-center font-mono">
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Mean Delay</div>
-              <div className="text-base font-bold text-emerald-400 mt-1">
+          {/* Controller B telemetry */}
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Mean delay</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
                 {ctrlB?.mean_delay !== undefined ? `${ctrlB.mean_delay.toFixed(1)}s` : "-"}
               </div>
             </div>
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Queue Area</div>
-              <div className="text-base font-bold text-slate-200 mt-1">
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Queue area</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
                 {ctrlB?.queue_area !== undefined ? ctrlB.queue_area.toFixed(0) : "-"}
               </div>
             </div>
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Throughput</div>
-              <div className="text-base font-bold text-slate-200 mt-1">
-                {ctrlB?.throughput !== undefined ? `${ctrlB.throughput} veh` : "-"}
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Throughput</div>
+              <div className="text-base font-semibold font-mono tabular-nums text-white mt-1">
+                {ctrlB?.throughput !== undefined ? `${ctrlB.throughput}` : "-"}
               </div>
             </div>
-            <div className="bg-black/40 border border-white/5 rounded-xl p-3">
-              <div className="text-[10px] text-slate-400 uppercase">Uncertainty</div>
+            <div className="bg-black/30 border border-neutral-800 rounded-md p-3">
+              <div className="text-[11px] text-neutral-500">Uncertainty</div>
               <div
-                className={`text-base font-bold mt-1 ${
-                  (ctrlB?.uncertainty ?? 0) >= 0.65 ? "text-rose-400" : "text-sky-300"
+                className={`text-base font-semibold font-mono tabular-nums mt-1 ${
+                  (ctrlB?.uncertainty ?? 0) >= 0.65 ? "text-red-300" : "text-neutral-200"
                 }`}
               >
                 {ctrlB?.uncertainty !== undefined ? ctrlB.uncertainty.toFixed(2) : "0.00"}
