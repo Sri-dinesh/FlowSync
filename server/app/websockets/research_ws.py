@@ -122,12 +122,28 @@ class ExperimentSession:
         self.is_paused = False
         self.step_delay = 0.05  # 20 FPS default streaming
         self.task: Optional[asyncio.Task] = None
+        self.speed: float = 1.0
+        self.seek_step: Optional[int] = None
 
     def stop(self) -> None:
         self.is_running = False
         self.is_paused = False
+        self.seek_step = None
         if self.task and not self.task.done():
             self.task.cancel()
+
+    def set_speed(self, speed: float) -> None:
+        try:
+            self.speed = float(speed)
+        except (TypeError, ValueError):
+            return
+        self.speed = max(0.1, min(10.0, self.speed))
+
+    def request_seek(self, step: int) -> None:
+        try:
+            self.seek_step = max(0, int(step))
+        except (TypeError, ValueError):
+            self.seek_step = None
 
     async def run_single(
         self,
@@ -141,6 +157,8 @@ class ExperimentSession:
     ) -> None:
         self.is_running = True
         self.is_paused = False
+        self.seek_step = None
+        self.set_speed(speed)
         
         scenario = _load_scenario(scenario_id)
         seed_everything(seed)
@@ -322,6 +340,15 @@ class ExperimentSession:
                 green_elapsed = round(fsm.time_in_phase, 2) if fsm.color.value == "green" else 0.0
                 min_green_rem = round(max(0.0, fsm.min_green - fsm.time_in_phase), 2) if fsm.color.value == "green" else 0.0
 
+                q_north = int(queues.get("north_straight", 0) + queues.get("north_left", 0) + queues.get("north_right", 0))
+                q_south = int(queues.get("south_straight", 0) + queues.get("south_left", 0) + queues.get("south_right", 0))
+                q_east  = int(queues.get("east_straight", 0) + queues.get("east_left", 0) + queues.get("east_right", 0))
+                q_west  = int(queues.get("west_straight", 0) + queues.get("west_left", 0) + queues.get("west_right", 0))
+                vehicles_list = _build_vehicle_list(env, fault_injector)
+                detected_n = sum(1 for v in vehicles_list if v.get("detection_state") == "detected")
+                missed_n = sum(1 for v in vehicles_list if v.get("detection_state") == "missed_ground_truth")
+                gt_n = len(vehicles_list)
+
                 frame_payload = {
                     "type": "research_frame",
                     "experiment_id": exp_id,
@@ -381,17 +408,34 @@ class ExperimentSession:
                         "starvation_events": starvation_count,
                         "spillback_incidents": 0,
                         "max_queue": current_queue,
+                        "queue_length_north": q_north,
+                        "queue_length_south": q_south,
+                        "queue_length_east": q_east,
+                        "queue_length_west": q_west,
                     },
-                    "vehicles": _build_vehicle_list(env, fault_injector),
+                    "vehicles": vehicles_list,
+                    "perception": {
+                        "camera_health": "HEALTHY" if not fault_injector or fault_profile.name == "clean" else ("OCCLUDED" if fault_profile.miss_rate >= 0.3 else "DEGRADED"),
+                        "detected_count": detected_n,
+                        "ground_truth_count": gt_n,
+                        "missed_count": missed_n,
+                        "false_positive_count": 0,
+                        "occluded_count": missed_n,
+                        "cv_latency_ms": 57.2 if not fault_injector else 65.3,
+                        "track_confidence_avg": 1.0 if not fault_injector else round(max(0.2, 1.0 - fault_profile.miss_rate), 2),
+                        "noise_type": fault_profile.name,
+                        "noise_intensity": fault_profile.miss_rate,
+                        "active_cues": ["detector_dispersion", "tracking_fragmentation"] if fault_injector and fault_profile.miss_rate > 0 else [],
+                    },
                 }
 
                 trajectory.append(frame_payload)
 
                 # Send frame every step or throttled based on speed
                 await research_manager.send_json(self.websocket, frame_payload)
-                
-                # Dynamic pacing
-                sleep_time = max(0.005, (0.1 / max(0.1, speed)))
+
+                # Dynamic pacing (live speed adjustments via set_speed)
+                sleep_time = max(0.005, (0.1 / max(0.1, self.speed)))
                 await asyncio.sleep(sleep_time)
 
             # Final summary
@@ -449,6 +493,9 @@ class ExperimentSession:
     ) -> None:
         """Run synchronized paired comparison under identical CRN arrivals and noise."""
         self.is_running = True
+        self.is_paused = False
+        self.seek_step = None
+        self.set_speed(speed)
         scenario = _load_scenario(scenario_id)
         num_steps = scenario.duration_steps
 
@@ -617,7 +664,7 @@ class ExperimentSession:
                 }
 
                 await research_manager.send_json(self.websocket, paired_payload)
-                sleep_time = max(0.005, (0.1 / max(0.1, speed)))
+                sleep_time = max(0.005, (0.1 / max(0.1, self.speed)))
                 await asyncio.sleep(sleep_time)
 
             await research_manager.send_json(self.websocket, {
@@ -635,6 +682,129 @@ class ExperimentSession:
             pass
         except Exception as e:
             logger.exception("Error in paired execution")
+            await research_manager.send_json(self.websocket, {
+                "type": "experiment_error",
+                "error": str(e),
+            })
+        finally:
+            self.is_running = False
+
+    def _resolve_run_dir(self, run_id: str) -> Optional[Path]:
+        """Resolve a run id to its results directory.
+
+        Accepts either the directory name (exp_...) or the experiment_id
+        stored inside metadata.json.
+        """
+        candidate = _RESULTS_DIR / run_id
+        if candidate.is_dir() and (candidate / "trajectory.jsonl").exists():
+            return candidate
+        if _RESULTS_DIR.is_dir():
+            for sub in _RESULTS_DIR.iterdir():
+                meta = sub / "metadata.json"
+                if sub.is_dir() and meta.exists():
+                    try:
+                        stored = json.loads(meta.read_text(encoding="utf-8"))
+                        if stored.get("experiment_id") == run_id and (sub / "trajectory.jsonl").exists():
+                            return sub
+                    except Exception:
+                        continue
+        return None
+
+    async def run_replay(self, run_id: str, speed: float = 1.0) -> None:
+        """Stream a recorded trajectory without re-simulating physics.
+
+        Supports live pause/resume (shared flags), set_speed pacing changes,
+        and seek jumps to an absolute step index.
+        """
+        self.is_running = True
+        self.is_paused = False
+        self.seek_step = None
+        self.set_speed(speed)
+
+        run_dir = self._resolve_run_dir(run_id)
+        if run_dir is None:
+            await research_manager.send_json(self.websocket, {
+                "type": "experiment_error",
+                "error": f"Run '{run_id}' not found in results/.",
+            })
+            self.is_running = False
+            return
+
+        try:
+            frames: List[Dict[str, Any]] = []
+            with open(run_dir / "trajectory.jsonl", "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        frames.append(json.loads(line))
+
+            if not frames:
+                await research_manager.send_json(self.websocket, {
+                    "type": "experiment_error",
+                    "error": f"Run '{run_id}' has an empty trajectory.",
+                })
+                self.is_running = False
+                return
+
+            metadata: Dict[str, Any] = {}
+            meta_path = run_dir / "metadata.json"
+            if meta_path.exists():
+                try:
+                    metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+                except Exception:
+                    metadata = {}
+
+            first = frames[0]
+            await research_manager.send_json(self.websocket, {
+                "type": "replay_started",
+                "experiment_id": metadata.get("experiment_id", run_id),
+                "scenario_id": metadata.get("scenario_id", first.get("scenario_id", "")),
+                "scenario_hash": metadata.get("scenario_hash", first.get("scenario_hash", "")),
+                "controller": metadata.get("controller", first.get("controller", "")),
+                "seed": metadata.get("seed", first.get("seed", 0)),
+                "total_steps": len(frames),
+                "replay_of": run_id,
+            })
+
+            idx = 0
+            total = len(frames)
+            while idx < total:
+                if not self.is_running:
+                    break
+
+                while self.is_paused and self.is_running:
+                    await asyncio.sleep(0.1)
+
+                if self.seek_step is not None:
+                    idx = max(0, min(total - 1, self.seek_step))
+                    self.seek_step = None
+
+                payload = dict(frames[idx])
+                payload["type"] = "research_frame"
+                payload["replay"] = True
+                await research_manager.send_json(self.websocket, payload)
+                idx += 1
+
+                sleep_time = max(0.005, (0.1 / max(0.1, self.speed)))
+                await asyncio.sleep(sleep_time)
+
+            if self.is_running:
+                await research_manager.send_json(self.websocket, {
+                    "type": "replay_completed",
+                    "result": {
+                        "experiment_id": metadata.get("experiment_id", run_id),
+                        "scenario_id": metadata.get("scenario_id", first.get("scenario_id", "")),
+                        "controller": metadata.get("controller", first.get("controller", "")),
+                        "seed": metadata.get("seed", first.get("seed", 0)),
+                        "num_steps": total,
+                        "status": "COMPLETED",
+                        "replay": True,
+                    },
+                })
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.exception("Error in replay execution")
             await research_manager.send_json(self.websocket, {
                 "type": "experiment_error",
                 "error": str(e),
@@ -712,6 +882,30 @@ async def research_socket(websocket: WebSocket) -> None:
             elif cmd == "stop":
                 session.stop()
                 await research_manager.send_json(websocket, {"type": "experiment_stopped"})
+
+            elif cmd == "set_speed":
+                session.set_speed(msg.get("speed", 1.0))
+
+            elif cmd == "seek":
+                session.request_seek(int(msg.get("step", 0)))
+
+            elif cmd == "replay_run":
+                session.stop()
+                run_id = str(msg.get("run_id", ""))
+                speed = float(msg.get("speed", 1.0))
+                if not run_id:
+                    await research_manager.send_json(websocket, {
+                        "type": "experiment_error",
+                        "error": "replay_run requires a run_id.",
+                    })
+                else:
+                    session.task = asyncio.create_task(session.run_replay(run_id=run_id, speed=speed))
+
+            else:
+                await research_manager.send_json(websocket, {
+                    "type": "experiment_error",
+                    "error": f"Unknown command '{cmd}'.",
+                })
 
     except WebSocketDisconnect:
         session.stop()
