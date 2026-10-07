@@ -24,10 +24,21 @@ export interface ReplayState {
   totalSteps: number;
 }
 
+export interface ActiveControllerItem {
+  id: string;
+  name?: string;
+  description?: string;
+  is_proposed_method?: boolean;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export type ActiveController = string | ActiveControllerItem;
+
 interface ResearchState {
   // Configuration
   activeScenario: ResearchScenario;
-  activeController: any;
+  activeController: ActiveController;
   activeSeed: number;
   activeNoisePreset: NoisePresetKey;
   activeNoise: ActiveNoise;
@@ -69,7 +80,7 @@ interface ResearchState {
   // Actions
   setConfig: (config: {
     scenario?: ResearchScenario | null;
-    controller?: any;
+    controller?: ActiveController;
     seed?: number;
     noisePreset?: NoisePresetKey;
   }) => void;
@@ -81,11 +92,11 @@ interface ResearchState {
   setExperimentSummary: (summary: ExperimentSummary | null) => void;
   setPairedSummary: (summary: Record<string, unknown> | null) => void;
   setPairedMode: (isPaired: boolean, ctrlA?: string, ctrlB?: string) => void;
-  selectNoise: (noise: any) => void;
-  toggleDebugOverlay: (val?: any) => void;
-  togglePerceptionDebug: (val?: any) => void;
-  togglePresentationMode: (val?: any) => void;
-  toggleProvenanceDrawer: (val?: any) => void;
+  selectNoise: (noise: ActiveNoise) => void;
+  toggleDebugOverlay: (val?: unknown) => void;
+  togglePerceptionDebug: (val?: unknown) => void;
+  togglePresentationMode: (val?: unknown) => void;
+  toggleProvenanceDrawer: (val?: unknown) => void;
   loadReplayTrace: (frames: ResearchTelemetryFrame[]) => void;
   setReplayIndex: (index: number) => void;
   setIsReplaying: (val: boolean) => void;

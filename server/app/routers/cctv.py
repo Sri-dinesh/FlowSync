@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ..realworld.models.config import (
@@ -21,7 +20,6 @@ from ..realworld.models.config import (
 
 router = APIRouter(prefix="/cctv", tags=["cctv"])
 
-# ── Video Management ──────────────────────────────────────────────────────────
 
 @router.post("/upload")
 async def upload_video(file: UploadFile) -> Dict[str, str]:
@@ -71,7 +69,6 @@ async def delete_video(filename: str) -> Dict[str, str]:
     return {"deleted": filename}
 
 
-# ── Session Management ────────────────────────────────────────────────────────
 
 @router.get("/sessions")
 async def list_sessions() -> List[Dict[str, Any]]:
@@ -136,7 +133,6 @@ async def get_session_twin_data(session_id: str) -> Dict[str, Any]:
     }
 
 
-# ── Model Status ──────────────────────────────────────────────────────────────
 
 @router.get("/model/status")
 async def model_status(request: Request) -> Dict[str, Any]:

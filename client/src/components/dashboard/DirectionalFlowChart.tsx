@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { Compass, Truck, Navigation2 } from "lucide-react";
+import { Compass, Truck } from "lucide-react";
 
 interface Props {
   approachTotals: {

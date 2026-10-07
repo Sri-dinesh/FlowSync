@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Loader2, Play, RotateCcw, Square, Siren, FastForward, Gauge, Zap, Timer } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -42,15 +42,12 @@ export default function SimulationControls({
     );
   }, [simSpeed]);
 
-  const runStartTimestepRef = useRef<number | null>(null);
+  const [runStartTimestep, setRunStartTimestep] = useState<number | null>(null);
 
-  // If backend resets timestep to 0 on a new run, adapt the base step
-  if (currentFrame && currentFrame.timestep < (runStartTimestepRef.current ?? 0)) {
-    runStartTimestepRef.current = 0;
-  }
-
-  const baseStep = runStartTimestepRef.current ?? (currentFrame?.timestep ?? 0);
-  const simElapsedSec = Math.max(0, ((currentFrame?.timestep ?? 0) - baseStep) * 0.1);
+  const currentStep = currentFrame?.timestep ?? 0;
+  const effectiveStart =
+    runStartTimestep !== null && currentStep >= runStartTimestep ? runStartTimestep : currentStep;
+  const simElapsedSec = Math.max(0, (currentStep - effectiveStart) * 0.1);
 
   const modeLabel = useMemo(
     () =>
@@ -79,24 +76,22 @@ export default function SimulationControls({
   };
 
   const handleStart = () => {
-    runStartTimestepRef.current = currentFrame?.timestep ?? 0;
+    setRunStartTimestep(currentFrame?.timestep ?? 0);
     setRunning(true);
     const durationSeconds = durationMode === "timed" ? targetDuration : null;
     sendCommand({ command: "start", duration_seconds: durationSeconds });
   };
 
-  const handleStop = () => {
+  const handleStop = useCallback(() => {
     setRunning(false);
     sendCommand({ command: "stop" });
     fetch(`${API_BASE}/simulation/stop`, { method: "POST" }).catch(() => {});
-  };
+  }, [API_BASE, sendCommand, setRunning]);
 
   const handleReset = () => {
-    runStartTimestepRef.current = 0;
-    // Send reset to backend first — cancels tasks, empties all vehicle queues, disables spawner
+    setRunStartTimestep(0);
     sendCommand({ command: "reset" });
     fetch(`${API_BASE}/simulation/reset`, { method: "POST" }).catch(() => {});
-    // Clear frontend state so the canvas and metrics wipe immediately
     resetSimulation();
   };
 
@@ -110,7 +105,7 @@ export default function SimulationControls({
       );
       handleStop();
     }
-  }, [isRunning, durationMode, targetDuration, simElapsedSec]);
+  }, [isRunning, durationMode, targetDuration, simElapsedSec, handleStop]);
 
   const handleSpeedChange = (newSpeed: number) => {
     const clamped = Math.max(0.25, Math.min(16.0, newSpeed));

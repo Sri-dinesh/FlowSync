@@ -3,10 +3,6 @@ Albumentations augmentation pipeline tailored for Indian traffic in varied condi
 """
 from __future__ import annotations
 
-import random
-from typing import Dict, List, Tuple
-
-import numpy as np
 
 try:
     import albumentations as A

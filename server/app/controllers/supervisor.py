@@ -1,31 +1,9 @@
-"""
-supervisor.py — Controller Authority Supervisor with Hysteretic Fallback
-=========================================================================
-Task 1A.5 & Task C4: Manages authority transfer between RL policy and
-deterministic Max-Pressure fallback based on online perception uncertainty.
-
-State Machine:
-  RL_ACTIVE
-     │
-     │ Uncertainty U_t >= T_high
-     ▼
-  FALLBACK_ACTIVE (Max-Pressure)
-     │
-     │ Dwell time >= K_dwell AND U_t <= T_low for K_recover steps
-     ▼
-  RL_ACTIVE
-
-Guarantees:
-- Hysteresis (T_low < T_high) eliminates rapid chattering / controller thrashing.
-- Minimum dwell time prevents partial-phase authority oscillation.
-- All transfers are logged with entry/exit uncertainty and durations.
-"""
+"""Controller authority supervisor managing hysteretic switching between RL and fallback based on uncertainty."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
-import numpy as np
+from typing import Any, Dict, List
 
 
 class ControlAuthority(Enum):
@@ -100,7 +78,6 @@ class ControllerSupervisor:
         if self.authority == ControlAuthority.RL_ACTIVE:
             self.total_rl_steps += 1
             if uncertainty_score >= self.threshold_high:
-                # Trigger fallback
                 self.authority = ControlAuthority.FALLBACK_ACTIVE
                 self.total_switches += 1
                 trans = AuthorityTransition(
@@ -118,7 +95,6 @@ class ControllerSupervisor:
         elif self.authority == ControlAuthority.FALLBACK_ACTIVE:
             self.total_fallback_steps += 1
 
-            # Check recovery conditions
             if uncertainty_score <= self.threshold_low:
                 self._consecutive_low_uncertainty_steps += 1
             else:
@@ -130,7 +106,6 @@ class ControllerSupervisor:
             )
 
             if can_return:
-                # Return authority to RL
                 self.authority = ControlAuthority.RL_ACTIVE
                 self.total_switches += 1
                 trans = AuthorityTransition(

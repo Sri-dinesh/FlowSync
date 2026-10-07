@@ -1,13 +1,8 @@
-"""
-dqn.py — Plain Deep Q-Network (DQN) Signal Controller Baseline (Mnih et al. 2015)
-==================================================================================
-Standard deep reinforcement learning baseline without dueling streams,
-double-DQN target stabilization, or prioritized replay.
-"""
+"""Standard Deep Q-Network (DQN) signal controller baseline (Mnih et al. 2015)."""
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 import numpy as np
 import torch
 

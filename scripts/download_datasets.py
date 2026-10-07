@@ -6,7 +6,6 @@ Usage:
     python scripts/download_datasets.py --roboflow-key YOUR_KEY --datasets roboflow ua_detrac
 """
 import argparse
-import os
 import sys
 from pathlib import Path
 

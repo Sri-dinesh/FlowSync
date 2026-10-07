@@ -75,7 +75,7 @@ export function ScenarioSelector({ selected, onSelect }: ScenarioSelectorProps) 
     const preset = QUICK_PRESETS.find((p) => p.key === presetKey);
     if (!preset) return;
 
-    let match = scenarios.find(preset.match);
+    const match = scenarios.find(preset.match);
     if (match) {
       onSelect(match);
       return;

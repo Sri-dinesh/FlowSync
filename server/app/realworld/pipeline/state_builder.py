@@ -1,20 +1,7 @@
-"""
-StateBuilder — Convert YOLO+ROI output → 28-dim RL observation vector.
-=========================================================================
-BUG-04 Fix: Previously this module computed pressure (Dim 18) as a simple
-sum of all 12 normalized queues / 20.0, while environment.py computed
-destination-aware movement pressure (incoming/cap - outgoing/cap).
-
-This mismatch caused Sim-to-Real policy breakdown: the agent was trained on
-destination-aware pressure but received raw queue-sum pressure in real-world mode.
-
-Corrected: Dim 18 now uses compute_movement_pressures() from traffic_math.py —
-the same function used by environment.py — providing numerically identical
-pressure signals in both simulation training and real-world deployment.
-"""
+"""Constructs the canonical 28-dimensional RL observation vector from camera detections."""
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -26,8 +13,6 @@ from ..models.config import (
     STARVATION_THRESHOLD,
 )
 from ..models.schemas import WeightedLaneCounts
-
-# BUG-04 Fix: import canonical shared pressure computation
 from ...simulation.traffic_math import (
     DEST_MAP,
     MOVEMENT_KEYS,
@@ -40,22 +25,14 @@ from ...simulation.demand_forecast import ArrivalForecaster
 
 class StateBuilder:
     """
-    Converts real-world vehicle detections to the same 28-dim observation vector
-    used by the simulation's DQN agent. This is the bridge between real-world and RL.
-
-    Observation vector (28 dims) — identical structure to simulation:
-    Dims 0-11:  Weighted queue per movement lane (normalized by MAX_QUEUE_CAP=10.0)
-    Dims 12-15: One-hot current signal phase (4 dims)
-    Dim  16:    Time in current phase / MAX_GREEN_TIME (normalized)
-    Dim  17:    Is transitioning (1.0 if yellow/all-red, 0.0 if green)
-    Dim  18:    Destination-aware total pressure (BUG-04 fix: uses shared DEST_MAP)
-    Dim  19:    Starvation score (max wait time / STARVATION_THRESHOLD)
-    Dims 20-27: Online EWMA demand forecast features
-
-    BUG-04 Change:
-    - OLD (broken): obs[18] = sum(normalized_queues) / 20.0
-    - NEW (correct): obs[18] = normalize(sum(compute_movement_pressures(queues, outgoing)))
-      where compute_movement_pressures uses DEST_MAP to subtract downstream occupancy.
+    Constructs the 28-dimensional RL observation vector from camera detections:
+      Dims 0-11:  Weighted queue per movement lane
+      Dims 12-15: One-hot signal phase encoding
+      Dim 16:     Normalized time in phase
+      Dim 17:     Transitioning indicator (yellow / all-red clearance)
+      Dim 18:     Destination-aware total pressure matching simulation environment
+      Dim 19:     Normalized maximum starvation wait time
+      Dims 20-27: Online EWMA arrival rate and trend features
     """
 
     def __init__(self) -> None:
@@ -100,11 +77,9 @@ class StateBuilder:
         # Dim 16: normalized time in phase
         obs[16] = min(1.0, time_in_phase_seconds / MAX_GREEN_TIME)
 
-        # Dim 17: is transitioning (yellow/all-red clearance)
         obs[17] = 1.0 if is_transitioning else 0.0
 
-        # Dim 18: BUG-04 CORRECTED — destination-aware total pressure
-        # Build integer queue counts from weighted float counts (approximate)
+        # Destination-aware pressure matches simulation observation distribution.
         movement_queues = {
             lane: max(0, round(counts_dict.get(lane, 0.0)))
             for lane in MOVEMENT_KEYS

@@ -19,7 +19,6 @@ export const ResearchExportModal = memo(function ResearchExportModal({
   const experimentId = useResearchStore((s) => s.experimentId) || "exp_flowsync_canonical";
   const activeScenario = useResearchStore((s) => s.activeScenario);
   const activeSeed = useResearchStore((s) => s.activeSeed);
-  const activeNoise = useResearchStore((s) => s.activeNoise);
   const currentFrame = useResearchStore((s) => s.currentFrame);
 
   if (!isOpen) return null;

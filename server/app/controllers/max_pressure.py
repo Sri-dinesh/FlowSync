@@ -1,27 +1,7 @@
-"""
-max_pressure.py — Max-Pressure Traffic Signal Controller Baseline (Varaiya 2013)
-==================================================================================
-Implements classical decentralized Max-Pressure control (Varaiya 2013, PressLight 2019).
-
-Theoretical Formulation:
------------------------
-For each turning movement m:
-    P(m) = max(0, q_in(m) / C_in - q_out(dest(m)) / C_out)
-
-For each candidate phase p in {0, 1, 2, 3}:
-    W(p) = sum_{m in Movements(p)} P(m)
-
-Action Selection:
-    p* = argmax_{p in {0, 1, 2, 3}} W(p)
-
-Tie-Breaking & Hysteresis:
-- If current active phase is tied for maximum pressure, preserve current phase to
-  avoid wasteful yellow/all-red clearance intervals.
-- If all phase pressures are zero, hold current phase.
-"""
+"""Decentralized Max-Pressure traffic signal controller baseline (Varaiya 2013)."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 import numpy as np
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
@@ -96,11 +76,9 @@ class MaxPressureController(BaseController):
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:
         self._step_count += 1
 
-        # 1. Resolve upstream queues and downstream outgoing counts
         if context.movement_queues is not None:
             queues = {k: float(v) for k, v in context.movement_queues.items()}
         else:
-            # Extract from observation vector (dims 0-11)
             queues = {
                 MOVEMENT_KEYS[i]: float(observation[i]) * self.max_cap_in
                 for i in range(min(12, len(observation)))
@@ -112,7 +90,6 @@ class MaxPressureController(BaseController):
             else {d: 0.0 for d in ["north", "south", "east", "west"]}
         )
 
-        # 2. Compute movement and phase pressures
         movement_pressures = self.compute_movement_pressures(queues, outgoing)
         phase_pressures = self.compute_phase_pressures(movement_pressures)
 
@@ -120,14 +97,12 @@ class MaxPressureController(BaseController):
         current_press = phase_pressures.get(current_phase, 0.0)
         max_press = max(phase_pressures.values()) if phase_pressures else 0.0
 
-        # 3. Action selection: hold current if tied with max or if all pressures are 0
+        # Preserve green if current phase is tied for maximum or if all pressures are zero
         if (current_press >= max_press and current_press > 0.0) or max_press == 0.0:
             selected_phase = current_phase
         else:
-            # Deterministic tie-breaking on max pressure
             selected_phase = max(phase_pressures, key=lambda p: (phase_pressures[p], -p))
 
-        # Respect transition permissions
         action = selected_phase if context.can_switch_phase else current_phase
 
         self._last_diagnostics = {

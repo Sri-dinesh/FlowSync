@@ -13,13 +13,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
 
-from server.app.controllers import get_controller, CONTROLLER_REGISTRY
-from research.scenarios.scenario_schema import ScenarioConfig
+from server.app.controllers import get_controller
 from research.noise.fault_injector import PerceptionFaultInjector, FaultProfile
 from research.experiments.engine import ExperimentRunner, ExperimentResult
 from research.analysis.statistical_pipeline import (

@@ -70,7 +70,6 @@ export default function ROIEditor({
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
 
-  // Load preview frame as Image object once available
   useEffect(() => {
     if (!previewFrame) return;
     const img = new Image();
@@ -82,7 +81,6 @@ export default function ROIEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewFrame]);
 
-  // Fetch existing ROIs
   useEffect(() => {
     async function fetchROIs() {
       try {
@@ -91,7 +89,7 @@ export default function ROIEditor({
         const data = await res.json();
         if (data.rois) {
           const loaded: PolygonMap = {};
-          data.rois.forEach((r: any) => {
+          data.rois.forEach((r: { lane_id: string; vertices: Point[] }) => {
             loaded[r.lane_id as LaneKey] = r.vertices;
           });
           setPolygons(loaded);
@@ -103,7 +101,6 @@ export default function ROIEditor({
     fetchROIs();
   }, [intersectionId, cameraId]);
 
-  // ── Canvas redraw ────────────────────────────────────────────────────
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -114,13 +111,11 @@ export default function ROIEditor({
 
     ctx.clearRect(0, 0, W, H);
 
-    // Draw background frame
     if (imgRef.current) {
       ctx.drawImage(imgRef.current, 0, 0, W, H);
     } else {
       ctx.fillStyle = "#0a0a0a";
       ctx.fillRect(0, 0, W, H);
-      // Draw grid pattern
       ctx.strokeStyle = "#ffffff08";
       ctx.lineWidth = 1;
       for (let x = 0; x < W; x += 40) {
@@ -131,7 +126,6 @@ export default function ROIEditor({
       }
     }
 
-    // Draw all saved polygons
     for (const [lane, pts] of Object.entries(polygons) as [LaneKey, Point[]][]) {
       if (!pts || pts.length < 2) continue;
       const color = getLaneColor(lane);
@@ -148,7 +142,6 @@ export default function ROIEditor({
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      // Label
       const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
       ctx.globalAlpha = 0.9;
@@ -158,7 +151,6 @@ export default function ROIEditor({
       ctx.fillText(lane.replace(/_/g, " "), cx * W, cy * H + 4);
       ctx.restore();
 
-      // Vertex dots
       for (const [px, py] of pts) {
         ctx.beginPath();
         ctx.arc(px * W, py * H, 3, 0, Math.PI * 2);
@@ -170,7 +162,6 @@ export default function ROIEditor({
       }
     }
 
-    // Draw in-progress polygon
     if (drawing.length > 0) {
       const color = getLaneColor(selectedLane);
       ctx.save();
@@ -197,12 +188,10 @@ export default function ROIEditor({
     }
   }, [polygons, drawing, hoveredPt, selectedLane]);
 
-  // Re-render whenever state changes
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // ── Mouse events ─────────────────────────────────────────────────────
   function toRel(e: MouseEvent<HTMLCanvasElement>): Point {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -257,7 +246,6 @@ export default function ROIEditor({
     });
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────
   async function saveROI() {
     const defined = Object.keys(polygons);
 

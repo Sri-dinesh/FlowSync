@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -73,7 +73,7 @@ def list_scenarios() -> Dict[str, Any]:
 @router.get("/controllers")
 def list_controllers() -> Dict[str, Any]:
     """Return available research controllers and their capabilities."""
-    from ..controllers import CONTROLLER_REGISTRY, get_controller
+    from ..controllers import get_controller
     
     controllers = []
     unique_names = ["fixed", "greedy", "actuated", "max_pressure", "dqn", "d3qn", "flowsync_uq"]

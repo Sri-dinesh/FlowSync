@@ -8,7 +8,6 @@ import {
   TorusGeometry,
 } from "three";
 
-// ── 1. Modern Minimalist Gooseneck Streetlight ──────────────────────────────
 interface StreetlightProps {
   position: [number, number, number];
   rotationY?: number;
@@ -69,7 +68,6 @@ export function Streetlight({
   );
 }
 
-// ── 2. City Park Bench (Wood & Cast Iron) ────────────────────────────────────
 interface ParkBenchProps {
   position: [number, number, number];
   rotationY?: number;
@@ -116,7 +114,6 @@ export function ParkBench({ position, rotationY = 0 }: ParkBenchProps) {
   );
 }
 
-// ── 3. Street Corner Fire Hydrant ───────────────────────────────────────────
 export function FireHydrant({
   position,
   rotationY = 0,
@@ -166,7 +163,6 @@ export function FireHydrant({
   );
 }
 
-// ── 4. Granite Planter Box with Shrub ────────────────────────────────────────
 export function PlanterBox({
   position,
   size = [1.2, 0.4, 0.5],
@@ -224,7 +220,6 @@ export function PlanterBox({
   );
 }
 
-// ── 5. Sidewalk Security Bollard ────────────────────────────────────────────
 export function Bollard({
   position,
 }: {

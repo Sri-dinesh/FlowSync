@@ -13,10 +13,8 @@ Metrics Computed:
 """
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 import numpy as np
 
 from server.app.simulation.traffic_math import MOVEMENT_KEYS

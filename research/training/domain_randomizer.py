@@ -15,13 +15,12 @@ Randomization Parameters:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import Optional, Tuple
 import numpy as np
 
-from server.app.simulation.environment import TrafficEnv
 from server.app.simulation.spawner import TrafficProfile
-from research.noise.fault_injector import PerceptionFaultInjector, FaultProfile
+from research.noise.fault_injector import FaultProfile
 from research.scenarios.scenario_schema import DemandProfile, ScenarioConfig
 
 

@@ -1,21 +1,15 @@
-"""
-d3qn.py — Dueling Double DQN (D3QN) Controller Baseline
-=======================================================
-Combines Dueling value-advantage decomposition with Double-DQN target
-stabilization and demand action masking.
-"""
+"""Dueling Double DQN (D3QN) traffic controller baseline with demand action masking."""
 from __future__ import annotations
 
 import hashlib
 import io
 import time
-from typing import Any, Dict, Optional
+from typing import Optional
 import numpy as np
 import torch
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
 from ..rl.dqn_agent import DQNAgent
-from ..rl.dqn_network import DuelingDQNNetwork
 from ..rl.hyperparams import HyperParams
 
 HP = HyperParams()
@@ -99,7 +93,6 @@ class D3QNController(BaseController):
             valid_indices = np.arange(HP.ACTION_DIM)
             mask = np.ones(HP.ACTION_DIM, dtype=bool)
 
-        # Pad / truncate observation to match network expected input
         expected_dim = self.agent.online_net.feature_layer[0].in_features
         obs = observation
         if len(obs) < expected_dim:
@@ -114,7 +107,6 @@ class D3QNController(BaseController):
             q_values_tensor = self.agent.online_net(state_tensor, valid_action_mask=mask_tensor)
             q_values = q_values_tensor.squeeze(0).cpu().numpy()
 
-        # Action selection
         eps = 0.0 if self.deterministic else self.epsilon
         if eps > 0.0 and np.random.random() < eps:
             action = int(np.random.choice(valid_indices))

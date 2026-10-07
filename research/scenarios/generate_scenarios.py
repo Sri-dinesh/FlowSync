@@ -20,9 +20,7 @@ SCENARIOS_DIR = Path(__file__).parent
 def create_canonical_scenarios() -> List[ScenarioConfig]:
     scenarios: List[ScenarioConfig] = []
 
-    # ──────────────────────────────────────────────────────────────────────────
     # TRAIN SPLIT (Policy learning & baseline training)
-    # ──────────────────────────────────────────────────────────────────────────
     scenarios.append(ScenarioConfig(
         scenario_id="train_low_balanced_01",
         split="train",
@@ -99,9 +97,7 @@ def create_canonical_scenarios() -> List[ScenarioConfig]:
         ),
     ))
 
-    # ──────────────────────────────────────────────────────────────────────────
     # VALIDATION SPLIT (Hyperparameter selection, UQ calibration & tuning)
-    # ──────────────────────────────────────────────────────────────────────────
     scenarios.append(ScenarioConfig(
         scenario_id="val_oversaturated_01",
         split="validation",
@@ -145,9 +141,7 @@ def create_canonical_scenarios() -> List[ScenarioConfig]:
         ),
     ))
 
-    # ──────────────────────────────────────────────────────────────────────────
     # FINAL TEST SPLIT (FROZEN — Evaluated only after training/tuning freeze)
-    # ──────────────────────────────────────────────────────────────────────────
     scenarios.append(ScenarioConfig(
         scenario_id="test_clean_balanced_01",
         split="test",

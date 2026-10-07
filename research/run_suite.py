@@ -17,7 +17,6 @@ import logging
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
-import numpy as np
 
 # Ensure repository root and server/ are on sys.path
 _ROOT = Path(__file__).resolve().parent.parent
@@ -27,7 +26,7 @@ if str(_ROOT) not in sys.path:
 if str(_SERVER) not in sys.path:
     sys.path.insert(0, str(_SERVER))
 
-from server.app.controllers import get_controller, BaseController, CONTROLLER_REGISTRY
+from server.app.controllers import get_controller
 from research.scenarios.scenario_schema import ScenarioConfig
 from research.experiments.engine import ExperimentRunner, ExperimentResult
 

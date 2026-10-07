@@ -31,10 +31,8 @@ import numpy as np
 from .benchmark_harness import (
     CRN_SEEDS,
     DeterministicEvaluator,
-    BenchmarkResult,
     BENCHMARK_STEPS_MEDIUM,
     BENCHMARK_STEPS_LONG,
-    seed_everything,
 )
 
 if TYPE_CHECKING:
@@ -42,7 +40,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── Gate Thresholds ─────────────────────────────────────────────────────────
 GATE2_AI_MAX_WAIT    = 10.0   # seconds (vs Fixed >= 24s)
 GATE3_AI_MAX_WAIT    = 8.5    # seconds (vs Greedy >= 11.5s on burst)
 GATE4_MIN_THROUGHPUT = 1800.0 # vehicles/hour
@@ -132,7 +129,6 @@ class AcceptanceGateRunner:
         torch.save(self.agent.online_net.state_dict(), buf)
         return hashlib.sha256(buf.getvalue()).hexdigest()[:16]
 
-    # ── Gate 1: Mathematical Correctness ────────────────────────────────────
     def run_gate1(self) -> GateResult:
         """
         Verify mathematical correctness of PER priorities and action masking.
@@ -193,7 +189,6 @@ class AcceptanceGateRunner:
             elapsed_seconds=elapsed,
         )
 
-    # ── Gate 2: Basic Competence ─────────────────────────────────────────────
     def run_gate2(self, seeds: Optional[List[int]] = None) -> GateResult:
         """AI avg_wait <= 10.0s vs Fixed >= 24.0s on balanced traffic."""
         t_start = time.perf_counter()
@@ -233,7 +228,6 @@ class AcceptanceGateRunner:
             elapsed_seconds=time.perf_counter() - t_start,
         )
 
-    # ── Gate 3: Predictive Superiority ──────────────────────────────────────
     def run_gate3(self, seeds: Optional[List[int]] = None) -> GateResult:
         """AI avg_wait <= 8.5s vs Greedy >= 11.5s on burst demand."""
         t_start = time.perf_counter()
@@ -274,7 +268,6 @@ class AcceptanceGateRunner:
             elapsed_seconds=time.perf_counter() - t_start,
         )
 
-    # ── Gate 4: Network Coordination (simplified single-intersection proxy) ─
     def run_gate4(self, seeds: Optional[List[int]] = None) -> GateResult:
         """
         Throughput proxy: AI throughput >= threshold on long run.
@@ -311,7 +304,6 @@ class AcceptanceGateRunner:
             elapsed_seconds=time.perf_counter() - t_start,
         )
 
-    # ── Gate 5: Safety & Override Rate ──────────────────────────────────────
     def run_gate5(self, seeds: Optional[List[int]] = None) -> GateResult:
         """Watchdog override rate < 5% on balanced traffic."""
         t_start = time.perf_counter()
@@ -340,7 +332,6 @@ class AcceptanceGateRunner:
             elapsed_seconds=time.perf_counter() - t_start,
         )
 
-    # ── Full Pipeline ────────────────────────────────────────────────────────
     def run_all_gates(
         self,
         seeds: Optional[List[int]] = None,

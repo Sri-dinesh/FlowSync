@@ -5,16 +5,14 @@ Broadcasts progress events during video processing.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import uuid
-from pathlib import Path
 from typing import Dict, Optional, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from ..realworld.models.config import SESSION_DIR, UPLOAD_DIR
+from ..realworld.models.config import SESSION_DIR
 from ..realworld.models.schemas import CCTVFrame
 from ..realworld.pipeline.cctv_pipeline import CCTVPipeline
 from ..realworld.pipeline.video_processor import VideoProcessor

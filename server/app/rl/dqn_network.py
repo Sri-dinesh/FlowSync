@@ -14,8 +14,10 @@ Improvements in this version:
 """
 import torch
 import torch.nn as nn
-from typing import Optional
-from app.rl.hyperparams import HyperParams
+try:
+    from .hyperparams import HyperParams
+except (ImportError, ValueError):
+    from app.rl.hyperparams import HyperParams
 
 HP = HyperParams()
 
@@ -94,12 +96,8 @@ class DuelingDQNNetwork(nn.Module):
         advantage = self.advantage_stream(features)  # (batch, action_dim)
 
         if valid_action_mask is not None:
-            # BUG-05 CORRECTED: compute mean only over valid action dimensions
-            # valid_action_mask: True for valid actions, False for invalid
-            # Shape: (batch, action_dim) bool
-            float_mask = valid_action_mask.float()  # 1.0 = valid, 0.0 = invalid
-
-            # Masked advantage sum, divide by number of valid actions per sample
+            # Center advantage over valid action dimensions for Dueling identifiability
+            float_mask = valid_action_mask.float()
             n_valid = float_mask.sum(dim=1, keepdim=True).clamp(min=1.0)
             masked_advantage_mean = (advantage * float_mask).sum(dim=1, keepdim=True) / n_valid
             q_values = value + advantage - masked_advantage_mean

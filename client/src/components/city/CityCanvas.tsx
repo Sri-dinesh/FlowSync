@@ -13,7 +13,6 @@ import CityRoads from "@/components/city/CityRoads";
 import CityVehicle from "@/components/city/CityVehicle";
 import TrafficLight from "@/components/simulation/TrafficLight";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const INTERSECTION_POSITIONS: Record<string, [number, number, number]> = {
   A: [-10, 0, -10],
   B: [10, 0, -10],
@@ -100,7 +99,6 @@ function resolveLightColor(
   return "red";
 }
 
-// ── Single Intersection Component ──
 const IntersectionNode = React.memo(function IntersectionNode({
   data,
   showCongestion,
@@ -185,15 +183,16 @@ const IntersectionNode = React.memo(function IntersectionNode({
   );
 });
 
-// ── Main Canvas ──
 interface CityCanvasProps {
   frame: CityFrame | null;
   showCongestion: boolean;
 }
 
+const EMPTY_INTERSECTIONS: Record<string, CityIntersectionState> = {};
+const EMPTY_ROAD_VEHICLES: NonNullable<CityFrame["road_vehicles"]> = [];
+
 export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
-  const intersectionData = frame?.intersections ?? {};
-  const roadVehicles = frame?.road_vehicles ?? [];
+  const intersectionData = frame?.intersections ?? EMPTY_INTERSECTIONS;
 
   const allVehicles = useMemo(() => {
     const list: Array<{
@@ -203,7 +202,8 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
       cz?: number;
     }> = [];
 
-    for (const inter of Object.values(intersectionData)) {
+    const inters = frame?.intersections ?? EMPTY_INTERSECTIONS;
+    for (const inter of Object.values(inters)) {
       for (const v of inter.vehicles) {
         list.push({
           vehicle: v,
@@ -214,6 +214,7 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
       }
     }
 
+    const roadVehicles = frame?.road_vehicles ?? EMPTY_ROAD_VEHICLES;
     for (const rv of roadVehicles) {
       list.push({
         vehicle: {
@@ -235,7 +236,7 @@ export default function CityCanvas({ frame, showCongestion }: CityCanvasProps) {
     }
 
     return list;
-  }, [intersectionData, roadVehicles]);
+  }, [frame]);
 
   return (
     <Canvas

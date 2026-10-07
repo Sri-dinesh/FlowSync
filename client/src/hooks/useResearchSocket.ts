@@ -18,7 +18,7 @@ let globalSocket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let retryCount = 0;
 let isConnecting = false;
-let messageQueue: string[] = [];
+const messageQueue: string[] = [];
 let activeListenersCount = 0;
 let startTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -135,7 +135,9 @@ function ensureResearchSocket() {
       isConnecting = false;
       try {
         socket.close();
-      } catch (_) {}
+      } catch {
+        // ignore close error
+      }
     };
   } catch (err) {
     isConnecting = false;
@@ -177,8 +179,8 @@ export function useResearchSocket() {
   const startExperiment = useCallback(
     (
       scenarioId: string,
-      controller: any,
-      seed: number,
+      controller: string | { id?: string; name?: string } = "flowsync_uq",
+      seed: number = 1101,
       noisePreset: NoisePresetKey = "clean",
       speed: number = speedMultiplier,
     ) => {
@@ -216,8 +218,8 @@ export function useResearchSocket() {
   const startPairedComparison = useCallback(
     (
       scenarioId: string,
-      controllerA: any = "d3qn",
-      controllerB: any = "flowsync_uq",
+      controllerA: string | { id?: string; name?: string } = "d3qn",
+      controllerB: string | { id?: string; name?: string } = "flowsync_uq",
       seed: number = 1101,
       noisePreset: NoisePresetKey = "miss_30",
       speed: number = speedMultiplier,

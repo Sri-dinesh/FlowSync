@@ -74,10 +74,13 @@ export default function MetricsPanel() {
       return;
     }
 
-    const maxQueue = Math.max(...Object.values(frame.queue_lengths ?? {}), 0);
-    setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.avg_wait_time]);
-    setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.throughput]);
-    setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
+    const timer = setTimeout(() => {
+      const maxQueue = Math.max(...Object.values(frame.queue_lengths ?? {}), 0);
+      setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.avg_wait_time]);
+      setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.throughput]);
+      setQueueHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), maxQueue]);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [frame, isRunning]);
 
   useEffect(() => {
@@ -88,7 +91,10 @@ export default function MetricsPanel() {
     if (!latest) {
       return;
     }
-    setEpisodeHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), latest.episode]);
+    const timer = setTimeout(() => {
+      setEpisodeHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), latest.episode]);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [trainingMetrics, isRunning]);
 
   const metrics = useMemo(() => {

@@ -67,7 +67,6 @@ export interface EpisodeRecord {
   steps: number;
 }
 
-// ─── Scenario Builder ─────────────────────────────────────────────────────────
 
 export type ScenarioType = "standard" | "stress" | "held_out" | "sweep";
 

@@ -10,8 +10,10 @@ Improvements in this version:
 """
 import numpy as np
 import torch
-from typing import Optional, Tuple
-from app.rl.hyperparams import HyperParams
+try:
+    from .hyperparams import HyperParams
+except (ImportError, ValueError):
+    from app.rl.hyperparams import HyperParams
 
 HP = HyperParams()
 
@@ -104,8 +106,7 @@ class PrioritizedReplayBuffer:
         self.beta = HP.PER_BETA_START
         self.beta_end = HP.PER_BETA_END
         self.epsilon = HP.PER_EPSILON
-        # BUG-03 FIX: max_priority is now stored as raw (|δ| + ε), NOT raised to alpha
-        self.max_priority: float = 1.0  # raw priority floor
+        self.max_priority: float = 1.0  # Raw priority floor (|δ| + ε)
 
     def push(
         self,
@@ -120,13 +121,8 @@ class PrioritizedReplayBuffer:
         is_demo: bool = False,
     ) -> None:
         """
-        Add transition with maximum-priority guarantee (ensures new transitions
-        are sampled quickly — they have the highest uncertainty).
-
-        BUG-03 FIX: priority = max_priority^alpha  where max_priority is RAW.
-        Task 1.3:   Store optional valid_action_mask with the transition.
+        Add transition with maximum-priority guarantee to ensure immediate sampling.
         """
-        # Default action mask: all 4 actions valid (if no mask provided)
         if valid_action_mask is None:
             valid_action_mask = np.ones(HP.ACTION_DIM, dtype=bool)
         if next_valid_action_mask is None:
@@ -146,7 +142,6 @@ class PrioritizedReplayBuffer:
             float(is_demo),
         )
 
-        # BUG-03 CORRECTED: max_priority is raw, apply alpha here exactly once
         priority = self.max_priority ** self.alpha
         self.tree.add(priority, transition)
 
@@ -202,14 +197,8 @@ class PrioritizedReplayBuffer:
         )
 
     def update_priorities(self, indices: list, td_errors: np.ndarray) -> None:
-        """
-        Update priorities after training step based on new TD errors.
-
-        BUG-03 FIX: Store raw_priority in self.max_priority, apply alpha once
-        when updating the SumTree leaf.
-        """
+        """Update priorities after training step based on new TD errors."""
         for idx, td_error in zip(indices, td_errors):
-            # BUG-03 CORRECTED: compute raw priority, apply alpha once for SumTree
             raw_priority = abs(float(td_error)) + self.epsilon
             stored_priority = raw_priority ** self.alpha
             self.tree.update(idx, stored_priority)

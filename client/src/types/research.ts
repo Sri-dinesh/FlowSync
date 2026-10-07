@@ -168,6 +168,24 @@ export interface PerceptionHealthState {
   active_cues: string[];
 }
 
+export interface ResearchActionsState {
+  executed?: number;
+  proposed_d3qn?: number;
+  fallback?: number;
+  supervisor_selected?: number;
+  shield_validated?: number;
+  [key: string]: unknown;
+}
+
+export interface ResearchFsmState {
+  current_state?: string;
+  remaining_in_state_s?: number;
+  min_green_remaining_s?: number;
+  premature_switch_attempts?: number;
+  executed_safety_violations?: number;
+  [key: string]: unknown;
+}
+
 export interface ResearchTelemetryFrame {
   type: "research_frame";
   experiment_id: string;
@@ -179,6 +197,7 @@ export interface ResearchTelemetryFrame {
   step: number;
   sim_time_s: number;
   sim_time?: number;
+  signal_phase?: number;
   signal: SignalState;
   policy: PolicyState;
   uncertainty: UncertaintyState;
@@ -187,8 +206,8 @@ export interface ResearchTelemetryFrame {
   metrics: ResearchMetricsState;
   vehicles: ResearchVehicleState[];
   perception?: PerceptionHealthState;
-  actions?: Record<string, any>;
-  fsm?: Record<string, any>;
+  actions?: ResearchActionsState;
+  fsm?: ResearchFsmState;
   [key: string]: unknown;
 }
 

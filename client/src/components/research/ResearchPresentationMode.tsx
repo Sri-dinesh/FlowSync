@@ -1,8 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import dynamic from "next/dynamic";
-import { Maximize2, Minimize2, Shield, Activity, AlertTriangle, Layers, TrendingUp } from "lucide-react";
+import { Minimize2, Shield, Activity, TrendingUp } from "lucide-react";
 import { useResearchStore } from "@/store/researchStore";
 import { ControllerComparison } from "./ControllerComparison";
 
@@ -17,14 +16,10 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
   const activeScenario = useResearchStore((s) => s.activeScenario);
   const activeSeed = useResearchStore((s) => s.activeSeed);
   const activeNoise = useResearchStore((s) => s.activeNoise);
-  const runStatus = useResearchStore((s) => s.runStatus);
 
   const uScore = currentFrame?.uncertainty?.composite_u ?? 0.0;
   const isFallback = (currentFrame?.supervisor?.mode ?? "").toUpperCase() === "FALLBACK";
   const delayMean = currentFrame?.metrics?.delay_mean_s ?? 0.0;
-  const p95Delay = currentFrame?.metrics?.delay_p95_s ?? 0.0;
-  const queueArea = currentFrame?.metrics?.queue_area_veh_s ?? 0.0;
-  const throughput = currentFrame?.metrics?.throughput_total_veh ?? 0;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#07090e] text-white flex flex-col p-6 overflow-y-auto">

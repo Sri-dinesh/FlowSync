@@ -1,30 +1,8 @@
-"""
-safety_shield.py — Dedicated Formal Traffic Signal Safety Shield Layer
-======================================================================
-Task 1A.4 & Task C3: Centralizes all signal-safety constraints and transition
-rules into an auditable, controller-independent enforcement layer.
-
-Safety Pipeline:
-  Controller Policy Proposal
-           ↓
-     Valid Action Mask
-           ↓
-      SafetyShield
-           ↓
-   Physical Signal FSM
-
-Enforced Invariants:
-1. Minimum Green Guard: No phase switch permitted before MIN_GREEN_TIME (8.0s).
-2. Clearance Interlock: All-red and yellow clearance cannot be truncated or skipped.
-3. Max Green Ceiling: Phase green duration cannot exceed MAX_GREEN_TIME (40.0s).
-4. Anti-Starvation Precedence: Phases waiting >= STARVATION_LIMIT (45.0s) take precedence.
-5. Conflict Compatibility: Green phases on conflicting approaches can NEVER execute concurrently.
-6. Forbidden Action Rejection: Proposed actions not in valid_action_mask are overridden.
-"""
+"""Traffic signal safety shield enforcing clearance interlocks, minimum green guards, and anti-starvation invariants."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import numpy as np
 
 
@@ -100,7 +78,6 @@ class SafetyShield:
         self.total_evaluations += 1
         target_action = proposed_action
 
-        # Check bounds: action must be in [0, 3]
         if not (0 <= target_action <= 3):
             self.unsafe_proposals_blocked += 1
             self._record_override("invalid_action_index_out_of_bounds")

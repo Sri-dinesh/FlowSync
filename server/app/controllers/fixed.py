@@ -1,14 +1,7 @@
-"""
-fixed.py — Fixed-Time Traffic Signal Controller Baseline (Webster 1958)
-=======================================================================
-Operates strictly on fixed pre-timed clock cycle durations.
-Sequentially cycles phases: 0 -> 1 -> 2 -> 3 -> 0.
-Does NOT inspect queue lengths, does NOT prioritize high-traffic approaches,
-and does NOT skip phases.
-"""
+"""Pre-timed fixed-cycle traffic signal controller baseline (Webster 1958)."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import numpy as np
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
@@ -48,11 +41,9 @@ class FixedController(BaseController):
 
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:
         self._step_count += 1
-        # Synchronize with context if provided, else use internal timer
         self._time_in_phase += context.dt
         phase_cap = self.phase_durations[self._current_phase]
 
-        # In stable green: if time exceeded phase allocation and switching is allowed, advance
         if context.can_switch_phase and self._time_in_phase >= phase_cap:
             self._current_phase = (self._current_phase + 1) % 4
             self._time_in_phase = 0.0

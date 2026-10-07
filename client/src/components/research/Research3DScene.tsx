@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useMemo } from "react";
 import { Billboard, Text } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
-import { ConeGeometry, MeshBasicMaterial, DoubleSide, Group } from "three";
+import { ConeGeometry, MeshBasicMaterial, DoubleSide } from "three";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";
 import TrafficLight from "@/components/simulation/TrafficLight";
@@ -165,11 +164,11 @@ export function Research3DScene({ frameOverride, label }: Research3DSceneProps) 
 
   const frame = frameOverride !== undefined ? frameOverride : storeFrame;
   const fsmState = frame?.fsm?.current_state ?? "GREEN";
-  const executedPhase = frame?.actions?.executed ?? frame?.signal_phase ?? 0;
+  const executedPhase: number =
+    frame?.actions?.executed ?? frame?.signal_phase ?? frame?.signal?.current_phase ?? 0;
   const remainingInState = frame?.fsm?.remaining_in_state_s ?? 0;
 
-  // Vehicles from telemetry frame or empty
-  const vehicles: VehicleState[] = (frame?.vehicles as any) ?? [];
+  const vehicles: VehicleState[] = (frame?.vehicles as unknown as VehicleState[]) ?? [];
 
   const queueLengths = {
     north: frame?.metrics?.queue_length_north ?? 0,

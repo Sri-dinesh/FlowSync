@@ -14,14 +14,13 @@ Measures:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 import numpy as np
 
-from server.app.controllers import get_controller, BaseController, ControllerContext
+from server.app.controllers import get_controller, ControllerContext
 from server.app.simulation.city_network import CityNetwork
 from server.app.simulation.city_spawner import CitySpawner
 from server.app.simulation.traffic_signal import SignalColor

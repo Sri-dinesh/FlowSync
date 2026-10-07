@@ -14,13 +14,13 @@ import {
 import {
   Trophy,
   Play,
-  Square,
   RotateCcw,
   Clock,
   Target,
   Bot,
   SlidersHorizontal,
   Activity,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -39,7 +39,7 @@ const PRESET_DURATIONS = [15, 30, 60, 120];
 
 const MODE_CONFIG: Record<
   string,
-  { label: string; shortLabel: string; icon: any; barColor: string }
+  { label: string; shortLabel: string; icon: LucideIcon; barColor: string }
 > = {
   fixed: {
     label: "Fixed Timing",

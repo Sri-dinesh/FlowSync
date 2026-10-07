@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { BoxGeometry, MeshPhysicalMaterial, MeshStandardMaterial, PlaneGeometry } from "three";
-import { Tree, Hedge } from "./city/Tree";
+import { Tree } from "./city/Tree";
 import { Streetlight, ParkBench, FireHydrant, PlanterBox, Bollard } from "./city/UrbanProps";
 import { GlassTower, SteppedTower, MidRiseBlock, PlazaTower } from "./city/BuildingModels";
 import { CityPark } from "./city/CityPark";

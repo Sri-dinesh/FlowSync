@@ -5,13 +5,8 @@ import {
   FlaskConical,
   Play,
   RotateCcw,
-  Sparkles,
   ShieldAlert,
-  Cpu,
-  Hash,
   Activity,
-  Layers,
-  CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

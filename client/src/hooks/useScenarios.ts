@@ -25,7 +25,6 @@ export function useScenarios() {
   const { httpUrl } = getFastApiUrls();
   const BASE = `${httpUrl}/simulation/scenarios`;
 
-  // ─── List ───────────────────────────────────────────────────────────────────
   const fetchScenarios = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -47,7 +46,6 @@ export function useScenarios() {
     }, 0);
   }, [fetchScenarios]);
 
-  // ─── Create ─────────────────────────────────────────────────────────────────
   const createScenario = useCallback(
     async (
       name: string,
@@ -83,7 +81,6 @@ export function useScenarios() {
     [BASE],
   );
 
-  // ─── Delete ─────────────────────────────────────────────────────────────────
   const deleteScenario = useCallback(
     async (id: string): Promise<boolean> => {
       setError(null);
@@ -101,7 +98,6 @@ export function useScenarios() {
     [BASE],
   );
 
-  // ─── Fetch runs for one scenario ────────────────────────────────────────────
   const fetchRuns = useCallback(
     async (scenarioId: string): Promise<ScenarioRun[]> => {
       try {
@@ -116,7 +112,6 @@ export function useScenarios() {
     [BASE],
   );
 
-  // ─── Fetch grouped runs (3-controller paired runs) ──────────────────────────
   const fetchGroupedRuns = useCallback(
     async (scenarioId: string): Promise<ScenarioRunGroup[]> => {
       try {
@@ -131,7 +126,6 @@ export function useScenarios() {
     [BASE],
   );
 
-  // ─── Fetch cross-scenario aggregate stats ──────────────────────────────────
   const fetchAggregateStats = useCallback(
     async (): Promise<ScenarioAggregateStats | null> => {
       try {
@@ -146,7 +140,6 @@ export function useScenarios() {
     [BASE],
   );
 
-  // ─── Seed Default Evaluation Scenarios ─────────────────────────────────────
   const seedDefaultScenarios = useCallback(async (): Promise<boolean> => {
     setError(null);
     try {

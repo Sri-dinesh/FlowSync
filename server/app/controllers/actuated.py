@@ -1,14 +1,7 @@
-"""
-actuated.py — NEMA Actuated / Variable-Access-Timer (VAT) Signal Controller Baseline
-====================================================================================
-Implements classical NEMA dual-ring actuated signal control:
-- Serves green until gap-out condition (no arrivals for gap_threshold AND min_green served).
-- Enforces max_green hard ceiling.
-- At termination of green, transitions to highest-demand conflicting phase.
-"""
+"""NEMA actuated / Variable-Access-Timer (VAT) signal controller baseline."""
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 import numpy as np
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
@@ -80,11 +73,9 @@ class ActuatedController(BaseController):
         self._step_count += 1
         self._time_in_phase += context.dt
 
-        # Check arrivals from context if available
         spawned = context.extra_telemetry.get("spawned_this_step", 0)
         self.update_arrivals(spawned, dt=context.dt)
 
-        # Gap-out condition
         gap_out = (
             self._time_in_phase >= self.min_green
             and self._time_since_last_arrival >= self.gap_threshold
@@ -94,7 +85,6 @@ class ActuatedController(BaseController):
         should_switch = (gap_out or max_green_exceeded) and context.can_switch_phase
 
         if should_switch:
-            # Pick next phase with highest queue
             phase_counts: Dict[int, float] = {}
             if context.movement_queues is not None:
                 for ph, movements in PHASE_MOVEMENTS.items():
@@ -107,11 +97,10 @@ class ActuatedController(BaseController):
                         if m in MOVEMENT_KEYS and MOVEMENT_KEYS.index(m) < len(observation)
                     )
 
-            # Look at alternative phases
             candidates = [p for p in range(4) if p != self._current_phase]
             best_alt = max(candidates, key=lambda p: (phase_counts.get(p, 0.0), -p))
 
-            # Only switch if candidate has vehicles or if current phase has reached max-green
+            # Only switch if candidate has vehicles or if current phase reached max green ceiling
             if phase_counts.get(best_alt, 0.0) > 0.0 or max_green_exceeded:
                 self._current_phase = best_alt
                 self._time_in_phase = 0.0

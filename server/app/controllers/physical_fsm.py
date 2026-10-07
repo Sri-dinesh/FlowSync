@@ -1,20 +1,4 @@
-"""
-physical_fsm.py — Mandatory Physical Signal State Machine (Fair Benchmark Layer)
-================================================================================
-Task 3 (P0): Ensures all evaluated traffic controllers pass through a mandatory,
-uniform physical signal transition state machine (analogous to a NEMA TS2 MMU /
-hardware signal cabinet).
-
-This architecture guarantees:
-1. No controller can execute conflicting green phases simultaneously.
-2. Mandatory yellow clearance (3.0s) and all-red clearance (1.0s) are ALWAYS enforced.
-3. Minimum green time (8.0s) is strictly enforced for physical lamp changes.
-4. Proposed illegal actions (e.g. skipping yellow or switching early) are recorded
-   as `proposed_violations`, while `executed_violations` are identically zero for
-   all controllers operating with this physical layer.
-5. FlowSync-UQ's additional safety layer (anti-starvation preemption, max-green ceiling,
-   and uncertainty-triggered fallback) is cleanly separated and audited.
-"""
+"""Mandatory physical signal state machine enforcing lamp transitions, minimum green, and clearance intervals."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -71,13 +55,11 @@ class PhysicalSignalFSM:
         self.yellow_duration = yellow_duration
         self.all_red_duration = all_red_duration
 
-        # Current physical state
         self.current_phase: int = 0
         self.color: FSMColor = FSMColor.GREEN
         self.time_in_phase: float = 0.0
         self.pending_phase: Optional[int] = None
 
-        # Cumulative audit counters
         self.total_decisions: int = 0
         self.total_proposed_violations: int = 0
         self.total_executed_violations: int = 0

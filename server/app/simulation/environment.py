@@ -1,26 +1,4 @@
-"""
-environment.py — FlowSync TrafficEnv (RL Gymnasium Environment)
-================================================================
-All improvements integrated in this version:
-
-  Phase 0:
-  - Task 0.2:  Reward component decomposition + watchdog override telemetry
-
-  Phase 1:
-  - BUG-01:    Returns executed_action in info dict so trainer stores correct action
-  - BUG-04:    Uses shared traffic_math.DEST_MAP (eliminates Sim-Real divergence)
-
-  Phase 2:
-  - Task 2.1:  Semi-MDP decision flag: is_decision_step tracks causal decision points
-
-  Phase 3:
-  - Task 3.1:  Delay-anchored reward function (R_delay + R_pressure + R_throughput
-               − R_switch − R_starvation − R_max_green + R_balance)
-
-  Phase 4:
-  - Task 4.1:  Integrates ArrivalForecaster into intersection tick loop
-  - Task 4.2:  Observation vector expanded to 28-D (dims 20-27 = forecast features)
-"""
+"""Gymnasium environment for traffic signal control simulation."""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -32,7 +10,7 @@ from gymnasium.spaces import Box, Discrete
 from ..config import settings
 from ..schemas.simulation_schema import SimulationFrame, build_frame
 from .intersection import Intersection
-from .traffic_signal import PHASE_GREEN_LANES, SignalColor
+from .traffic_signal import SignalColor
 from .traffic_math import (
     MAX_CAP,
     MOVEMENT_KEYS,
@@ -46,11 +24,6 @@ from ..rl.hyperparams import HyperParams
 
 HP = HyperParams()
 
-# ── Observation layout ──────────────────────────────────────────────────────
-#   Dims 0-11:  Movement queue counts (12)
-#   Dims 12-15: Phase one-hot encoding (4)
-#   Dims 16-19: Signal context [time_norm, is_trans, pressure_norm, starv_norm] (4)
-#   Dims 20-27: Demand forecast features (8)  ← Task 4.2 addition
 OBS_DIM = HP.STATE_DIM  # = 28
 
 
@@ -90,12 +63,10 @@ class TrafficEnv(gym.Env):
 
         self._last_reward: float = 0.0
         self._episode: int = 0
-        self._env_step_count: int = 0  # BUG-E: per-episode step counter
+        self._env_step_count: int = 0
 
-        # ── Task 4.1: Demand forecaster ─────────────────────────────────────
         self.forecaster = ArrivalForecaster()
 
-        # ── Task 0.2: Reward component telemetry ────────────────────────────
         self.reward_component_accumulators: Dict[str, float] = {
             "pressure":   0.0,
             "delay":      0.0,
@@ -113,9 +84,6 @@ class TrafficEnv(gym.Env):
         """Forward traffic profile assignment to underlying intersection."""
         self.intersection.set_traffic_profile(profile)
 
-    # ────────────────────────────────────────────────────────────────────────
-    # Reset
-    # ────────────────────────────────────────────────────────────────────────
     def reset(
         self,
         seed: int | None = None,
@@ -124,20 +92,18 @@ class TrafficEnv(gym.Env):
         super().reset(seed=seed)
         self._episode += 1
         self.intersection.reset()
-        # Gymnasium's seed must control the component that actually samples
-        # arrivals.  Previously reset(seed=...) never reached default_rng().
+        # Seed spawner RNG directly so episode generation is strictly repeatable.
         if seed is not None:
             self.intersection.spawner.set_seed(seed)
         self.intersection.spawner.set_enabled(True)
         self._last_reward = 0.0
 
-        # Reset forecaster and telemetry
         self.forecaster.reset()
         for k in self.reward_component_accumulators:
             self.reward_component_accumulators[k] = 0.0
         self.watchdog_override_count = 0
         self.total_decision_steps = 0
-        self._env_step_count = 0  # BUG-E: reset per-episode counter
+        self._env_step_count = 0
         self.passed_vehicle_waits = []
 
         return self._get_obs(), {}
@@ -148,9 +114,6 @@ class TrafficEnv(gym.Env):
         signal = self.intersection.signal
         return signal.color == SignalColor.GREEN and signal.can_switch_phase
 
-    # ────────────────────────────────────────────────────────────────────────
-    # Reward: incremental delay with pressure shaping
-    # ────────────────────────────────────────────────────────────────────────
     def compute_reward(
         self,
         prev_pressures: Dict[str, float],
@@ -179,27 +142,23 @@ class TrafficEnv(gym.Env):
             delay_incurred = max(0.0, delta_total_wait)
         delay_reward = -float(delay_incurred) / 10.0
 
-        # 2. Pressure differential
         total_curr = compute_total_pressure(curr_pressures)
         # Penalize the pressure level, not only a telescoping difference.  A
         # pure difference can be gamed at an arbitrary episode boundary.
         pressure_reward = -total_curr * 0.05 * dt
 
-        # 3. Throughput — BUG-D: raised coefficient for clearer signal
         throughput_reward = vehicles_passed * 0.10
 
-        # 4. Switch penalty — BUG-D: threshold 0.5 (was 0.3) — only penalize high-pressure switches
+        # Penalize phase switches when previous phase had high queue pressure.
         if phase_changed and prev_phase is not None:
             prev_phase_pressure = compute_phase_pressure(prev_pressures, prev_phase)
             switch_penalty = -0.10 if prev_phase_pressure > 0.5 else -0.03
         else:
             switch_penalty = 0.0
 
-        # 5. Starvation penalty
         starved = signal.get_starved_phases()
         starvation_penalty = -0.10 * len(starved) * dt
 
-        # 6. Max-green violation
         max_green_penalty = -0.10 * dt if signal.is_max_green_exceeded else 0.0
 
         # Reserved in telemetry for backward compatibility. A positive balance
@@ -217,9 +176,6 @@ class TrafficEnv(gym.Env):
         }
         return float(sum(components.values())), components
 
-    # ────────────────────────────────────────────────────────────────────────
-    # Step
-    # ────────────────────────────────────────────────────────────────────────
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Run one simulation tick (dt=0.1s).
@@ -230,14 +186,12 @@ class TrafficEnv(gym.Env):
         """
         signal = self.intersection.signal
         proposed_action = action
-        self._env_step_count += 1  # BUG-E: increment per-episode counter
+        self._env_step_count += 1
 
-        # ── Semi-MDP: is this a causal decision step? ────────────────────────
         is_decision_step = (
             signal.color == SignalColor.GREEN and signal.can_switch_phase
         )
 
-        # ── Watchdog override: max-green ─────────────────────────────────────
         was_overridden = False
         override_reason: Optional[str] = None
         if (
@@ -250,7 +204,6 @@ class TrafficEnv(gym.Env):
             override_reason = "max_green_exceeded"
             self.watchdog_override_count += 1
 
-        # ── Watchdog override: starvation ────────────────────────────────────
         starved = signal.get_starved_phases()
         if is_decision_step and starved:
             starved_phase = max(
@@ -264,29 +217,22 @@ class TrafficEnv(gym.Env):
 
         requested_action = action
 
-        # ── Pre-step snapshots ──────────────────────────────────────────────
         prev_pressures = self._compute_movement_pressures(self.intersection)
         prev_passed = self.intersection.total_passed
         prev_phase = self.intersection.signal.current_phase
-        prev_actual_phase = self.intersection.signal.current_phase  # BUG-A: track real phase
+        prev_actual_phase = self.intersection.signal.current_phase
         prev_wait = self.intersection.get_total_wait_time()
 
-        # ── Tick environment ─────────────────────────────────────────────────
         passed_vehicles = self.intersection.tick(dt=0.1, action=requested_action)
         for pv in passed_vehicles:
             self.passed_vehicle_waits.append(pv.wait_time)
 
-        # ── Post-step snapshots ──────────────────────────────────────────────
         curr_pressures = self._compute_movement_pressures(self.intersection)
         curr_passed = self.intersection.total_passed
         vehicles_passed_this_step = curr_passed - prev_passed
 
-        # BUG-A FIX: phase_changed should detect REAL phase transitions, not blocked attempts.
-        # Old logic: (executed_action != prev_phase AND color==GREEN) was backwards:
-        #   - Real switch: color goes YELLOW -> GREEN check fails -> penalty NEVER fired
-        #   - Blocked switch (min-green): color stays GREEN -> penalty DID fire spuriously
-        # Fix: check if signal.current_phase actually changed after the tick, OR if
-        # a yellow transition was just initiated (pending_phase set for first time).
+        # Detect true physical phase transitions (committed yellow clearance or completed switch),
+        # avoiding spurious penalties on proposals blocked by minimum green time.
         new_actual_phase = self.intersection.signal.current_phase
         executed_action = (
             self.intersection.signal.pending_phase
@@ -297,18 +243,16 @@ class TrafficEnv(gym.Env):
         switch_just_initiated = (
             self.intersection.signal.pending_phase is not None
             and self.intersection.signal.color.name == "YELLOW"
-            and self.intersection.signal.time_in_phase < 0.15  # just started
+            and self.intersection.signal.time_in_phase < 0.15  # just initiated
         )
         phase_changed = actually_switched or switch_just_initiated
 
         curr_wait = self.intersection.get_total_wait_time()
         delta_total_wait = curr_wait - prev_wait
 
-        # ── Task 4.1: Update arrival forecaster ──────────────────────────────
         spawned_this_step = self.intersection._generated_last_tick
         self.forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this_step))
 
-        # ── Compute reward ───────────────────────────────────────────────────
         reward, components = self.compute_reward(
             prev_pressures=prev_pressures,
             curr_pressures=curr_pressures,
@@ -322,7 +266,6 @@ class TrafficEnv(gym.Env):
         )
         self._last_reward = reward
 
-        # ── Accumulate component telemetry ───────────────────────────────────
         for k, v in components.items():
             self.reward_component_accumulators[k] = (
                 self.reward_component_accumulators.get(k, 0.0) + v
@@ -339,28 +282,22 @@ class TrafficEnv(gym.Env):
         )
 
         info: Dict[str, Any] = {
-            # S-01 / R-01: Explicit version tracking
             "state_version":           "v1_28d",
             "reward_version":          "v4_incremental_delay",
-            # BUG-01: expose executed action for correct replay buffer push
             "executed_action":         executed_action,
             "proposed_action":         proposed_action,
             "was_overridden":          was_overridden,
             "override_reason":         override_reason,
             "is_decision_step":        is_decision_step,
-            # reward telemetry
             "reward_components":       components,
             "reward_accumulators":     dict(self.reward_component_accumulators),
-            # standard telemetry
             "pressures":               curr_pressures,
             "vehicles_passed":         vehicles_passed_this_step,
             "avg_wait_time":           self.intersection.get_avg_wait_time(),
             "starved_phases":          starved,
-            # watchdog telemetry
             "watchdog_override_count": self.watchdog_override_count,
             "total_decision_steps":    self.total_decision_steps,
             "watchdog_override_rate":  override_rate,
-            # Task 4.1: forecast debug
             "forecast":                self.forecaster.get_debug_info(),
         }
 
@@ -468,9 +405,6 @@ class TrafficEnv(gym.Env):
         })
         return self._get_obs(), cumulative_reward, terminated, truncated, last_info
 
-    # ────────────────────────────────────────────────────────────────────────
-    # Internal helpers
-    # ────────────────────────────────────────────────────────────────────────
     def _get_best_alternative_phase(self) -> int:
         """When max green exceeded, pick the phase with highest pressure."""
         pressures = self._compute_movement_pressures(self.intersection)
@@ -520,31 +454,24 @@ class TrafficEnv(gym.Env):
         signal = self.intersection.signal
         pressures = self._compute_movement_pressures(self.intersection)
 
-        # Dims 0-11: queue values in canonical MOVEMENT_KEYS order with smooth tanh saturation (S-03)
         movements = [
             float(np.tanh(movement_queues.get(k, 0) / 15.0))
             for k in MOVEMENT_KEYS
         ]
 
-        # Dims 12-15: one-hot phase
         phase_onehot = [0.0, 0.0, 0.0, 0.0]
         phase_onehot[signal.current_phase] = 1.0
 
-        # Dim 16: time in phase
         time_norm = min(1.0, signal.time_in_phase / signal.MAX_GREEN_TIME)
 
-        # Dim 17: is transitioning
         is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
 
-        # Dim 18: destination-aware total pressure
         total_pressure = compute_total_pressure(pressures)
         pressure_norm = normalize_total_pressure(total_pressure)
 
-        # Dim 19: max starvation timer
         starv_timers = list(signal.phase_starvation_timer.values())
         max_starv_norm = min(max(starv_timers) / signal.STARVATION_THRESHOLD, 1.0)
 
-        # Dims 20-27: demand forecast features (Task 4.2)
         forecast_features = self.forecaster.get_forecast_features().tolist()
 
         obs = movements + phase_onehot + [time_norm, is_trans, pressure_norm, max_starv_norm] + forecast_features

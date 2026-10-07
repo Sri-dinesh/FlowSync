@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import gsap from "gsap";
-import { Car, Clock, Leaf, Zap, ShieldCheck, TrendingDown } from "lucide-react";
+import { Car, Clock, Zap, TrendingDown } from "lucide-react";
 
 export interface DashboardOverviewData {
   total_sessions: number;

@@ -13,26 +13,22 @@ Usage:
     forecaster = ArrivalForecaster()
     forecaster.tick(dt=0.1, spawned_this_step=2)
     state_features = forecaster.get_forecast_features()
-    # Returns 8 float values for state vector dims 20-27
 """
 from __future__ import annotations
 
 from collections import deque
-from typing import Deque, Dict, List, Tuple
+from typing import Deque, Dict
 
 import numpy as np
 
 
-# Time constants in seconds.  Alpha is computed from the actual caller dt;
-# fixed alphas of .18/.10/.05 at 10 Hz were really ~0.5/1/2-second filters,
-# ten times faster than their documented horizons.
+    # Time constants in seconds; alpha is computed from dt to maintain exact filtering horizons.
 _TAU_5S = 5.0
 _TAU_10S = 10.0
 _TAU_20S = 20.0
 
-# Normalization cap: max expected arrivals/second (Poisson λ=2.0 → extreme scenario)
+    # Normalization cap for extreme Poisson arrival rates.
 _MAX_ARRIVAL_RATE = 2.0
-# Window duration for rate-of-change estimation (growth rate signal)
 _GROWTH_WINDOW_SECONDS = 10.0
 _GROWTH_WINDOW_STEPS = int(_GROWTH_WINDOW_SECONDS / 0.1)  # 100 steps
 
@@ -67,15 +63,12 @@ class ArrivalForecaster:
         self._tau_20s = tau_20s
         self._max_rate = max_arrival_rate
 
-        # EWMA state (vehicles/step, then divided by dt to get vehicles/second)
         self._ewma_5s: float = 0.0
         self._ewma_10s: float = 0.0
         self._ewma_20s: float = 0.0
 
-        # Sliding window for growth rate computation
         self._rate_history: Deque[float] = deque(maxlen=_GROWTH_WINDOW_STEPS)
 
-        # Accumulated arrivals this second (for instantaneous rate)
         self._instant_rate: float = 0.0
         self._total_arrivals: int = 0
         self._total_steps: int = 0
@@ -88,7 +81,6 @@ class ArrivalForecaster:
             dt: Simulation timestep (seconds, typically 0.1).
             spawned_this_step: Number of vehicles spawned this tick.
         """
-        # Convert to instantaneous rate (vehicles/second)
         instant_rate = spawned_this_step / dt if dt > 0 else 0.0
         self._instant_rate = instant_rate
         self._total_arrivals += spawned_this_step
@@ -101,7 +93,6 @@ class ArrivalForecaster:
         self._ewma_10s = (1 - alpha_10s) * self._ewma_10s + alpha_10s * instant_rate
         self._ewma_20s = (1 - alpha_20s) * self._ewma_20s + alpha_20s * instant_rate
 
-        # Store recent 10-second EWMA for growth rate
         self._rate_history.append(self._ewma_10s)
 
     def get_forecast_features(self) -> np.ndarray:
@@ -120,12 +111,12 @@ class ArrivalForecaster:
         growth = (self._ewma_5s - self._ewma_20s) / cap
         growth_clamped = max(-1.0, min(1.0, growth))
 
-        # Burst flag: 1.0 if short-term rate is 50%+ above long-term (platoon detected)
+        # Burst flag: short-term rate exceeds 50% above long-term baseline (platoon detection).
         burst_flag = 1.0 if (
             self._ewma_20s > 0.05 and self._ewma_5s > 1.5 * self._ewma_20s
         ) else 0.0
 
-        # Dissipation flag: 1.0 if rate dropped to <50% of baseline (queue clearing)
+        # Dissipation flag: rate dropped below 50% of baseline (queue clearance).
         dissipation = 1.0 if (
             self._ewma_20s > 0.05 and self._ewma_5s < 0.5 * self._ewma_20s
         ) else 0.0
@@ -134,7 +125,6 @@ class ArrivalForecaster:
         trend = (self._ewma_10s - self._ewma_20s) / cap
         trend_signed = max(-1.0, min(1.0, trend))
 
-        # Absolute instantaneous rate (most recent tick)
         absolute_rate = min(1.0, self._instant_rate / cap)
 
         return np.array(

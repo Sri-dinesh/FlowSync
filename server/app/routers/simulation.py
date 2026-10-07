@@ -210,7 +210,6 @@ async def get_status(request: Request) -> MetricsSnapshot:
     return _build_snapshot(app)
 
 
-# ─── Scenario Builder Endpoints ───────────────────────────────────────────────
 
 @router.get("/scenarios")
 async def get_scenarios() -> list:

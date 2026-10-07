@@ -212,14 +212,7 @@ export default function DigitalTwinShowdown({
     };
   }, [setStoreFrame, setStoreConnected, setStoreRunning]);
 
-  // Inject initial scenario when counts change
-  useEffect(() => {
-    if (!initialCounts) return;
-    setScenarioCounts(initialCounts);
-    injectScenario(initialCounts);
-  }, [initialCounts]);
-
-  const injectScenario = async (counts: Record<string, number>) => {
+  const injectScenario = useCallback(async (counts: Record<string, number>) => {
     setInjecting(true);
     try {
       await fetch(`${API_BASE}/simulation/scenario`, {
@@ -232,7 +225,17 @@ export default function DigitalTwinShowdown({
     } finally {
       setInjecting(false);
     }
-  };
+  }, []);
+
+  // Inject initial scenario when counts change
+  useEffect(() => {
+    if (!initialCounts) return;
+    const timer = setTimeout(() => {
+      setScenarioCounts(initialCounts);
+      void injectScenario(initialCounts);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialCounts, injectScenario]);
 
   const sendWsCommand = useCallback((data: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -264,7 +267,7 @@ export default function DigitalTwinShowdown({
     if (scenarioCounts) {
       await injectScenario(scenarioCounts);
     }
-  }, [scenarioCounts]);
+  }, [scenarioCounts, injectScenario]);
 
   const handleStopBenchmark = useCallback(() => {
     sendWsCommand({ command: "stop" });
@@ -290,7 +293,7 @@ export default function DigitalTwinShowdown({
         <p className="text-white/70 text-sm font-medium">No session loaded</p>
         <p className="text-white/30 text-xs max-w-xs leading-relaxed">
           Upload and process a video in the Live View tab. When processing completes,
-          click "Open in Digital Twin" to load the vehicle data here.
+          click &ldquo;Open in Digital Twin&rdquo; to load the vehicle data here.
         </p>
       </div>
     );

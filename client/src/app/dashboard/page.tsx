@@ -7,8 +7,8 @@ import DashboardKpis, { DashboardOverviewData } from "@/components/dashboard/Das
 import ModeComparisonChart, { ModeBenchmarks } from "@/components/dashboard/ModeComparisonChart";
 import DirectionalFlowChart from "@/components/dashboard/DirectionalFlowChart";
 import AIPolicyInsights from "@/components/dashboard/AIPolicyInsights";
-import HistoricalSessionsTable, { SessionItem } from "@/components/dashboard/HistoricalSessionsTable";
-import { BarChart3, RefreshCw, Sparkles, Layers, Activity } from "lucide-react";
+import HistoricalSessionsTable, { SessionItem, BenchmarkSummary } from "@/components/dashboard/HistoricalSessionsTable";
+import { BarChart3, RefreshCw } from "lucide-react";
 
 interface DashboardPayload {
   overview: DashboardOverviewData;
@@ -38,7 +38,7 @@ interface DashboardPayload {
     share_pct: number;
   }[];
   sessions: SessionItem[];
-  benchmarks?: any[];
+  benchmarks?: BenchmarkSummary[];
 }
 
 // Fallback data in case backend is offline during first boot
@@ -120,7 +120,6 @@ const DEFAULT_FALLBACK_DATA: DashboardPayload = {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardPayload>(DEFAULT_FALLBACK_DATA);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "benchmarks" | "sessions">("all");
 
@@ -137,14 +136,28 @@ export default function DashboardPage() {
     } catch (err) {
       console.warn("Using fallback analytics data (backend unreachable):", err);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   }, [API_BASE]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    let ignore = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/analytics/dashboard-summary`);
+        if (res.ok && !ignore) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (err) {
+        console.warn("Using fallback analytics data (backend unreachable):", err);
+      }
+    };
+    void load();
+    return () => {
+      ignore = true;
+    };
+  }, [API_BASE]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-indigo-500 selection:text-white">

@@ -22,14 +22,13 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .intersection import Intersection
 
 logger = logging.getLogger(__name__)
 
-# ── VAT Parameters (classical NEMA actuated) ────────────────────────────────
 _GAP_THRESHOLD    = 3.5    # seconds: gap-out if no vehicle for this long
 _MIN_GREEN_TIME   = 8.0    # seconds: minimum before gap-out can occur
 _MAX_GREEN_TIME   = 40.0   # seconds: hard cap per phase

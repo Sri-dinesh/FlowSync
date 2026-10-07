@@ -4,7 +4,6 @@ All data models for the CCTV pipeline, detection outputs, ROI configs, and train
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 

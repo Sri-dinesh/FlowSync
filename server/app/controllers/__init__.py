@@ -1,18 +1,7 @@
-"""
-controllers — Unified Traffic Signal Controller Package
-========================================================
-Exports standard baselines and adaptive controllers:
-- BaseController, ControllerCapabilities, ControllerContext
-- FixedController (Webster 1958)
-- GreedyController (Max-Queue heuristic)
-- MaxPressureController (Varaiya 2013)
-- ActuatedController (NEMA Variable-Access-Timer)
-- DQNController (Mnih et al. 2015)
-- D3QNController (Wang et al. 2016, Van Hasselt et al. 2016)
-"""
+"""Traffic signal controllers package exporting baseline and adaptive controllers."""
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
 from .fixed import FixedController
@@ -77,6 +66,8 @@ __all__ = [
     "ControllerSupervisor",
     "ControlAuthority",
     "FlowSyncUQController",
+    "PhysicalSignalFSM",
+    "FSMDecision",
     "CONTROLLER_REGISTRY",
     "get_controller",
 ]

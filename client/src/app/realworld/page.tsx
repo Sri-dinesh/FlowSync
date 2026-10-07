@@ -80,6 +80,8 @@ export default function RealWorldPage() {
   const [twinData, setTwinData] = useState<TwinData | null>(null);
   const [totalVehiclesDetected, setTotalVehiclesDetected] = useState<number>(0);
 
+  const connectRef = useRef<() => void>(() => {});
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     const ws = new WebSocket(`${WS_URL}/ws/cctv`);
@@ -88,7 +90,7 @@ export default function RealWorldPage() {
     ws.onopen = () => setIsConnected(true);
     ws.onclose = () => {
       setIsConnected(false);
-      setTimeout(connect, 3000);
+      setTimeout(() => connectRef.current(), 3000);
     };
     ws.onerror = () => ws.close();
 
@@ -131,6 +133,7 @@ export default function RealWorldPage() {
   }, []);
 
   useEffect(() => {
+    connectRef.current = connect;
     connect();
     return () => wsRef.current?.close();
   }, [connect]);
@@ -265,7 +268,7 @@ export default function RealWorldPage() {
                 <DigitalTwinShowdown
                   twinData={twinData}
                   initialCounts={twinCounts}
-                  sessionId={twinData?.session_id}
+                  sessionId={twinData?.session_id || sessionId}
                 />
               </div>
             )}

@@ -75,7 +75,6 @@ class CityFrame(BaseModel):
     road_vehicles: List[RoadVehicleState]
 
 
-# ── Phase metadata (mirrors single-intersection schema) ───────────────────────
 
 PHASE_LABELS = {0: "NS_GREEN", 1: "EW_GREEN", 2: "NS_LEFT", 3: "EW_LEFT"}
 

@@ -1,21 +1,4 @@
-"""
-base.py — Unified Base Controller Interface for FlowSync Traffic Controllers
-=============================================================================
-Defines the standard contract for all traffic signal controllers:
-- Fixed-Time
-- Greedy Max-Queue
-- Max-Pressure (Varaiya 2013)
-- Actuated / VAT (NEMA)
-- Plain DQN
-- Dueling Double DQN (D3QN)
-- FlowSync-UQ (Uncertainty-Aware Safe Fallback)
-
-All controllers must implement:
-    act(observation: np.ndarray, context: ControllerContext) -> int
-    reset(seed: Optional[int] = None) -> None
-    get_capabilities() -> ControllerCapabilities
-    get_diagnostics() -> Dict[str, Any]
-"""
+"""Base controller interface and contract for FlowSync traffic signal controllers."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

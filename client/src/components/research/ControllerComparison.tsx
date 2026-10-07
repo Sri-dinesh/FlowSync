@@ -14,14 +14,18 @@ import {
 } from "lucide-react";
 import { useResearchSocket } from "@/hooks/useResearchSocket";
 import { useResearchStore } from "@/store/researchStore";
-import type { PairedControllerState } from "@/types/research";
+import type { PairedControllerState, ResearchTelemetryFrame, NoisePresetKey } from "@/types/research";
 
 const ResearchCanvas = dynamic(
   () => import("@/components/research/ResearchCanvas").then((mod) => mod.ResearchCanvas),
   { ssr: false }
 );
 
-function toTelemetryFrame(ctrl: PairedControllerState | undefined, step: number, simTime: number) {
+function toTelemetryFrame(
+  ctrl: PairedControllerState | undefined,
+  step: number,
+  simTime: number
+): ResearchTelemetryFrame | null {
   if (!ctrl) return null;
   return {
     step,
@@ -74,7 +78,7 @@ function toTelemetryFrame(ctrl: PairedControllerState | undefined, step: number,
       noise_intensity: 0,
       active_cues: [],
     },
-  } as any;
+  } as unknown as ResearchTelemetryFrame;
 }
 
 export const ControllerComparison = memo(function ControllerComparison() {
@@ -84,7 +88,6 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const activeSeed = useResearchStore((s) => s.activeSeed);
   const activeNoise = useResearchStore((s) => s.activeNoise);
   const runStatus = useResearchStore((s) => s.runStatus);
-  const setRunStatus = useResearchStore((s) => s.setRunStatus);
 
   const [controllerA, setControllerA] = useState("d3qn");
   const [controllerB, setControllerB] = useState("flowsync_uq");
@@ -106,7 +109,7 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const handleStartComparison = () => {
     const scId = activeScenario?.scenario_id || activeScenario?.id || "test_clean_balanced_01";
     // activeNoise.id is synced to backend FAULT_PRESETS keys by the compare page pills.
-    const presetKey = (activeNoise?.id || "miss_30") as any;
+    const presetKey = (activeNoise?.id || "miss_30") as NoisePresetKey;
     startPairedComparison(scId, controllerA, controllerB, activeSeed, presetKey);
   };
 

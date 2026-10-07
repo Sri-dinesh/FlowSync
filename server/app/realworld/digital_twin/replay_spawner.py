@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 import numpy as np
 
-from ..models.config import LANE_KEYS, VEHICLE_CLASSES, VEHICLE_QUEUE_WEIGHTS
+from ..models.config import LANE_KEYS
 from ..models.schemas import TrafficFlowParams
 
 

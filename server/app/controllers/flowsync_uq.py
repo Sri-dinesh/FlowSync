@@ -1,33 +1,8 @@
-"""
-flowsync_uq.py — FlowSync-UQ Uncertainty-Aware Safe Fallback Controller
-========================================================================
-Core Proposed Method (Task C1, C2, C3, C4):
-Integrates:
-1. Dueling Double DQN (D3QN) learned control policy.
-2. Online Perception Uncertainty Estimator (multi-feature reliability).
-3. Max-Pressure deterministic adaptive fallback controller.
-4. Hysteretic Authority Supervisor with minimum dwell times.
-5. Independent Formal SafetyShield enforcing transition and clearance invariants.
-
-Operational Pipeline:
-  Observation s_t
-       ↓
-  Uncertainty Engine: U_t = Estimator(s_t)
-       ↓
-  Supervisor Decision:
-     if U_t >= T_high: Authority = FALLBACK (Max-Pressure)
-     elif U_t <= T_low & dwell_met: Authority = RL (D3QN)
-       ↓
-  Candidate Action Proposal
-       ↓
-  SafetyShield: Enforce min-green, clearance, max-green, starvation
-       ↓
-  Executed Safe Action a_t
-"""
+"""FlowSync-UQ uncertainty-aware safe fallback controller integrating D3QN, uncertainty estimation, and Max-Pressure."""
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Optional
 import numpy as np
 
 from .base import BaseController, ControllerCapabilities, ControllerContext
@@ -128,7 +103,6 @@ class FlowSyncUQController(BaseController):
         t0 = time.perf_counter()
         self._step_count += 1
 
-        # 1. Compute perception uncertainty
         forecast_feats = observation[20:28] if len(observation) >= 28 else None
         obs_age = float(context.extra_telemetry.get("observation_age_ms", 0.0))
         frame_drop = bool(context.extra_telemetry.get("frame_dropped", False))
@@ -143,11 +117,9 @@ class FlowSyncUQController(BaseController):
         )
         self._last_uncertainty = u_score
 
-        # 2. Update supervisor state machine
         authority = self.supervisor.update(u_score.score, step=self._step_count)
         self._last_authority = authority
 
-        # 3. Consult designated controller
         if authority == ControlAuthority.RL_ACTIVE:
             proposed_action = self.d3qn.act(observation, context)
             q_values = self.d3qn.get_diagnostics().get("q_values", [])
@@ -157,7 +129,6 @@ class FlowSyncUQController(BaseController):
             q_values = []
             active_controller = "max_pressure_fallback"
 
-        # 4. Enforce Safety Shield invariants (if enabled)
         if self.enable_shield and self.safety_shield is not None:
             shield_decision = self.safety_shield.filter_action(
                 proposed_action=proposed_action,
@@ -179,7 +150,6 @@ class FlowSyncUQController(BaseController):
 
         inference_time_ms = (time.perf_counter() - t0) * 1000.0
 
-        # 5. Record complete diagnostics
         self._last_diagnostics = {
             "controller": "flowsync_uq",
             "active_controller": active_controller,

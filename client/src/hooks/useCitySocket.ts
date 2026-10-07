@@ -109,7 +109,7 @@ export function useCitySocket(): UseCitySocketReturn {
       console.error("[CityWS] Connection error.");
       socket.close();
     };
-  }, []);
+  }, [setCityConnected]);
 
   useEffect(() => {
     connectRef.current = connect;

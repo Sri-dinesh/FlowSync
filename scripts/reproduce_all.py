@@ -21,12 +21,15 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 import torch
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+_SERVER = _ROOT / "server"
+if str(_SERVER) not in sys.path:
+    sys.path.insert(0, str(_SERVER))
 
 from research.run_experiments_matrix import run_matrix_benchmark
 from research.experiments.run_ablations import run_ablation_experiments
@@ -174,7 +177,7 @@ def main() -> None:
         output_tables_dir=results_dir / "tables",
     )
 
-    # 2. Component Ablations (Phase J / Task J1)
+    # 2. Component Ablations
     logger.info(">>> Stage 2/7: Component Ablations Study...")
     ablation_noise = FaultProfile(name="ablation_noise", miss_rate=0.20, latency_ms=150)
     run_ablation_experiments(
@@ -184,7 +187,7 @@ def main() -> None:
         results_dir=results_dir / "ablations",
     )
 
-    # 3. Threshold Sensitivity Sweep (Phase J / Task J2)
+    # 3. Threshold Sensitivity Sweep
     logger.info(">>> Stage 3/7: Fallback Uncertainty Threshold Sensitivity...")
     run_threshold_sweep(
         scenario_ids=["train_mod_balanced_01"],
@@ -194,7 +197,7 @@ def main() -> None:
         results_dir=results_dir / "sensitivity",
     )
 
-    # 4. Failure Analysis & Reliability Boundary (Phase L)
+    # 4. Failure Analysis & Reliability Boundary
     logger.info(">>> Stage 4/7: Reliability Boundary & Failure Taxonomy...")
     sweep_reliability_boundary(
         scenario_id="train_mod_balanced_01",
@@ -204,7 +207,7 @@ def main() -> None:
         results_dir=results_dir / "reliability",
     )
 
-    # 5. Multi-Intersection Scalability (Phase M / Task M1)
+    # 5. Multi-Intersection Scalability
     logger.info(">>> Stage 5/7: 2x2 City Network Multi-Intersection Scalability...")
     run_scalability_benchmark(
         controller_names=["fixed", "greedy", "max_pressure", "d3qn", "flowsync_uq"],
@@ -213,7 +216,7 @@ def main() -> None:
         results_dir=results_dir / "scalability",
     )
 
-    # 6. Real-Time Latency Profiling (Phase M / Task M2 / Task 1A.17)
+    # 6. Real-Time Latency Profiling
     logger.info(">>> Stage 6/7: Real-Time Performance Profiling...")
     num_decisions = 1000 if args.quick else 10000
     profile_pipeline_latency(
@@ -222,7 +225,7 @@ def main() -> None:
         results_dir=results_dir / "profiling",
     )
 
-    # 7. Shadow-Mode Real CCTV Replay (Phase F3)
+    # 7. Shadow-Mode Real CCTV Replay
     logger.info(">>> Stage 7/7: Real-World CCTV Shadow-Mode Replay...")
     evaluate_shadow_replay(
         controller_names=["fixed", "greedy", "max_pressure", "d3qn", "flowsync_uq"],

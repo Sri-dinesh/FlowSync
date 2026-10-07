@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
-import { BoxGeometry, CylinderGeometry, MeshStandardMaterial, PlaneGeometry, SphereGeometry } from "three";
+import { BoxGeometry, MeshStandardMaterial, PlaneGeometry } from "three";
 
 interface BoundaryGantryProps {
   position: [number, number, number];

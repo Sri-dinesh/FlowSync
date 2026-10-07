@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import {
   BoxGeometry,
   CylinderGeometry,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
 } from "three";
 import { Tree, Hedge } from "./Tree";

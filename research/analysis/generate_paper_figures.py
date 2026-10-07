@@ -4,7 +4,6 @@ Saves figures into IEEE-conference-template-062824/ as high-resolution PNGs.
 """
 
 import os
-import json
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt

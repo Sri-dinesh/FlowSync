@@ -4,11 +4,10 @@ import React, { useMemo } from "react";
 import {
   BoxGeometry,
   CylinderGeometry,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
 } from "three";
-import { Tree, Hedge } from "@/components/simulation/city/Tree";
+import { Tree } from "@/components/simulation/city/Tree";
 import {
   Streetlight,
   ParkBench,

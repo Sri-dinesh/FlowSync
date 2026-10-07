@@ -14,14 +14,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 import numpy as np
 
 from server.app.controllers import get_controller
-from research.scenarios.scenario_schema import ScenarioConfig
 from research.noise.fault_injector import PerceptionFaultInjector, FaultProfile
 from research.experiments.engine import ExperimentRunner, ExperimentResult
 from research.analysis.table_generator import TableGenerator

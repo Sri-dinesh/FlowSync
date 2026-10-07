@@ -9,10 +9,9 @@ Evaluates Fixed, Greedy, Max-Pressure, D3QN, and FlowSync-UQ under non-Poisson r
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import numpy as np
 
 from server.app.controllers import get_controller

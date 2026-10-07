@@ -8,10 +8,8 @@ LaTeX booktabs tables and CSV summaries for IEEE T-ITS manuscripts.
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import numpy as np
+from typing import Any, Dict, List
 
 
 class TableGenerator:

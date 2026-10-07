@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+
 import { Text, Billboard } from "@react-three/drei";
 import IntersectionGrid from "@/components/simulation/IntersectionGrid";
 import Road from "@/components/simulation/Road";

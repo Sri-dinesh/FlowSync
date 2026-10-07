@@ -21,8 +21,6 @@ import asyncio
 import logging
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-import numpy as np
-
 from .dqn_agent import DQNAgent
 from .hyperparams import HyperParams
 from ..simulation.environment import TrafficEnv
@@ -33,7 +31,7 @@ from ..simulation.benchmark_harness import DeterministicEvaluator
 
 logger = logging.getLogger(__name__)
 
-# Greedy warm-start: number of demonstration transitions to collect before RL
+# Seed buffer with demonstrations before RL to accelerate early convergence.
 _GREEDY_WARMUP_STEPS = 3000
 _GREEDY_PRETRAIN_UPDATES = 500
 
@@ -143,7 +141,6 @@ class Trainer:
             else float(getattr(profile, "base_lambda", 0.85))
         )
 
-        # ── Checkpoint & Resume / Fine-Tune Loading ─────────────────────────
         start_episode = 0
         base_model_id = None
         if resume_model_id:
@@ -172,7 +169,6 @@ class Trainer:
 
             start_episode = resume_episode or 0
 
-            # Load checkpoint state into training agent and sync sim_agent
             try:
                 chk_data = await asyncio.to_thread(self.model_service.load_checkpoint, base_model_id, start_episode)
                 if (
@@ -194,15 +190,13 @@ class Trainer:
                         self.agent.step_count = chk_data["step_count"]
                     if not is_finetune and "total_train_steps" in chk_data:
                         self.agent.total_train_steps = chk_data["total_train_steps"]
-                    # checkpoint_0.pt is an alias; continue numbering from the
-                    # real winning episode stored inside the checkpoint.
+            # checkpoint_0.pt is an alias; resume numbering from real episode inside checkpoint.
                     start_episode = int(chk_data.get("episode", start_episode))
                 else:
                     self.agent.online_net.load_state_dict(chk_data)
                     self.agent.sync_target_network()
                 self.agent.target_net.eval()
 
-                # Sync inference agent
                 if self.app_state and hasattr(self.app_state, "sim_agent"):
                     self.app_state.sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
                     self.app_state.sim_agent.target_net.load_state_dict(self.agent.target_net.state_dict())
@@ -225,29 +219,23 @@ class Trainer:
             if is_finetune:
                 self.parent_model_id = base_model_id
                 self.parent_episode = start_episode
-                # Re-initialize optimizer with reduced LR and reset replay buffer
                 self.agent.prepare_for_finetuning(learning_rate=finetune_lr)
 
-                # Fork simulation_id into branched model name
                 clean_base = base_model_id.split(":")[0] if ":" in base_model_id else base_model_id
                 scenario_slug = finetune_scenario.lower().replace(" ", "_")
                 simulation_id = f"{clean_base}-ft-{scenario_slug}"
                 if self.app_state:
                     self.app_state.current_simulation_id = simulation_id
 
-                # Assign traffic profile
                 self.env.set_traffic_profile(profile)
 
-                # Episode indexing: fine-tune runs for 1..num_episodes
                 start_episode = 0
                 total_target_episodes = num_episodes
 
-                # Epsilon schedule: warm reset to finetune_epsilon, decaying to 0.05
                 self.epsilon = finetune_epsilon
                 decay_steps = max(1, int(num_episodes * 0.75))
                 self.finetune_decay = (0.05 / max(0.06, finetune_epsilon)) ** (1.0 / decay_steps)
             else:
-                # Normal resume: preserve simulation_id
                 if not simulation_id or simulation_id.startswith("local-"):
                     simulation_id = base_model_id
                 self.env.set_traffic_profile(SCENARIO_PROFILES["uniform"])
@@ -258,7 +246,6 @@ class Trainer:
                 else:
                     self.epsilon = self.hyperparams.epsilon_start
         else:
-            # Fresh training
             self.agent.reset_for_fresh_training()
             self.env.set_traffic_profile(SCENARIO_PROFILES["uniform"])
             total_target_episodes = num_episodes
@@ -268,13 +255,11 @@ class Trainer:
         self.current_episode = start_episode
         self.target_episodes = total_target_episodes
 
-        # ── Task 5.2: Curriculum setup ─────────────────────────────────────
         curriculum = TrainingCurriculum(
             env=self.env,
             total_episodes=total_target_episodes,
         ) if (self.enable_curriculum and not self.is_finetune) else None
 
-        # ── Warm-start Seeding ─────────────────────────────────────────────
         if self.is_finetune and profile:
             logger.info("Fine-tuning: seeding replay buffer with base policy on scenario '%s'...", profile_name)
             state, reset_info = self.env.reset_to_decision()
@@ -384,7 +369,6 @@ class Trainer:
                 self.hyperparams.MIN_REPLAY_SIZE,
             )
 
-        # Broadcast resume event notification
         if self.is_resumed:
             await self.ws_broadcast_fn({
                 "type":                  "training_resumed",
@@ -395,11 +379,9 @@ class Trainer:
                 "message":               f"Resumed model training from episode {start_episode} for +{num_episodes} episodes (target: {total_target_episodes}).",
             })
 
-        # Rolling window of recent rewards for model metadata avg_reward
         _recent_rewards: list[dict] = []
         _REWARD_WINDOW = 50
 
-        # TR-03: Best-checkpoint tracking by validation delay
         best_avg_wait: float = float("inf")
         best_validation_queue_area: float = float("inf")
         best_episode: int = 0
@@ -411,7 +393,6 @@ class Trainer:
             episode_num = start_episode + episode_index + 1
             self.current_episode = episode_num
 
-            # ── Curriculum or Scenario Status ──────────────────────────────
             curriculum_status = {}
             if curriculum is not None and not self.is_finetune:
                 stage_name, applied_lambda = curriculum.apply(episode_num)
@@ -433,7 +414,6 @@ class Trainer:
             steps = 0
             stopped_early = False
 
-            # Anneal PER beta over training with global target
             self.agent.replay_buffer.anneal_beta(episode_num, total_target_episodes)
 
             decision_step = 0
@@ -446,17 +426,12 @@ class Trainer:
                     state, self.epsilon, valid_action_mask=action_mask
                 )
 
-                # ── Step environment (fast in-thread execution) ─────────────
                 next_state, reward, terminated, truncated, info = self.env.step_decision(action)
                 done = terminated or truncated
 
-                # ── BUG-01 FIX: Use executed_action for replay buffer push ──
+            # Record executed action to account for physical watchdog overrides.
                 executed_action = info.get("executed_action", action)
 
-                # ── Task 2.1 (Semi-MDP): Only push causal transitions ────────
-                # BUG-E FIX: subsample GREEN steps — store 1 per 10 (1 simulated second).
-                # Old: push every GREEN step (~680/ep) — redundant near-identical transitions.
-                # Now: push every 10th GREEN step (~65/ep) — informative, diverse transitions.
                 next_action_mask = info["valid_action_mask"]
                 self.agent.replay_buffer.push(
                     state,
@@ -469,7 +444,6 @@ class Trainer:
                     bootstrap_discount=info["bootstrap_discount"],
                 )
 
-                # ── Train step ───────────────────────────────────────────────
                 if (
                     self.agent.replay_buffer.is_ready
                     and decision_step % self.hyperparams.TRAIN_EVERY_N_STEPS == 0
@@ -489,7 +463,7 @@ class Trainer:
                 decision_step += 1
                 steps = self.env.intersection.timestep
 
-                # Periodically yield to event loop so WebSocket keep-alives and commands process smoothly
+            # Yield periodically to event loop so WebSocket keep-alives process smoothly.
                 if decision_step % 10 == 0:
                     await asyncio.sleep(0)
 
@@ -540,7 +514,6 @@ class Trainer:
                         best_episode,
                     )
 
-            # ── Task 0.2: Collect reward component telemetry ─────────────────
             episode_telemetry = self.env.get_episode_telemetry()
             reward_components = episode_telemetry.get("reward_components", {})
             watchdog_rate = episode_telemetry.get("watchdog_override_rate", 0.0)
@@ -553,8 +526,7 @@ class Trainer:
             persist_remote = bool(simulation_id) and not simulation_id.startswith("local-")
 
             if persist_remote:
-                # Dispatch remote save in background so high Supabase cloud network latency
-                # does not block subsequent training episodes
+            # Dispatch remote persistence in background so latency does not block training.
                 asyncio.create_task(
                     asyncio.to_thread(
                         self.supabase_service.save_episode,
@@ -575,7 +547,6 @@ class Trainer:
                 else self.finetune_scenario
             )
 
-            # ── Broadcast episode metrics ────────────────────────────────────
             await self.ws_broadcast_fn(
                 {
                     "episode":                 episode_num,
@@ -595,16 +566,12 @@ class Trainer:
                     "steps":                   steps,
                     "buffer_ready":            self.agent.replay_buffer.is_ready,
                     "is_training":             False if is_last_episode else self.is_training,
-                    "total_train_steps":       self.agent.total_train_steps,  # BUG-B visibility
-                    # Task 0.2: reward component telemetry
+                    "total_train_steps":       self.agent.total_train_steps,
                     "reward_components":       reward_components,
                     "watchdog_override_rate":  watchdog_rate,
                     "watchdog_override_count": watchdog_count,
-                    # Task 5.2: curriculum info
                     "curriculum":              curriculum_status,
-                    # P-01/P-02/P-03: Q-value health monitoring
                     "q_stats":                 getattr(self.agent, "latest_q_stats", {}),
-                    # TR-03: Best-checkpoint tracking
                     "best_avg_wait":           best_avg_wait if best_avg_wait < float("inf") else None,
                     "best_episode":            best_episode if best_episode > 0 else None,
                     "is_new_best":             is_new_best,
@@ -621,7 +588,7 @@ class Trainer:
                 or is_new_best
             )
 
-            # Sync active inference agent immediately whenever a new best or milestone occurs
+            # Sync inference agent immediately when a new milestone or best checkpoint occurs.
             if (is_new_best or should_save_checkpoint) and self.app_state and hasattr(self.app_state, "sim_agent"):
                 sim_agent = self.app_state.sim_agent
                 sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
@@ -659,7 +626,6 @@ class Trainer:
                     chk_state,
                 )
                 if is_new_best:
-                    # Save dedicated 'best' checkpoint file
                     await asyncio.to_thread(
                         self.model_service.save_checkpoint,
                         simulation_id,

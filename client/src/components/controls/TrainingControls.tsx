@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus, RotateCcw, Sparkles, Sliders, Settings2 } from "lucide-react";
+import { Loader2, Activity, Zap, Clock, TrendingUp, TrendingDown, Brain, CheckCircle2, Minus, RotateCcw, Sparkles, Sliders } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import AIStatusBadge from "@/components/dashboard/AIStatusBadge";
@@ -270,7 +270,6 @@ export default function TrainingControls({ sendCommand }: TrainingControlsProps)
   const recentMetrics = useMemo(() => trainingMetrics.slice(-40), [trainingMetrics]);
 
   const isResumedRun = latest?.is_resumed ?? (latest?.start_episode ? latest.start_episode > 0 : false);
-  const isFinetuneRun = latest?.is_finetuned ?? false;
   const sessionStartEp = latest?.start_episode ?? 0;
   const effectiveTargetEpisodes = latest?.target_episodes ?? targetEpisodes;
 
@@ -352,7 +351,6 @@ export default function TrainingControls({ sendCommand }: TrainingControlsProps)
     refetchInterval: 30_000,
   });
 
-  // Calculate resume metadata from selected model
   const selectedResumeModel = useMemo(() => {
     return models.find((m) => m.id === resumeModelId) ?? null;
   }, [models, resumeModelId]);
@@ -374,7 +372,6 @@ export default function TrainingControls({ sendCommand }: TrainingControlsProps)
     return Math.max(0.05, 1.0 * Math.pow(0.994, resumeBaseEpisode));
   }, [resumeBaseEpisode]);
 
-  // Calculate fine-tune metadata from selected base model
   const selectedFinetuneModel = useMemo(() => {
     return models.find((m) => m.id === finetuneModelId) ?? null;
   }, [models, finetuneModelId]);
