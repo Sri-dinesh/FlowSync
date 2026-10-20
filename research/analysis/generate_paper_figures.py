@@ -1,6 +1,7 @@
-"""
-Script to generate publication-quality figures for the FlowSync-UQ IEEE manuscript.
-Saves figures into IEEE-conference-template-062824/ as high-resolution PNGs.
+"""ARCHIVED: hard-coded historical illustrations, not verified research evidence.
+
+The command-line entry point is disabled. Use research/build_paper_evidence.py
+with a verified evaluation directory instead. Existing figures are preserved.
 """
 
 import os
@@ -10,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 OUTPUT_DIR = "/home/dracarys/Projects/personal-stuff/FlowSync/IEEE-conference-template-062824"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Set publication style
 plt.rcParams.update({
@@ -275,10 +275,7 @@ def generate_fig6_cv_regimes():
     print("Fig 6 generated.")
 
 if __name__ == '__main__':
-    generate_fig1_architecture()
-    generate_fig2_supervisor()
-    generate_fig3_robustness()
-    generate_fig4_ablations()
-    generate_fig5_latency()
-    generate_fig6_cv_regimes()
-    print("All 6 publication figures generated successfully in", OUTPUT_DIR)
+    raise SystemExit(
+        "Historical hard-coded figures are not validated evidence. No figures written. "
+        "Use research/build_paper_evidence.py with a frozen matched-shield evaluation."
+    )
