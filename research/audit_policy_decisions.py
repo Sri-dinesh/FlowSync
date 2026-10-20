@@ -57,7 +57,7 @@ def action_branches(env, sensor, injector, controller, context, scenario, step, 
 
 
 def audit_run(checkpoint, scenario, seed, fault, horizon=200, max_events=4, *, all_actions=False,
-              budget=None, branch_steps=None):
+              budget=None, branch_steps=None, branch_diagnostic=None):
     if scenario.split != "train":
         raise ValueError("Policy development audit requires training scenarios")
     if horizon < 1 or max_events < 0:
@@ -105,6 +105,12 @@ def audit_run(checkpoint, scenario, seed, fault, horizon=200, max_events=4, *, a
                     sum(context.valid_action_mask) >= 2 and forks < max_events and step+horizon <= scenario.duration_steps):
                 event.update(horizon_steps=horizon, all_action_branches=action_branches(
                     env,sensor,injector,controller,context,scenario,step,horizon,action,budget))
+                if branch_diagnostic is not None:
+                    # Optional research hook. It must fork before altering state;
+                    # callers must verify the complete source replay afterward.
+                    event["branch_diagnostic"] = branch_diagnostic(
+                        env, sensor, injector, controller, context, scenario,
+                        step, horizon, action, budget)
                 forks += 1
                 last_fork_step = step
             if not all_actions and action != teacher_action and forks < max_events and step+horizon <= scenario.duration_steps:
