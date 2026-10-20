@@ -44,8 +44,14 @@ class TrafficEnv(gym.Env):
         self,
         max_steps: Optional[int] = None,
         red_duration: Optional[float] = None,
+        enable_watchdogs: bool = True,
+        reward_version: str = "v4_incremental_delay",
     ) -> None:
         super().__init__()
+        if reward_version not in ("v4_incremental_delay", "v5_single_switch_delay"):
+            raise ValueError(f"Unsupported reward version: {reward_version}")
+        self.reward_version = reward_version
+        self.enable_watchdogs = enable_watchdogs
         self.intersection = Intersection(
             spawn_lambda=HP.TRAINING_LAMBDA,
             red_duration=(
@@ -195,7 +201,7 @@ class TrafficEnv(gym.Env):
         was_overridden = False
         override_reason: Optional[str] = None
         if (
-            is_decision_step
+            self.enable_watchdogs and is_decision_step
             and signal.is_max_green_exceeded
             and action == signal.current_phase
         ):
@@ -205,7 +211,7 @@ class TrafficEnv(gym.Env):
             self.watchdog_override_count += 1
 
         starved = signal.get_starved_phases()
-        if is_decision_step and starved:
+        if self.enable_watchdogs and is_decision_step and starved:
             starved_phase = max(
                 starved, key=lambda phase: signal.phase_starvation_timer[phase]
             )
@@ -221,6 +227,7 @@ class TrafficEnv(gym.Env):
         prev_passed = self.intersection.total_passed
         prev_phase = self.intersection.signal.current_phase
         prev_actual_phase = self.intersection.signal.current_phase
+        prev_color = self.intersection.signal.color
         prev_wait = self.intersection.get_total_wait_time()
 
         passed_vehicles = self.intersection.tick(dt=0.1, action=requested_action)
@@ -245,7 +252,14 @@ class TrafficEnv(gym.Env):
             and self.intersection.signal.color.name == "YELLOW"
             and self.intersection.signal.time_in_phase < 0.15  # just initiated
         )
-        phase_changed = actually_switched or switch_just_initiated
+        if self.reward_version == "v5_single_switch_delay":
+            # Charge once when a request actually commits GREEN -> YELLOW.
+            # A time threshold also charges the next yellow tick; completion
+            # charges the same switch again. Neither is a new decision.
+            phase_changed = prev_color == SignalColor.GREEN and signal.color == SignalColor.YELLOW
+        else:
+            # Explicit legacy mode preserves old training/evaluation provenance.
+            phase_changed = actually_switched or switch_just_initiated
 
         curr_wait = self.intersection.get_total_wait_time()
         delta_total_wait = curr_wait - prev_wait
@@ -283,7 +297,7 @@ class TrafficEnv(gym.Env):
 
         info: Dict[str, Any] = {
             "state_version":           "v1_28d",
-            "reward_version":          "v4_incremental_delay",
+            "reward_version":          self.reward_version,
             "executed_action":         executed_action,
             "proposed_action":         proposed_action,
             "was_overridden":          was_overridden,
@@ -502,7 +516,7 @@ class TrafficEnv(gym.Env):
         }
         return {
             "state_version":           "v1_28d",
-            "reward_version":          "v4_incremental_delay",
+            "reward_version":          self.reward_version,
             "reward_components":       comp_dict,
             "reward_component_stats":  comp_stats,
             "watchdog_override_count": self.watchdog_override_count,

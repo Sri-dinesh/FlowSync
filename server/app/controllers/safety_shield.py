@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 import numpy as np
+from .base import ControllerContext
+from .max_pressure import PHASE_MOVEMENTS
 
 
 @dataclass
@@ -27,7 +29,10 @@ class ShieldDecision:
 
 class SafetyShield:
     """
-    Formal, stateful safety shield verifying traffic signal phase proposals.
+    Rule-based guard for modeled signal constraints and phase-service fairness.
+
+    Phase-service timers are not individual vehicle waiting times. This class
+    does not establish a per-vehicle waiting bound or certify real-world safety.
     """
 
     def __init__(
@@ -60,6 +65,20 @@ class SafetyShield:
         self.total_overrides += 1
         self.override_counts_by_reason[reason] = self.override_counts_by_reason.get(reason, 0) + 1
 
+    def filter_context(self, proposed_action: int, context: ControllerContext) -> ShieldDecision:
+        """Shared sensor-only adapter for inference and shield-aware replay."""
+        return self.filter_action(
+            proposed_action=proposed_action,
+            current_phase=context.current_phase,
+            time_in_phase=context.time_in_phase,
+            color=context.color,
+            valid_action_mask=context.valid_action_mask,
+            starvation_timers=context.phase_starvation_times,
+            movement_pressures={p: sum((context.movement_queues or {}).get(m, 0)
+                                      for m in movements)
+                                for p, movements in PHASE_MOVEMENTS.items()},
+        )
+
     def filter_action(
         self,
         proposed_action: int,
@@ -73,7 +92,7 @@ class SafetyShield:
         """
         Validate and filter a proposed controller action.
 
-        Returns ShieldDecision with guaranteed safe executed_action.
+        Returns a ShieldDecision after applying the configured modeled guards.
         """
         self.total_evaluations += 1
         target_action = proposed_action
@@ -91,6 +110,8 @@ class SafetyShield:
 
         # 1. Clearance interval lock: during YELLOW or RED, phase switches cannot be initiated
         if color in ("YELLOW", "RED"):
+            if target_action != current_phase:
+                self._record_override("clearance_interval_active")
             return ShieldDecision(
                 proposed_action=proposed_action,
                 executed_action=current_phase,
@@ -112,6 +133,9 @@ class SafetyShield:
             )
 
         # 3. Maximum Green Ceiling Watchdog
+        # Every override, including starvation, must respect minimum green.
+        if not can_switch:
+            return ShieldDecision(proposed_action, current_phase, False)
         if color == "GREEN" and time_in_phase >= self.max_green_time and target_action == current_phase:
             # Force transition to alternative phase with highest pressure / demand
             best_alt = (current_phase + 1) % 4
@@ -165,7 +189,7 @@ class SafetyShield:
                     is_safe=True,
                 )
 
-        # Proposed action satisfies all formal safety invariants
+        # Proposed action passed the configured modeled guards.
         return ShieldDecision(
             proposed_action=proposed_action,
             executed_action=target_action,

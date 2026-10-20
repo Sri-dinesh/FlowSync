@@ -27,30 +27,37 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("ablations")
 
 
-def build_ablation_controllers() -> Dict[str, FlowSyncUQController]:
+def build_ablation_controllers(checkpoint_path: Optional[str] = None) -> Dict[str, FlowSyncUQController]:
     """Instantiates each ablated variant of FlowSync-UQ."""
     return {
         "Full FlowSync-UQ": FlowSyncUQController(
+            checkpoint_path=checkpoint_path,
             uncertainty_threshold=0.45,
             enable_shield=True,
             fallback_controller_name="max_pressure",
         ),
         "minus Uncertainty (No-UQ)": FlowSyncUQController(
+            checkpoint_path=checkpoint_path,
+            enable_fallback=False,
             uncertainty_threshold=999.0,  # Never triggers fallback
             enable_shield=True,
             fallback_controller_name="max_pressure",
         ),
         "minus Safety Shield (No-Shield)": FlowSyncUQController(
+            checkpoint_path=checkpoint_path,
             uncertainty_threshold=0.45,
             enable_shield=False,
             fallback_controller_name="max_pressure",
         ),
         "minus Fallback (No-Fallback)": FlowSyncUQController(
+            checkpoint_path=checkpoint_path,
+            enable_fallback=False,
             uncertainty_threshold=0.45,
             enable_shield=True,
-            fallback_controller_name="d3qn",  # Falls back to pure D3QN
+            fallback_controller_name="max_pressure",
         ),
         "minus MaxPressure (Fixed Fallback)": FlowSyncUQController(
+            checkpoint_path=checkpoint_path,
             uncertainty_threshold=0.45,
             enable_shield=True,
             fallback_controller_name="fixed",  # Falls back to Webster fixed
@@ -63,13 +70,14 @@ def run_ablation_experiments(
     seeds: List[int],
     noise_profile: Optional[FaultProfile] = None,
     results_dir: Path = Path("results/ablations"),
+    checkpoint_path: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Executes controlled paired ablations.
     """
     results_dir.mkdir(parents=True, exist_ok=True)
     runner = ExperimentRunner()
-    variants = build_ablation_controllers()
+    variants = build_ablation_controllers(checkpoint_path)
 
     records: List[Dict[str, Any]] = []
 
@@ -100,8 +108,8 @@ def run_ablation_experiments(
                 p95s.append(res.p95_delay)
                 qas.append(res.queue_area)
                 tps.append(res.total_vehicles_passed / (res.num_steps * 0.1) * 3600.0)
-                fbs.append(res.watchdog_override_rate)
-                shields.append(res.watchdog_override_count)
+                fbs.append(100.0 * res.fallback_steps / max(1, res.num_steps))
+                shields.append(res.shield_interventions)
 
         records.append({
             "variant": name,
@@ -157,13 +165,14 @@ def main() -> None:
     parser.add_argument("--scenarios", type=str, default="train_mod_balanced_01,test_clean_balanced_01")
     parser.add_argument("--seeds", type=str, default="101,202,303")
     parser.add_argument("--miss-rate", type=float, default=0.20)
+    parser.add_argument("--checkpoint", required=True)
     args = parser.parse_args()
 
     scenarios = [s.strip() for s in args.scenarios.split(",") if s.strip()]
     seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
     noise = FaultProfile(name="ablation_noise", miss_rate=args.miss_rate, latency_ms=150)
 
-    run_ablation_experiments(scenarios, seeds, noise)
+    run_ablation_experiments(scenarios, seeds, noise, checkpoint_path=args.checkpoint)
 
 
 if __name__ == "__main__":

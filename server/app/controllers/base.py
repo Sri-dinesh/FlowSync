@@ -18,6 +18,7 @@ class ControllerCapabilities:
     uses_camera_observable_state_only: bool = True
     is_learning_based: bool = False
     description: str = ""
+    supports_safety_shield: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -32,7 +33,7 @@ class ControllerCapabilities:
             # Frontend contract compatibility aliases
             "uses_uncertainty_estimation": self.supports_uncertainty,
             "supports_hysteretic_fallback": self.supports_fallback,
-            "supports_safety_shield": True if self.supports_fallback or "flowsync" in self.name.lower() else False,
+            "supports_safety_shield": self.supports_safety_shield or self.supports_fallback or "flowsync" in self.name.lower(),
             "produces_q_values": self.is_learning_based,
             "handles_continuous_obs": True,
         }
@@ -55,6 +56,7 @@ class ControllerContext:
     movement_queues: Optional[Dict[str, int]] = None
     outgoing_counts: Optional[Dict[str, int]] = None
     starvation_times: Optional[Dict[str, float]] = None
+    phase_starvation_times: Optional[Dict[int, float]] = None
     raw_detections: Optional[List[Dict[str, Any]]] = None
     extra_telemetry: Dict[str, Any] = field(default_factory=dict)
 

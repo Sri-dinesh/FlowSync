@@ -21,6 +21,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
+import hashlib
+import json
+from pathlib import Path
 import numpy as np
 
 
@@ -71,7 +74,7 @@ class UncertaintyScore:
 
 class PerceptionUncertaintyEstimator:
     """
-    Computes calibrated perception uncertainty from observation dynamics.
+    Computes a heuristic score, or a fitted synthetic-error probability if supplied.
     """
 
     def __init__(
@@ -80,12 +83,13 @@ class PerceptionUncertaintyEstimator:
         threshold_low: float = 0.25,
         temperature: float = 1.0,
         weights: Optional[Dict[str, float]] = None,
+        calibration_path: Optional[str] = None,
     ) -> None:
         self.threshold_high = threshold_high
         self.threshold_low = threshold_low
         self.temperature = max(1e-3, temperature)
 
-        # Default calibrated feature weights (empirically calibrated on validation noise data)
+        # Heuristic defaults. These are not fitted/calibrated probabilities.
         self.weights = weights or {
             "detector_uncertainty": 0.20,
             "tail_detector_uncertainty": 0.15,
@@ -97,10 +101,31 @@ class PerceptionUncertaintyEstimator:
         }
 
         self._prev_queues: Optional[np.ndarray] = None
+        self._queue_ewma: Optional[np.ndarray] = None
         self._step: int = 0
+        self.calibration = None
+        self.calibration_hash = None
+        if calibration_path is not None:
+            raw = Path(calibration_path).read_bytes()
+            data = json.loads(raw)
+            if data.get("version") != "synthetic_error_logistic_v1" or data.get("feature_names") != list(UncertaintyFeatures().to_dict()):
+                raise ValueError("Incompatible uncertainty calibration feature schema")
+            for key in ("mean", "scale", "coefficients"):
+                a = np.asarray(data[key], dtype=float)
+                if a.shape != (7,) or not np.isfinite(a).all():
+                    raise ValueError(f"Invalid calibration {key}")
+            if min(data["scale"]) <= 0 or not np.isfinite(data["intercept"]):
+                raise ValueError("Invalid calibration scale/intercept")
+            if not 0 <= data["threshold_low"] < data["threshold_high"] <= 1:
+                raise ValueError("Invalid calibration hysteresis thresholds")
+            self.calibration = data
+            self.calibration_hash = hashlib.sha256(raw).hexdigest()
+            self.threshold_high = float(data["threshold_high"])
+            self.threshold_low = float(data["threshold_low"])
 
     def reset(self) -> None:
         self._prev_queues = None
+        self._queue_ewma = None
         self._step = 0
 
     def compute(
@@ -147,14 +172,13 @@ class PerceptionUncertaintyEstimator:
             volatility = 0.0
         self._prev_queues = np.copy(q_curr)
 
-        # 3. Forecast innovation residual: disagreement between instantaneous queue and EWMA baseline
-        if forecast_features is not None and len(forecast_features) >= 3:
-            # Dims 0, 1, 2 of forecast are 5s, 10s, 20s EWMA
-            ewma_5s = float(forecast_features[0])
-            mean_q = float(np.mean(q_curr))
-            residual = float(np.clip(abs(mean_q - ewma_5s) * 2.0, 0.0, 1.0))
-        else:
-            residual = 0.0
+        # Compare queues with a queue EWMA. Arrival-rate forecasts have different
+        # units and cannot serve as the expected queue length.
+        if self._queue_ewma is None:
+            self._queue_ewma = q_curr.copy()
+        residual = float(np.clip(np.mean(np.abs(q_curr - self._queue_ewma)) * 2.0, 0.0, 1.0))
+        alpha = 1.0 - np.exp(-0.1 / 5.0)
+        self._queue_ewma += alpha * (q_curr - self._queue_ewma)
 
         # 4. Observation age / staleness (normalized by 1000ms)
         age_norm = float(np.clip(observation_age_ms / 1000.0, 0.0, 1.0))
@@ -186,8 +210,7 @@ class PerceptionUncertaintyEstimator:
             + self.weights["track_instability"] * track_u
         )
 
-        # Calibrated temperature scaling with sigmoid mapping
-        # Maps 0.0 weighted sum to ~0.05, 0.5 to ~0.50, 1.0 to ~0.95
+        # Heuristic sigmoid score; zero weighted input maps to about 0.148.
         scaled_logits = (weighted_sum - 0.35) * 5.0 / self.temperature
         calibrated_score = float(1.0 / (1.0 + np.exp(-scaled_logits)))
 
@@ -200,6 +223,14 @@ class PerceptionUncertaintyEstimator:
             "missing_frame_penalty": self.weights["missing_frame_penalty"] * frame_u,
             "track_instability": self.weights["track_instability"] * track_u,
         }
+
+        if self.calibration is not None:
+            data = self.calibration
+            terms = ((features.to_array() - np.asarray(data["mean"])) /
+                     np.asarray(data["scale"])) * np.asarray(data["coefficients"])
+            logit = float(np.sum(terms) + data["intercept"])
+            calibrated_score = float(1 / (1 + np.exp(-np.clip(logit, -60, 60))))
+            contributions = dict(zip(data["feature_names"], terms.tolist()))
 
         return UncertaintyScore(
             score=calibrated_score,

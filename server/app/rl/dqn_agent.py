@@ -29,9 +29,12 @@ class DQNAgent:
     - PER: prioritized experience replay with importance sampling correction
     """
 
-    def __init__(self):
-        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
-        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+    def __init__(self, state_dim=HP.STATE_DIM, obs_version=HP.OBS_VERSION):
+        self.state_dim = state_dim
+        self.obs_version = obs_version
+        self.reward_version = "v4_incremental_delay"
+        self.online_net = DuelingDQNNetwork(state_dim, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(state_dim, HP.ACTION_DIM)
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.target_net.eval()
 
@@ -46,6 +49,7 @@ class DQNAgent:
         self.total_train_steps = 0
         self.all_masked_fallback_count = 0
         self.latest_q_stats: Dict[str, float] = {}
+        self.demonstration_loss_weight = 0.10
 
     def prepare_for_finetuning(self, learning_rate: float = 1e-4) -> None:
         """
@@ -70,8 +74,8 @@ class DQNAgent:
 
     def reset_for_fresh_training(self) -> None:
         """Discard weights, optimizer moments and replay for a genuinely fresh run."""
-        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
-        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+        self.online_net = DuelingDQNNetwork(self.state_dim, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(self.state_dim, HP.ACTION_DIM)
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.target_net.eval()
         self.optimizer = optim.Adam(
@@ -213,11 +217,11 @@ class DQNAgent:
             (margin_loss_per_sample * demo_weight).sum()
             / demo_weight.sum().clamp(min=1.0)
         )
-        weighted_loss = td_loss + 0.10 * demo_loss
+        weighted_loss = td_loss + self.demonstration_loss_weight * demo_loss
 
         self.optimizer.zero_grad()
         weighted_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
+        gradient_norm = torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
         self.optimizer.step()
 
         self.step_count += 1
@@ -238,7 +242,18 @@ class DQNAgent:
             "td_error_max": round(float(np.max(np.abs(td_errors))), 4),
             "loss": round(float(weighted_loss.item()), 5),
             "td_loss": round(float(td_loss.item()), 5),
+            # Keep scale diagnostics separate: shrinking PER weights can lower
+            # weighted loss even while the same sampled prediction errors grow.
+            "unweighted_td_loss": round(float(per_sample_loss.detach().mean().item()), 5),
+            "pre_clip_gradient_norm": round(float(gradient_norm.item()), 5),
             "demo_margin_loss": round(float(demo_loss.item()), 5),
+            "weighted_demo_loss": round(float(self.demonstration_loss_weight * demo_loss.item()), 5),
+            "demo_sample_fraction": round(float(demo_flags.mean().item()), 5),
+            "importance_weight_mean": round(float(weights.mean().item()), 5),
+            "importance_weight_min": round(float(weights.min().item()), 5),
+            "importance_weight_max": round(float(weights.max().item()), 5),
+            "bootstrap_discount_mean": round(float(bootstrap_discounts.mean().item()), 5),
+            "target_q_mean": round(float(target_q.mean().item()), 4),
         }
 
         self.replay_buffer.update_priorities(indices, np.abs(td_errors))
@@ -255,8 +270,8 @@ class DQNAgent:
             "optimizer":         self.optimizer.state_dict(),
             "step_count":        self.step_count,
             "total_train_steps": self.total_train_steps,
-            "obs_version":       HP.OBS_VERSION,
-            "reward_version":    "v4_incremental_delay",
+            "obs_version":       self.obs_version,
+            "reward_version":    self.reward_version,
             "demand_version":    "v2_total_lambda_with_upstream_backlog",
         }
 
@@ -266,6 +281,7 @@ class DQNAgent:
     def load(self, path: str):
         checkpoint = torch.load(path, map_location="cpu")
         if isinstance(checkpoint, dict) and "online_net" in checkpoint:
+            self.reward_version = checkpoint.get("reward_version", self.reward_version)
             self.online_net.load_state_dict(checkpoint["online_net"])
             self.target_net.load_state_dict(checkpoint["target_net"])
             if "optimizer" in checkpoint:

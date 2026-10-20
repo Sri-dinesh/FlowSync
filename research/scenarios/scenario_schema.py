@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
@@ -52,6 +53,27 @@ class ScenarioConfig:
     def __post_init__(self) -> None:
         if isinstance(self.demand_profile, dict):
             self.demand_profile = DemandProfile(**self.demand_profile)
+        dp = self.demand_profile
+        directions = {"north", "south", "east", "west"}
+        if self.duration_steps <= 0 or not math.isfinite(self.red_duration) or self.red_duration < 0:
+            raise ValueError("Invalid scenario duration or clearance")
+        if set(dp.directional_weights) != directions or any(not math.isfinite(v) or v < 0 for v in dp.directional_weights.values()) or sum(dp.directional_weights.values()) <= 0:
+            raise ValueError("Scenario requires nonnegative directional weights with positive total")
+        if not math.isfinite(dp.base_lambda) or dp.base_lambda < 0:
+            raise ValueError("Invalid demand rate")
+        for direction in directions:
+            ratios = dp.turn_ratios[direction]
+            if set(ratios) != {"straight", "left", "right"} or any(not math.isfinite(v) or v < 0 for v in ratios.values()) or not math.isclose(sum(ratios.values()), 1.0):
+                raise ValueError(f"Invalid turn ratios for {direction}")
+        for event in dp.burst_events + dp.incident_events:
+            if not 0 <= event["start_step"] < event["end_step"] <= self.duration_steps:
+                raise ValueError("Event interval must be within scenario duration")
+        for event in dp.burst_events:
+            if set(event.get("directions", [])) - directions or not math.isfinite(event.get("multiplier", 1)) or event.get("multiplier", 1) < 0:
+                raise ValueError("Invalid burst configuration")
+        for event in dp.incident_events:
+            if event["direction"] not in directions or not 0 <= event["capacity_factor"] <= 1:
+                raise ValueError("Invalid incident configuration")
         if not self.scenario_hash:
             self.scenario_hash = self.compute_hash()
 

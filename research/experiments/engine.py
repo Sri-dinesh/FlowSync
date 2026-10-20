@@ -37,6 +37,7 @@ from server.app.simulation.environment import TrafficEnv
 from server.app.simulation.benchmark_harness import seed_everything
 from server.app.simulation.spawner import TrafficProfile
 from research.scenarios.scenario_schema import ScenarioConfig
+from research.experiments.runtime import ObservedState, SignalAudit, apply_scenario_step, build_environment
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,17 @@ class ExperimentResult:
     git_commit: str = ""
     timestamp: str = ""
     checkpoint_hash: str = ""
+    executed_conflict_violations: int = 0
+    executed_clearance_violations: int = 0
+    safety_samples: int = 0
+    fallback_steps: int = 0
+    fallback_activations: int = 0
+    shield_interventions: int = 0
+    observation_mae: float = 0.0
+    arrival_trace_hash: str = ""
+    controller_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    fault_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    scenario_diagnostics: Dict[str, Any] = field(default_factory=dict)
     trajectory: List[Dict[str, Any]] = field(default_factory=list)
     events: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -80,7 +92,7 @@ class ExperimentResult:
     def save_bundle(self, base_dir: Path | str) -> Path:
         """Save immutable experiment artifact bundle to disk."""
         target_dir = Path(base_dir) / self.experiment_id
-        target_dir.mkdir(parents=True, exist_ok=True)
+        target_dir.mkdir(parents=True, exist_ok=False)
 
         # 1. metadata.json
         metadata = {
@@ -93,6 +105,9 @@ class ExperimentResult:
             "timestamp": self.timestamp,
             "checkpoint_hash": self.checkpoint_hash,
             "controller_capabilities": self.controller_capabilities,
+            "controller_diagnostics": self.controller_diagnostics,
+            "scenario_diagnostics": self.scenario_diagnostics,
+            "arrival_trace_hash": self.arrival_trace_hash,
         }
         (target_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
@@ -112,6 +127,14 @@ class ExperimentResult:
             "watchdog_override_rate": self.watchdog_override_rate,
             "total_reward": self.total_reward,
             "elapsed_wall_seconds": self.elapsed_wall_seconds,
+            "executed_conflict_violations": self.executed_conflict_violations,
+            "executed_clearance_violations": self.executed_clearance_violations,
+            "safety_samples": self.safety_samples,
+            "fallback_steps": self.fallback_steps,
+            "fallback_activations": self.fallback_activations,
+            "shield_interventions": self.shield_interventions,
+            "observation_mae": self.observation_mae,
+            "fault_diagnostics": self.fault_diagnostics,
         }
         (target_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
@@ -156,16 +179,22 @@ class ExperimentRunner:
         seed: int,
         record_trajectory: bool = True,
         fault_injector: Optional[Any] = None,
+        allow_untrained: bool = False,
     ) -> ExperimentResult:
         """
         Execute deterministic simulation run.
         """
         t_start = time.perf_counter()
+        if (controller.get_capabilities().is_learning_based and not allow_untrained
+                and not controller.get_diagnostics().get("checkpoint_loaded")):
+            raise ValueError("Evaluation requires an explicit trained checkpoint; random weights are not a trained baseline")
+        if scenario.topology != "single_intersection":
+            raise ValueError(f"Unsupported headless topology: {scenario.topology}")
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
         git_commit = self.get_git_commit()
 
         # Generate unique deterministic experiment ID
-        exp_id_raw = f"{scenario.scenario_id}_{controller.name}_seed{seed}_{timestamp}"
+        exp_id_raw = f"{scenario.scenario_id}_{controller.name}_seed{seed}_{time.time_ns()}"
         exp_hash = hashlib.sha256(exp_id_raw.encode()).hexdigest()[:8]
         experiment_id = f"exp_{scenario.scenario_id}_{controller.name}_s{seed}_{exp_hash}"
 
@@ -177,27 +206,22 @@ class ExperimentRunner:
 
         # 3. Instantiate and configure simulation environment
         num_steps = scenario.duration_steps
-        env = TrafficEnv(max_steps=num_steps, red_duration=scenario.red_duration)
-
-        # Build traffic profile from scenario demand profile
+        # Mandatory physical lamp FSM remains active. Controller-level watchdogs
+        # belong to the controller/shield and must not secretly alter ablations.
+        env, profile = build_environment(scenario)
         dp = scenario.demand_profile
-        profile = TrafficProfile(
-            id=scenario.scenario_id,
-            name=scenario.name,
-            description=scenario.description,
-            directional_weights=dp.directional_weights,
-            turn_probs=[
-                dp.turn_ratios["north"]["straight"],
-                dp.turn_ratios["north"]["left"],
-                dp.turn_ratios["north"]["right"],
-            ],
-            base_lambda=dp.base_lambda,
-            lambda_multiplier=1.0,
-        )
-        env.set_traffic_profile(profile)
 
         # Environment reset with seed
         obs, _ = env.reset(seed=seed)
+        observed_state = ObservedState()
+        signal_audit = SignalAudit()
+        arrival_trace = hashlib.sha256()
+        observation_error = 0.0
+        fallback_steps = fallback_activations = shield_interventions = 0
+        previous_authority = "rl_active"
+        active_incident_steps = 0
+        if fault_injector is not None:
+            fault_injector.reset(seed=fault_injector.seed if fault_injector.seed is not None else seed + 90000)
 
         # Telemetry accumulators
         total_reward = 0.0
@@ -215,51 +239,34 @@ class ExperimentRunner:
 
         # Step loop
         for step in range(num_steps):
-            # Dynamic burst events from scenario
-            current_lambda = dp.base_lambda
-            for burst in dp.burst_events:
-                if burst.get("start_step", 0) <= step <= burst.get("end_step", 0):
-                    current_lambda *= burst.get("multiplier", 1.0)
-            env.intersection.set_spawn_rate(current_lambda)
-
-            # Build ControllerContext
+            dynamics = apply_scenario_step(env.intersection, profile, dp, step)
+            active_incident_steps += int(any(f < 1 for f in dynamics["downstream_capacity_factors"].values()))
             signal = env.intersection.signal
             queues = env.intersection.get_movement_queues()
-            valid_mask = env.get_valid_action_mask()
-
-            # Estimate outgoing counts
-            outgoing_counts = {
-                "north": sum(1 for v in env.intersection.lanes.get("north_straight", []) if v.position > 0.42),
-                "south": sum(1 for v in env.intersection.lanes.get("south_straight", []) if v.position > 0.42),
-                "east":  sum(1 for v in env.intersection.lanes.get("east_straight", []) if v.position > 0.42),
-                "west":  sum(1 for v in env.intersection.lanes.get("west_straight", []) if v.position > 0.42),
-            }
-
-            ctx = ControllerContext(
-                timestep=step,
-                dt=0.1,
-                current_phase=signal.current_phase,
-                time_in_phase=signal.time_in_phase,
-                color=signal.color.name,
-                can_switch_phase=signal.can_switch_phase,
-                is_decision_step=env.is_decision_step,
-                valid_action_mask=valid_mask,
-                movement_queues=queues,
-                outgoing_counts=outgoing_counts,
-                starvation_times=signal.starvation_timer.copy(),
-                extra_telemetry={"spawned_this_step": max(0, getattr(env.intersection, "_generated_last_tick", 0))},
-            )
-
-            # Observation conditioning (e.g. fault injector if present)
-            policy_obs = obs
-            if fault_injector is not None:
-                policy_obs = fault_injector.corrupt_observation(obs, step=step, context=ctx)
+            policy_obs, ctx = observed_state.build(env, obs, step, fault_injector)
+            observation_error += float(np.mean(np.abs(policy_obs[:12] - obs[:12])))
 
             # Controller action selection
             action = controller.act(policy_obs, ctx)
+            diagnostics = controller.get_diagnostics()
+            authority = diagnostics.get("authority", "rl_active")
+            fallback_steps += int(authority == "fallback_active")
+            if authority != previous_authority:
+                fallback_activations += int(authority == "fallback_active")
+                events.append({"type": "authority_transfer", "step": step,
+                               "from": previous_authority, "to": authority,
+                               "uncertainty": diagnostics.get("uncertainty_score")})
+            previous_authority = authority
+            if diagnostics.get("was_overridden"):
+                shield_interventions += 1
+                events.append({"type": "shield_override", "step": step,
+                               "reason": diagnostics.get("override_reason")})
+            before_signal = (signal.current_phase, signal.color.name, signal.time_in_phase)
 
             # Environment step
             next_obs, reward, terminated, truncated, info = env.step(action)
+            signal_audit.observe(before_signal, signal)
+            arrival_trace.update(json.dumps([step, env.intersection.spawner.generated_movements_last_tick]).encode())
             total_reward += reward
 
             # Accumulate queue area
@@ -310,6 +317,15 @@ class ExperimentRunner:
                     "executed_action": info.get("executed_action"),
                     "total_waiting": step_q,
                     "reward": round(reward, 4),
+                    "clean_observation": obs.tolist(),
+                    "policy_observation": policy_obs.tolist(),
+                    "observed_queues": ctx.movement_queues,
+                    "valid_action_mask": ctx.valid_action_mask.tolist(),
+                    "sensor_metadata": ctx.extra_telemetry,
+                    "authority": authority,
+                    "uncertainty_score": diagnostics.get("uncertainty_score"),
+                    "uncertainty_features": diagnostics.get("uncertainty_features"),
+                    "scenario_dynamics": dynamics,
                 })
 
             obs = next_obs
@@ -324,7 +340,7 @@ class ExperimentRunner:
             all_delays.extend(env.passed_vehicle_waits)
         for queue in env.intersection.lanes.values():
             for v in queue:
-                if v.wait_time > 0:
+                if v.state != "passed":
                     all_delays.append(v.wait_time)
         all_delays.extend(env.intersection.spawner.get_backlog_waits())
 
@@ -351,7 +367,7 @@ class ExperimentRunner:
         return ExperimentResult(
             experiment_id=experiment_id,
             scenario_id=scenario.scenario_id,
-            scenario_hash=scenario.scenario_hash,
+            scenario_hash=scenario.compute_hash(),
             controller_name=controller.name,
             seed=seed,
             num_steps=num_steps,
@@ -373,6 +389,25 @@ class ExperimentRunner:
             git_commit=git_commit,
             timestamp=timestamp,
             checkpoint_hash=checkpoint_hash,
+            executed_conflict_violations=signal_audit.conflicts,
+            executed_clearance_violations=signal_audit.clearance_violations,
+            safety_samples=signal_audit.samples,
+            fallback_steps=fallback_steps,
+            fallback_activations=fallback_activations,
+            shield_interventions=shield_interventions,
+            observation_mae=observation_error / max(1, signal_audit.samples),
+            arrival_trace_hash=arrival_trace.hexdigest(),
+            controller_diagnostics=diag,
+            fault_diagnostics=fault_injector.get_realized_diagnostics() if fault_injector else {},
+            scenario_diagnostics={"incident_active_steps": active_incident_steps,
+                                  "generated_by_movement": env.intersection.spawner.generated_by_movement,
+                                  "environment_watchdogs": False,
+                                  "reward_version": env.reward_version,
+                                  "signal_fsm": "TrafficSignal",
+                                  "min_green_s": signal.min_green_duration,
+                                  "yellow_s": signal.yellow_duration,
+                                  "all_red_s": signal.red_duration,
+                                  "sensor_model": "synthetic_count_sensor_v2"},
             trajectory=trajectory,
             events=events,
         )

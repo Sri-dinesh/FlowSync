@@ -5,6 +5,8 @@ Tests for ablation studies and failure taxonomy analysis (Phase J & Phase L).
 import tempfile
 from pathlib import Path
 import pytest
+import torch
+from server.app.controllers import D3QNController
 
 from research.experiments.run_ablations import build_ablation_controllers, run_ablation_experiments
 from research.analysis.failure_analysis import (
@@ -37,7 +39,8 @@ def test_ablation_controller_specifications():
     assert no_shield.enable_shield is False
 
     no_fb = variants["minus Fallback (No-Fallback)"]
-    assert no_fb.fallback_controller_name == "d3qn"
+    assert no_fb.enable_fallback is False
+    assert no_fb.fallback_controller_name == "max_pressure"
 
     fixed_fb = variants["minus MaxPressure (Fixed Fallback)"]
     assert fixed_fb.fallback_controller_name == "fixed"
@@ -108,6 +111,8 @@ def test_failure_taxonomy_classification():
 def test_ablation_and_reliability_execution_smoke():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
+        weights = tmp_path / "test_weights.pt"
+        torch.save({"online_net": D3QNController().agent.online_net.state_dict()}, weights)
 
         # Fast ablation check
         res_ablation = run_ablation_experiments(
@@ -115,6 +120,7 @@ def test_ablation_and_reliability_execution_smoke():
             seeds=[101],
             noise_profile=FaultProfile(name="test_miss", miss_rate=0.10),
             results_dir=tmp_path / "ablations",
+            checkpoint_path=str(weights),
         )
         assert len(res_ablation) == 5
         assert (tmp_path / "ablations" / "table_ablations.tex").exists()
@@ -127,6 +133,7 @@ def test_ablation_and_reliability_execution_smoke():
             miss_rates=[0.0, 0.20],
             controllers=["d3qn", "flowsync_uq"],
             results_dir=tmp_path / "reliability",
+            checkpoint_path=str(weights),
         )
         assert "d3qn" in res_boundary
         assert "flowsync_uq" in res_boundary

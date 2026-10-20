@@ -11,6 +11,7 @@ from .max_pressure import MaxPressureController
 from .safety_shield import SafetyShield, ShieldDecision
 from .supervisor import ControllerSupervisor, ControlAuthority
 from research.uncertainty.estimator import PerceptionUncertaintyEstimator, UncertaintyScore
+from research.uncertainty.benefit_gate import FallbackBenefitGate, observable_features
 
 
 class FlowSyncUQController(BaseController):
@@ -21,7 +22,7 @@ class FlowSyncUQController(BaseController):
         d3qn_controller: Pre-configured D3QN controller instance.
         fallback_controller: Deterministic fallback controller (default: MaxPressureController).
         uncertainty_estimator: Online multi-feature uncertainty estimator.
-        safety_shield: Formal safety invariant enforcement layer.
+        safety_shield: Rule-based signal and phase-service guard.
         supervisor: Authority transfer state machine.
     """
 
@@ -38,6 +39,11 @@ class FlowSyncUQController(BaseController):
         uncertainty_threshold: Optional[float] = None,
         enable_shield: bool = True,
         fallback_controller_name: Optional[str] = None,
+        enable_fallback: bool = True,
+        checkpoint_path: Optional[str] = None,
+        max_observation_age_ms: float = 1000.0,
+        calibration_path: Optional[str] = None,
+        benefit_gate_path: Optional[str] = None,
     ) -> None:
         super().__init__(name="flowsync_uq")
 
@@ -49,9 +55,11 @@ class FlowSyncUQController(BaseController):
         self.threshold_low = threshold_low
         self.uncertainty_threshold = threshold_high
         self.enable_shield = enable_shield
+        self.enable_fallback = enable_fallback
+        self.max_observation_age_ms = max_observation_age_ms
         self.fallback_controller_name = fallback_controller_name or "max_pressure"
 
-        self.d3qn = d3qn_controller or D3QNController(deterministic=True)
+        self.d3qn = d3qn_controller or D3QNController(deterministic=True, checkpoint_path=checkpoint_path)
 
         if fallback_controller is not None:
             self.fallback = fallback_controller
@@ -64,7 +72,13 @@ class FlowSyncUQController(BaseController):
         self.uncertainty_estimator = uncertainty_estimator or PerceptionUncertaintyEstimator(
             threshold_high=threshold_high,
             threshold_low=threshold_low,
+            calibration_path=calibration_path,
         )
+        if calibration_path is not None:
+            threshold_high = self.uncertainty_estimator.threshold_high
+            threshold_low = self.uncertainty_estimator.threshold_low
+            self.threshold_high = self.uncertainty_threshold = threshold_high
+            self.threshold_low = threshold_low
         self.safety_shield = safety_shield or SafetyShield()
         self.supervisor = supervisor or ControllerSupervisor(
             threshold_high=threshold_high,
@@ -75,6 +89,16 @@ class FlowSyncUQController(BaseController):
         self._last_uncertainty: Optional[UncertaintyScore] = None
         self._last_shield_decision: Optional[ShieldDecision] = None
         self._last_authority: ControlAuthority = ControlAuthority.RL_ACTIVE
+        self.benefit_gate = FallbackBenefitGate(benefit_gate_path) if benefit_gate_path else None
+        if self.benefit_gate is not None:
+            if self.benefit_gate.model.get("calibration_sha256") != self.uncertainty_estimator.calibration_hash:
+                raise ValueError("Benefit gate requires its recorded uncertainty calibration")
+            if self.d3qn._checkpoint_hash not in self.benefit_gate.model.get("checkpoint_hashes", []):
+                raise ValueError("Benefit gate has not been fitted for this checkpoint family")
+        self._gate_allow = None
+        self._gate_probability = None
+        self._gate_low_steps = 0
+        self._gate_evaluations = self._gate_vetoes = 0
 
     def reset(self, seed: Optional[int] = None) -> None:
         super().reset(seed=seed)
@@ -86,6 +110,8 @@ class FlowSyncUQController(BaseController):
         self._last_uncertainty = None
         self._last_shield_decision = None
         self._last_authority = ControlAuthority.RL_ACTIVE
+        self._gate_allow = self._gate_probability = None
+        self._gate_low_steps = self._gate_evaluations = self._gate_vetoes = 0
 
     def get_capabilities(self) -> ControllerCapabilities:
         return ControllerCapabilities(
@@ -117,7 +143,26 @@ class FlowSyncUQController(BaseController):
         )
         self._last_uncertainty = u_score
 
-        authority = self.supervisor.update(u_score.score, step=self._step_count)
+        stale = obs_age >= self.max_observation_age_ms
+        supervisor_score = 1.0 if stale else u_score.score
+        if self.benefit_gate is not None and self.enable_fallback:
+            self._gate_low_steps = self._gate_low_steps + 1 if u_score.score <= self.supervisor.threshold_low else 0
+            if self._gate_low_steps >= self.supervisor.recovery_window_steps:
+                self._gate_allow = self._gate_probability = None
+            # Decide once per uncertainty episode, never repeatedly search for a
+            # favorable prediction each tick. Active fallback keeps its dwell.
+            if (not stale and self.supervisor.authority == ControlAuthority.RL_ACTIVE
+                    and u_score.score >= self.supervisor.threshold_high):
+                if self._gate_allow is None:
+                    self._gate_probability = self.benefit_gate.predict(observable_features(context, u_score.score))
+                    self._gate_allow = (self._gate_probability is None or
+                                       self._gate_probability >= self.benefit_gate.model["threshold"])
+                    self._gate_evaluations += 1
+                    self._gate_vetoes += int(not self._gate_allow)
+                if not self._gate_allow:
+                    supervisor_score = float(np.nextafter(self.supervisor.threshold_high, -np.inf))
+        authority = (self.supervisor.update(supervisor_score, step=self._step_count)
+                     if self.enable_fallback else ControlAuthority.RL_ACTIVE)
         self._last_authority = authority
 
         if authority == ControlAuthority.RL_ACTIVE:
@@ -127,17 +172,10 @@ class FlowSyncUQController(BaseController):
         else:
             proposed_action = self.fallback.act(observation, context)
             q_values = []
-            active_controller = "max_pressure_fallback"
+            active_controller = f"{self.fallback.name}_fallback"
 
         if self.enable_shield and self.safety_shield is not None:
-            shield_decision = self.safety_shield.filter_action(
-                proposed_action=proposed_action,
-                current_phase=context.current_phase,
-                time_in_phase=context.time_in_phase,
-                color=context.color,
-                valid_action_mask=context.valid_action_mask,
-                starvation_timers={i: context.starvation_times.get(d, 0.0) for i, d in enumerate(["north", "east", "south", "west"])} if context.starvation_times else None,
-            )
+            shield_decision = self.safety_shield.filter_context(proposed_action, context)
         else:
             shield_decision = ShieldDecision(
                 proposed_action=proposed_action,
@@ -155,7 +193,12 @@ class FlowSyncUQController(BaseController):
             "active_controller": active_controller,
             "authority": authority.value,
             "uncertainty_score": round(u_score.score, 4),
+            "stale_observation_failover": stale,
+            "supervisor_score": supervisor_score,
+            "benefit_gate_probability": self._gate_probability,
+            "benefit_gate_allows_entry": self._gate_allow,
             "uncertainty_features": u_score.features.to_dict(),
+            "phase_wait_semantics": context.extra_telemetry.get("phase_wait_semantics", "unspecified"),
             "proposed_action": proposed_action,
             "executed_action": executed_action,
             "was_overridden": shield_decision.was_overridden,
@@ -166,3 +209,17 @@ class FlowSyncUQController(BaseController):
         }
 
         return executed_action
+
+    def get_diagnostics(self) -> dict:
+        policy = self.d3qn.get_diagnostics()
+        return {**super().get_diagnostics(),
+                **{k: policy.get(k) for k in ("checkpoint_hash", "checkpoint_path",
+                   "checkpoint_loaded", "checkpoint_metadata", "deterministic")},
+                "shield_enabled": self.enable_shield,
+                "fallback_enabled": self.enable_fallback,
+                "uncertainty_calibration_hash": self.uncertainty_estimator.calibration_hash,
+                "benefit_gate_hash": self.benefit_gate.sha256 if self.benefit_gate else None,
+                "benefit_gate_evaluations": self._gate_evaluations,
+                "benefit_gate_vetoes": self._gate_vetoes,
+                "supervisor": self.supervisor.get_audit_summary(),
+                "shield": self.safety_shield.get_audit_metrics()}

@@ -71,7 +71,8 @@ class ActuatedController(BaseController):
 
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:
         self._step_count += 1
-        self._time_in_phase += context.dt
+        self._current_phase = context.current_phase
+        self._time_in_phase = context.time_in_phase
 
         spawned = context.extra_telemetry.get("spawned_this_step", 0)
         self.update_arrivals(spawned, dt=context.dt)
@@ -82,7 +83,7 @@ class ActuatedController(BaseController):
         )
         max_green_exceeded = self._time_in_phase >= self.max_green
 
-        should_switch = (gap_out or max_green_exceeded) and context.can_switch_phase
+        should_switch = (gap_out or max_green_exceeded) and context.can_switch_phase and context.color == "GREEN"
 
         if should_switch:
             phase_counts: Dict[int, float] = {}

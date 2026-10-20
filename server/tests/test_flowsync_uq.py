@@ -17,6 +17,30 @@ from server.app.controllers.base import ControllerContext
 from research.uncertainty.estimator import PerceptionUncertaintyEstimator, UncertaintyScore
 
 
+@pytest.mark.parametrize("miss_rate,latency", [(0., 0), (.3, 1000)])
+def test_disabled_supervisor_matches_same_checkpoint_policy(tmp_path, miss_rate, latency):
+    import torch
+    from research.experiments.engine import ExperimentRunner
+    from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
+    from research.scenarios.scenario_schema import ScenarioConfig
+    from server.app.controllers.d3qn import D3QNController
+    from server.app.rl.dqn_agent import DQNAgent
+
+    path = tmp_path / "policy.pt"
+    torch.save(DQNAgent().get_checkpoint_state(), path)
+    scenario = ScenarioConfig("val_ablation_identity", "validation", "Identity", duration_steps=1000)
+    profile = FaultProfile(miss_rate=miss_rate, latency_ms=latency)
+    plain = ExperimentRunner().run(D3QNController(checkpoint_path=str(path)), scenario, 21001,
+        record_trajectory=False, fault_injector=PerceptionFaultInjector(profile, seed=111001))
+    wrapped = ExperimentRunner().run(FlowSyncUQController(checkpoint_path=str(path),
+        enable_shield=False, enable_fallback=False), scenario, 21001,
+        record_trajectory=False, fault_injector=PerceptionFaultInjector(profile, seed=111001))
+    for metric in ("avg_delay", "p95_delay", "total_vehicles_passed", "queue_area",
+                   "max_queue", "starvation_count", "arrival_trace_hash"):
+        assert getattr(plain, metric) == getattr(wrapped, metric)
+    assert wrapped.fallback_steps == wrapped.shield_interventions == 0
+
+
 def test_uncertainty_estimator_response():
     """Uncertainty score must be low on clean data and high on corrupted inputs."""
     estimator = PerceptionUncertaintyEstimator(threshold_high=0.45, threshold_low=0.25)

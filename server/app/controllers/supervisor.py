@@ -76,7 +76,6 @@ class ControllerSupervisor:
         self._steps_in_current_authority += 1
 
         if self.authority == ControlAuthority.RL_ACTIVE:
-            self.total_rl_steps += 1
             if uncertainty_score >= self.threshold_high:
                 self.authority = ControlAuthority.FALLBACK_ACTIVE
                 self.total_switches += 1
@@ -93,7 +92,6 @@ class ControllerSupervisor:
                 self._consecutive_low_uncertainty_steps = 0
 
         elif self.authority == ControlAuthority.FALLBACK_ACTIVE:
-            self.total_fallback_steps += 1
 
             if uncertainty_score <= self.threshold_low:
                 self._consecutive_low_uncertainty_steps += 1
@@ -120,6 +118,11 @@ class ControllerSupervisor:
                 self._steps_in_current_authority = 0
                 self._consecutive_low_uncertainty_steps = 0
 
+        # Attribute the tick to the controller that actually executes it.
+        if self.authority == ControlAuthority.RL_ACTIVE:
+            self.total_rl_steps += 1
+        else:
+            self.total_fallback_steps += 1
         return self.authority
 
     def get_audit_summary(self) -> Dict[str, Any]:

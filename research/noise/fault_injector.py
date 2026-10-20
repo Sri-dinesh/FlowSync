@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
+import math
 import numpy as np
 
 from server.app.controllers.base import ControllerContext
@@ -92,11 +93,16 @@ class PerceptionFaultInjector:
 
     def __init__(self, profile: Optional[FaultProfile] = None, seed: Optional[int] = None) -> None:
         self.profile = profile or FaultProfile()
+        for key in ("miss_rate", "burst_miss_prob", "frame_drop_prob", "lane_misclass_prob"):
+            if not 0 <= getattr(self.profile, key) <= 1:
+                raise ValueError(f"{key} must be in [0, 1]")
+        if self.profile.latency_ms < 0 or self.profile.false_positive_lambda < 0 or self.profile.jitter_std < 0:
+            raise ValueError("Latency and noise magnitudes cannot be negative")
         self.seed = seed
         self._rng = np.random.default_rng(seed)
 
         # Latency ring buffer: dt=0.1s (100ms) per step
-        self._latency_steps = max(0, int(round(self.profile.latency_ms / 100.0)))
+        self._latency_steps = max(0, int(math.ceil(self.profile.latency_ms / 100.0)))
         self._obs_ring_buffer: deque[np.ndarray] = deque(maxlen=max(1, self._latency_steps + 1))
 
         # Burst occlusion state
@@ -110,6 +116,9 @@ class PerceptionFaultInjector:
         self.total_false_positives: int = 0
         self.total_stale_frames: int = 0
         self.total_burst_steps: int = 0
+        self.total_visible_vehicle_samples = 0
+        self._packets = deque(maxlen=self._latency_steps + 1)
+        self._last_packet = None
 
     def reset(self, seed: Optional[int] = None) -> None:
         """Reset fault generator state with optional seed refresh."""
@@ -120,6 +129,11 @@ class PerceptionFaultInjector:
         self._in_burst = False
         self._burst_steps_remaining = 0
         self._last_emitted_obs = None
+        self._packets.clear()
+        self._last_packet = None
+        self.total_queries = self.total_missed_detections = 0
+        self.total_false_positives = self.total_stale_frames = self.total_burst_steps = 0
+        self.total_visible_vehicle_samples = 0
 
     def reset_seed(self, seed: int) -> None:
         """Alias for reset(seed)."""
@@ -140,87 +154,73 @@ class PerceptionFaultInjector:
         Produce corrupted observation vector according to the active FaultProfile.
         Clean observation remains untouched.
         """
+        return self._corrupt_packet(clean_obs, step, context)
+
+    def _corrupt_packet(self, clean_obs, step, context):
+        """Corrupt vehicle counts, arrivals and outflow together; retain frame age.
+
+        A missed detection is a Bernoulli trial per vehicle sample. Synthetic
+        fault truth is retained only in audit counters, never sent as confidence.
+        """
         self.total_queries += 1
-        obs = np.copy(clean_obs)
-
-        # 1. Stale Frame Drop
-        if (
-            self.profile.frame_drop_prob > 0.0
-            and self._last_emitted_obs is not None
-            and self._rng.random() < self.profile.frame_drop_prob
-        ):
-            self.total_stale_frames += 1
-            return np.copy(self._last_emitted_obs)
-
-        # 2. Burst Occlusion Handling
-        if self._in_burst:
-            self._burst_steps_remaining -= 1
-            self.total_burst_steps += 1
-            if self._burst_steps_remaining <= 0:
-                self._in_burst = False
-        elif (
-            self.profile.burst_miss_prob > 0.0
-            and self._rng.random() < self.profile.burst_miss_prob
-        ):
-            self._in_burst = True
+        # Independent step streams prevent controller-dependent queue sizes from
+        # moving the fault schedule for later frames.
+        rng = np.random.default_rng(np.random.SeedSequence([self.seed or 0, step]))
+        drop = rng.random() < self.profile.frame_drop_prob
+        burst_start = rng.random() < self.profile.burst_miss_prob
+        if self._burst_steps_remaining <= 0 and burst_start:
             self._burst_steps_remaining = self.profile.burst_miss_duration
-            self.total_burst_steps += 1
+        in_burst = self._burst_steps_remaining > 0
+        self._burst_steps_remaining = max(0, self._burst_steps_remaining - 1)
+        self.total_burst_steps += int(in_burst)
 
-        # Dims 0-11: movement queues
-        # Apply queue-level faults
-        queues = np.copy(obs[:12])
-
-        # (a) Bernoulli Missed Detections
-        if self.profile.miss_rate > 0.0:
-            for i in range(12):
-                if queues[i] > 0 and self._rng.random() < self.profile.miss_rate:
-                    # Scale down observed queue
-                    loss_factor = self._rng.uniform(0.3, 0.9)
-                    queues[i] = max(0.0, queues[i] * (1.0 - loss_factor))
-                    self.total_missed_detections += 1
-
-        # (b) Burst Occlusion on designated approaches
-        if self._in_burst:
+        obs = np.copy(clean_obs)
+        clean_counts = np.rint(15.0 * np.arctanh(np.clip(obs[:12], 0, 0.999999))).astype(int)
+        self.total_visible_vehicle_samples += int(clean_counts.sum())
+        counts = rng.binomial(clean_counts, 1.0 - self.profile.miss_rate)
+        if in_burst:
             for i, movement in enumerate(MOVEMENT_KEYS):
-                dir_name = movement.split("_")[0]
-                if dir_name in self.profile.burst_approaches:
-                    # Approach is occluded: camera sees near-zero demand
-                    queues[i] *= 0.05
+                if movement.split("_")[0] in self.profile.burst_approaches:
+                    counts[i] = 0
+        self.total_missed_detections += int((clean_counts - counts).sum())
+        ghosts = rng.poisson(self.profile.false_positive_lambda / 12.0, size=12)
+        self.total_false_positives += int(ghosts.sum())
+        counts += ghosts
+        if self.profile.jitter_std:
+            counts = np.maximum(0, np.rint(counts + rng.normal(0, self.profile.jitter_std * 15, 12))).astype(int)
+        if rng.random() < self.profile.lane_misclass_prob:
+            pair = int(rng.choice([0, 3, 6, 9]))
+            counts[pair], counts[pair + 1] = counts[pair + 1], counts[pair]
+        obs[:12] = np.tanh(counts / 15.0)
 
-        # (c) False Positives (Ghost Vehicles)
-        if self.profile.false_positive_lambda > 0.0:
-            fp_count = self._rng.poisson(self.profile.false_positive_lambda)
-            if fp_count > 0:
-                for _ in range(fp_count):
-                    idx = self._rng.integers(0, 12)
-                    ghost_addition = self._rng.uniform(0.08, 0.20)  # normalized ghost queue
-                    queues[idx] = min(1.0, queues[idx] + ghost_addition)
-                    self.total_false_positives += 1
+        outgoing = {}
+        arrivals = 0
+        if context is not None:
+            outgoing = {d: int(rng.binomial(int(n), 1.0 - self.profile.miss_rate))
+                        for d, n in (context.outgoing_counts or {}).items()}
+            arrivals = int(rng.binomial(int(context.extra_telemetry.get("spawned_this_step", 0)),
+                                       1.0 - self.profile.miss_rate))
+            if in_burst:
+                for d in self.profile.burst_approaches:
+                    outgoing[d] = 0
+        packet = (step, obs, outgoing, arrivals)
+        self._packets.append(packet)
+        selected = self._packets[0]
+        if drop and self._last_packet is not None:
+            selected = self._last_packet
+            self.total_stale_frames += 1
+        repeated = self._last_packet is not None and selected[0] == self._last_packet[0]
+        self._last_packet = selected
+        if context is not None:
+            context.outgoing_counts = dict(selected[2])
+            context.extra_telemetry.update(
+                observation_age_ms=(step - selected[0]) * 100.0,
+                frame_dropped=bool(drop or repeated),
+                spawned_this_step=0 if repeated else selected[3],
+            )
+        self._last_emitted_obs = np.copy(selected[1])
+        return np.copy(selected[1])
 
-        # (d) Bounding Box / Coordinate Jitter
-        if self.profile.jitter_std > 0.0:
-            noise = self._rng.normal(0.0, self.profile.jitter_std, size=12)
-            queues = np.clip(queues + noise, 0.0, 1.0)
-
-        # (e) Lane Misclassification (swap straight with left on same approach)
-        if self.profile.lane_misclass_prob > 0.0 and self._rng.random() < self.profile.lane_misclass_prob:
-            # Pair indices: (0, 1) for north, (3, 4) for south, (6, 7) for east, (9, 10) for west
-            pair = self._rng.choice([0, 3, 6, 9])
-            queues[pair], queues[pair + 1] = queues[pair + 1], queues[pair]
-
-        obs[:12] = queues
-
-        # 3. Observation Latency (Ring Buffer Delay)
-        if self._latency_steps > 0:
-            self._obs_ring_buffer.append(obs)
-            # If buffer not full yet, return earliest available or zero-padded
-            delayed_obs = self._obs_ring_buffer[0]
-            emitted_obs = np.copy(delayed_obs)
-        else:
-            emitted_obs = obs
-
-        self._last_emitted_obs = np.copy(emitted_obs)
-        return emitted_obs
 
     def get_realized_diagnostics(self) -> Dict[str, Any]:
         """Audit statistics of realized corruption."""
@@ -232,6 +232,10 @@ class PerceptionFaultInjector:
             "total_stale_frames": self.total_stale_frames,
             "total_burst_steps": self.total_burst_steps,
             "realized_miss_rate": (
-                self.total_missed_detections / max(1, self.total_queries * 12)
+                self.total_missed_detections / max(1, self.total_visible_vehicle_samples)
             ),
+            "total_visible_vehicle_samples": self.total_visible_vehicle_samples,
+            "fault_model": "vehicle_sample_binomial_v2",
+            "requested_profile": self.profile.to_dict(),
+            "modeled_latency_ms": self._latency_steps * 100,
         }

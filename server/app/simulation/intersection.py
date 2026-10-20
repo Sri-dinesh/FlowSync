@@ -5,6 +5,9 @@ from typing import Any, Dict, List, Optional
 from .spawner import PoissonSpawner
 from .traffic_signal import TrafficSignal
 from .vehicle import DEFAULT_SPEED, Vehicle
+from .traffic_math import DEST_MAP
+
+STOP_LINE = 0.42
 
 
 class Intersection:
@@ -27,6 +30,9 @@ class Intersection:
         self._generated_last_tick = 0
         self._delay_this_tick = 0.0
         self.completed_wait_times: List[float] = []
+        # Deterministic discharge gates for declared downstream incidents.
+        self.downstream_capacity_factors = {d: 1.0 for d in ("north", "south", "east", "west")}
+        self._incident_next_release: Dict[str, float] = {}
 
     @property
     def vehicles(self) -> List[Vehicle]:
@@ -120,7 +126,6 @@ class Intersection:
         # Vehicles queued outside visible bounds still incur real delay.
         self._delay_this_tick = backlog_before * dt
 
-        STOP_LINE = 0.42
         MIN_DIST = 0.08
         passed_vehicles = []
 
@@ -185,6 +190,21 @@ class Intersection:
                             else:
                                 vehicle.position = STOP_LINE
                                 can_move = False
+
+                # A capacity factor scales per-lane discharge headway at the
+                # stop line, using the movement's destination (not its origin).
+                factor = self.downstream_capacity_factors.get(DEST_MAP[lane_id], 1.0)
+                entering = (can_move and vehicle.position <= STOP_LINE
+                            and vehicle.position + DEFAULT_SPEED * dt > STOP_LINE)
+                if entering and factor < 1.0:
+                    now = self.timestep * dt
+                    if factor <= 0 or now + 1e-9 < self._incident_next_release.get(lane_id, 0.0):
+                        vehicle.position = min(vehicle.position, STOP_LINE)
+                        can_move = False
+                    else:
+                        self._incident_next_release[lane_id] = now + MIN_DIST / DEFAULT_SPEED / factor
+                elif factor >= 1.0:
+                    self._incident_next_release.pop(lane_id, None)
 
                 wait_before = vehicle.wait_time
                 vehicle.tick(dt, can_move)
@@ -326,6 +346,8 @@ class Intersection:
         self.spawner.set_profile(profile)
 
     def reset(self) -> None:
+        self.downstream_capacity_factors = {d: 1.0 for d in ("north", "south", "east", "west")}
+        self._incident_next_release.clear()
         for queue in self.lanes.values():
             queue.clear()
         self.signal = TrafficSignal(red_duration=self.signal.red_duration)

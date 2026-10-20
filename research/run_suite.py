@@ -16,7 +16,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Ensure repository root and server/ are on sys.path
 _ROOT = Path(__file__).resolve().parent.parent
@@ -88,6 +88,8 @@ def run_benchmark_suite(
     results_dir: Path = RESULTS_DIR,
     record_trajectory: bool = True,
     fault_injector: Optional[Any] = None,
+    checkpoint_path: Optional[str] = None,
+    dqn_checkpoint_path: Optional[str] = None,
 ) -> List[ExperimentResult]:
     """
     Execute paired CRN benchmark runs across all (Scenario, Controller, Seed) tuples.
@@ -108,7 +110,12 @@ def run_benchmark_suite(
         for seed in seeds:
             logger.info("--- CRN Seed %d ---", seed)
             for c_name in controller_names:
-                ctrl = get_controller(c_name)
+                kwargs = {}
+                if c_name in ("ai", "d3qn", "flowsync_uq"):
+                    kwargs["checkpoint_path"] = checkpoint_path
+                elif c_name in ("dqn", "plain_dqn"):
+                    kwargs["checkpoint_path"] = dqn_checkpoint_path
+                ctrl = get_controller(c_name, **kwargs)
                 logger.info("Executing Controller: %s", ctrl.name)
 
                 res = runner.run(
@@ -183,6 +190,8 @@ def print_comparison_table(results: List[ExperimentResult]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="FlowSync Headless Research Benchmark Suite Runner")
     parser.add_argument("--suite", type=str, default="", help="Preset suite name: smoke, baselines, validation, test_clean, test_stress")
+    parser.add_argument("--checkpoint", help="Required for trained D3QN/UQ evaluation")
+    parser.add_argument("--dqn-checkpoint", help="Separate plain DQN weights")
     parser.add_argument("--scenario", type=str, default="", help="Specific scenario ID or YAML file path")
     parser.add_argument("--controllers", type=str, default="fixed,greedy,max_pressure,d3qn", help="Comma-separated controller names")
     parser.add_argument("--seeds", type=str, default="42,1337,2026", help="Comma-separated seeds or range (e.g. 42,1337,2026 or 1000:1005)")
@@ -214,6 +223,8 @@ def main() -> None:
         seeds=seeds,
         results_dir=results_dir,
         record_trajectory=not args.no_trajectory,
+        checkpoint_path=args.checkpoint,
+        dqn_checkpoint_path=args.dqn_checkpoint,
     )
 
     print_comparison_table(results)

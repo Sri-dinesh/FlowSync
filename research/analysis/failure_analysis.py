@@ -17,7 +17,7 @@ import logging
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import numpy as np
 
 from server.app.controllers import get_controller
@@ -36,14 +36,14 @@ class FailureMode(str, Enum):
     STARVATION = "starvation"             # starvation_count > 3
     EXTREME_DELAY = "extreme_tail_delay"  # p95_delay > 50s
     SAFETY_VIOLATION = "safety_violation" # unsafe transitions > 0
-    FALLBACK_THRASHING = "thrashing"     # fallback_rate > 40%
+    FALLBACK_THRASHING = "thrashing"     # excessive authority switches per minute
 
 
 FAILURE_CRITERIA = {
     "max_queue_limit": 25,
     "starvation_limit": 3,
     "p95_delay_limit": 50.0,
-    "fallback_thrashing_limit": 0.40,
+    "authority_switches_per_minute_limit": 12.0,
 }
 
 
@@ -73,7 +73,7 @@ def classify_run_failure(
     """
     modes: List[str] = []
 
-    if unsafe_transitions > 0:
+    if unsafe_transitions + exp_res.executed_conflict_violations + exp_res.executed_clearance_violations > 0:
         modes.append(FailureMode.SAFETY_VIOLATION.value)
     if exp_res.max_queue > FAILURE_CRITERIA["max_queue_limit"]:
         modes.append(FailureMode.SPILLBACK.value)
@@ -81,7 +81,9 @@ def classify_run_failure(
         modes.append(FailureMode.STARVATION.value)
     if exp_res.p95_delay > FAILURE_CRITERIA["p95_delay_limit"]:
         modes.append(FailureMode.EXTREME_DELAY.value)
-    if exp_res.watchdog_override_rate > FAILURE_CRITERIA["fallback_thrashing_limit"]:
+    switches = exp_res.controller_diagnostics.get("supervisor", {}).get("total_authority_switches", 0)
+    switches_per_minute = switches / max(exp_res.num_steps * 0.1 / 60.0, 1e-9)
+    if switches_per_minute > FAILURE_CRITERIA["authority_switches_per_minute_limit"]:
         modes.append(FailureMode.FALLBACK_THRASHING.value)
 
     if not modes:
@@ -117,7 +119,8 @@ def classify_run_failure(
             "p95_delay": exp_res.p95_delay,
             "max_queue": float(exp_res.max_queue),
             "starvation_count": float(exp_res.starvation_count),
-            "fallback_rate": exp_res.watchdog_override_rate,
+            "fallback_rate": exp_res.fallback_steps / max(exp_res.num_steps, 1),
+            "authority_switches_per_minute": switches_per_minute,
         },
     )
 
@@ -128,6 +131,7 @@ def sweep_reliability_boundary(
     miss_rates: List[float] = (0.0, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50),
     controllers: List[str] = ("d3qn", "flowsync_uq", "max_pressure"),
     results_dir: Path = Path("results/reliability"),
+    checkpoint_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Task L1: Sweeps perception corruption to find the empirical reliability boundary.
@@ -144,7 +148,8 @@ def sweep_reliability_boundary(
         fault_inj = PerceptionFaultInjector(fault_prof)
 
         for c_name in controllers:
-            ctrl = get_controller(c_name)
+            ctrl = get_controller(c_name, **({"checkpoint_path": checkpoint_path}
+                if c_name in ("d3qn", "flowsync_uq") else {}))
             delays = []
             p95s = []
             failures = 0
@@ -202,10 +207,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run failure analysis and reliability boundary sweep")
     parser.add_argument("--scenario", type=str, default="train_mod_balanced_01")
     parser.add_argument("--seeds", type=str, default="101,202,303")
+    parser.add_argument("--checkpoint", required=True)
     args = parser.parse_args()
 
     seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
-    sweep_reliability_boundary(scenario_id=args.scenario, seeds=seeds)
+    sweep_reliability_boundary(scenario_id=args.scenario, seeds=seeds, checkpoint_path=args.checkpoint)
 
 
 if __name__ == "__main__":

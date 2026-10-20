@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+from pathlib import Path
 from typing import Optional
 import numpy as np
 import torch
@@ -24,6 +26,7 @@ class DQNController(BaseController):
         network: Optional[PlainDQNNetwork] = None,
         state_dim: int = HP.STATE_DIM,
         action_dim: int = HP.ACTION_DIM,
+        checkpoint_path: Optional[str] = None,
     ) -> None:
         super().__init__(name="plain_dqn")
         self.state_dim = state_dim
@@ -31,9 +34,22 @@ class DQNController(BaseController):
         self.network = network or PlainDQNNetwork(state_dim=state_dim, action_dim=action_dim)
         self.network.eval()
         self.epsilon: float = 0.0
+        self.checkpoint_path = None
+        self._checkpoint_hash = ""
+        self._next_decision_step = 0
+        self._held_action = 0
+        if checkpoint_path:
+            checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+            weights = checkpoint.get("online_net", checkpoint)
+            self.network.load_state_dict(weights, strict=True)
+            self.network.eval()
+            self.checkpoint_path = str(Path(checkpoint_path).resolve())
+            self._checkpoint_hash = hashlib.sha256(Path(checkpoint_path).read_bytes()).hexdigest()
 
     def reset(self, seed: Optional[int] = None) -> None:
         super().reset(seed=seed)
+        self._next_decision_step = 0
+        self._held_action = 0
         self.network.eval()
 
     def get_capabilities(self) -> ControllerCapabilities:
@@ -50,6 +66,10 @@ class DQNController(BaseController):
 
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:
         self._step_count += 1
+        if not context.is_decision_step:
+            return context.current_phase
+        if context.timestep < self._next_decision_step:
+            return self._held_action
 
         mask = context.valid_action_mask
         if mask is None:
@@ -84,4 +104,11 @@ class DQNController(BaseController):
             "valid_action_mask": mask.tolist(),
             "selected_action": selected_action,
         }
+        self._held_action = selected_action
+        self._next_decision_step = context.timestep + max(1, int(round(HP.DECISION_DT / context.dt)))
         return selected_action
+
+    def get_diagnostics(self) -> dict:
+        return {**super().get_diagnostics(), "checkpoint_path": self.checkpoint_path,
+                "checkpoint_loaded": self.checkpoint_path is not None,
+                "checkpoint_hash": self._checkpoint_hash, "deterministic": True}

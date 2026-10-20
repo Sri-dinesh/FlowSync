@@ -45,12 +45,12 @@ def test_fixed_controller_cycling():
 
     # First 1.9 seconds (19 steps at 0.1s): holds Phase 0
     for t in range(19):
-        ctx = ControllerContext(timestep=t, dt=0.1, current_phase=0, can_switch_phase=True)
+        ctx = ControllerContext(timestep=t, dt=0.1, current_phase=0, time_in_phase=t * 0.1, can_switch_phase=True)
         act = ctrl.act(obs, ctx)
         assert act == 0
 
     # At 2.0s (step 19), time_in_phase reaches 2.0s and advances to Phase 1
-    ctx = ControllerContext(timestep=19, dt=0.1, current_phase=0, can_switch_phase=True)
+    ctx = ControllerContext(timestep=20, dt=0.1, current_phase=0, time_in_phase=2.0, can_switch_phase=True)
     act = ctrl.act(obs, ctx)
     assert act == 1
 
@@ -178,7 +178,7 @@ def test_actuated_controller_gap_out_and_max_green():
     # First 50 steps (5 seconds): no arrivals, but min_green (8s) NOT yet met
     for t in range(50):
         ctx = ControllerContext(
-            timestep=t, dt=0.1, current_phase=0, can_switch_phase=True,
+            timestep=t, dt=0.1, current_phase=0, time_in_phase=t * 0.1, can_switch_phase=True,
             movement_queues=queues, extra_telemetry={"spawned_this_step": 0}
         )
         assert ctrl.act(obs, ctx) == 0
@@ -187,10 +187,12 @@ def test_actuated_controller_gap_out_and_max_green():
     # Because East-West (Phase 1) has backlog (10 cars), it must switch to Phase 1.
     for t in range(50, 86):
         ctx = ControllerContext(
-            timestep=t, dt=0.1, current_phase=0, can_switch_phase=True,
+            timestep=t, dt=0.1, current_phase=0, time_in_phase=t * 0.1, can_switch_phase=True,
             movement_queues=queues, extra_telemetry={"spawned_this_step": 0}
         )
         act = ctrl.act(obs, ctx)
+        if act != ctx.current_phase:
+            break  # The simulator would now enter yellow; do not fake more green ticks.
 
     assert act == 1  # Gapped out to Phase 1
 

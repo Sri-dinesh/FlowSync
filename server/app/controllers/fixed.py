@@ -41,10 +41,12 @@ class FixedController(BaseController):
 
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:
         self._step_count += 1
-        self._time_in_phase += context.dt
+        # Follow executed lamp state, including after fallback authority transfer.
+        self._current_phase = context.current_phase
+        self._time_in_phase = context.time_in_phase
         phase_cap = self.phase_durations[self._current_phase]
 
-        if context.can_switch_phase and self._time_in_phase >= phase_cap:
+        if context.color == "GREEN" and context.can_switch_phase and self._time_in_phase >= phase_cap:
             self._current_phase = (self._current_phase + 1) % 4
             self._time_in_phase = 0.0
 

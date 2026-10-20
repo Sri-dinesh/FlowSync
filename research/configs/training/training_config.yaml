@@ -1,4 +1,6 @@
-# FlowSync Research Training Protocol Configuration (Frozen)
+# Legacy reference configuration; NOT consumed by research/train_policy.py.
+# Some values differ from the implementation. Do not cite these as executed
+# hyperparameters: use each run's manifest.json and the frozen research protocol.
 protocol_version: "1.0.0"
 algorithm: "Dueling Double DQN (D3QN) with Prioritized Experience Replay (PER)"
 
