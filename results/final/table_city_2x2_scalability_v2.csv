@@ -1,0 +1,9 @@
+regime,controller,mean_delay,ci_95_low,ci_95_high,p95_delay,mean_queue,throughput,p95_latency_ms
+Clean,fixed,12.52,10.8,14.27,43.67,9.8,1053.0,0.0
+Clean,max_pressure,12.57,10.84,14.33,43.67,9.8,1050.0,0.01
+Clean,d3qn,12.52,10.8,14.27,43.67,9.8,1053.0,0.4
+Clean,flowsync_uq,12.52,10.8,14.27,43.67,9.8,1053.0,0.55
+Corrupted (30% Miss),fixed,12.57,10.84,14.33,43.67,9.8,1050.0,0.0
+Corrupted (30% Miss),max_pressure,12.57,10.84,14.33,43.67,9.8,1050.0,0.02
+Corrupted (30% Miss),d3qn,12.52,10.8,14.27,43.67,9.8,1053.0,0.41
+Corrupted (30% Miss),flowsync_uq,12.52,10.8,14.27,43.67,9.8,1053.0,0.56

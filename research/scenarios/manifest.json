@@ -1,0 +1,142 @@
+{
+  "suite_version": "1.0.0",
+  "total_scenarios": 16,
+  "splits": {
+    "train": [
+      "train_low_balanced_01",
+      "train_mod_balanced_01",
+      "train_high_balanced_01",
+      "train_ns_asymmetric_01",
+      "train_ew_asymmetric_01",
+      "train_platoon_burst_01"
+    ],
+    "validation": [
+      "val_oversaturated_01",
+      "val_turning_heavy_01",
+      "val_rush_hour_ramp_01"
+    ],
+    "test": [
+      "test_clean_balanced_01",
+      "test_near_gridlock_01",
+      "test_left_turn_surge_01",
+      "test_sudden_burst_01",
+      "test_demand_reversal_01",
+      "test_incident_reduction_01",
+      "test_heldout_ood_01"
+    ]
+  },
+  "scenarios": {
+    "train_low_balanced_01": {
+      "name": "Low Balanced Flow",
+      "split": "train",
+      "hash": "d564848e558dbde2",
+      "file": "scenarios/train/train_low_balanced_01.yaml",
+      "duration_steps": 1200
+    },
+    "train_mod_balanced_01": {
+      "name": "Moderate Balanced Flow",
+      "split": "train",
+      "hash": "e2ecf31533479edc",
+      "file": "scenarios/train/train_mod_balanced_01.yaml",
+      "duration_steps": 1200
+    },
+    "train_high_balanced_01": {
+      "name": "High Balanced Flow",
+      "split": "train",
+      "hash": "a82deeb10aaa15a6",
+      "file": "scenarios/train/train_high_balanced_01.yaml",
+      "duration_steps": 1200
+    },
+    "train_ns_asymmetric_01": {
+      "name": "North-South Arterial Priority",
+      "split": "train",
+      "hash": "f81876990f91bd5e",
+      "file": "scenarios/train/train_ns_asymmetric_01.yaml",
+      "duration_steps": 1200
+    },
+    "train_ew_asymmetric_01": {
+      "name": "East-West Arterial Priority",
+      "split": "train",
+      "hash": "da16aabc1f7374b0",
+      "file": "scenarios/train/train_ew_asymmetric_01.yaml",
+      "duration_steps": 1200
+    },
+    "train_platoon_burst_01": {
+      "name": "Platoon Arrival Bursts",
+      "split": "train",
+      "hash": "c2b918e065c415eb",
+      "file": "scenarios/train/train_platoon_burst_01.yaml",
+      "duration_steps": 1200
+    },
+    "val_oversaturated_01": {
+      "name": "Validation Oversaturated",
+      "split": "validation",
+      "hash": "30db90327198da31",
+      "file": "scenarios/validation/val_oversaturated_01.yaml",
+      "duration_steps": 1200
+    },
+    "val_turning_heavy_01": {
+      "name": "Validation Turning Heavy",
+      "split": "validation",
+      "hash": "63cd3039478e5480",
+      "file": "scenarios/validation/val_turning_heavy_01.yaml",
+      "duration_steps": 1200
+    },
+    "val_rush_hour_ramp_01": {
+      "name": "Validation Rush Hour Ramp",
+      "split": "validation",
+      "hash": "2511f4cd38d3d140",
+      "file": "scenarios/validation/val_rush_hour_ramp_01.yaml",
+      "duration_steps": 1200
+    },
+    "test_clean_balanced_01": {
+      "name": "Test Benchmark Clean Balanced",
+      "split": "test",
+      "hash": "f37255a9bfd0ff03",
+      "file": "scenarios/test/test_clean_balanced_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_near_gridlock_01": {
+      "name": "Test Near Gridlock Stress",
+      "split": "test",
+      "hash": "0fe425456bbbec76",
+      "file": "scenarios/test/test_near_gridlock_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_left_turn_surge_01": {
+      "name": "Test Left Turn Congestion",
+      "split": "test",
+      "hash": "fdead1982723950f",
+      "file": "scenarios/test/test_left_turn_surge_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_sudden_burst_01": {
+      "name": "Test Sudden Arterial Burst",
+      "split": "test",
+      "hash": "33b9f4cb498089de",
+      "file": "scenarios/test/test_sudden_burst_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_demand_reversal_01": {
+      "name": "Test Commuter Demand Reversal",
+      "split": "test",
+      "hash": "6fb01aa285fd8a8d",
+      "file": "scenarios/test/test_demand_reversal_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_incident_reduction_01": {
+      "name": "Test Incident Bottleneck",
+      "split": "test",
+      "hash": "2dacaefd4f03fc5a",
+      "file": "scenarios/test/test_incident_reduction_01.yaml",
+      "duration_steps": 1500
+    },
+    "test_heldout_ood_01": {
+      "name": "Test Held-Out OOD Multi-Distribution",
+      "split": "test",
+      "hash": "d369fa58236c740a",
+      "file": "scenarios/test/test_heldout_ood_01.yaml",
+      "duration_steps": 2000
+    }
+  }
+}

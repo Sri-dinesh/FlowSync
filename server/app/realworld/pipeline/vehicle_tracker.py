@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, Optional, Set
+from typing import Dict, Set
 
 from ..models.config import MOVEMENT_THRESHOLD_PX
 from ..models.schemas import BoundingBox, TrackState, VehicleDetection

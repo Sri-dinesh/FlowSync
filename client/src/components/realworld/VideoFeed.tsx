@@ -62,6 +62,7 @@ export default function VideoFeed({
       {/* ── Video frame ──────────────────────────────────────────── */}
       <div className="relative flex-1 flex items-center justify-center bg-black min-h-0">
         {hasFeed ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={`data:image/jpeg;base64,${frame.annotated_frame_b64}`}
             alt="CCTV annotated feed"

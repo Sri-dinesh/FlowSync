@@ -1,0 +1,34 @@
+scenario_id: val_turning_heavy_01
+split: validation
+name: Validation Turning Heavy
+description: 'High turning percentage: 40% left turns and 30% right turns.'
+duration_steps: 1200
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.6
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.3
+      left: 0.4
+      right: 0.3
+    south:
+      straight: 0.3
+      left: 0.4
+      right: 0.3
+    east:
+      straight: 0.3
+      left: 0.4
+      right: 0.3
+    west:
+      straight: 0.3
+      left: 0.4
+      right: 0.3
+  burst_events: []
+  incident_events: []
+scenario_hash: 63cd3039478e5480

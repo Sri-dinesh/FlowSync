@@ -1,0 +1,34 @@
+scenario_id: train_ns_asymmetric_01
+split: train
+name: North-South Arterial Priority
+description: NS approaches carry 3x more traffic than EW cross streets.
+duration_steps: 1200
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.5
+  directional_weights:
+    north: 1.5
+    south: 1.5
+    east: 0.5
+    west: 0.5
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events: []
+  incident_events: []
+scenario_hash: f81876990f91bd5e

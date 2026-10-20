@@ -1,0 +1,34 @@
+scenario_id: test_left_turn_surge_01
+split: test
+name: Test Left Turn Congestion
+description: 50% left turns on North/South approaches, testing protected phases.
+duration_steps: 1500
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.7
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.35
+      left: 0.5
+      right: 0.15
+    south:
+      straight: 0.35
+      left: 0.5
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events: []
+  incident_events: []
+scenario_hash: fdead1982723950f

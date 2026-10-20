@@ -1,23 +1,18 @@
-"""
-dqn_agent.py — Dueling Double DQN Agent with Masked Targets
-=============================================================
-Improvements in this version:
-  - BUG-05 fix: train_step() uses action masks from replay buffer to:
-      1. Mask advantage centering in the forward pass.
-      2. Mask illegal actions from next_action selection in Double-DQN target.
-         Previously: next_actions = online_net(next_states).argmax(1)  [unmasked]
-         Corrected:  next_actions = argmax over valid actions only.
-  - select_action(): accepts optional valid_action_mask to exclude illegal phases.
-"""
+"""Dueling Double DQN Agent with action masking and prioritized experience replay."""
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import logging
-from typing import Optional, Dict
-from app.rl.dqn_network import DuelingDQNNetwork
-from app.rl.replay_buffer import PrioritizedReplayBuffer
-from app.rl.hyperparams import HyperParams
+from typing import Dict, Optional, Tuple
+try:
+    from .dqn_network import DuelingDQNNetwork
+    from .replay_buffer import PrioritizedReplayBuffer
+    from .hyperparams import HyperParams
+except (ImportError, ValueError):
+    from app.rl.dqn_network import DuelingDQNNetwork
+    from app.rl.replay_buffer import PrioritizedReplayBuffer
+    from app.rl.hyperparams import HyperParams
 
 logger = logging.getLogger(__name__)
 
@@ -29,30 +24,32 @@ class DQNAgent:
     Dueling Double DQN with Prioritized Experience Replay and Action Masking.
 
     Architecture combines:
-    - Dueling DQN: V(s) + A(s,a) decomposition with masked advantage centering (BUG-05)
-    - Double DQN: online net selects action (masked), target net evaluates (reduces overestimation)
-    - PER: high-TD-error transitions sampled more often (learns from critical events faster)
-
-    Based on: FPA-DQN (2025), 3DQN-PER (2025), Wang et al. 2016, Schaul et al. 2016
+    - Dueling DQN: V(s) + A(s,a) decomposition with masked advantage centering
+    - Double DQN: online net selects action (masked), target net evaluates
+    - PER: prioritized experience replay with importance sampling correction
     """
 
-    def __init__(self):
-        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
-        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+    def __init__(self, state_dim=HP.STATE_DIM, obs_version=HP.OBS_VERSION):
+        self.state_dim = state_dim
+        self.obs_version = obs_version
+        self.reward_version = "v4_incremental_delay"
+        self.online_net = DuelingDQNNetwork(state_dim, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(state_dim, HP.ACTION_DIM)
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.target_net.eval()
 
         self.optimizer = optim.Adam(
             self.online_net.parameters(),
             lr=HP.LEARNING_RATE,
-            eps=1e-8,       # Adam epsilon — slightly larger for stability
+            eps=1e-8,
         )
-        self.loss_fn = nn.SmoothL1Loss(reduction="none")  # per-sample loss for PER weighting
+        self.loss_fn = nn.SmoothL1Loss(reduction="none")
         self.replay_buffer = PrioritizedReplayBuffer(HP.REPLAY_BUFFER_SIZE)
         self.step_count = 0
-        self.total_train_steps = 0  # BUG-B: persistent counter for diagnostics
-        self.all_masked_fallback_count = 0  # A-03: audit all-masked fallback triggers
-        self.latest_q_stats: Dict[str, float] = {}  # P-01/P-02/P-03: Q-value health metrics
+        self.total_train_steps = 0
+        self.all_masked_fallback_count = 0
+        self.latest_q_stats: Dict[str, float] = {}
+        self.demonstration_loss_weight = 0.10
 
     def prepare_for_finetuning(self, learning_rate: float = 1e-4) -> None:
         """
@@ -77,8 +74,8 @@ class DQNAgent:
 
     def reset_for_fresh_training(self) -> None:
         """Discard weights, optimizer moments and replay for a genuinely fresh run."""
-        self.online_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
-        self.target_net = DuelingDQNNetwork(HP.STATE_DIM, HP.ACTION_DIM)
+        self.online_net = DuelingDQNNetwork(self.state_dim, HP.ACTION_DIM)
+        self.target_net = DuelingDQNNetwork(self.state_dim, HP.ACTION_DIM)
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.target_net.eval()
         self.optimizer = optim.Adam(
@@ -134,10 +131,8 @@ class DQNAgent:
         mask_tensor = torch.BoolTensor(valid_action_mask).unsqueeze(0)
 
         with torch.no_grad():
-            # BUG-05: pass mask for masked advantage centering
             q_values = self.online_net(state_tensor, valid_action_mask=mask_tensor)
 
-        # Mask out invalid actions before argmax
         q_values_masked = q_values.clone()
         q_values_masked[0, ~valid_action_mask] = float("-inf")
 
@@ -180,42 +175,33 @@ class DQNAgent:
             action_masks, next_action_masks, bootstrap_discounts, demo_flags,
         ) = batch
 
-        # ── Current Q-values (online net) with masked centering ─────────────
         current_q_all = self.online_net(states, valid_action_mask=action_masks)
         current_q = current_q_all.gather(1, actions.unsqueeze(1)).squeeze(1)
 
         with torch.no_grad():
-            # ── Double DQN: online net selects next action, masked by valid actions ──
+            # Double DQN: online network selects action, target network evaluates
             next_q_online = self.online_net(
                 next_states, valid_action_mask=next_action_masks
             )
-
-            # BUG-05 CORRECTED: mask invalid actions before argmax
             next_q_masked = next_q_online.clone()
-            # Set invalid action Q-values to -inf so they cannot be selected
             next_q_masked[~next_action_masks] = float("-inf")
             next_actions = next_q_masked.argmax(1)
 
-            # ── Target net evaluates selected action ─────────────────────────
             next_q_target = self.target_net(
                 next_states, valid_action_mask=next_action_masks
             )
             next_q = next_q_target.gather(1, next_actions.unsqueeze(1)).squeeze(1)
 
-            # ── Bellman target ───────────────────────────────────────────────
             target_q = rewards + bootstrap_discounts * next_q * (1 - dones)
 
-        # ── Per-sample loss (needed for PER priority update) ─────────────────
+        # Per-sample loss for prioritized experience replay weights
         td_errors = (target_q - current_q).detach().cpu().numpy()
         per_sample_loss = self.loss_fn(current_q, target_q)
 
-        # ── Weight loss by importance sampling weights (PER correction) ──────
+        # Weight loss by importance sampling weights for PER bias correction
         td_loss = (per_sample_loss * weights).mean()
 
-        # DQfD-style large-margin term for greedy warm-start transitions.  A
-        # replay warm-up without this term does not actually teach the network
-        # the demonstrator's action; unseen actions can remain arbitrarily
-        # overestimated and immediately erase the benefit of seeding.
+        # Large-margin penalty prevents unvisited actions from being overestimated on warm-start transitions.
         other_q = current_q_all.clone()
         other_q[~action_masks] = float("-inf")
         other_q.scatter_(1, actions.unsqueeze(1), float("-inf"))
@@ -231,17 +217,16 @@ class DQNAgent:
             (margin_loss_per_sample * demo_weight).sum()
             / demo_weight.sum().clamp(min=1.0)
         )
-        weighted_loss = td_loss + 0.10 * demo_loss
+        weighted_loss = td_loss + self.demonstration_loss_weight * demo_loss
 
         self.optimizer.zero_grad()
         weighted_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
+        gradient_norm = torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), max_norm=10.0)
         self.optimizer.step()
 
         self.step_count += 1
-        self.total_train_steps += 1  # BUG-B: track actual gradient updates
+        self.total_train_steps += 1
 
-        # ── P-01/P-02/P-03: Q-value health monitoring ────────────────────────
         with torch.no_grad():
             q_mean = float(current_q.mean().item())
             q_std = float(current_q.std().item()) if len(current_q) > 1 else 0.0
@@ -257,10 +242,20 @@ class DQNAgent:
             "td_error_max": round(float(np.max(np.abs(td_errors))), 4),
             "loss": round(float(weighted_loss.item()), 5),
             "td_loss": round(float(td_loss.item()), 5),
+            # Keep scale diagnostics separate: shrinking PER weights can lower
+            # weighted loss even while the same sampled prediction errors grow.
+            "unweighted_td_loss": round(float(per_sample_loss.detach().mean().item()), 5),
+            "pre_clip_gradient_norm": round(float(gradient_norm.item()), 5),
             "demo_margin_loss": round(float(demo_loss.item()), 5),
+            "weighted_demo_loss": round(float(self.demonstration_loss_weight * demo_loss.item()), 5),
+            "demo_sample_fraction": round(float(demo_flags.mean().item()), 5),
+            "importance_weight_mean": round(float(weights.mean().item()), 5),
+            "importance_weight_min": round(float(weights.min().item()), 5),
+            "importance_weight_max": round(float(weights.max().item()), 5),
+            "bootstrap_discount_mean": round(float(bootstrap_discounts.mean().item()), 5),
+            "target_q_mean": round(float(target_q.mean().item()), 4),
         }
 
-        # ── Update PER priorities with new TD errors ─────────────────────────
         self.replay_buffer.update_priorities(indices, np.abs(td_errors))
 
         return float(weighted_loss.item()), td_errors
@@ -274,9 +269,9 @@ class DQNAgent:
             "target_net":        self.target_net.state_dict(),
             "optimizer":         self.optimizer.state_dict(),
             "step_count":        self.step_count,
-            "total_train_steps": self.total_train_steps,  # BUG-B: diagnostic
-            "obs_version":       HP.OBS_VERSION,
-            "reward_version":    "v4_incremental_delay",
+            "total_train_steps": self.total_train_steps,
+            "obs_version":       self.obs_version,
+            "reward_version":    self.reward_version,
             "demand_version":    "v2_total_lambda_with_upstream_backlog",
         }
 
@@ -286,6 +281,7 @@ class DQNAgent:
     def load(self, path: str):
         checkpoint = torch.load(path, map_location="cpu")
         if isinstance(checkpoint, dict) and "online_net" in checkpoint:
+            self.reward_version = checkpoint.get("reward_version", self.reward_version)
             self.online_net.load_state_dict(checkpoint["online_net"])
             self.target_net.load_state_dict(checkpoint["target_net"])
             if "optimizer" in checkpoint:
@@ -293,7 +289,6 @@ class DQNAgent:
             if "step_count" in checkpoint:
                 self.step_count = checkpoint["step_count"]
         else:
-            # Legacy format — weights only
             self.online_net.load_state_dict(checkpoint)
             self.sync_target_network()
         self.target_net.eval()

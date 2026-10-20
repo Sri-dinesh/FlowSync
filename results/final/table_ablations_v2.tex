@@ -1,0 +1,18 @@
+% Auto-generated 20-seed Component Ablation Study (Table III)
+\begin{table*}[t]
+\caption{Component Ablation Study Under Perception Faults (20 Seeds, CRN)}
+\label{tab:ablations_20_seeds}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Architecture Variant} & \textbf{Mean Delay (s)} & \textbf{95\% CI} & \textbf{P95 Delay (s)} & \textbf{Starvations} & \textbf{Proposed Violations} \\
+\midrule
+\textbf{V1 (Full FlowSync-UQ)} & \textbf{15.08} & [14.24, 15.94] & 18.5 & 64 & 54 \\
+V2 (No-UQ / Blind D3QN) & 12.43 & [11.64, 13.25] & 16.2 & 78 & 68 \\
+V3 (No-Shield) & 15.04 & [14.29, 15.77] & 17.1 & 66 & 61 \\
+V4 (No-Fallback / Shield Only) & 18.23 & [17.35, 19.13] & 21.7 & 82 & 75 \\
+V5 (Fixed-Time Fallback) & 16.59 & [15.61, 17.52] & 18.8 & 62 & 52 \\
+\bottomrule
+\end{tabular}
+\end{table*}

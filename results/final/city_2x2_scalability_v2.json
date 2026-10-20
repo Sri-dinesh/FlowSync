@@ -1,0 +1,94 @@
+{
+  "Clean": {
+    "fixed": {
+      "mean_delay": 12.52,
+      "ci_95": [
+        10.8,
+        14.27
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1053.0,
+      "p95_latency_ms": 0.0
+    },
+    "max_pressure": {
+      "mean_delay": 12.57,
+      "ci_95": [
+        10.84,
+        14.33
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1050.0,
+      "p95_latency_ms": 0.01
+    },
+    "d3qn": {
+      "mean_delay": 12.52,
+      "ci_95": [
+        10.8,
+        14.27
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1053.0,
+      "p95_latency_ms": 0.4
+    },
+    "flowsync_uq": {
+      "mean_delay": 12.52,
+      "ci_95": [
+        10.8,
+        14.27
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1053.0,
+      "p95_latency_ms": 0.55
+    }
+  },
+  "Corrupted (30% Miss)": {
+    "fixed": {
+      "mean_delay": 12.57,
+      "ci_95": [
+        10.84,
+        14.33
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1050.0,
+      "p95_latency_ms": 0.0
+    },
+    "max_pressure": {
+      "mean_delay": 12.57,
+      "ci_95": [
+        10.84,
+        14.33
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1050.0,
+      "p95_latency_ms": 0.02
+    },
+    "d3qn": {
+      "mean_delay": 12.52,
+      "ci_95": [
+        10.8,
+        14.27
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1053.0,
+      "p95_latency_ms": 0.41
+    },
+    "flowsync_uq": {
+      "mean_delay": 12.52,
+      "ci_95": [
+        10.8,
+        14.27
+      ],
+      "p95_delay": 43.67,
+      "mean_queue": 9.8,
+      "throughput": 1053.0,
+      "p95_latency_ms": 0.56
+    }
+  }
+}

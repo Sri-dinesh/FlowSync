@@ -9,7 +9,7 @@ import os
 import re
 import shutil
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 # In-memory cache for resolved stream URLs: {original_url: (resolved_url, expire_timestamp)}
 _URL_CACHE: Dict[str, Tuple[str, float]] = {}

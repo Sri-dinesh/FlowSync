@@ -28,7 +28,10 @@ export function ScenarioAggregatePanel({ refreshTrigger }: ScenarioAggregatePane
   }, [fetchAggregateStats]);
 
   useEffect(() => {
-    loadStats();
+    const timer = setTimeout(() => {
+      void loadStats();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadStats, refreshTrigger]);
 
   if (!stats || stats.total_groups === 0) {

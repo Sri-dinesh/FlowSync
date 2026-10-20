@@ -94,10 +94,13 @@ export default function CityMetricsPanel({ frame }: { frame: CityFrame | null })
   useEffect(() => {
     if (!frame) return;
 
-    setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.avg_wait_time]);
-    setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.total_throughput]);
-    setActiveHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.active_vehicles]);
-    setRoadsHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.road_vehicles]);
+    const timer = setTimeout(() => {
+      setWaitHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.avg_wait_time]);
+      setThroughputHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.total_throughput]);
+      setActiveHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.active_vehicles]);
+      setRoadsHistory((prev) => [...prev.slice(-HISTORY_LENGTH + 1), frame.city_metrics.road_vehicles]);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [frame]);
 
   const metrics = frame?.city_metrics;

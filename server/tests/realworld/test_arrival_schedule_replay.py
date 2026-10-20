@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from app.realworld.digital_twin.session_recorder import SessionRecorder
 from app.realworld.models.schemas import CCTVFrame, LaneCounts, VehicleArrivalEvent
 from app.simulation.intersection import Intersection

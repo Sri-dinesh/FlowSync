@@ -1,0 +1,53 @@
+{
+  "manifest_name": "final_seed_manifest_v2",
+  "version": "2.0.0",
+  "created_at": "2026-09-30T11:45:00Z",
+  "seed_count": 20,
+  "seeds": [
+    1101, 1102, 1103, 1104, 1105,
+    1106, 1107, 1108, 1109, 1110,
+    1111, 1112, 1113, 1114, 1115,
+    1116, 1117, 1118, 1119, 1120
+  ],
+  "training_seeds_excluded": [101, 202, 303, 404, 505],
+  "pairing_methodology": "Common Random Numbers (CRN)",
+  "purpose": "Final frozen test seed suite for IEEE submission verification across all controllers",
+  "scenarios_evaluated": {
+    "clean": [
+      "test_low_clean_01",
+      "test_medium_clean_02",
+      "test_high_clean_03",
+      "test_asymmetric_commute_04"
+    ],
+    "corrupted": [
+      "test_medium_clean_02_noise_10",
+      "test_medium_clean_02_noise_20",
+      "test_medium_clean_02_noise_30",
+      "test_medium_clean_02_noise_40",
+      "test_medium_clean_02_burst_occl",
+      "test_medium_clean_02_latency"
+    ],
+    "ood": [
+      "ood_stadium_surge_01",
+      "ood_adverse_weather_02",
+      "ood_incident_lane_block_03",
+      "ood_multi_surge_oscillate_04"
+    ]
+  },
+  "controllers_evaluated": [
+    "fixed",
+    "actuated",
+    "greedy",
+    "max_pressure",
+    "dqn",
+    "d3qn",
+    "flowsync_uq"
+  ],
+  "ablations_evaluated": [
+    "full_flowsync_uq",
+    "no_uq_blind_d3qn",
+    "no_shield_unshielded",
+    "no_fallback_shield_only",
+    "fixed_fallback"
+  ]
+}

@@ -118,7 +118,7 @@ function buildCurve(lane: string, turn: Turn): CurvePath<Vector3> {
   return path;
 }
 
-// ── Static Precomputed Curve Cache (Zero allocation during simulation) ───────
+// Precomputed curve cache to avoid allocations during simulation.
 const LANES = ["north", "south", "east", "west"] as const;
 const TURNS = ["straight", "left", "right"] as const;
 const CURVE_CACHE = new Map<string, { curve: CurvePath<Vector3>; t_stop: number }>();
@@ -141,7 +141,6 @@ function getCachedCurve(lane: string, turn: Turn) {
   return { curve, t_stop };
 }
 
-// ── Color & Vehicle Type Generator ──────────────────────────────────────────
 const VEHICLE_COLORS = [
   "#dc2626", "#2563eb", "#16a34a", "#ea580c",
   "#9333ea", "#0891b2", "#db2777", "#e2e8f0",
@@ -167,36 +166,30 @@ function getVehicleProps(id: string, isEmergency?: boolean) {
   };
 }
 
-// ── Shared Module Geometries (0 GC Churn & 0 GPU Buffer Re-allocations) ──────
+// Module-level shared geometries to prevent GPU buffer reallocations.
 const WHEEL_GEO = new CylinderGeometry(0.09, 0.09, 0.07, 8);
 
-// Sedan
 const SEDAN_BODY_GEO = new BoxGeometry(0.42, 0.14, 0.84);
 const SEDAN_CABIN_GEO = new BoxGeometry(0.38, 0.11, 0.46);
 const SEDAN_WINDOW_GEO = new BoxGeometry(0.39, 0.08, 0.43);
 
-// SUV
 const SUV_BODY_GEO = new BoxGeometry(0.44, 0.18, 0.82);
 const SUV_CABIN_GEO = new BoxGeometry(0.40, 0.13, 0.50);
 const SUV_WINDOW_GEO = new BoxGeometry(0.41, 0.09, 0.47);
 
-// Hatchback
 const HATCH_BODY_GEO = new BoxGeometry(0.42, 0.14, 0.74);
 const HATCH_CABIN_GEO = new BoxGeometry(0.38, 0.11, 0.44);
 const HATCH_WINDOW_GEO = new BoxGeometry(0.39, 0.08, 0.41);
 
-// Sportscar
 const SPORT_BODY_GEO = new BoxGeometry(0.46, 0.10, 0.88);
 const SPORT_CABIN_GEO = new BoxGeometry(0.38, 0.09, 0.40);
 const SPORT_WINDOW_GEO = new BoxGeometry(0.39, 0.07, 0.37);
 
-// Bike
 const BIKE_FRAME_GEO = new BoxGeometry(0.12, 0.20, 0.45);
 const BIKE_TANK_GEO = new BoxGeometry(0.11, 0.08, 0.18);
 const BIKE_SEAT_GEO = new BoxGeometry(0.10, 0.03, 0.16);
 const BIKE_BAR_GEO = new CylinderGeometry(0.015, 0.015, 0.26, 8);
 
-// Ambulance
 const AMBULANCE_BODY_GEO = new BoxGeometry(0.46, 0.28, 0.85);
 const AMBULANCE_CAB_GEO = new BoxGeometry(0.44, 0.14, 0.25);
 const AMBULANCE_WINDOW_GEO = new BoxGeometry(0.41, 0.08, 0.18);
@@ -205,13 +198,12 @@ const AMBULANCE_CROSS_V_GEO = new BoxGeometry(0.03, 0.12, 0.005);
 const AMBULANCE_SIREN_BAR_GEO = new BoxGeometry(0.3, 0.03, 0.06);
 const AMBULANCE_FLASHER_GEO = new BoxGeometry(0.1, 0.03, 0.05);
 
-// Lights
 const HEADLIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
 const BRAKELIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
 const BIKE_HEADLIGHT_GEO = new BoxGeometry(0.08, 0.06, 0.01);
 const BIKE_BRAKELIGHT_GEO = new BoxGeometry(0.06, 0.04, 0.01);
 
-// ── Shared Static Materials Singletons (0 Shader Re-compilations) ────────────
+// Static material singletons to prevent runtime shader re-compilation.
 const WINDOW_MAT = new MeshStandardMaterial({
   color: "#0a0a14",
   roughness: 0.02,
@@ -278,7 +270,6 @@ function getPaintMaterial(paintColor: string): MeshStandardMaterial {
   return mat;
 }
 
-// ── Car Body Component (Zero GC, Reuses Module Singletons) ───────────────────
 function CarBody({
   type,
   paintMat,
@@ -377,13 +368,11 @@ export default function Vehicle({ vehicle }: VehicleProps) {
   const rrRef = useRef<Mesh>(null);
   const lrRef = useRef<Mesh>(null);
 
-  // Siren refs for emergency vehicles
   const sirenRedMeshRef = useRef<MeshStandardMaterial>(null);
   const sirenBlueMeshRef = useRef<MeshStandardMaterial>(null);
   const sirenRedLightRef = useRef<import("three").PointLight>(null);
   const sirenBlueLightRef = useRef<import("three").PointLight>(null);
 
-  // Smooth interpolation refs
   const lastTargetPosRef = useRef(vehicle.position);
   const startPosRef = useRef(vehicle.position);
   const lastVisualTRef = useRef(vehicle.position);
@@ -452,7 +441,6 @@ export default function Vehicle({ vehicle }: VehicleProps) {
       if (lrRef.current) lrRef.current.rotation.x = a;
     }
 
-    // Siren blinking for emergency vehicle
     if (vehicle.is_emergency) {
       const flash = Math.floor(time * 8) % 2 === 0;
       if (sirenRedMeshRef.current) {

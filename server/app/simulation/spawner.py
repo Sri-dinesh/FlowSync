@@ -23,6 +23,7 @@ class TrafficProfile:
     )  # [straight, left, right]
     base_lambda: float = 0.5
     lambda_multiplier: float = 1.0
+    directional_turn_probs: Optional[Dict[str, List[float]]] = None
 
 
 SCENARIO_PROFILES: Dict[str, TrafficProfile] = {
@@ -91,6 +92,8 @@ class PoissonSpawner:
         }
         self.generated_last_tick: int = 0
         self.total_generated: int = 0
+        self.generated_by_movement: Dict[str, int] = {k: 0 for k in self._pending}
+        self.generated_movements_last_tick: List[str] = []
 
     def set_rate(self, lambda_rate: float) -> None:
         self.lambda_rate = max(0.0, lambda_rate)
@@ -139,6 +142,8 @@ class PoissonSpawner:
         self._clock = 0.0
         self.generated_last_tick = 0
         self.total_generated = 0
+        self.generated_by_movement = {k: 0 for k in self._pending}
+        self.generated_movements_last_tick = []
         for arrivals in self._pending.values():
             arrivals.clear()
 
@@ -204,6 +209,7 @@ class PoissonSpawner:
     def spawn(self, dt: float, lanes: Dict[str, List[Vehicle]]) -> List[Vehicle]:
         spawned: List[Vehicle] = []
         self.generated_last_tick = 0
+        self.generated_movements_last_tick = []
         self._clock += max(0.0, dt)
 
         # Do not spawn when disabled or lambda is zero
@@ -231,16 +237,22 @@ class PoissonSpawner:
         total_weight = sum(max(0.0, dir_weights.get(d, 0.0)) for d in dir_names)
         total_weight = max(total_weight, 1e-9)
         for dir_name in dir_names:
+            local_turn_probs = (
+                self.profile.directional_turn_probs.get(dir_name, turn_probs)
+                if self.profile and self.profile.directional_turn_probs else turn_probs
+            )
             weight = max(0.0, dir_weights.get(dir_name, 0.0))
             per_dir_rate = self.lambda_rate * lambda_mult * (weight / total_weight)
 
             num_to_spawn = int(self._rng.poisson(per_dir_rate * dt))
             for _ in range(num_to_spawn):
-                turn = str(self._rng.choice(["straight", "left", "right"], p=turn_probs))
+                turn = str(self._rng.choice(["straight", "left", "right"], p=local_turn_probs))
                 lane_id = f"{dir_name}_{turn}"
                 self._pending[lane_id].append(self._clock)
                 self.generated_last_tick += 1
                 self.total_generated += 1
+                self.generated_by_movement[lane_id] += 1
+                self.generated_movements_last_tick.append(lane_id)
 
         # Admit upstream demand whenever there is physical room at the modelled
         # lane entrance.  At most one vehicle per lane per tick is enough for the

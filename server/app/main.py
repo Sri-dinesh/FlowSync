@@ -1,5 +1,14 @@
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
+
+# Ensure project root (for research package) and server directory are on sys.path
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = _SERVER_DIR.parent
+for _p in [str(_PROJECT_ROOT), str(_SERVER_DIR)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +21,14 @@ from .routers.simulation import router as simulation_router
 from .routers.training import router as training_router
 from .routers.cctv import router as cctv_router
 from .routers.analytics import router as analytics_router
+from .routers.research import router as research_router
 from .services import model_service, supabase_service
 from .simulation.environment import TrafficEnv
 from .websockets.simulation_ws import simulation_socket
 from .websockets.city_ws import city_socket
 from .websockets.training_ws import broadcast_training_metric, training_socket
 from .websockets.cctv_ws import cctv_socket
+from .websockets.research_ws import research_socket
 
 from .simulation.intersection import Intersection
 
@@ -151,11 +162,13 @@ app.include_router(training_router)
 app.include_router(metrics_router)
 app.include_router(cctv_router)
 app.include_router(analytics_router)
+app.include_router(research_router)
 
 app.add_api_websocket_route("/ws/simulation", simulation_socket)
 app.add_api_websocket_route("/ws/training", training_socket)
 app.add_api_websocket_route("/ws/city", city_socket)
 app.add_api_websocket_route("/ws/cctv", cctv_socket)
+app.add_api_websocket_route("/ws/research", research_socket)
 
 
 @app.get("/")

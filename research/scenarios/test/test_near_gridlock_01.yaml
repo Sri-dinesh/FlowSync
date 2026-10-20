@@ -1,0 +1,34 @@
+scenario_id: test_near_gridlock_01
+split: test
+name: Test Near Gridlock Stress
+description: 'Severe stress test: 1.3 veh/s demand creating heavy spillback risk.'
+duration_steps: 1500
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 1.3
+  directional_weights:
+    north: 1.2
+    south: 1.2
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events: []
+  incident_events: []
+scenario_hash: 0fe425456bbbec76

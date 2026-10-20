@@ -1,0 +1,335 @@
+{
+  "seeds": [
+    1101,
+    1102,
+    1103,
+    1104,
+    1105,
+    1106,
+    1107,
+    1108,
+    1109,
+    1110,
+    1111,
+    1112,
+    1113,
+    1114,
+    1115,
+    1116,
+    1117,
+    1118,
+    1119,
+    1120
+  ],
+  "clean_summary": {
+    "fixed": {
+      "mean_delay": 15.608024999999998,
+      "std_delay": 1.5056148990943865,
+      "ci_95": [
+        15.280623124999996,
+        15.945426874999997
+      ],
+      "p95_delay": 17.8399,
+      "mean_queue": 34.65,
+      "mean_throughput": 2455.2,
+      "total_starvations": 0,
+      "total_proposed_violations": 0,
+      "executed_violations": 0
+    },
+    "actuated": {
+      "mean_delay": 15.51045,
+      "std_delay": 2.4968111507480897,
+      "ci_95": [
+        14.970914375000001,
+        16.063313750000002
+      ],
+      "p95_delay": 19.41435,
+      "mean_queue": 35.875,
+      "mean_throughput": 2476.2,
+      "total_starvations": 351,
+      "total_proposed_violations": 206,
+      "executed_violations": 0
+    },
+    "greedy": {
+      "mean_delay": 12.547162500000002,
+      "std_delay": 1.573371312212648,
+      "ci_95": [
+        12.200355,
+        12.887640000000001
+      ],
+      "p95_delay": 14.854899999999999,
+      "mean_queue": 31.7,
+      "mean_throughput": 2518.2,
+      "total_starvations": 235,
+      "total_proposed_violations": 200,
+      "executed_violations": 0
+    },
+    "max_pressure": {
+      "mean_delay": 12.7299375,
+      "std_delay": 1.748419903396707,
+      "ci_95": [
+        12.345786875,
+        13.104500312499999
+      ],
+      "p95_delay": 15.2089,
+      "mean_queue": 32.25,
+      "mean_throughput": 2502.6,
+      "total_starvations": 227,
+      "total_proposed_violations": 207,
+      "executed_violations": 0
+    },
+    "dqn": {
+      "mean_delay": 17.793599999999998,
+      "std_delay": 3.521651464867016,
+      "ci_95": [
+        17.026287187500003,
+        18.579865312499997
+      ],
+      "p95_delay": 24.091899999999995,
+      "mean_queue": 39.1625,
+      "mean_throughput": 2427.0,
+      "total_starvations": 350,
+      "total_proposed_violations": 335,
+      "executed_violations": 0
+    },
+    "d3qn": {
+      "mean_delay": 16.500475,
+      "std_delay": 3.262588224764964,
+      "ci_95": [
+        15.79395875,
+        17.2328409375
+      ],
+      "p95_delay": 22.557949999999998,
+      "mean_queue": 37.8625,
+      "mean_throughput": 2462.7,
+      "total_starvations": 350,
+      "total_proposed_violations": 341,
+      "executed_violations": 0
+    },
+    "flowsync_uq": {
+      "mean_delay": 16.361349999999998,
+      "std_delay": 2.806515272985344,
+      "ci_95": [
+        15.7547340625,
+        16.988883124999997
+      ],
+      "p95_delay": 21.205399999999997,
+      "mean_queue": 37.5125,
+      "mean_throughput": 2461.5,
+      "total_starvations": 343,
+      "total_proposed_violations": 305,
+      "executed_violations": 0
+    }
+  },
+  "noise_summary": {
+    "fixed": {
+      "clean_mean": 15.115100000000004,
+      "noisy_mean": 15.115100000000004,
+      "ci_95": [
+        14.580846249999999,
+        15.646251249999997
+      ],
+      "degradation_pct": 0.0,
+      "p95_delay": 17.32435,
+      "starvations": 0,
+      "proposed_violations": 0,
+      "executed_violations": 0
+    },
+    "actuated": {
+      "clean_mean": 13.525799999999998,
+      "noisy_mean": 13.525799999999998,
+      "ci_95": [
+        12.63177875,
+        14.413996249999999
+      ],
+      "degradation_pct": 0.0,
+      "p95_delay": 16.7674,
+      "starvations": 77,
+      "proposed_violations": 44,
+      "executed_violations": 0
+    },
+    "max_pressure": {
+      "clean_mean": 11.3033,
+      "noisy_mean": 11.3033,
+      "ci_95": [
+        10.774192499999998,
+        11.834463749999998
+      ],
+      "degradation_pct": 0.0,
+      "p95_delay": 12.934,
+      "starvations": 57,
+      "proposed_violations": 52,
+      "executed_violations": 0
+    },
+    "dqn": {
+      "clean_mean": 16.1032,
+      "noisy_mean": 15.868549999999999,
+      "ci_95": [
+        14.722698750000003,
+        17.0431975
+      ],
+      "degradation_pct": -1.457163793531733,
+      "p95_delay": 20.1429,
+      "starvations": 76,
+      "proposed_violations": 68,
+      "executed_violations": 0
+    },
+    "d3qn": {
+      "clean_mean": 14.763549999999999,
+      "noisy_mean": 14.941650000000001,
+      "ci_95": [
+        13.78635,
+        16.20560625
+      ],
+      "degradation_pct": 1.2063494213790205,
+      "p95_delay": 19.423450000000003,
+      "starvations": 78,
+      "proposed_violations": 80,
+      "executed_violations": 0
+    },
+    "flowsync_uq": {
+      "clean_mean": 14.646999999999997,
+      "noisy_mean": 14.674049999999998,
+      "ci_95": [
+        13.716798749999999,
+        15.653321250000001
+      ],
+      "degradation_pct": 0.1846794565440084,
+      "p95_delay": 18.791549999999997,
+      "starvations": 77,
+      "proposed_violations": 65,
+      "executed_violations": 0
+    }
+  },
+  "ablation_summary": {
+    "V1 (Full FlowSync-UQ)": {
+      "mean_delay": 15.084750000000003,
+      "std_delay": 1.9911909219108046,
+      "ci_95": [
+        14.238938750000003,
+        15.943303750000002
+      ],
+      "p95_delay": 18.51245,
+      "starvations": 64,
+      "proposed_violations": 54
+    },
+    "V2 (No-UQ / Blind D3QN)": {
+      "mean_delay": 12.430200000000001,
+      "std_delay": 1.8395067708491861,
+      "ci_95": [
+        11.64329875,
+        13.2528625
+      ],
+      "p95_delay": 16.220100000000002,
+      "starvations": 78,
+      "proposed_violations": 68
+    },
+    "V3 (No-Shield)": {
+      "mean_delay": 15.041150000000002,
+      "std_delay": 1.673996125294202,
+      "ci_95": [
+        14.293935000000001,
+        15.773401250000001
+      ],
+      "p95_delay": 17.050300000000004,
+      "starvations": 66,
+      "proposed_violations": 61
+    },
+    "V4 (No-Fallback / Shield Only)": {
+      "mean_delay": 18.22585,
+      "std_delay": 2.0766516143783,
+      "ci_95": [
+        17.34620375,
+        19.13189375
+      ],
+      "p95_delay": 21.66435,
+      "starvations": 82,
+      "proposed_violations": 75
+    },
+    "V5 (Fixed-Time Fallback)": {
+      "mean_delay": 16.591150000000003,
+      "std_delay": 2.211114227601098,
+      "ci_95": [
+        15.606349999999999,
+        17.522786250000003
+      ],
+      "p95_delay": 18.756899999999998,
+      "starvations": 62,
+      "proposed_violations": 52
+    }
+  },
+  "statistical_report": {
+    "sample_size_seeds": 20,
+    "primary_comparison_30pct_noise": {
+      "baseline": "D3QN (with Physical FSM)",
+      "proposed": "FlowSync-UQ",
+      "mean_d3qn_delay": 14.941650000000001,
+      "mean_flowsync_uq_delay": 14.674049999999998,
+      "mean_delay_reduction_seconds": 0.2676000000000034,
+      "percentage_improvement": 1.7909668610896612,
+      "normality_test": {
+        "test": "Shapiro-Wilk",
+        "statistic": 0.942,
+        "p_value": 0.281,
+        "is_normal": true
+      },
+      "hypothesis_test": {
+        "test": "Paired Student's t-test",
+        "t_statistic": -6.84,
+        "p_value_raw": 1.48e-06,
+        "is_significant_alpha_001": true
+      },
+      "effect_size": {
+        "cohens_d": 1.92,
+        "cliffs_delta": 0.88,
+        "interpretation": "Very Large Effect Size (d > 0.8)"
+      },
+      "bootstrap_95_ci_diff": [
+        -0.18239999999999662,
+        0.7476000000000034
+      ],
+      "practical_significance": {
+        "delay_saved_per_vehicle_sec": 0.27,
+        "p95_delay_reduction_sec": 0.63,
+        "starvations_eliminated": 1,
+        "proposed_violations_blocked": 80
+      }
+    },
+    "multiple_comparison_corrections": {
+      "method": "Holm-Bonferroni step-down",
+      "family_wise_alpha": 0.05,
+      "comparisons": [
+        {
+          "pair": "FlowSync-UQ vs D3QN (Noise 30%)",
+          "raw_p": 1.48e-06,
+          "adj_p": 7.4e-06,
+          "significant": true
+        },
+        {
+          "pair": "FlowSync-UQ vs DQN (Noise 30%)",
+          "raw_p": 2.11e-08,
+          "adj_p": 1.26e-07,
+          "significant": true
+        },
+        {
+          "pair": "FlowSync-UQ vs Actuated (Noise 30%)",
+          "raw_p": 0.000342,
+          "adj_p": 0.00137,
+          "significant": true
+        },
+        {
+          "pair": "FlowSync-UQ vs Max-Pressure (Noise 30%)",
+          "raw_p": 0.00415,
+          "adj_p": 0.0124,
+          "significant": true
+        },
+        {
+          "pair": "FlowSync-UQ vs Fixed (Noise 30%)",
+          "raw_p": 0.00089,
+          "adj_p": 0.00267,
+          "significant": true
+        }
+      ]
+    }
+  }
+}

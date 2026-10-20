@@ -5,9 +5,7 @@ Converts multiple datasets with dynamic class mappings (Roboflow YAMLs, IDD XMLs
 into a single unified YOLOv8 dataset.
 """
 import argparse
-import os
 import shutil
-import sys
 import yaml
 import xml.etree.ElementTree as ET
 from pathlib import Path

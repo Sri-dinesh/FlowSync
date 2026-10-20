@@ -1,0 +1,38 @@
+scenario_id: test_incident_reduction_01
+split: test
+name: Test Incident Bottleneck
+description: Downstream lane blockage on Westbound approach reducing capacity by 70%.
+duration_steps: 1500
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.6
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events: []
+  incident_events:
+  - start_step: 300
+    end_step: 1100
+    direction: west
+    capacity_factor: 0.3
+scenario_hash: 2dacaefd4f03fc5a

@@ -17,15 +17,13 @@ from ..models.config import (
     VEHICLE_QUEUE_WEIGHTS,
 )
 from ..models.schemas import (
-    BoundingBox,
     LaneCounts,
     ROIConfig,
-    ROIPolygon,
     VehicleDetection,
     VehicleTypeBreakdown,
     WeightedLaneCounts,
 )
-from ..utils.geometry import normalize_polygon_to_frame, point_in_polygon
+from ..utils.geometry import point_in_polygon
 
 
 class ROIManager:

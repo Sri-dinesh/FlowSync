@@ -8,6 +8,16 @@ os.environ["SUPABASE_SERVICE_KEY"] = "sb_secret_dummy"
 # Mock create_client before importing the app
 mock_create_client = patch("supabase.create_client", return_value=MagicMock()).start()
 
+import sys
+from pathlib import Path
+
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SERVER_DIR))
+_ROOT_DIR = _SERVER_DIR.parent
+if str(_ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_ROOT_DIR))
+
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app

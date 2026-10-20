@@ -67,10 +67,10 @@ def retry_on_transient_error(max_retries: int = 3, base_delay: float = 0.5):
                         "remoteprotocolerror" in error_msg or
                         "server disconnected" in error_msg
                     )
-                    
+
                     if not is_transient or attempt == max_retries - 1:
                         raise
-                    
+
                     last_exception = e
                     delay = base_delay * (2 ** attempt)
                     logger.warning(
@@ -78,14 +78,13 @@ def retry_on_transient_error(max_retries: int = 3, base_delay: float = 0.5):
                         f"retrying in {delay}s: {e}"
                     )
                     time.sleep(delay)
-            
+
             if last_exception:
                 raise last_exception
         return wrapper
     return decorator
 
 
-# ─── Simulations ─────────────────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def create_simulation(mode: str) -> str:
@@ -127,7 +126,6 @@ def update_simulation(
         logger.exception("update_simulation failed for id=%s", simulation_id)
 
 
-# ─── Episodes ────────────────────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def save_episode(
@@ -158,7 +156,6 @@ def save_episode(
         )
 
 
-# ─── Traffic logs (sampled) ───────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def save_traffic_logs_bulk(rows: List[Dict[str, Any]]) -> None:
@@ -194,7 +191,6 @@ def save_traffic_log(
     }])
 
 
-# ─── Signal states (sampled) ──────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def save_signal_states_bulk(rows: List[Dict[str, Any]]) -> None:
@@ -231,7 +227,6 @@ def save_signal_state(
     }])
 
 
-# ─── Performance metrics ──────────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def save_performance_metric(
@@ -258,7 +253,6 @@ def save_performance_metric(
         )
 
 
-# ─── RL model metadata ────────────────────────────────────────────────────────
 
 def save_model_metadata(
     simulation_id: str,
@@ -302,7 +296,7 @@ def _save_model_metadata_impl(
                 date_part = old_name.split(" - ")[0]
             else:
                 date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            
+
             # Raw cumulative reward changes with episode length and reward
             # versions, so it is not a valid quality grade.  Validation
             # benchmarks are the source of truth for model quality.
@@ -320,7 +314,7 @@ def _save_model_metadata_impl(
         else:
             date_part = f"Model {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
             new_name = f"{date_part} - {episode}eps"
-            
+
             supabase_client.table("rl_models").insert({
                 "id": model_id,
                 "name": new_name,
@@ -347,7 +341,6 @@ def set_active_model(model_id: str) -> None:
         logger.exception("set_active_model failed for id=%s", model_id)
 
 
-# ─── Scenarios ───────────────────────────────────────────────────────────────
 
 @retry_on_transient_error(max_retries=3)
 def list_scenarios() -> List[Dict[str, Any]]:
@@ -455,7 +448,6 @@ def delete_scenario(scenario_id: str) -> bool:
         return False
 
 
-# ─── Scenario Runs ────────────────────────────────────────────────────────────
 
 def list_scenario_runs(scenario_id: str) -> List[Dict[str, Any]]:
     """Return all runs for a scenario ordered by model_episode ascending."""
@@ -525,7 +517,6 @@ def save_scenario_run(
         return {}
 
 
-# ─── Grouped + Aggregate reads ────────────────────────────────────────────────
 
 def get_grouped_scenario_runs(scenario_id: str) -> List[Dict[str, Any]]:
     """

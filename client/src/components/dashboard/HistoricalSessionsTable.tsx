@@ -75,7 +75,7 @@ interface BenchmarkModeResult {
   duration_seconds?: number;
 }
 
-interface BenchmarkSummary {
+export interface BenchmarkSummary {
   benchmark_id: string;
   benchmark_type?: string;
   created_at: string;

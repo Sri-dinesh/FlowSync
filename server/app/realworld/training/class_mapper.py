@@ -3,7 +3,7 @@ ClassMapper — Converts class annotations from different dataset formats to the
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, Optional, Union
 
 from ..models.config import VEHICLE_CLASSES
 

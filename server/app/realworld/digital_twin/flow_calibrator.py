@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from ..models.config import LANE_KEYS, SESSION_DIR
+from ..models.config import LANE_KEYS
 from ..models.schemas import CCTVFrame, TrafficFlowParams
 
 

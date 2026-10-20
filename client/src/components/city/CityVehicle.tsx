@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   MeshStandardMaterial,
   Group,
   Mesh,
-  MathUtils,
-  Color,
   CylinderGeometry,
   Vector3,
   CurvePath,
@@ -88,7 +86,6 @@ function buildCurve(lane: string, turn: Turn, SPAWN_DIST: number, EXIT_DIST: num
 
 import { CityVehicleState } from "@/types/city";
 
-// ── Color and Model Picker ───────────────────────────────────────────────────
 function getVehicleProps(id: string, isEmergency?: boolean) {
   if (isEmergency) {
     return {
@@ -112,7 +109,7 @@ function getVehicleProps(id: string, isEmergency?: boolean) {
   };
 }
 
-// ── Global Vehicle Materials & Geometry Singletons (0 GC Churn) ──────────────
+// Module singletons to prevent allocation churn in render loop.
 const SHARED_WHEEL_GEO = new CylinderGeometry(0.09, 0.09, 0.07, 8);
 const MAT_CACHE = new Map<string, {
   paint: MeshStandardMaterial;
@@ -160,7 +157,6 @@ function useMaterials(paintColor: string, isWaiting: boolean) {
   }, [paintColor, isWaiting]);
 }
 
-// ── 3D Geometry Composers ────────────────────────────────────────────────────
 function CarBody({ type, mats }: {
   type: "sedan" | "suv" | "hatchback" | "sportscar" | "bike" | "ambulance";
   mats: ReturnType<typeof useMaterials>;
@@ -287,11 +283,10 @@ interface CityVehicleProps {
 }
 
 function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehicleProps) {
+  const isEmergency = "is_emergency" in vehicle ? Boolean(vehicle.is_emergency) : false;
   const { paintColor, type } = useMemo(
-    () => "is_emergency" in vehicle
-      ? getVehicleProps(vehicle.id, vehicle.is_emergency)
-      : getVehicleProps(vehicle.id, false),
-    [vehicle.id, "is_emergency" in vehicle ? vehicle.is_emergency : false]
+    () => getVehicleProps(vehicle.id, isEmergency),
+    [vehicle.id, isEmergency]
   );
   const mats = useMaterials(paintColor, vehicle.state === "waiting");
 
@@ -330,7 +325,6 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
   }, [intersectionId, vehicle.lane, vehicle.turn]);
 
   const curve = useMemo(() => buildCurve(vehicle.lane, turn, spawnDist, exitDist), [vehicle.lane, turn, spawnDist, exitDist]);
-  const t_stop = useMemo(() => (spawnDist - 3.5) / curve.getLength(), [curve, spawnDist]);
 
   const groupRef = useRef<Group>(null);
   const smoothRotRef = useRef<number | null>(null);
@@ -346,12 +340,10 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
   const sirenRedLightRef = useRef<THREE.PointLight>(null);
   const sirenBlueLightRef = useRef<THREE.PointLight>(null);
 
-  // For RoadVehicles (no center)
   const lastTargetPos = useRef({ x: vehicle.world_x, z: vehicle.world_z });
   const startVisualPos = useRef({ x: vehicle.world_x, z: vehicle.world_z });
   const currentVisualPos = useRef({ x: vehicle.world_x, z: vehicle.world_z });
   
-  // For IntersectionVehicles (has center)
   const lastTargetTRef = useRef(vehicle.position);
   const startTRef = useRef(vehicle.position);
   const lastVisualTRef = useRef(vehicle.position);
@@ -359,7 +351,6 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
   const lastUpdateTime = useRef<number | null>(null);
   const updateInterval = useRef(0.1);
 
-  // Set default heading based on compass travel direction
   const getDefaultHeading = (dir: string) => {
     switch (dir) {
       case "north": return Math.PI;    // Northbound (-Z)
@@ -379,7 +370,6 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
     }
 
     if (intersectionId !== undefined && cx !== undefined && cz !== undefined) {
-      // INTERSECTION VEHICLE LOGIC (CurvePath)
       if (vehicle.position !== lastTargetTRef.current) {
         const actualInterval = time - lastUpdateTime.current;
         updateInterval.current = Math.min(Math.max(actualInterval, 0.05), 2.0);
@@ -438,7 +428,6 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
       groupRef.current.rotation.set(0, nextRot, 0);
 
     } else {
-      // ROAD VEHICLE LOGIC (Linear interpolation of world_x / world_z with physical lateral lane offset)
       if (
         vehicle.world_x !== lastTargetPos.current.x ||
         vehicle.world_z !== lastTargetPos.current.z
@@ -458,7 +447,6 @@ function CityVehicleComponent({ vehicle, intersectionId, cx, cz }: CityVehiclePr
       const z = startVisualPos.current.z + (lastTargetPos.current.z - startVisualPos.current.z) * progress;
       currentVisualPos.current = { x, z };
 
-      // Exact heading based on compass travel direction
       const targetAngle = getDefaultHeading(vehicle.lane);
 
       if (smoothRotRef.current === null) {

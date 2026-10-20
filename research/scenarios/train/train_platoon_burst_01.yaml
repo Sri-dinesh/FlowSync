@@ -1,0 +1,44 @@
+scenario_id: train_platoon_burst_01
+split: train
+name: Platoon Arrival Bursts
+description: Periodic platoon surges on Northbound approach.
+duration_steps: 1200
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.4
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events:
+  - start_step: 300
+    end_step: 500
+    multiplier: 2.5
+    directions:
+    - north
+  - start_step: 700
+    end_step: 900
+    multiplier: 2.5
+    directions:
+    - south
+  incident_events: []
+scenario_hash: c2b918e065c415eb

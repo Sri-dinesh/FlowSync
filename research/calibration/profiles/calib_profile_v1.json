@@ -1,0 +1,81 @@
+{
+  "calibration_version": "v1.0",
+  "camera_id": "cam_main_01",
+  "approach": "4_way_intersection",
+  "free_flow_speed": 12.8,
+  "saturation_headway": 2.1,
+  "lane_storage_capacity": 15,
+  "overall_flow_error_pct": 2.62,
+  "overall_turn_error_pts": 1.6,
+  "is_calibrated": true,
+  "approaches": {
+    "north": {
+      "approach": "north",
+      "observed_arrival_rate_veh_min": 15.0,
+      "simulated_arrival_rate_veh_min": 14.5,
+      "flow_error_pct": 3.33,
+      "turn_ratios_observed": {
+        "straight": 0.667,
+        "left": 0.167,
+        "right": 0.167
+      },
+      "turn_ratios_simulated": {
+        "straight": 0.655,
+        "left": 0.172,
+        "right": 0.172
+      },
+      "turn_ratio_max_error_pts": 1.15
+    },
+    "south": {
+      "approach": "south",
+      "observed_arrival_rate_veh_min": 15.0,
+      "simulated_arrival_rate_veh_min": 15.0,
+      "flow_error_pct": 0.0,
+      "turn_ratios_observed": {
+        "straight": 0.667,
+        "left": 0.167,
+        "right": 0.167
+      },
+      "turn_ratios_simulated": {
+        "straight": 0.7,
+        "left": 0.167,
+        "right": 0.133
+      },
+      "turn_ratio_max_error_pts": 3.33
+    },
+    "east": {
+      "approach": "east",
+      "observed_arrival_rate_veh_min": 7.0,
+      "simulated_arrival_rate_veh_min": 7.0,
+      "flow_error_pct": 0.0,
+      "turn_ratios_observed": {
+        "straight": 0.714,
+        "left": 0.143,
+        "right": 0.143
+      },
+      "turn_ratios_simulated": {
+        "straight": 0.714,
+        "left": 0.143,
+        "right": 0.143
+      },
+      "turn_ratio_max_error_pts": 0.0
+    },
+    "west": {
+      "approach": "west",
+      "observed_arrival_rate_veh_min": 7.0,
+      "simulated_arrival_rate_veh_min": 7.5,
+      "flow_error_pct": 7.14,
+      "turn_ratios_observed": {
+        "straight": 0.714,
+        "left": 0.143,
+        "right": 0.143
+      },
+      "turn_ratios_simulated": {
+        "straight": 0.733,
+        "left": 0.133,
+        "right": 0.133
+      },
+      "turn_ratio_max_error_pts": 1.9
+    }
+  }
+}

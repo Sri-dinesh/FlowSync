@@ -9,7 +9,6 @@ import {
   RingGeometry,
 } from "three";
 
-// ── 1. Industrial HVAC Chiller / Air-Handling Unit ──────────────────────────
 export function HVACUnit({
   position,
   scale = 1,
@@ -59,7 +58,6 @@ export function HVACUnit({
   );
 }
 
-// ── 2. Elevator Shaft & Stairwell Access Penthouse ──────────────────────────
 export function ElevatorPenthouse({
   position,
   size = [1.2, 0.7, 1.0],
@@ -100,7 +98,6 @@ export function ElevatorPenthouse({
   );
 }
 
-// ── 3. Communications Tower & Red Aviation Beacon ──────────────────────────
 export function AntennaSpire({
   position,
   height = 1.8,
@@ -141,7 +138,6 @@ export function AntennaSpire({
   );
 }
 
-// ── 4. Classic Urban Rooftop Water Tower ────────────────────────────────────
 export function WaterTower({
   position,
 }: {
@@ -187,7 +183,6 @@ export function WaterTower({
   );
 }
 
-// ── 5. Rooftop Helipad ──────────────────────────────────────────────────────
 export function Helipad({
   position,
   radius = 1.0,

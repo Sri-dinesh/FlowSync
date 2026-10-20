@@ -57,7 +57,6 @@ const FOLIAGE_CONFIG: Record<
   },
 };
 
-// ── Shared Module Geometries (Zero GC Churn) ─────────────────────────────────
 const TRUNK_GEO = new CylinderGeometry(0.09, 0.15, 0.9, 6);
 const CROWN_GEO1 = new DodecahedronGeometry(0.55, 1);
 const CROWN_GEO2 = new DodecahedronGeometry(0.42, 1);

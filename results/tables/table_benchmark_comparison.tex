@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\caption{Comparative Evaluation Across Traffic Controllers under Paired Benchmark Conditions}
+\label{tab:benchmark_comparison}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Controller} & \textbf{Mean Delay (s)} & \textbf{P95 Delay (s)} & \textbf{Queue-Area (veh$\cdot$s)} & \textbf{Throughput (veh/h)} & \textbf{Fallback Rate (\%)} & \textbf{Shield Int.} \\
+\midrule
+max_pressure & 10.11 $\pm$ 1.04 & 33.27 & 1278.5 & 1600.5 & 442.2\% & 4 \\
+greedy & 10.73 $\pm$ 1.89 & 37.47 & 1342.7 & 1665.0 & 515.8\% & 8 \\
+d3qn & 14.60 $\pm$ 0.83 & 44.87 & 1586.9 & 1620.0 & 131.0\% & 10 \\
+\textbf{flowsync_uq} & \textbf{14.60 $\pm$ 0.83} & \textbf{44.87} & 1586.9 & 1620.0 & 131.0\% & 10 \\
+fixed & 15.29 $\pm$ 0.92 & 41.56 & 1606.4 & 1506.0 & 0.0\% & 0 \\
+\bottomrule
+\end{tabular}
+\end{table*}

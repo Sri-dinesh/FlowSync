@@ -14,8 +14,10 @@ Improvements in this version:
 """
 import torch
 import torch.nn as nn
-from typing import Optional
-from app.rl.hyperparams import HyperParams
+try:
+    from .hyperparams import HyperParams
+except (ImportError, ValueError):
+    from app.rl.hyperparams import HyperParams
 
 HP = HyperParams()
 
@@ -94,12 +96,8 @@ class DuelingDQNNetwork(nn.Module):
         advantage = self.advantage_stream(features)  # (batch, action_dim)
 
         if valid_action_mask is not None:
-            # BUG-05 CORRECTED: compute mean only over valid action dimensions
-            # valid_action_mask: True for valid actions, False for invalid
-            # Shape: (batch, action_dim) bool
-            float_mask = valid_action_mask.float()  # 1.0 = valid, 0.0 = invalid
-
-            # Masked advantage sum, divide by number of valid actions per sample
+            # Center advantage over valid action dimensions for Dueling identifiability
+            float_mask = valid_action_mask.float()
             n_valid = float_mask.sum(dim=1, keepdim=True).clamp(min=1.0)
             masked_advantage_mean = (advantage * float_mask).sum(dim=1, keepdim=True) / n_valid
             q_values = value + advantage - masked_advantage_mean
@@ -108,3 +106,40 @@ class DuelingDQNNetwork(nn.Module):
             q_values = value + advantage - advantage.mean(dim=1, keepdim=True)
 
         return q_values  # (batch, action_dim)
+
+
+class PlainDQNNetwork(nn.Module):
+    """
+    Standard Deep Q-Network (Mnih et al. 2015) without dueling streams.
+    Serves as an essential ablation baseline to measure dueling architecture benefit.
+    """
+
+    def __init__(self, state_dim: int = HP.STATE_DIM, action_dim: int = HP.ACTION_DIM):
+        super().__init__()
+        self.action_dim = action_dim
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, 256),
+            nn.LayerNorm(256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.LayerNorm(256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, action_dim),
+        )
+        self._init_weights()
+
+    def _init_weights(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_uniform_(module.weight, nonlinearity="relu")
+                nn.init.zeros_(module.bias)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        valid_action_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        q_values = self.network(x)
+        return q_values

@@ -17,7 +17,6 @@ Inter-intersection connections:
 """
 
 from typing import Dict, List, Optional, Tuple
-from uuid import uuid4
 
 import numpy as np
 
@@ -32,30 +31,22 @@ from .traffic_math import (
 )
 from .demand_forecast import ArrivalForecaster
 
-# Road travel time between intersections (seconds at 10 Hz → ticks)
 ROAD_TRAVEL_TIME = 3.0   # seconds to cross a connecting road segment
 ROAD_TICKS = int(ROAD_TRAVEL_TIME / 0.1)   # 30 ticks
 
 MAX_QUEUE = 12  # per-lane cap at city intersections
 
-# Which adjacent intersection + entry direction when a vehicle exits a given direction
-# (from_intersection, exit_dir) → (to_intersection, entry_dir)
 ROAD_CONNECTIONS: Dict[Tuple[str, str], Tuple[str, str]] = {
-    # A's exits
     ("A", "east"):  ("B", "west"),
     ("A", "south"): ("C", "north"),
-    # B's exits
     ("B", "west"):  ("A", "east"),
     ("B", "south"): ("D", "north"),
-    # C's exits
     ("C", "north"): ("A", "south"),
     ("C", "east"):  ("D", "west"),
-    # D's exits
     ("D", "north"): ("B", "south"),
     ("D", "west"):  ("C", "east"),
 }
 
-# External exits (when a vehicle leaves the city boundary)
 EXTERNAL_EXITS: Dict[Tuple[str, str], str] = {
     ("A", "north"): "north_exit",
     ("A", "west"):  "west_exit",
@@ -67,8 +58,6 @@ EXTERNAL_EXITS: Dict[Tuple[str, str], str] = {
     ("D", "east"):  "east_exit",
 }
 
-# Which directions map to which intersection outputs
-# A lane_key like "north_straight" exits the intersection going SOUTH (opposite)
 EXIT_DIR_MAP: Dict[str, str] = {
     "north_straight": "south",
     "south_straight": "north",
@@ -137,7 +126,6 @@ class CityNetwork:
             "C": Intersection(red_duration=red_duration, spawn_lambda=0.0),
             "D": Intersection(red_duration=red_duration, spawn_lambda=0.0),
         }
-        # Disable internal spawners — city spawner (city_spawner.py) handles spawning
         for inter in self.intersections.values():
             inter.spawner.set_enabled(False)
 
@@ -149,7 +137,6 @@ class CityNetwork:
             iid: ArrivalForecaster() for iid in self.intersections
         }
 
-    # ── Observation builder (matches existing single-intersection obs exactly) ──
 
     def build_obs(self, intersection_id: str, forecaster: Optional[ArrivalForecaster] = None) -> np.ndarray:
         """
@@ -166,28 +153,22 @@ class CityNetwork:
         signal = intersection.signal
         outgoing = intersection.get_outgoing_counts()
 
-        # Dims 0-11: queues in canonical MOVEMENT_KEYS order
         movements = [
             float(np.tanh(movement_queues.get(k, 0) / 15.0))
             for k in MOVEMENT_KEYS
         ]
 
-        # Dims 12-15: one-hot phase
         phase_onehot = [0.0, 0.0, 0.0, 0.0]
         phase_onehot[signal.current_phase] = 1.0
 
-        # Dim 16: time in phase
         time_norm = min(signal.time_in_phase / signal.MAX_GREEN_TIME, 1.0)
 
-        # Dim 17: transitioning
         is_trans = 1.0 if signal.color.name in ("YELLOW", "RED") else 0.0
 
-        # Dim 18: destination-aware pressure (BUG-04 city parity: shared formula)
         pressures = compute_movement_pressures(movement_queues, outgoing, MAX_CAP)
         total_pressure = compute_total_pressure(pressures)
         pressure_norm = normalize_total_pressure(total_pressure)
 
-        # Dim 19: starvation
         max_starv_norm = min(
             max(signal.phase_starvation_timer.values()) / signal.STARVATION_THRESHOLD, 1.0
         )
@@ -204,7 +185,6 @@ class CityNetwork:
         obs = base_obs + forecast_features
         return np.array(obs, dtype=np.float32)
 
-    # ── Greedy action helper ────────────────────────────────────────────────────
 
     def get_greedy_action(self, intersection_id: str) -> int:
         intersection = self.intersections[intersection_id]
@@ -238,7 +218,6 @@ class CityNetwork:
                 mask[phase] = True
         return mask
 
-    # ── Tick ───────────────────────────────────────────────────────────────────
 
     def tick(self, dt: float, mode: str, shared_agent=None) -> None:
         """
@@ -249,7 +228,6 @@ class CityNetwork:
         3. Route them to road segments or city exits
         4. Advance road vehicles; inject arrived ones into destination intersections
         """
-        # --- Step 1: Tick each intersection ---
         all_passed_vehicles: List[Tuple[str, Vehicle]] = []
         for iid, intersection in self.intersections.items():
             if mode == "ai" and shared_agent is not None:
@@ -284,33 +262,28 @@ class CityNetwork:
                 action = self.get_greedy_action(iid)
                 passed = intersection.tick(dt=dt, action=action)
             else:
-                # fixed timer — intersection handles it internally
                 passed = intersection.tick(dt=dt, action=None)
             
             for v in (passed or []):
                 all_passed_vehicles.append((iid, v))
 
-        # --- Step 2: Collect passed vehicles and route them ---
         self._route_passed_vehicles(dt, all_passed_vehicles)
 
-        # --- Step 3: Advance road vehicles with Car-Following model ---
         arrived: List[RoadVehicle] = []
         still_traveling: List[RoadVehicle] = []
 
-        # Group road vehicles by corridor segment
         corridors: Dict[Tuple[str, str], List[RoadVehicle]] = {}
         for rv in self.road_vehicles:
             corridors.setdefault((rv.from_intersection, rv.to_intersection), []).append(rv)
 
         for segment_key, group in corridors.items():
-            # Sort vehicles by progress descending (lead vehicle first)
             group.sort(key=lambda v: v.progress, reverse=True)
             for idx, rv in enumerate(group):
                 if idx == 0:
                     max_p = 1.0
                 else:
                     leader = group[idx - 1]
-                    # Enforce safe physical headway (~2.0m on a 13m road segment -> 0.16 normalized headway)
+            # Safe headway spacing (~2.0m on 13m segment) prevents vehicle collisions along corridor.
                     safe_headway = 0.16
                     max_p = max(0.0, leader.progress - safe_headway)
 
@@ -320,10 +293,8 @@ class CityNetwork:
                 else:
                     still_traveling.append(rv)
 
-        # --- Step 4: Inject arrived vehicles into destination intersections ---
         for rv in arrived:
             if rv.is_exit:
-                # Reached the city boundary! Count in total throughput and despawn
                 self.total_city_throughput += 1
                 continue
 
@@ -333,7 +304,6 @@ class CityNetwork:
                 injected = self._inject_vehicle(dest, rv)
 
             if not injected and dest is not None:
-                # Keep it waiting at the end of the road
                 rv.progress = 1.0
                 still_traveling.append(rv)
 
@@ -377,7 +347,6 @@ class CityNetwork:
                 )
                 self.road_vehicles.append(rv)
             else:
-                # Exits the city boundary: create an exiting road vehicle that smoothly departs to map edge
                 exit_target = f"exit_{exit_dir}_{iid}"
                 rv = RoadVehicle(
                     vehicle_id=vehicle.id,
@@ -400,8 +369,7 @@ class CityNetwork:
         if len(lane_queue) >= MAX_QUEUE:
             return False
 
-        # Anti-overlap clearance: if there is already a vehicle in this approach lane,
-        # the tail vehicle must have moved forward (position >= 0.18) before a new vehicle can enter at 0.0
+        # Ensure minimum physical clearance before injection to prevent entrance overlap.
         if lane_queue:
             tail_vehicle = lane_queue[-1]
             if tail_vehicle.position < 0.18:
@@ -421,7 +389,6 @@ class CityNetwork:
         intersection._spawned_this_interval += 1
         return True
 
-    # ── Task 6.1: Spillback awareness ──────────────────────────────────────────
 
     def get_corridor_occupancy(self) -> Dict[Tuple[str, str], float]:
         """
@@ -453,11 +420,10 @@ class CityNetwork:
         penalty = 0.0
         for (from_inter, to_inter), occ in occupancy.items():
             if from_inter == intersection_id and occ > 0.7:
-                # Penalize proportionally once corridor is 70%+ full
+        # Penalize proportionally once corridor exceeds 70% capacity to prevent spillback.
                 penalty += -2.0 * (occ - 0.7) / 0.3
         return penalty
 
-    # ── Metrics ────────────────────────────────────────────────────────────────
 
     def get_city_metrics(self) -> Dict:
         all_waits = []
@@ -484,7 +450,6 @@ class CityNetwork:
         city_avg_wait = round(sum(all_waits) / len(all_waits), 2) if all_waits else 0.0
         road_vehicles_count = len(self.road_vehicles)
 
-        # Congestion level
         if city_avg_wait < 5:
             congestion = "low"
         elif city_avg_wait < 15:
@@ -497,7 +462,6 @@ class CityNetwork:
         worst_inter = max(per_inter, key=lambda k: per_inter[k]["avg_wait_time"]) if per_inter else "A"
         best_inter  = min(per_inter, key=lambda k: per_inter[k]["avg_wait_time"]) if per_inter else "A"
 
-        # Task 6.1: corridor spillback occupancy
         corridor_occ = {
             f"{frm}→{to}": round(occ, 3)
             for (frm, to), occ in self.get_corridor_occupancy().items()
@@ -513,7 +477,6 @@ class CityNetwork:
             "worst_intersection": worst_inter,
             "best_intersection":  best_inter,
             "per_intersection":   per_inter,
-            # Task 6.1
             "corridor_occupancy":   corridor_occ,
             "spillback_gridlock":   spillback_gridlock,
         }

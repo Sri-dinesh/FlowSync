@@ -1,0 +1,39 @@
+scenario_id: test_sudden_burst_01
+split: test
+name: Test Sudden Arterial Burst
+description: Massive sudden surge (3.5x multiplier) on Eastbound corridor.
+duration_steps: 1500
+topology: single_intersection
+red_duration: 3.0
+demand_profile:
+  base_lambda: 0.4
+  directional_weights:
+    north: 1.0
+    south: 1.0
+    east: 1.0
+    west: 1.0
+  turn_ratios:
+    north:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    south:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    east:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+    west:
+      straight: 0.7
+      left: 0.15
+      right: 0.15
+  burst_events:
+  - start_step: 400
+    end_step: 800
+    multiplier: 3.5
+    directions:
+    - east
+  incident_events: []
+scenario_hash: 33b9f4cb498089de

@@ -1,0 +1,98 @@
+{
+  "cctv_session_01_midday": {
+    "fixed": {
+      "mean_delay": 13.61,
+      "p95_delay": 56.81,
+      "throughput": 1020.0,
+      "total_vehicles": 34
+    },
+    "greedy": {
+      "mean_delay": 4.97,
+      "p95_delay": 14.72,
+      "throughput": 1080.0,
+      "total_vehicles": 36
+    },
+    "max_pressure": {
+      "mean_delay": 4.97,
+      "p95_delay": 14.72,
+      "throughput": 1080.0,
+      "total_vehicles": 36
+    },
+    "d3qn": {
+      "mean_delay": 7.57,
+      "p95_delay": 39.12,
+      "throughput": 1020.0,
+      "total_vehicles": 34
+    },
+    "flowsync_uq": {
+      "mean_delay": 20.75,
+      "p95_delay": 51.98,
+      "throughput": 1080.0,
+      "total_vehicles": 36
+    }
+  },
+  "cctv_session_02_rush_commute": {
+    "fixed": {
+      "mean_delay": 14.84,
+      "p95_delay": 49.19,
+      "throughput": 1170.0,
+      "total_vehicles": 39
+    },
+    "greedy": {
+      "mean_delay": 7.71,
+      "p95_delay": 19.92,
+      "throughput": 1140.0,
+      "total_vehicles": 38
+    },
+    "max_pressure": {
+      "mean_delay": 6.06,
+      "p95_delay": 14.33,
+      "throughput": 1140.0,
+      "total_vehicles": 38
+    },
+    "d3qn": {
+      "mean_delay": 10.53,
+      "p95_delay": 44.76,
+      "throughput": 840.0,
+      "total_vehicles": 28
+    },
+    "flowsync_uq": {
+      "mean_delay": 17.0,
+      "p95_delay": 50.76,
+      "throughput": 840.0,
+      "total_vehicles": 28
+    }
+  },
+  "cctv_session_03_adverse_rain": {
+    "fixed": {
+      "mean_delay": 7.96,
+      "p95_delay": 21.94,
+      "throughput": 1170.0,
+      "total_vehicles": 39
+    },
+    "greedy": {
+      "mean_delay": 7.16,
+      "p95_delay": 18.0,
+      "throughput": 1530.0,
+      "total_vehicles": 51
+    },
+    "max_pressure": {
+      "mean_delay": 5.57,
+      "p95_delay": 18.0,
+      "throughput": 1530.0,
+      "total_vehicles": 51
+    },
+    "d3qn": {
+      "mean_delay": 18.69,
+      "p95_delay": 48.8,
+      "throughput": 1530.0,
+      "total_vehicles": 51
+    },
+    "flowsync_uq": {
+      "mean_delay": 19.99,
+      "p95_delay": 51.45,
+      "throughput": 1530.0,
+      "total_vehicles": 51
+    }
+  }
+}

@@ -73,3 +73,61 @@ def test_double_dqn_loss_runs_cleanly():
     )
     loss, td_errors = agent.train_step(batch)
     assert isinstance(loss, float)
+
+
+def test_td_target_uses_masked_double_q_duration_discount_and_terminal_flag():
+    class FixedQ(torch.nn.Module):
+        def __init__(self, values):
+            super().__init__()
+            self.values = torch.nn.Parameter(torch.tensor(values, dtype=torch.float32))
+
+        def forward(self, states, valid_action_mask=None):
+            return self.values.expand(len(states), -1)
+
+    agent = DQNAgent()
+    agent.online_net = FixedQ([1., 3., 9., 7.])
+    agent.target_net = FixedQ([10., 20., 100., 40.])
+    agent.optimizer = torch.optim.SGD(agent.online_net.parameters(), lr=0.)
+    batch = (
+        torch.zeros((3, HP.STATE_DIM)), torch.tensor([0, 1, 2]), torch.tensor([1., 2., 3.]),
+        torch.zeros((3, HP.STATE_DIM)), torch.tensor([0., 1., 0.]), torch.ones(3),
+        [99999, 100000, 100001], torch.ones((3, 4), dtype=torch.bool),
+        torch.tensor([[True, True, False, False], [True, True, True, True],
+                      [False, False, False, True]]),
+        torch.tensor([.9, .5, .5]), torch.zeros(3),
+    )
+    _, errors = agent.train_step(batch)
+    # Online chooses allowed action 1 (not masked-out 2); target evaluates it.
+    # True terminal sample does not bootstrap. Final sample has a 0.5 discount.
+    np.testing.assert_allclose(errors, [18., -1., 14.], atol=1e-6)
+    assert agent.latest_q_stats["demo_sample_fraction"] == 0.
+    assert agent.latest_q_stats["weighted_demo_loss"] == 0.
+
+
+@pytest.mark.parametrize("weight", [1., .1])
+def test_loss_scale_telemetry_distinguishes_weighting_from_prediction_error(weight):
+    class FixedQ(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.values = torch.nn.Parameter(torch.zeros(4))
+
+        def forward(self, states, valid_action_mask=None):
+            return self.values.expand(len(states), -1)
+
+    agent = DQNAgent()
+    agent.online_net, agent.target_net = FixedQ(), FixedQ()
+    agent.optimizer = torch.optim.SGD(agent.online_net.parameters(), lr=.1)
+    batch = (torch.zeros((2, HP.STATE_DIM)), torch.zeros(2, dtype=torch.long), torch.full((2,), 2.),
+        torch.zeros((2, HP.STATE_DIM)), torch.ones(2), torch.full((2,), weight),
+        [99999, 100000], torch.ones((2, 4), dtype=torch.bool), torch.ones((2, 4), dtype=torch.bool),
+        torch.full((2,), .99), torch.zeros(2))
+    loss, errors = agent.train_step(batch)
+    np.testing.assert_allclose(errors, 2.)
+    stats = agent.latest_q_stats
+    assert stats["unweighted_td_loss"] == 1.5
+    assert stats["td_loss"] == pytest.approx(1.5*weight)
+    assert loss == pytest.approx(1.5*weight)
+    assert stats["pre_clip_gradient_norm"] == pytest.approx(weight)
+    assert stats["importance_weight_min"] == stats["importance_weight_max"] == weight
+    # Instrumentation leaves the expected original SGD update unchanged.
+    torch.testing.assert_close(agent.online_net.values, torch.tensor([.1*weight, 0., 0., 0.]))

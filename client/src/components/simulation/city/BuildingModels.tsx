@@ -13,7 +13,6 @@ import {
   WaterTower,
 } from "./RooftopDetails";
 
-// ── 1. Glass Curtain High-Rise (Corporate Skyscraper) ───────────────────────
 interface GlassTowerProps {
   position: [number, number, number];
   size?: [number, number, number];
@@ -83,17 +82,6 @@ export const GlassTower = React.memo(function GlassTower({
     [accentColor]
   );
 
-  const windowGlowMat = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: "#e0f2fe",
-        emissive: "#7dd3fc",
-        emissiveIntensity: 1.2,
-        roughness: 0.2,
-      }),
-    []
-  );
-
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       {/* ── Ground Floor Glass Lobby & Canopy ── */}
@@ -149,7 +137,6 @@ export const GlassTower = React.memo(function GlassTower({
   );
 });
 
-// ── 2. Stepped High-Rise Tower (Mixed-Use Commercial / Hotel) ───────────────
 interface SteppedTowerProps {
   position: [number, number, number];
   rotationY?: number;
@@ -210,7 +197,6 @@ export const SteppedTower = React.memo(function SteppedTower({ position, rotatio
   );
 });
 
-// ── 3. Mid-Rise Urban Commercial Block (Retail & Offices) ────────────────────
 interface MidRiseBlockProps {
   position: [number, number, number];
   size?: [number, number, number];
@@ -278,7 +264,6 @@ export const MidRiseBlock = React.memo(function MidRiseBlock({
   );
 });
 
-// ── 4. Contemporary Plaza Tower (Angled Tech Center) ─────────────────────────
 interface PlazaTowerProps {
   position: [number, number, number];
   size?: [number, number, number];

@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from ..models.config import DIRECTION_COLORS_BGR, LANE_KEYS
+from ..models.config import DIRECTION_COLORS_BGR
 from ..models.schemas import CCTVFrame, LaneCounts, ROIConfig, VehicleDetection
 
 

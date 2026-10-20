@@ -8,13 +8,12 @@ import asyncio
 import datetime
 import json
 import logging
-import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from ..realworld.models.config import SESSION_DIR
 from ..services.supabase_service import supabase_client
@@ -180,7 +179,6 @@ def _fetch_supabase_simulations() -> List[Dict[str, Any]]:
                 continue
             total_steps = s.get("totalSteps", 0)
             status = s.get("status", "")
-            # Include completed simulations or those that progressed
             if total_steps == 0 and status != "completed":
                 continue
             results.append({
@@ -204,11 +202,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
     sessions_dir.mkdir(parents=True, exist_ok=True)
     session_files = list(sessions_dir.glob("*.json"))
 
-    # Fetch completed simulations from Supabase DB to ensure cloud-persisted runs are included
     supabase_sims = await asyncio.to_thread(_fetch_supabase_simulations)
     existing_session_ids = {p.stem for p in session_files}
 
-    # Materialize missing Supabase completed simulations into session files for local replay
+        # Cache remote Supabase records locally for offline playback.
     for item in supabase_sims:
         s = item["sim"]
         pm = item["pm"]
@@ -340,22 +337,18 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if dur < 0:
                 dur = 0.0
 
-            # Count unique vehicle arrivals/detections from twin_data or stats
             arrivals = twin.get("arrivals", [])
             vehs = len(arrivals) if arrivals else (twin.get("total_vehicles_detected") or stats.get("total_detections", 0))
 
-            # Count actual vehicle classifications from arrivals
             for arr in arrivals:
                 vt = str(arr.get("vehicle_type", "car")).lower()
                 if vt in vehicle_type_counts:
                     vehicle_type_counts[vt] += 1
 
-            # Accumulate directional lane counts from session stats
             agg = stats.get("aggregate_counts") or twin.get("aggregate_counts", {})
             for k in lane_aggregates:
                 lane_aggregates[k] += int(agg.get(k, 0))
 
-            # Extract per-frame actual telemetry: phase, wait time, and raw detections
             sess_waits: List[float] = []
             sess_peak_queue = 0
             for fr in frames_list:
@@ -387,7 +380,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             c_level = _calculate_congestion_level(vehs, dur)
             congestion_distribution[c_level] += 1
 
-            # Mode & Model Telemetry
             mode = str(data.get("mode") or stats.get("mode") or twin.get("mode") or "ai").lower()
             model_name = _clean_legacy_model_label(
                 data.get("model_name") or stats.get("model_name") or twin.get("model_name")
@@ -398,7 +390,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if model_episodes is None and mode == "ai":
                 model_episodes = 300
 
-            # Fine-tuning detection for simulation history
             is_finetuned = bool(data.get("is_finetuned") or stats.get("is_finetuned"))
             finetune_scenario = data.get("finetune_scenario") or stats.get("finetune_scenario")
             if not is_finetuned and mode == "ai":
@@ -410,7 +401,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                     except Exception:
                         finetune_scenario = "specialized"
 
-            # F-04: Determine run_type for population separation
             run_type = str(data.get("run_type") or "").lower()
             if not run_type:
                 sid = str(sess_id).lower()
@@ -421,16 +411,13 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 else:
                     run_type = "standalone"
 
-            # D-04: Default simulation vehicles to "car" when no vehicle_type in arrivals
             if not arrivals and vehs > 0:
                 vehicle_type_counts["car"] += vehs
 
-            # Session delay & peak queue
             if sess_waits:
                 sess_avg_wait = round(sum(sess_waits) / len(sess_waits), 1)
             else:
                 sess_avg_wait = float(stats.get("avg_wait_s", 0.0))
-                # F-03: Do NOT fabricate wait times — only use actual measured values
 
             if sess_peak_queue == 0:
                 sess_peak_queue = int(stats.get("peak_queue", max(1, int(vehs * 0.15))))
@@ -440,7 +427,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             if sess_peak_queue > peak_queue_observed:
                 peak_queue_observed = sess_peak_queue
 
-            # Throughput
             throughput = stats.get("throughput") or stats.get("total_passed") or twin.get("total_passed") or data.get("throughput")
             if throughput is None or throughput == 0:
                 if mode == "ai":
@@ -454,7 +440,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
 
             throughput_pct = round((throughput / vehs * 100.0), 1) if vehs > 0 else 100.0
 
-            # Direct Performance Evaluation Rating
             if (sess_avg_wait <= 20.0 and throughput_pct >= 90.0) or throughput_pct >= 96.0:
                 perf_rating = "OPTIMAL"
             elif sess_avg_wait <= 32.0 or throughput_pct >= 85.0:
@@ -464,7 +449,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             else:
                 perf_rating = "CONGESTED"
 
-            # Highway Capacity Manual (HCM) Level of Service (LOS)
             if sess_avg_wait <= 10.0:
                 los = "A"
             elif sess_avg_wait <= 20.0:
@@ -478,14 +462,12 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
             else:
                 los = "F"
 
-            # F-03: Per-session efficiency gain — only compute against paired benchmark baseline
-            # No fabricated 38.5s reference; eff_gain is null when no paired Fixed run exists
-            eff_gain = None  # Will be computed properly by paired benchmark comparison
+            # Only compute efficiency gain against a true paired benchmark baseline
+            eff_gain = None
 
             mtime = file_path.stat().st_mtime
             created_at_val = data.get("created_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
             ts_ms_val = data.get("timestamp_ms") or int(mtime * 1000)
-            # F-04: Extract benchmark_id for paired comparisons
             benchmark_id = data.get("benchmark_id") or None
 
             benchmark_results = data.get("benchmark_results") or None
@@ -537,12 +519,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         except Exception:
             continue
 
-    # Cross-reference sessions sharing a benchmark_id to construct complete multi-controller benchmark results
     from collections import defaultdict
     bm_groups: Dict[str, Dict[str, Any]] = defaultdict(dict)
     for s in sessions_list:
         bid = s.get("benchmark_id")
-        # Only group multi-controller benchmarks; model_comparison benchmarks already hold full results
         if bid and s.get("benchmark_type") != "model_comparison":
             mode_k = (s.get("mode") or "ai").lower()
             bm_groups[bid][mode_k] = s
@@ -603,7 +583,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 my_wait = s["avg_wait_s"]
                 s["efficiency_gain_pct"] = round(((f_wait - my_wait) / f_wait) * 100.0, 1)
 
-    # Unique consolidated benchmark runs list
     benchmarks_list = []
     seen_bids = set()
     for s in sorted(sessions_list, key=lambda x: x["timestamp_ms"], reverse=True):
@@ -634,7 +613,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
                 "finetune_scenario": s.get("finetune_scenario"),
             })
 
-    # Approach direction totals from lane aggregates
     approach_totals = {
         "north": lane_aggregates["north_straight"] + lane_aggregates["north_left"] + lane_aggregates["north_right"],
         "south": lane_aggregates["south_straight"] + lane_aggregates["south_left"] + lane_aggregates["south_right"],
@@ -642,12 +620,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         "west":  lane_aggregates["west_straight"]  + lane_aggregates["west_left"]  + lane_aggregates["west_right"],
     }
 
-    # Actual mean intersection wait time from recorded frame metrics
     avg_intersection_wait_s = round(sum(all_waits) / len(all_waits), 1) if all_waits else 0.0
     avg_detection_fps = round(sum(fps_list) / len(fps_list), 2) if fps_list else 0.0
 
-    # F-04: Dynamic Controller Benchmarks — prefer benchmark-tagged sessions for official KPIs
-    # Fall back to all sessions if no benchmark-tagged runs exist yet
+    # Prefer benchmark-tagged sessions to prevent interactive manual runs from biasing official KPIs.
     benchmark_sessions = [s for s in sessions_list if s.get("run_type") == "benchmark"]
     kpi_pool = benchmark_sessions if benchmark_sessions else sessions_list
 
@@ -691,9 +667,7 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
     greedy_bm = _calc_mode_kpis(greedy_sessions, "#10b981", "Greedy Controller")
     ai_bm = _calc_mode_kpis(ai_sessions, "#6366f1", "FlowSync DQN AI")
 
-    # F-02 + F-03: Correct comparison logic
-    # Only compute paired deltas when BOTH AI and Fixed data exist from real runs.
-    # Never use a fabricated static baseline for official comparisons.
+    # Only compute comparison deltas when true paired baseline runs exist.
     baseline_type = "none"
     if ai_bm["has_data"] and fixed_bm["has_data"] and fixed_bm["avg_wait_time"] > 0:
         baseline_type = "paired"
@@ -701,13 +675,10 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         thr_gain = round(((ai_bm["throughput_rate"] - fixed_bm["throughput_rate"]) / max(1.0, fixed_bm["throughput_rate"])) * 100.0, 1)
         q_red = round(((fixed_bm["max_queue_avg"] - ai_bm["max_queue_avg"]) / max(1.0, fixed_bm["max_queue_avg"])) * 100.0, 1)
     else:
-        # F-03: No paired baseline — do not fabricate comparisons
         wait_red = None
         thr_gain = None
         q_red = None
 
-    # F-02: Derive leader from actual metric direction
-    # Lower wait = better, Higher throughput = better
     modes_with_data = {}
     if ai_bm["has_data"]:
         modes_with_data["ai"] = ai_bm
@@ -717,7 +688,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         modes_with_data["greedy"] = greedy_bm
 
     if len(modes_with_data) >= 2:
-        # Leader = lowest avg_wait_time among modes with data
         leader = min(modes_with_data, key=lambda m: modes_with_data[m]["avg_wait_time"])
         leader_name = modes_with_data[leader]["name"]
     elif len(modes_with_data) == 1:
@@ -742,7 +712,6 @@ async def get_dashboard_summary(request: Request) -> Dict[str, Any]:
         },
     }
 
-    # Signal Phase selection distribution calculated dynamically from recorded frame decisions
     total_phase_frames = sum(phase_counts.values()) or 1
     phase_meta = [
         {"phase": 0, "name": "North-South Green", "description": "Parallel straight & right movements"},

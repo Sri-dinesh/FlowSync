@@ -14,7 +14,6 @@ interface CityAnalyticsBarProps {
   history: DataPoint[];
 }
 
-// ── Mini sparkline chart ──────────────────────────────────────────────────────
 function Sparkline({
   data,
   color,
@@ -59,7 +58,11 @@ function Sparkline({
     data.forEach((v, i) => {
       const x = i * step;
       const y = height - ((v - min) / range) * (height - 4) - 2;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
     });
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
@@ -76,7 +79,6 @@ function Sparkline({
   );
 }
 
-// ── Metric tile ───────────────────────────────────────────────────────────────
 function MetricTile({
   label,
   value,
@@ -106,7 +108,6 @@ function MetricTile({
   );
 }
 
-// ── Main analytics bar ────────────────────────────────────────────────────────
 export default function CityAnalyticsBar({ frame, history }: CityAnalyticsBarProps) {
   const metrics = frame?.city_metrics;
   const intersections = frame?.intersections ?? {};

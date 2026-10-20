@@ -8,9 +8,7 @@ Supports Fixed / Greedy / AI (shared-policy DQN) control modes.
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional
-
-import numpy as np
+from typing import Dict, List
 
 try:
     import ujson as json
@@ -50,7 +48,6 @@ class CityConnectionManager:
 city_manager = CityConnectionManager()
 
 
-# ── Comparison test state ─────────────────────────────────────────────────────
 
 class ComparisonTestState:
     def __init__(self) -> None:
@@ -86,7 +83,7 @@ class ComparisonTestState:
         mode = self.current_mode()
         if mode not in self.snapshots:
             self.snapshots[mode] = []
-        
+
         # Calculate max queue across all intersections in this snapshot
         per_inter = city_metrics.get("per_intersection", {})
         peak_q = 0
@@ -130,7 +127,7 @@ class ComparisonTestState:
 
     def finish(self) -> Dict:
         self.running = False
-        
+
         fixed_res = self.results.get("fixed")
         improvements = {}
         if fixed_res and fixed_res.get("avg_wait_time", 0) > 0:
@@ -160,7 +157,6 @@ class ComparisonTestState:
 comparison_state = ComparisonTestState()
 
 
-# ── City simulation loop ──────────────────────────────────────────────────────
 
 async def _city_simulation_loop(app) -> None:
     try:
@@ -264,7 +260,6 @@ async def _city_simulation_loop(app) -> None:
         app.state.city_task = None
 
 
-# ── Command validation ────────────────────────────────────────────────────────
 
 VALID_CITY_COMMANDS = {"start", "stop", "reset", "set_mode", "set_spawn_rate", "run_comparison"}
 
@@ -289,7 +284,6 @@ def _validate_city_command(data: dict) -> tuple[bool, str]:
     return True, ""
 
 
-# ── WebSocket handler ─────────────────────────────────────────────────────────
 
 async def city_socket(websocket: WebSocket) -> None:
     await city_manager.connect(websocket)

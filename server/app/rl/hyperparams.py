@@ -1,73 +1,50 @@
-"""
-hyperparams.py — FlowSync RL Hyperparameters
-=============================================
-Changes:
-  - Task 4.2: STATE_DIM updated to 28 (from 20) to accommodate 8 demand-forecast features
-  - Task 2.1: Added DECISION_DT = 2.0 seconds (Semi-MDP decision interval reference)
-  - Updated obs_version to v6_28dim_smdp for checkpoint compatibility tracking
-"""
+"""RL agent hyperparameters and environment timing constraints."""
 from dataclasses import dataclass
 
 
 @dataclass
 class HyperParams:
-    # ── Core network dimensions ───────────────────────────────────────────────
-    # Task 4.2: 28 = 12 queues + 4 phase-onehot + 4 signal-context + 8 forecast
-    STATE_DIM: int = 28           # expanded from 20 → 28 (8 demand-forecast dims appended)
+    STATE_DIM: int = 28
     ACTION_DIM: int = 4
 
-    # ── Learning ──────────────────────────────────────────────────────────────
-    LEARNING_RATE: float = 3e-4   # slightly lower for Dueling stability
-    # Discount per DECISION_DT seconds.  Variable-duration signal changes use
-    # GAMMA ** (elapsed_seconds / DECISION_DT) in the replay target.
+    LEARNING_RATE: float = 3e-4
+    # Discount scaled per DECISION_DT seconds for semi-MDP variable-duration transitions.
     GAMMA: float = 0.99
-    BATCH_SIZE: int = 128         # larger batch for PER stability
+    BATCH_SIZE: int = 128
 
-    # ── Training schedule ─────────────────────────────────────────────────────
-    TRAIN_EVERY_N_STEPS: int = 1  # one update per causal decision transition
-    # 300 simulated seconds.  The old 500-tick (50 s) horizon ended before a
-    # fixed controller could complete one four-phase cycle (~52 s).
+    TRAIN_EVERY_N_STEPS: int = 1
+    # 3000 steps = 300s, ensuring multiple complete four-phase signal cycles per episode.
     MAX_STEPS_PER_EPISODE: int = 3_000
     DEFAULT_EPISODES: int = 500
     TARGET_UPDATE_FREQ: int = 500
     CHECKPOINT_EVERY_N_EPISODES: int = 50
 
-    # ── Replay buffer ─────────────────────────────────────────────────────────
     REPLAY_BUFFER_SIZE: int = 100_000
     MIN_REPLAY_SIZE: int = 1_000
 
-    # ── Exploration ───────────────────────────────────────────────────────────
     EPSILON_START: float = 1.0
     EPSILON_END: float = 0.05
-    EPSILON_DECAY: float = 0.997  # reaches 0.05 at roughly 1,000 episodes
+    EPSILON_DECAY: float = 0.997
 
-    # ── PER parameters (Schaul et al. 2016) ──────────────────────────────────
     PER_ALPHA: float = 0.6
     PER_BETA_START: float = 0.4
     PER_BETA_END: float = 1.0
-    PER_EPSILON: float = 0.01   # BUG-F fix: Schaul 2016 standard; 1e-6 caused priority collapse
+    # Schaul et al. (2016) standard; smaller epsilon (1e-6) causes priority collapse.
+    PER_EPSILON: float = 0.01
 
-    # ── Signal timing constraints ─────────────────────────────────────────────
     MIN_GREEN_TIME: float = 8.0
     MAX_GREEN_TIME: float = 40.0
     STARVATION_THRESHOLD: float = 45.0
 
-    # ── Semi-MDP timing (Task 2.1) ────────────────────────────────────────────
-    # Reference decision interval: agent decisions are effective every ~2.0s
-    # (MIN_GREEN_TIME sets the actual gate; DECISION_DT used for GAMMA discounting)
+    # Reference decision interval for discount scaling under variable phase durations.
     DECISION_DT: float = 2.0
 
-    # ── Simulation ────────────────────────────────────────────────────────────
     TRAINING_LAMBDA: float = 0.8
     EVAL_LAMBDA: float = 0.5
 
-    # ── Demand forecaster (Task 4.1) ──────────────────────────────────────────
-    FORECAST_DIMS: int = 8        # dims 20-27 in the 28-D state vector
-
-    # ── Observation versioning (for checkpoint compatibility) ─────────────────
+    FORECAST_DIMS: int = 8
     OBS_VERSION: str = "v6_28dim_smdp"
 
-    # ── Backward-compatible property mappings ─────────────────────────────────
     @property
     def learning_rate(self) -> float: return self.LEARNING_RATE
     @property

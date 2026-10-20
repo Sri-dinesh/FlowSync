@@ -20,15 +20,10 @@ from typing import Any, Awaitable, Callable, Deque, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-from ..models.config import (
-    MAX_GREEN_TIME,
-    PHASE_NAMES,
-    PIPELINE_FPS,
-)
+from ..models.config import PIPELINE_FPS
 from ..models.schemas import (
     CCTVFrame,
     LaneCounts,
-    VehicleDetection,
     WeightedLaneCounts,
 )
 from .frame_annotator import FrameAnnotator
@@ -83,19 +78,15 @@ class CCTVPipeline:
         self._frame_id = 0
         self._task: Optional[asyncio.Task] = None
 
-        # Task 7.1: Detection confidence monitoring
-        # Rolling window of per-frame mean detection confidence scores
         self._confidence_window: Deque[float] = deque(maxlen=10)
         self._CONFIDENCE_FALLBACK_THRESHOLD: float = 0.30   # < 30% avg conf triggers fallback
         self._confidence_fallback_active: bool = False
         self._last_good_weighted_counts: Optional[Dict[str, float]] = None
         self._fallback_frame_count: int = 0
 
-        # Chronological vehicle arrival event log (for natural digital twin replay)
         self._arrival_events: List[Dict[str, Any]] = []
         self._recorded_track_ids: Set[int] = set()
 
-        # Aggregate counts accumulated across all frames
         self._aggregate_counts: Dict[str, int] = {
             "north_straight": 0, "north_left": 0, "north_right": 0,
             "south_straight": 0, "south_left": 0, "south_right": 0,
@@ -136,14 +127,12 @@ class CCTVPipeline:
 
     async def _tick(self) -> None:
         """Single pipeline iteration."""
-        # 1. Extract frame
         frame = await self.video_processor.read_frame()
         if frame is None:
             if self.video_processor.is_live:
-                # Live stream transient buffer drop: yield control and retry next tick
+            # Yield on transient buffer drop to allow stream decoder to recover.
                 await asyncio.sleep(0.05)
                 return
-            # End of video file — emit completion frame
             eof_frame = CCTVFrame(
                 frame_id=self._frame_id,
                 timestamp_ms=time.time() * 1000,
@@ -155,12 +144,10 @@ class CCTVPipeline:
 
         self._frame_id += 1
 
-        # 2. YOLO detection (returns empty bboxes if model not loaded)
         detection = await self.yolo_detector.detect(frame)
         detection.frame_id = self._frame_id
         detection.timestamp_ms = time.time() * 1000
 
-        # 3. Track vehicles across frames & log chronological arrival events
         detection = self._tracker.update(detection)
         fw = detection.frame_width or 1
         fh = detection.frame_height or 1
@@ -171,7 +158,6 @@ class CCTVPipeline:
                 cx = ((bbox.x1 + bbox.x2) / 2) / fw
                 cy = bbox.y2 / fh
 
-                # Determine dominant entrance approach
                 if abs(cy - 0.5) >= abs(cx - 0.5):
                     direction = "north" if cy < 0.5 else "south"
                 else:
@@ -192,26 +178,21 @@ class CCTVPipeline:
                 self._arrival_events.append(event)
                 self._recorded_track_ids.add(bbox.track_id)
 
-                # Emit immediate zero-latency telemetry arrival event
                 if self.on_arrival is not None:
                     try:
                         await self.on_arrival(event)
                     except Exception as err:
                         print(f"[CCTVPipeline] on_arrival error: {err}")
 
-        # 4. Count vehicles per lane using quadrant heuristic
         raw_counts_dict = self._quadrant_counter.count(detection)
         raw_counts = LaneCounts(**raw_counts_dict)
 
-        # Accumulate into aggregate
         for k, v in raw_counts_dict.items():
             self._aggregate_counts[k] = self._aggregate_counts.get(k, 0) + v
 
-        # Build WeightedLaneCounts (1:1 weight for quadrant counting)
         weighted_dict = {k: float(v) for k, v in raw_counts_dict.items()}
         weighted_counts = WeightedLaneCounts(**weighted_dict)
 
-        # Task 7.1: Update confidence monitoring
         if detection.bboxes:
             avg_conf = sum(b.confidence for b in detection.bboxes if b.confidence is not None) / max(len(detection.bboxes), 1)
         else:
@@ -228,7 +209,7 @@ class CCTVPipeline:
                 )
                 self._confidence_fallback_active = True
             self._fallback_frame_count += 1
-            # Use last-known-good counts instead of unreliable detections
+            # Freeze last-known-good counts during confidence drops to prevent erratic signal switching.
             if self._last_good_weighted_counts is not None:
                 weighted_dict = self._last_good_weighted_counts
                 weighted_counts = WeightedLaneCounts.from_dict(weighted_dict)
@@ -239,14 +220,11 @@ class CCTVPipeline:
                     rolling_conf,
                 )
                 self._confidence_fallback_active = False
-            # Record as last-known-good
             self._last_good_weighted_counts = dict(weighted_dict)
 
-        # 5. Temporal smoothing
         smoothed_dict = self._smoother.update(weighted_dict)
         smoothed_weighted = WeightedLaneCounts.from_dict(smoothed_dict)
 
-        # 6. Congestion metrics
         total_pressure = sum(smoothed_dict.values())
         estimated_wait = min(120.0, total_pressure * 2.5)
         pressure_ratio = total_pressure / (4 * 10.0)  # 4 main directions * max ~10 vehicles
@@ -261,17 +239,14 @@ class CCTVPipeline:
 
         model_status = "model_not_loaded" if detection.model_not_loaded else "ok"
 
-        # 7. Annotate frame
         annotated_b64 = None
         if self.annotate_frames:
             annotated_b64 = self._annotator.encode_frame_b64(
                 self._annotator.annotate_simple(frame, detection)
             )
 
-        # 8. Log metrics
         self._metrics.log_frame(detection, raw_counts)
 
-        # 9. Emit progress to WebSocket (every frame)
         if self.on_progress is not None:
             meta = self.video_processor.metadata
             total_frames = meta.total_frames if meta else None
@@ -288,7 +263,6 @@ class CCTVPipeline:
                 "vehicles_detected_so_far": len(self._recorded_track_ids) if self._recorded_track_ids else sum(self._aggregate_counts.values()),
             })
 
-        # 10. Build and emit complete CCTVFrame
         cctv_frame = CCTVFrame(
             frame_id=self._frame_id,
             timestamp_ms=time.time() * 1000,
@@ -301,7 +275,6 @@ class CCTVPipeline:
             status=model_status,
         )
 
-        # Task 7.1: Embed confidence health in emitted frame metadata (via status field)
         if self._confidence_fallback_active:
             cctv_frame.status = f"confidence_fallback_active | {model_status}"
 
