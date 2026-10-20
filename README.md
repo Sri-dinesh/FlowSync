@@ -1,5 +1,23 @@
 # FlowSync — AI-Powered Real-Time Traffic Simulation, Digital Twin & Research Inspection Platform
 
+> **Evaluation status — 2026-10-14:** The headless audit found unloaded RL checkpoints,
+> ignored scenario events, sensor leakage and unmeasured executed safety in the previous
+> evaluation pipeline. The performance, deployment, calibration, and parity claims below
+> are historical and **must not be cited as validated findings**. Use the corrected,
+> checkpoint-explicit runner and see [the audit and rerun instructions](research/EVALUATION_AUDIT.md).
+> FlowSync is a research prototype; these simulation results do not establish live-signal readiness.
+
+Current simulation-only work: [frozen research protocol](research/RESEARCH_PROTOCOL_20261014.md).
+Latest verified outcome and remaining gaps: [research status](research/RESEARCH_STATUS.md).
+For paper writing, use the [audited manuscript scaffold](research/PAPER_DRAFT_AUDITED_20261016.md)
+and its data-derived figures. The [legacy IEEE figures are unaudited](IEEE-conference-template-062824/AUDIT_NOTICE.md);
+their hard-coded generator is disabled. Neither these artifacts nor passing tests
+establish algorithmic superiority, publication readiness or live-signal safety.
+The audited research trainer is `research/train_policy.py`; its per-run manifest,
+not historical tables below, records the actual training settings. The optional
+v7 observation format requires a newly trained checkpoint and is currently
+verified on the research controller path, not end-to-end website deployment.
+
 > **FlowSync-UQ: Uncertainty-Aware Safe Fallback Control for Vision-Based Deep Reinforcement Learning Traffic Signals**  
 > *Target Submission: IEEE Transactions on Intelligent Transportation Systems (T-ITS) / IEEE Conference*
 
