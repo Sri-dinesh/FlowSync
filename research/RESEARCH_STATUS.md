@@ -1,11 +1,49 @@
-# Research status — verified 2026-10-20 IST
+# Research status — verified 2026-10-21 IST
 
 **The requested superiority/research-readiness goal is not achieved.** The
 execution pipeline is substantially more auditable, but the learned controllers
 still trail strong classical baselines. Do not describe this as an RL method
 that outperforms every controller or as a validated real-world traffic system.
 
-## Latest result: broader data complete, calibrated correction abstains
+## Latest diagnostic: future-arrival sensitivity implemented and smoke-verified
+
+The [fixed-state future-arrival diagnostic](ARRIVAL_LABEL_RESULTS_20261021.md)
+now preserves queues/backlog and pairs all candidate actions within each of
+eight new arrival streams. Its one-source smoke exactly reproduces the
+original source and original labels. At the three sampled gates, six of seven
+alternatives change delay-gain sign across futures; the single originally
+qualified choice becomes harmful in seven of eight new futures. This is a
+limited clean-sensing, one-parent/source finding, not a general causal
+explanation or improved controller. All 37,200 measured signal samples have
+zero violations; there is no real-world safety claim.
+
+The full frozen 18-source training-only panel is prepared but not run. Its
+command and expected completion checks are in the linked note. No model was
+trained/promoted and no calibration/probe/validation/final-test outcomes were
+accessed. The first smoke attempt caught a JSON-key representation mismatch
+in the new replay checker; that was fixed with a regression test.
+
+## Previous result: richer observed features fail grouped fitting-data screen
+
+The [prespecified compact/full-state comparison](ACTION_FEATURE_RESULTS_20261020.md)
+completed all 36 leave-one-traffic-seed-out fits using fitting data only.
+Full-state delay-prediction MAE is 35.851 versus compact 33.342 vehicle-seconds
+(7.53% worse); throughput and endpoint-wait errors also worsen. Harmful choices
+increase from 18/47 to 64/121 changed proposals. The continuation screen fails.
+These errors are not full-run traffic delays, and no new control improvement
+is established. No calibration/probe, validation or final-test outcomes were
+accessed, and original checkpoints remain unchanged. Exact refits, provenance
+hashes and independent aggregate-error reproduction were verified.
+
+Do not expand training or promote this candidate. The next bounded diagnostic
+is action-label stability across independent future-arrival realizations at
+the same observed state, with paired actions inside each realization. That
+now has the implemented protocol and limited smoke above; the full panel
+remains pending.
+The audited methods/results can be written up now, without claiming
+superiority or real-world readiness.
+
+## Previous result: broader data complete, calibrated correction abstains
 
 The user completed all 648 source runs in 24.22 minutes. Role-file/input/model
 hashes and all branch cells were verified: 216 fitting, 360 calibration and 72
