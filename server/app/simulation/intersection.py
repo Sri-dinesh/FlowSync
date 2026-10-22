@@ -263,6 +263,19 @@ class Intersection:
             )
         return queues
 
+    def get_upstream_movement_counts(self, *, include_backlog: bool = True) -> Dict[str, int]:
+        """Demand still able to be served by a signal, including approaching cars.
+
+        A car exactly at the stop line remains upstream. Cars already across it
+        must not request green again. Backlog inclusion is a simulation sensor
+        assumption, not a claim that a camera sees outside its field of view.
+        The historical all-in-scene getter is deliberately unchanged: existing
+        checkpoints were trained on those different observation semantics.
+        """
+        backlog = self.spawner.get_backlog_counts() if include_backlog else {}
+        return {movement: sum(v.state != "passed" and v.position <= STOP_LINE for v in vehicles)
+                + backlog.get(movement, 0) for movement, vehicles in self.lanes.items()}
+
     def get_outgoing_counts(self) -> Dict[str, int]:
         """
         Estimates outgoing lane occupancy by counting vehicles that have recently
