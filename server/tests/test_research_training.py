@@ -162,6 +162,7 @@ def test_shield_training_validation_scores_the_wrapped_policy(tmp_path, monkeypa
         return object()
 
     monkeypatch.setattr(train_policy, "get_controller", controller)
+    monkeypatch.setattr(train_policy.torch, "load", lambda *a, **kw: {"obs_version": OBSERVED_VERSION})
     monkeypatch.setattr(train_policy, "load_split", lambda _: [ScenarioConfig("val_one", "validation", "One")])
     monkeypatch.setattr(train_policy, "VALIDATION_FAULTS", (FaultProfile(),))
     monkeypatch.setattr(train_policy.ExperimentRunner, "run", lambda *a, **kw: SimpleNamespace(
@@ -227,6 +228,7 @@ def test_interrupted_validation_records_partial_rows_without_score(tmp_path, mon
 
     monkeypatch.setattr(train_policy.ExperimentRunner, "run", run)
     monkeypatch.setattr(train_policy, "get_controller", lambda *a, **kw: object())
+    monkeypatch.setattr(train_policy.torch, "load", lambda *a, **kw: {"obs_version": OBSERVED_VERSION})
     with pytest.raises(BudgetExceeded, match="validation_partial"):
         train_policy.validation("unused", tmp_path, "partial", budget=budget)
     data = json.loads((tmp_path / "validation_partial.json").read_text())

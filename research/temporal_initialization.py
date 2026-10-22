@@ -1,20 +1,20 @@
-"""Explicit v7-to-v8 weight expansion for a matched research pilot only."""
+"""Explicit zero-column v7 expansion for matched temporal/spatial research pilots."""
 import torch
 
-from server.app.rl.observations import OBSERVED_VERSION, TEMPORAL_VERSIONS
+from server.app.rl.observations import OBSERVED_VERSION, TEMPORAL_VERSIONS, SPATIAL_VERSIONS, OBSERVATION_DIMS
 
 
 def initialize_parent(agent, checkpoint, expand_v7=False):
     version = checkpoint.get("obs_version")
     weights = checkpoint["online_net"]
     if expand_v7:
-        if version != OBSERVED_VERSION or agent.obs_version not in TEMPORAL_VERSIONS:
-            raise ValueError("Expansion requires a v7 parent and an explicit v8 observation version")
+        if version != OBSERVED_VERSION or agent.obs_version not in (*TEMPORAL_VERSIONS, *SPATIAL_VERSIONS):
+            raise ValueError("Expansion requires a v7 parent and an explicit v8/v9 observation version")
         weights = {key: value.clone() for key, value in weights.items()}
         key = "feature_layer.0.weight"
         source = weights[key]
         target = agent.online_net.state_dict()[key]
-        if source.shape != (target.shape[0], 36) or target.shape[1] != 64:
+        if source.shape != (target.shape[0], 36) or target.shape[1] != OBSERVATION_DIMS[agent.obs_version]:
             raise ValueError("Unexpected parent input-layer shape")
         expanded = torch.zeros_like(target)
         expanded[:, :36] = source

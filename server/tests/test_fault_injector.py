@@ -15,8 +15,9 @@ from research.noise.fault_injector import PerceptionFaultInjector, FaultProfile,
 
 
 def test_clean_profile_identity():
-    """Clean profile must return exact copy without modification."""
+    """Clean integer-count sensor packets preserve their encoded values."""
     clean_obs = np.array([0.5] * 12 + [1.0, 0.0, 0.0, 0.0] + [0.2, 0.0, 0.3, 0.1] + [0.0] * 8, dtype=np.float32)
+    clean_obs[:12] = np.tanh(np.full(12, 8) / 15.)
     injector = PerceptionFaultInjector(FAULT_PRESETS["clean"], seed=42)
 
     corrupted = injector.corrupt_observation(clean_obs, step=1)

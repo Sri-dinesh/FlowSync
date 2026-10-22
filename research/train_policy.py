@@ -29,7 +29,10 @@ from server.app.controllers import get_controller
 from server.app.controllers.safety_shield import SafetyShield
 from server.app.rl.dqn_agent import DQNAgent
 from server.app.rl.hyperparams import HyperParams
-from server.app.rl.observations import OBSERVATION_DIMS, TEMPORAL_VERSIONS, TEMPORAL_SCHEMA, encode_policy_observation
+from server.app.rl.observations import (
+    OBSERVATION_DIMS, TEMPORAL_VERSIONS, TEMPORAL_SCHEMA, SPATIAL_VERSIONS, SPATIAL_SCHEMA,
+    encode_policy_observation,
+)
 
 HP = HyperParams()
 VALIDATION_SEEDS = (21001, 21002)
@@ -152,7 +155,7 @@ def collect_episode(agent, scenario, seed, fault, epsilon, teacher=None, learn=T
         budget.check("demonstrations" if teacher is not None else "training")
     env, profile = build_environment(scenario)
     obs, _ = env.reset(seed=seed)
-    sensor = ObservedState()
+    sensor = ObservedState(spatial=agent.obs_version in SPATIAL_VERSIONS)
     injector = PerceptionFaultInjector(fault, seed=seed + 90000)
     shield = SafetyShield() if train_with_shield else None
     if teacher is not None:
@@ -236,8 +239,14 @@ def validation(checkpoint, output, label, include_baselines=False, seeds=VALIDAT
 
     check_budget()
     runner = ExperimentRunner()
+    version = torch.load(checkpoint, map_location="cpu", weights_only=True).get("obs_version")
+    spatial = version in SPATIAL_VERSIONS
     policy_label = "d3qn_shield" if train_with_shield else "d3qn"
     controllers = [policy_label] + (["fixed", "actuated", "greedy", "max_pressure"] if include_baselines else [])
+    if spatial and include_baselines:
+        controllers.append("max_pressure_upstream")
+        if train_with_shield:
+            controllers.extend(("max_pressure_shield", "max_pressure_upstream_shield"))
     for scenario in load_split("validation"):
         for seed in seeds:
             for fault in VALIDATION_FAULTS:
@@ -246,10 +255,18 @@ def validation(checkpoint, output, label, include_baselines=False, seeds=VALIDAT
                     if name == "d3qn_shield":
                         ctrl = get_controller("flowsync_uq", checkpoint_path=str(checkpoint),
                                               enable_shield=True, enable_fallback=False)
+                    elif name in ("max_pressure_upstream", "max_pressure_shield", "max_pressure_upstream_shield"):
+                        from research.spatial_baselines import UpstreamMaxPressureController
+                        from research.experiments.shielded_controller import ShieldedController
+                        ctrl = (get_controller("max_pressure") if name == "max_pressure_shield"
+                                else UpstreamMaxPressureController())
+                        if name.endswith("_shield"):
+                            ctrl = ShieldedController(ctrl)
                     else:
                         ctrl = get_controller(name, **({"checkpoint_path": str(checkpoint)} if name == "d3qn" else {}))
                     result = runner.run(ctrl, scenario, seed, record_trajectory=False,
-                                        fault_injector=PerceptionFaultInjector(fault, seed=seed + 90000))
+                                        fault_injector=PerceptionFaultInjector(fault, seed=seed + 90000),
+                                        spatial_observation=spatial)
                     rows.append({"scenario": scenario.scenario_id, "seed": seed, "fault": fault.name,
                                  "controller": name, "delay": result.avg_delay, "p95": result.p95_delay,
                                  "throughput": result.total_vehicles_passed,
@@ -289,7 +306,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, help="Optional parent; omit for independent fresh training")
     parser.add_argument("--expand-v7-parent", action="store_true",
-                        help="Explicitly zero-expand a v7 parent into a matched v8 research network")
+                        help="Explicitly zero-expand a v7 parent into a matched v8/v9 research network")
     parser.add_argument("--updates-per-episode", type=int,
                         help="Opt-in fixed optimizer budget after each complete episode; defaults to per-transition updates")
     parser.add_argument("--episodes", type=int, default=120)
@@ -318,8 +335,8 @@ def main():
     parser.add_argument("--max-wall-seconds", type=float, default=0,
                         help="Cooperative limit including warmup/validation; may overrun by one validation run or optimizer step plus saving. 0 disables")
     args = parser.parse_args()
-    if args.expand_v7_parent and (not args.checkpoint or args.observation_version not in TEMPORAL_VERSIONS):
-        parser.error("--expand-v7-parent requires --checkpoint and a v8 observation version")
+    if args.expand_v7_parent and (not args.checkpoint or args.observation_version not in (*TEMPORAL_VERSIONS, *SPATIAL_VERSIONS)):
+        parser.error("--expand-v7-parent requires --checkpoint and a v8/v9 observation version")
     if args.updates_per_episode is not None and args.updates_per_episode < 1:
         parser.error("--updates-per-episode must be positive")
     if min(args.episodes, args.validate_every, args.target_update) < 1 or min(args.demo_episodes, args.pretrain_updates, args.imitation_updates) < 0:
@@ -352,8 +369,10 @@ def main():
                 "hyperparameters": {**asdict(HP), "STATE_DIM": agent.state_dim, "OBS_VERSION": agent.obs_version,
                                     "LEARNING_RATE": args.learning_rate, "TARGET_UPDATE_FREQ": args.target_update},
                 "parent_sha256": file_hash(args.checkpoint) if args.checkpoint else None,
-                "parent_initialization": "zero_expand_v7_to_v8" if args.expand_v7_parent else "same_version",
-                "observation_schema": TEMPORAL_SCHEMA if args.observation_version in TEMPORAL_VERSIONS else None,
+                "parent_initialization": (("zero_expand_v7_to_v9" if args.observation_version in SPATIAL_VERSIONS else "zero_expand_v7_to_v8")
+                                          if args.expand_v7_parent else "same_version"),
+                "observation_schema": (SPATIAL_SCHEMA if args.observation_version in SPATIAL_VERSIONS else
+                                       TEMPORAL_SCHEMA if args.observation_version in TEMPORAL_VERSIONS else None),
                 "online_update_schedule": ("fixed_after_complete_episode" if args.updates_per_episode else "per_complete_transition"),
                 "demonstration_schedule": {"initial": args.demo_loss_weight,
                     "final": args.demo_loss_final_weight, "online_decay_episodes": args.demo_loss_decay_episodes,

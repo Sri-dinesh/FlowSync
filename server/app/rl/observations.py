@@ -7,6 +7,20 @@ TEMPORAL_VERSION = "v8_64dim_temporal"
 TEMPORAL_CONTROL_VERSION = "v8_64dim_zero_history"
 TEMPORAL_VERSIONS = (TEMPORAL_CONTROL_VERSION, TEMPORAL_VERSION)
 TEMPORAL_KEY = "policy_temporal_features_v8"
+SPATIAL_VERSION = "v9_48dim_spatial"
+SPATIAL_CONTROL_VERSION = "v9_48dim_zero_spatial"
+SPATIAL_VERSIONS = (SPATIAL_CONTROL_VERSION, SPATIAL_VERSION)
+SPATIAL_KEY = "policy_spatial_features_v9"
+SPATIAL_SCHEMA = {
+    "current_v7_slice": [0, 36], "delivered_upstream_counts_slice": [36, 48],
+    "count_encoding": "tanh(delivered upstream count / 15), canonical movement order",
+    "boundary": "non-passed vehicles at/before stop line; same backlog assumption as legacy",
+    "saturation": "upstream count bounded by reconstructed legacy movement count",
+    "faults": "joint count partition; shared packet latency/drop, burst and lane swap",
+    "ghost_and_positive_jitter_location": "independent Bernoulli(0.5) upstream assignment",
+    "control_arm": "indices 36:48 forced to zero; identical architecture and sensor pipeline",
+    "mask_and_shield": "unchanged legacy delivered demand; spatial extension is additional information only",
+}
 TEMPORAL_SCHEMA = {
     "tick_seconds": .1, "current_v7_slice": [0, 36],
     "delivered_count_lags": {"10_ticks": [36, 48], "30_ticks": [48, 60]},
@@ -17,7 +31,8 @@ TEMPORAL_SCHEMA = {
     "history_boundary": "post-fault packets at every tick, reset each episode; no interpolation",
 }
 OBSERVATION_DIMS = {LEGACY_VERSION: 28, OBSERVED_VERSION: 36,
-                    TEMPORAL_VERSION: 64, TEMPORAL_CONTROL_VERSION: 64}
+                    TEMPORAL_VERSION: 64, TEMPORAL_CONTROL_VERSION: 64,
+                    SPATIAL_VERSION: 48, SPATIAL_CONTROL_VERSION: 48}
 
 
 class DeliveredHistory:
@@ -59,7 +74,7 @@ class DeliveredHistory:
 def encode_policy_observation(observation, context, version=LEGACY_VERSION):
     if version == LEGACY_VERSION:
         return np.asarray(observation, dtype=np.float32)
-    if version not in (OBSERVED_VERSION, *TEMPORAL_VERSIONS):
+    if version not in (OBSERVED_VERSION, *TEMPORAL_VERSIONS, *SPATIAL_VERSIONS):
         raise ValueError(f"Unsupported policy observation version: {version}")
     if len(observation) != 28:
         raise ValueError("v7 requires the shared 28-dimensional sensor observation")
@@ -71,6 +86,14 @@ def encode_policy_observation(observation, context, version=LEGACY_VERSION):
     current = np.concatenate((observation, extra)).astype(np.float32)
     if version == OBSERVED_VERSION:
         return current
+    if version in SPATIAL_VERSIONS:
+        spatial = np.asarray(context.extra_telemetry.get(SPATIAL_KEY), dtype=np.float32)
+        if (spatial.shape != (12,) or not np.isfinite(spatial).all() or (spatial < 0).any()
+                or (spatial > np.asarray(observation[:12]) + 1e-7).any()):
+            raise ValueError("v9 requires delivered spatial counts from the shared spatial sensor boundary")
+        if version == SPATIAL_CONTROL_VERSION:
+            spatial = np.zeros(12, dtype=np.float32)
+        return np.concatenate((current, spatial))
     temporal = np.asarray(context.extra_telemetry.get(TEMPORAL_KEY), dtype=np.float32)
     if temporal.shape != (28,) or not np.isfinite(temporal).all():
         raise ValueError("v8 requires the research delivered-history builder on every tick")
