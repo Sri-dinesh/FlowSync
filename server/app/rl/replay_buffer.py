@@ -8,6 +8,8 @@ Improvements in this version:
     corrected:   priority_stored = raw_max_priority^alpha  (raw = |δ| + ε)
   - Task 1.3:   Action masks stored per transition for masked Double-DQN targets.
 """
+from typing import Optional, Tuple
+
 import numpy as np
 import torch
 try:
