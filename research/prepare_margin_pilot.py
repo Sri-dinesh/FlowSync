@@ -10,7 +10,7 @@ PILOT = ROOT/"results/research_training/pilot_v5_kbW0lsY3"
 
 
 def prepare(prefix="margin_release_", launcher="run_margin_release_pilot.sh",
-            protocol="MARGIN_RELEASE_PROTOCOL_20261016.md"):
+            protocol="MARGIN_RELEASE_PROTOCOL_20261016.md", extra_sources=()):
     parents = {}
     for seed in (101, 202, 303):
         selection = PILOT/f"seed_{seed}/selection.json"
@@ -25,6 +25,7 @@ def prepare(prefix="margin_release_", launcher="run_margin_release_pilot.sh",
     output = Path(tempfile.mkdtemp(prefix=prefix, dir=ROOT/"results/research_training"))
     sources = [p for base in (ROOT/"research", ROOT/"server/app") for p in sorted(base.rglob("*.py"))]
     sources += [ROOT/"research"/launcher, ROOT/"research"/protocol]
+    sources += [ROOT/"research"/name for name in extra_sources]
     sources += sorted((ROOT/"research/scenarios").glob("train/*.yaml"))
     sources += sorted((ROOT/"research/scenarios").glob("validation/*.yaml"))
     manifest = dict(parents=parents, source_hashes={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()

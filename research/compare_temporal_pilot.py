@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import torch
 from research.audit_training_results import audit_run, read_json, require
-from server.app.rl.observations import TEMPORAL_CONTROL_VERSION, TEMPORAL_VERSION
+from server.app.rl.observations import TEMPORAL_CONTROL_VERSION, TEMPORAL_VERSION, OBSERVATION_DIMS
 
 ARMS = {"control": TEMPORAL_CONTROL_VERSION, "temporal": TEMPORAL_VERSION}
 SEEDS = (101, 202, 303)
@@ -92,7 +92,7 @@ def compare_paired_pilot(directory, *, arms, expected, arm_overrides, screen, sc
             for key, value in original.items():
                 child = initial["online_net"][key]
                 if args["expand_v7_parent"] and key == "feature_layer.0.weight":
-                    require(child.shape == (value.shape[0], 64) and not child[:, 36:].any(), "Nonzero added columns")
+                    require(child.shape == (value.shape[0], OBSERVATION_DIMS[version]) and not child[:, 36:].any(), "Nonzero added columns")
                     child = child[:, :36]
                 require(torch.equal(value, child), "Initial policy does not preserve parent weights")
             logs = [json.loads(line) for line in (path / "training.jsonl").read_text().splitlines()]
