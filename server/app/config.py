@@ -28,8 +28,6 @@ class Settings(BaseSettings):
             origins = [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
         default_origins = [
-            "https://flowsyncc.vercel.app",
-            "https://flowsync.vercel.app",
             "http://localhost:3000",
             "http://localhost:3001",
             "http://127.0.0.1:3000",
