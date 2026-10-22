@@ -1,9 +1,0 @@
-packages:
-  - "client"
-allowBuilds:
-  '@prisma/client': true
-  '@prisma/engines': false
-  msw: false
-  prisma: false
-  sharp: false
-  unrs-resolver: false
