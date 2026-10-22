@@ -1,7 +1,7 @@
 # Optional detector training
 
-`FlowSync_YOLO_Training.ipynb` is a detector-training utility. It requires the
-user's dataset access, optional vision dependencies and compute. Exclude
+`FlowSync_YOLO_Training.ipynb` is a detector-training utility. It requires theWW
+user's dataset access, optional vision dependencies and compute. ExcludeW
 credentials, private footage and access tokens from committed cells/outputs;
 record dataset/model licenses and provenance.
 

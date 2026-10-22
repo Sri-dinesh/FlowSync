@@ -66,14 +66,17 @@ reproducing or extending research.
 From the repository root, with the Python environment installed:
 
 ```bash
-npm --prefix client run lint
-npm --prefix client run typecheck
-PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m pytest server/tests --no-cov -p no:cacheprovider
-npm --prefix client run build
+make check-repository
+make lint
+make typecheck
+make test
+make build
 ```
 
-Testing scope is documented in [CONTRIBUTING.md](CONTRIBUTING.md).
-Tests do not establish research superiority or deployment readiness.
+The Makefile accepts `PYTHON=/path/to/python` and detects an existing
+`server/.venv` or `server/venv`. Equivalent commands and testing scope are in
+[CONTRIBUTING.md](CONTRIBUTING.md). Tests do not establish research superiority
+or deployment readiness. CI is configured in [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Research
 
