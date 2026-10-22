@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 import torch
 
-from research.audit_arrival_label_stability import (
+from research.audits.audit_arrival_label_stability import (
     REPLICATES, SOURCE_SEED, future_seed, replace_future_rng, resample_branches,
     summarize, summarize_event, verify_original,
 )
-from research.audit_policy_decisions import audit_run
+from research.audits.audit_policy_decisions import audit_run
 from research.noise.fault_injector import FaultProfile
 from research.scenarios.scenario_schema import ScenarioConfig
 from server.app.rl.dqn_agent import DQNAgent

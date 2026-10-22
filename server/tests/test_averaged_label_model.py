@@ -6,11 +6,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from research.audit_arrival_label_stability import future_seed, replace_future_rng
-from research.averaged_label_model import (
+from research.audits.audit_arrival_label_stability import future_seed, replace_future_rng
+from research.policies.averaged_label_model import (
     cells, configuration, fit_models, predict_source, selected_steps, summarize,
 )
-from research.run_averaged_label_model_pilot import collect_source
+from research.pilots.run_averaged_label_model_pilot import collect_source
 
 
 PARENTS = {"101": {"sha256": "fixture"}}
@@ -106,7 +106,7 @@ def test_new_source_seeds_produce_distinct_arrival_streams():
 
 
 def test_probe_choices_are_flushed_before_any_branch_outcomes(monkeypatch):
-    import research.run_averaged_label_model_pilot as runner
+    import research.pilots.run_averaged_label_model_pilot as runner
     branched = row(96903, "probe")
     for k in ("training_seed", "data_role", "selected_steps"):
         branched.pop(k)

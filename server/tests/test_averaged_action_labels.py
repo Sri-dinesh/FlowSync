@@ -2,8 +2,8 @@ import copy
 
 import pytest
 
-from research.audit_arrival_label_stability import future_seed, resample_branches
-from research.evaluate_averaged_action_labels import (
+from research.audits.audit_arrival_label_stability import future_seed, resample_branches
+from research.evaluation.evaluate_averaged_action_labels import (
     ARMS, EVAL_IDS, FIT_IDS, SMOKE_IDS, freeze_choices, score_source, summarize,
 )
 

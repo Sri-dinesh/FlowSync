@@ -3,12 +3,12 @@ import copy
 import pytest
 import torch
 
-from research.audit_policy_decisions import audit_run
-from research.collect_action_rank_labels import HORIZON, SCENARIOS, SEEDS, TRAFFIC_SEED, summarize
+from research.audits.audit_policy_decisions import audit_run
+from research.datasets.collect_action_rank_labels import HORIZON, SCENARIOS, SEEDS, TRAFFIC_SEED, summarize
 from research.experiments.engine import ExperimentRunner
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
 from research.scenarios.scenario_schema import ScenarioConfig
-from research.train_policy import VALIDATION_FAULTS
+from research.training.train_policy import VALIDATION_FAULTS
 from server.app.controllers.flowsync_uq import FlowSyncUQController
 from server.app.rl.dqn_agent import DQNAgent
 

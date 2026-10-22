@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from research.audit_averaged_model_choices import diagnose, flags
+from research.audits.audit_averaged_model_choices import diagnose, flags
 
 
 def test_constraint_boundaries_match_original_rule():
@@ -25,7 +25,7 @@ def sample():
 
 
 def test_audit_identifies_throughput_rejection_without_changing_choice(monkeypatch):
-    import research.audit_averaged_model_choices as audit
+    import research.audits.audit_averaged_model_choices as audit
     row, choice = sample()
     before = copy.deepcopy((row, choice))
     monkeypatch.setattr(audit, "predict_source", lambda *args: [choice])
@@ -44,7 +44,7 @@ def test_audit_identifies_throughput_rejection_without_changing_choice(monkeypat
 
 
 def test_opportunity_is_mean_label_not_any_lucky_future(monkeypatch):
-    import research.audit_averaged_model_choices as audit
+    import research.audits.audit_averaged_model_choices as audit
     row, choice = sample()
     other = copy.deepcopy(row["events"][0]["branch_diagnostic"][0])
     other["branches"][1]["outcome"]["incremental_delay_vehicle_seconds"] = 110.
@@ -57,7 +57,7 @@ def test_opportunity_is_mean_label_not_any_lucky_future(monkeypatch):
 
 
 def test_predicted_positive_is_not_automatically_a_true_benefit(monkeypatch):
-    import research.audit_averaged_model_choices as audit
+    import research.audits.audit_averaged_model_choices as audit
     row, choice = sample()
     choice["mean8"] = 1
     choice["predictions"]["mean8"][1] = [2., 0., 0.]

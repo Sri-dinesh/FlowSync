@@ -75,11 +75,11 @@ unchanged. **The fairness label is a prediction target, not a runtime bound.**
   provenance-bound logistic gate.
 - `server/app/controllers/flowsync_uq.py`: optional latched entry gating;
   default behavior unchanged, with gate diagnostics added.
-- `research/fit_benefit_gate.py`: training-only fit; rejects incomplete,
+- `research/calibration/fit_benefit_gate.py`: training-only fit; rejects incomplete,
   duplicate, unpaired, nonfinite or insufficient-label datasets.
-- `research/audit_control_interventions.py`: observable features, split tags,
+- `research/audits/audit_control_interventions.py`: observable features, split tags,
   and automatic source snapshots for future audits.
-- `research/evaluate_validation.py --benefit-gate PATH`: matched three-arm
+- `research/evaluation/evaluate_validation.py --benefit-gate PATH`: matched three-arm
   validation with provenance, gate counts and complete signal-audit checks.
 - 157 targeted regression tests passed, including 22 gate-specific tests.
 

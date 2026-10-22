@@ -12,9 +12,10 @@ dated records; historical launch instructions do not supersede completed results
 | [Guides](guides/README.md) | Research workflow integration notes |
 | [Papers](papers/README.md) | Dated manuscript drafts, addenda and novelty assessment |
 
-Original document filenames are preserved. Research Python commands retain
-their old paths; source references resolve grouped documents when creating new
-archives. Existing result/checkpoint/source archives are not relocated or edited.
+Original document filenames are preserved. Research tools now use purpose-based
+Python packages; see [the command and code guide](../README.md). Source references
+resolve grouped documents when creating new archives. Existing result/checkpoint/
+source archives are not relocated or edited.
 
 The recent sequence is: spatial-input pilot failure, input-use diagnosis,
 teacher-alignment failure and a separate horizon-sensitivity diagnostic.

@@ -49,7 +49,7 @@ investigation. A negative result is preserved, not used to lower baselines.
 Run from the repository root:
 
 ```bash
-bash research/run_margin_release_pilot.sh
+bash research/pilots/launchers/run_margin_release_pilot.sh
 ```
 
 The launcher validates parent selection/checkpoint hashes before any workers

@@ -31,7 +31,7 @@ performance or readiness for physical signal operation.
 
 ## Audited research
 
-`research/train_policy.py` and evaluation/audit entry points run without the
+`research/training/train_policy.py` and evaluation/audit entry points run without the
 website. `research/experiments/runtime.py` builds scenarios and delivered
 observations; `research/noise/` applies synthetic faults. Controller proposals
 pass through optional supervision/additional shielding and the physical
@@ -50,7 +50,8 @@ website training/inference. Preserve those version boundaries. See
 
 - Application code belongs in `client/src/` and `server/app/`.
 - Shared research support belongs in the existing research subpackages.
-- Research CLI paths stay stable for recorded commands and imports.
+- Research commands use `python -m research` or their full package module path.
+  Saved source snapshots retain the command paths used by their recorded runs.
 - Dated protocols, findings, audits and manuscripts belong in `research/docs/`.
 - Backend/research tests belong in `server/tests/`; frontend changes need frontend checks.
 - Private configuration, dependencies, checkpoints and raw results stay local.

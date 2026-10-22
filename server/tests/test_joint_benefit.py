@@ -3,12 +3,12 @@ import copy
 import numpy as np
 import pytest
 
-from research.compare_joint_benefit import (
+from research.analysis.compare_joint_benefit import (
     ARMS, choose_joint, fit_fold, fit_pair, logistic, predict, predict_source,
     read_fit, sigmoid, summarize,
 )
-from research.averaged_label_model import cells, configuration
-from research.train_policy import load_split
+from research.policies.averaged_label_model import cells, configuration
+from research.training.train_policy import load_split
 from server.tests.test_averaged_label_model import row
 
 

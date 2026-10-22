@@ -1,8 +1,8 @@
 # Observed-input averaged-label model pilot
 
 [Protocol](../protocols/AVERAGED_LABEL_MODEL_PROTOCOL_20261021.md).
-Runner: `research/run_averaged_label_model_pilot.py`.
-Model/scoring helpers: `research/averaged_label_model.py`.
+Runner: `research/pilots/run_averaged_label_model_pilot.py`.
+Model/scoring helpers: `research/policies/averaged_label_model.py`.
 
 ## Full pilot completed: continuation fails
 
@@ -100,7 +100,7 @@ Run from the repository root:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -u \
-  research/run_averaged_label_model_pilot.py \
+  research/pilots/run_averaged_label_model_pilot.py \
   results/averaged_action_labels/panel_20261021T091742Z \
   --output "results/averaged_label_model/pilot_$(date -u +%Y%m%dT%H%M%SZ)" \
   --max-wall-seconds 5400

@@ -85,7 +85,7 @@ total reward values across v4/v5 are not directly comparable.
 
 ## Full-curve artifact cross-check
 
-The read-only `research/audit_training_results.py` independently recomputed all
+The read-only `research/audits/audit_training_results.py` independently recomputed all
 33 completed candidate scores in the old shield batch, verified checkpoint-file
 hashes and paired arrivals, and confirmed the saved selections. It also checked
 the three v5 integration-smoke candidates. No new training or final tests ran.

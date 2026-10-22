@@ -150,12 +150,12 @@ without simulation, using a new output filename:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
-  research/verify_spatial_input_audit.py \
+  research/audits/verify_spatial_input_audit.py \
   results/spatial_input_audit/pilot_20261022 \
   --output /tmp/spatial_input_verification.json
 ```
 
-The frozen collection entry point is `research/audit_spatial_inputs.py`; its
+The frozen collection entry point is `research/audits/audit_spatial_inputs.py`; its
 three-minute cooperative cap is fixed. Source archives preserve the executed
 implementation. No checkpoint edits, optimizer updates, final-test rollouts,
 Supabase uploads, default-policy changes, commits or pushes were performed.

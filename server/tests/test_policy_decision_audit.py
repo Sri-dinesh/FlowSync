@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from research.audit_policy_decisions import alternative_branch, audit_run
+from research.audits.audit_policy_decisions import alternative_branch, audit_run
 from research.experiments.engine import ExperimentRunner
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
 from research.scenarios.scenario_schema import ScenarioConfig

@@ -1,8 +1,7 @@
 /**
  * FlowSync Research Mode TypeScript Definitions
  * ==============================================
- * Conforms strictly to the versioned Research Telemetry Contract in Section 27
- * of FlowSync_Frontend_UI_Research_Readiness_Implementation_Plan.md.
+ * Payload interfaces used by the research API and WebSocket views.
  */
 
 export type ScenarioSplit = "train" | "validation" | "test" | "ood";

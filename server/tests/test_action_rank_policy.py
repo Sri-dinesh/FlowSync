@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 import torch
 
-from research.action_rank_policy import (ActionRankController, BOOTSTRAPS, FEATURES, RankedD3QN,
+from research.policies.action_rank_policy import (ActionRankController, BOOTSTRAPS, FEATURES, RankedD3QN,
     RankingModel, TARGET_SCALE, action_features, fit_model)
 from research.experiments.engine import ExperimentRunner
 from research.noise.fault_injector import FaultProfile,PerceptionFaultInjector
-from research.run_action_rank_pilot import BASELINES, SEEDS, VALIDATION_SEEDS, VARIANTS, summarize_validation
+from research.pilots.run_action_rank_pilot import BASELINES, SEEDS, VALIDATION_SEEDS, VARIANTS, summarize_validation
 from research.scenarios.scenario_schema import ScenarioConfig
-from research.train_policy import VALIDATION_FAULTS
+from research.training.train_policy import VALIDATION_FAULTS
 from server.app.controllers.base import ControllerContext
 from server.app.controllers.flowsync_uq import FlowSyncUQController
 from server.app.rl.dqn_agent import DQNAgent

@@ -4,7 +4,7 @@ import itertools
 import numpy as np
 import pytest
 
-from research.compare_action_features import (
+from research.analysis.compare_action_features import (
     PARENTS, RIDGE, ROLES, TARGET_SCALE, VARIANTS, decision_rows, extract,
     features, fit_fold, predict, summarize,
 )

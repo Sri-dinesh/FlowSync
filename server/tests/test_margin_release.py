@@ -5,9 +5,9 @@ import subprocess
 
 import pytest
 
-from research.train_policy import demonstration_weight
-from research import prepare_margin_pilot
-from research.compare_margin_pilot import common_comparison
+from research.training.train_policy import demonstration_weight
+from research.pilots import prepare_margin_pilot
+from research.pilots.compare_margin_pilot import common_comparison
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -61,8 +61,10 @@ def test_preparation_checks_all_parent_hashes_before_creating_batch(tmp_path, mo
         assert not list(pilot.parent.glob("margin_release_*"))
     else:
         (tmp_path/"research").mkdir()
-        for name in ("run_margin_release_pilot.sh", "MARGIN_RELEASE_PROTOCOL_20261016.md"):
-            (tmp_path/"research"/name).write_text("fixture")
+        launchers = tmp_path/"research/pilots/launchers"
+        launchers.mkdir(parents=True)
+        (launchers/"run_margin_release_pilot.sh").write_text("fixture")
+        (tmp_path/"research/MARGIN_RELEASE_PROTOCOL_20261016.md").write_text("fixture")
         output = prepare_margin_pilot.prepare()
         manifest = json.loads((output/"batch_manifest.json").read_text())
         assert set(manifest["parents"]) == {"101", "202", "303"}
@@ -74,15 +76,15 @@ def test_preparation_checks_all_parent_hashes_before_creating_batch(tmp_path, mo
 def test_launcher_runs_paired_waves_with_distinct_parents(tmp_path, worker_exit):
     executable = tmp_path/"server/venv/bin/python"
     executable.parent.mkdir(parents=True)
-    research = tmp_path/"research"
-    research.mkdir()
+    research = tmp_path/"research/training"
+    research.mkdir(parents=True)
     (research/"train_policy.py").touch()
     batch = tmp_path/"batch with spaces"
     batch.mkdir()
     for seed in (101, 202, 303):
         (batch/f"parent_{seed}.txt").write_text(f"/checkpoint with spaces/seed_{seed}.pt\n")
     executable.write_text(f'''#!/bin/sh
-if [ "$1" = "research/prepare_margin_pilot.py" ]; then
+if [ "$1" = "research/pilots/prepare_margin_pilot.py" ]; then
   printf '%s\\n' '{batch}'
   exit 0
 fi
@@ -90,7 +92,7 @@ printf '%s\\n' "$@"
 exit {worker_exit}
 ''')
     executable.chmod(0o700)
-    result = subprocess.run(["bash", str(ROOT/"research/run_margin_release_pilot.sh")], cwd=tmp_path,
+    result = subprocess.run(["bash", str(ROOT/"research/pilots/launchers/run_margin_release_pilot.sh")], cwd=tmp_path,
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == int(worker_exit != 0)
     for arm in (["constant", "release"] if not worker_exit else ["constant"]):

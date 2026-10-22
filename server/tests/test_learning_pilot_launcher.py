@@ -13,10 +13,10 @@ def test_pilot_flags_and_worker_failure_reporting(tmp_path, worker_exit):
     executable.parent.mkdir(parents=True)
     executable.write_text(f'#!/bin/sh\nprintf \'%s\\n\' "$@"\nexit {worker_exit}\n')
     executable.chmod(0o700)
-    research = tmp_path / "research"
-    research.mkdir()
+    research = tmp_path / "research/training"
+    research.mkdir(parents=True)
     (research / "train_policy.py").touch()
-    result = subprocess.run(["bash", str(ROOT / "research/run_learning_pilot.sh")],
+    result = subprocess.run(["bash", str(ROOT / "research/pilots/launchers/run_learning_pilot.sh")],
                             cwd=tmp_path, capture_output=True, text=True, timeout=10)
     assert result.returncode == int(worker_exit != 0)
     assert f"Failed-process flag: {int(worker_exit != 0)}" in result.stdout

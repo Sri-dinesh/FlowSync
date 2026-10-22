@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from research.audit_teacher_alignment import (
+from research.audits.audit_teacher_alignment import (
     FUTURES, NAMES, freeze_sources, future_seed, resample, score,
 )
 from server.app.controllers.base import ControllerContext
@@ -104,7 +104,7 @@ def test_raw_integrity_failures_are_rejected(mutation,match):
 
 
 def test_resampling_forks_only_future_rng_and_preserves_hold_schedule(monkeypatch):
-    from research import audit_teacher_alignment as module
+    from research.audits import audit_teacher_alignment as module
     env=SimpleNamespace(intersection=SimpleNamespace(spawner=SimpleNamespace(_rng=np.random.default_rng(42),pending=[1,2])))
     controller=SimpleNamespace(d3qn=SimpleNamespace(_held_action=0,_next_decision_step=120),safety_shield=SafetyShield())
     context=ControllerContext(100,time_in_phase=10.,valid_action_mask=np.array([True,True,False,False]))

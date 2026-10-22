@@ -3,7 +3,7 @@ import json
 import pytest
 import torch
 
-from research.audit_control_interventions import audit_run, fork_state, phase_wait_truth, rollout_branch
+from research.audits.audit_control_interventions import audit_run, fork_state, phase_wait_truth, rollout_branch
 from research.experiments.engine import ExperimentRunner
 from research.experiments.runtime import ObservedState, apply_scenario_step, build_environment
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector

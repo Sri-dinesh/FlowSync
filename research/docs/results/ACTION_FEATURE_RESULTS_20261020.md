@@ -2,7 +2,7 @@
 
 Output: `results/action_feature_comparison/grouped_20261020`.
 Protocol: [prespecified comparison](../protocols/ACTION_FEATURE_PROTOCOL_20261020.md).
-Runner: `research/compare_action_features.py`.
+Runner: `research/analysis/compare_action_features.py`.
 
 ## What was evaluated
 

@@ -3,8 +3,8 @@ import copy
 import numpy as np
 import pytest
 
-from research.action_rank_policy import BOOTSTRAPS, FEATURES, RankingModel, TARGET_SCALE
-from research.audit_action_rank_uncertainty import aggregate, score_rows, summarize
+from research.policies.action_rank_policy import BOOTSTRAPS, FEATURES, RankingModel, TARGET_SCALE
+from research.audits.audit_action_rank_uncertainty import aggregate, score_rows, summarize
 
 
 def fixture():

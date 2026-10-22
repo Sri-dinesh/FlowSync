@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from research.audit_replay_coverage import ARMS, EXTRA_ONLINE, SEEDS, STEPS, extra_cases, summarize
+from research.audits.audit_replay_coverage import ARMS, EXTRA_ONLINE, SEEDS, STEPS, extra_cases, summarize
 
 
 @pytest.fixture

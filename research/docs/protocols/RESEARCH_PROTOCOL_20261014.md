@@ -27,7 +27,7 @@ road deployment readiness. No promise of superiority over every controller.
 
 ## Uncertainty model
 
-`research/calibrate_uncertainty.py` fits nonnegative logistic coefficients on
+`research/calibration/calibrate_uncertainty.py` fits nonnegative logistic coefficients on
 observable uncertainty features. Ground-truth synthetic count error supplies
 labels only. The event is total absolute count error >= 3 vehicles over the 12
 movements, **not** crash risk, model epistemic uncertainty, or fallback utility.
@@ -45,7 +45,7 @@ The separate hard failover on >=1,000 ms observation age remains disclosed.
 
 ## Frozen test evaluation
 
-Use `research/evaluate_replicates.py` with all three selected v7 checkpoints and
+Use `research/evaluation/evaluate_replicates.py` with all three selected v7 checkpoints and
 the fixed calibration artifact. No checkpoint/threshold selection inside it.
 
 - Traffic seeds: 51001–51020, unused in the above development runs.

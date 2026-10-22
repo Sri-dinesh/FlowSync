@@ -9,8 +9,8 @@ import zipfile
 import pytest
 import torch
 
-from research.compare_temporal_pilot import ARMS, EXPECTED, SEEDS, compare, common_online_labels, continuation_screen
-from research.train_policy import BudgetExceeded, fixed_episode_updates, HP
+from research.pilots.compare_temporal_pilot import ARMS, EXPECTED, SEEDS, compare, common_online_labels, continuation_screen
+from research.training.train_policy import BudgetExceeded, fixed_episode_updates, HP
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -92,15 +92,15 @@ def test_fixed_updates_honor_budget_and_reject_nonfinite_loss():
 def test_launcher_passes_matched_flags_and_stops_after_failed_wave(tmp_path, worker_exit):
     executable = tmp_path / "server/venv/bin/python"
     executable.parent.mkdir(parents=True)
-    research = tmp_path / "research"
-    research.mkdir()
+    research = tmp_path / "research/training"
+    research.mkdir(parents=True)
     (research / "train_policy.py").touch()
     batch = tmp_path / "batch with spaces"
     batch.mkdir()
     for seed in (101, 202, 303):
         (batch / f"parent_{seed}.txt").write_text(f"/parent with spaces/{seed}.pt\n")
     executable.write_text(f'''#!/bin/sh
-if [ "$1" = "research/prepare_temporal_pilot.py" ]; then
+if [ "$1" = "research/pilots/prepare_temporal_pilot.py" ]; then
   printf '%s\\n' '{batch}'
   exit 0
 fi
@@ -108,7 +108,7 @@ printf '%s\\n' "$@"
 exit {worker_exit}
 ''')
     executable.chmod(0o700)
-    result = subprocess.run(["bash", str(ROOT / "research/run_temporal_pilot.sh")], cwd=tmp_path,
+    result = subprocess.run(["bash", str(ROOT / "research/pilots/launchers/run_temporal_pilot.sh")], cwd=tmp_path,
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == int(worker_exit != 0)
     arms = ["control", "temporal"] if not worker_exit else ["control"]

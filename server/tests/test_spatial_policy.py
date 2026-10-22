@@ -9,9 +9,9 @@ from research.experiments.runtime import ObservedState
 from research.noise.fault_injector import FAULT_PRESETS, FaultProfile, PerceptionFaultInjector
 from research.noise.spatial_counts import bounded_upstream, thin_partition
 from research.scenarios.scenario_schema import ScenarioConfig
-from research.spatial_baselines import UpstreamMaxPressureController
-from research.temporal_initialization import initialize_parent
-from research.train_policy import collect_episode
+from research.policies.spatial_baselines import UpstreamMaxPressureController
+from research.training.temporal_initialization import initialize_parent
+from research.training.train_policy import collect_episode
 from server.app.controllers.base import ControllerContext
 from server.app.controllers.d3qn import D3QNController
 from server.app.controllers.flowsync_uq import FlowSyncUQController

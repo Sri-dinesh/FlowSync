@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from research.audit_upstream_observation import empty_switch, upstream_packet
+from research.audits.audit_upstream_observation import empty_switch, upstream_packet
 from research.experiments.runtime import ObservedState
 from server.app.simulation.environment import TrafficEnv
 from server.app.simulation.intersection import Intersection, STOP_LINE

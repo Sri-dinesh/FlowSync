@@ -10,7 +10,7 @@ deployment; it does not justify removing safety/liveness constraints.
 
 ## Behavior
 
-Add `--train-with-shield` to `research/train_policy.py` for a **new output run**.
+Add `--train-with-shield` to `research/training/train_policy.py` for a **new output run**.
 The existing default remains bare D3QN. With the flag enabled:
 
 - Demonstration and online replay collection apply the same `SafetyShield`
@@ -64,7 +64,7 @@ only the collection shield relative to the completed domain-randomized recipe:
   concurrent run to leave startup/reporting margin. Record actual completed
   episodes; an incomplete run is not a matched 900-episode experiment.
 
-The old-recipe controls are selected by `research/select_shield_control.py`
+The old-recipe controls are selected by `research/evaluation/select_shield_control.py`
 under the same shielded validation rule. Its outputs are separate from original
 training outputs. All 11 scheduled checkpoints per seed are evaluated, with
 checkpoint/source/scenario hashes and original fault profiles checked. This

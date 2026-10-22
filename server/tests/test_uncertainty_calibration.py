@@ -2,7 +2,7 @@ import json
 import numpy as np
 import pytest
 
-from research.calibrate_uncertainty import binary_metrics, fit_calibration, predict, select_threshold
+from research.calibration.calibrate_uncertainty import binary_metrics, fit_calibration, predict, select_threshold
 from research.uncertainty.estimator import PerceptionUncertaintyEstimator
 from server.app.controllers.flowsync_uq import FlowSyncUQController
 

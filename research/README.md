@@ -21,8 +21,9 @@ From the repository root, using Python 3.11 for a fresh environment:
 ```bash
 python3.11 -m venv server/.venv
 server/.venv/bin/python -m pip install -r research/requirements.txt -r server/requirements-dev.txt
-server/.venv/bin/python research/train_policy.py --help
-server/.venv/bin/python research/evaluate_replicates.py --help
+server/.venv/bin/python -m research --help
+server/.venv/bin/python -m research train --help
+server/.venv/bin/python -m research evaluate --help
 ```
 
 Use an existing environment explicitly when reproducing its recorded artifacts.
@@ -34,18 +35,50 @@ Supabase; API startup has separate private configuration requirements.
 
 | Location | Responsibility |
 | --- | --- |
-| `*.py`, `run_*.sh` | Stable training/evaluation/audit entry points and helpers |
-| `experiments/` | Shared execution engine, observed runtime and benchmark helpers |
+| `training/` | Research trainer, parent initialization, demand randomization and lineage |
+| `evaluation/` | Checkpoint-explicit evaluation, validation and control selection |
+| `audits/` | Training, replay, observation, action and teacher diagnostics |
+| `pilots/` | Bounded development pilots, preparation and matched comparators |
+| `pilots/launchers/` | Historical user-run shell recipes; check completed outcomes before use |
+| `datasets/` | Action-label collection code; generated data belongs in `results/` |
+| `policies/` | Research correction models and observed-input baselines |
+| `calibration/` | Calibration/fitting tools and digital-twin calibration helpers |
+| `evidence/` | Provenance-checked tables, figures and evidence exports |
+| `experiments/` | Shared execution engine, observed runtime, branching and shield adapter |
 | `noise/`, `observation/` | Synthetic sensor boundary and observation construction |
-| `scenarios/`, `configs/`, `manifests/` | Scenario definitions and declared experiment inputs |
-| `training/`, `uncertainty/`, `calibration/` | Domain randomization, lineage and fitted models |
-| `analysis/`, `profiling/`, `cv/` | Analysis, profiling and camera-surrogate utilities |
+| `scenarios/`, `manifests/` | Scenario definitions, shared loader and declared experiment inputs |
+| `uncertainty/` | Runtime uncertainty estimation and fallback-benefit models |
+| `analysis/` | Statistical summaries, feature comparisons and reporting |
+| `profiling/`, `cv/` | Profiling and camera-surrogate utilities; optional vision dependencies may be needed |
+| `legacy/` | Older exploratory runners, reference configuration and retired figure commands |
 | `docs/` | Grouped experiment documentation; original filenames retained |
 
-The flat Python entry points are intentional compatibility interfaces. Moving
-them would break recorded commands/imports. Shared implementation belongs in
-the existing subpackages; new unrelated utilities should not accumulate at
-the repository root.
+Run commands from the repository root. The main tools are available through
+`python -m research`; other tools use their full package path, for example
+`python -m research.audits.audit_teacher_alignment --help`. Package initializers
+do not load models or optional vision dependencies.
+
+The former flat scripts now live in the packages above. Live imports, shell
+recipes and documented commands use their new locations. Commands copied from
+an old saved source snapshot use that snapshot's layout; its archived paths and
+hashes have not been rewritten. Exact live-source hash checks still reject a
+different implementation, including one changed by reorganization.
+
+## Common commands
+
+These commands inspect usage or existing artifacts; none starts training:
+
+```bash
+server/.venv/bin/python -m research train --help
+server/.venv/bin/python -m research validate --help
+server/.venv/bin/python -m research export-paper --help
+server/.venv/bin/python -m research compare-spatial \
+  results/research_training/spatial_v9_k2bg79oc
+```
+
+Use `server/venv/bin/python` explicitly if reproducing the existing environment.
+The saved spatial recipe failed its continuation screen; its launcher is
+retained for provenance and must not be rerun as a proposed improvement.
 
 ## Reproducibility rules
 
@@ -62,10 +95,11 @@ the repository root.
 6. Distinguish stopped delay per arrived vehicle, within-run percentiles, branch
    vehicle-seconds, prediction error and optimizer losses. They are different units.
 
-Use `audit_training_results.py` and the matching `compare_*` tool to audit a
-recorded batch; use `build_paper_evidence.py` for compatible provenance-checked
-evaluation exports. Recent teacher diagnostics have their own
-`export_teacher_evidence.py`. Export compatibility is experiment-specific.
+Use `python -m research audit-training` and the matching `pilots.compare_*`
+module to audit a recorded batch. `python -m research export-paper` produces
+compatible provenance-checked evaluation exports; recent teacher diagnostics
+use `python -m research export-teachers`. Export compatibility is
+experiment-specific.
 
 ## Artifact and historical-code policy
 
@@ -74,7 +108,7 @@ Recorded checkpoints/results are local, not bundled in a fresh clone. Consult
 to substitute an untrained network. Archived source documents retain their old
 paths inside the corresponding ZIP; current documentation is under `docs/`.
 
-Older exploratory runners remain for code/test compatibility, but are not
+Older exploratory runners are grouped in `legacy/` for inspection and tests, but are not
 independent confirmation or a replacement for checkpoint-explicit evaluation.
-`scripts/reproduce_all.py` and hard-coded figure regeneration are retired.
+`scripts/reproduce_all.py` and the figure commands in `legacy/` are retired.
 Neither source organization nor passing tests establishes paper/deployment readiness.

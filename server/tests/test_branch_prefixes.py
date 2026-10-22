@@ -1,8 +1,8 @@
 import pytest
 
-from research.audit_control_interventions import fork_state, rollout_branch
-from research.audit_spatial_inputs import audit_source
-from research.branch_prefixes import rollout_prefixes
+from research.audits.audit_control_interventions import fork_state, rollout_branch
+from research.audits.audit_spatial_inputs import audit_source
+from research.experiments.branch_prefixes import rollout_prefixes
 from research.noise.fault_injector import FaultProfile
 from research.scenarios.scenario_schema import ScenarioConfig
 from server.tests.test_spatial_input_audit import spatial_model
@@ -36,7 +36,7 @@ def test_invalid_horizons_fail_before_simulation(horizons):
 
 def test_horizon_extension_cannot_promote_a_failed_teacher():
     import copy
-    from research.audit_teacher_horizon import summarize
+    from research.audits.audit_teacher_horizon import summarize
     from server.tests.test_teacher_alignment import panel
     frozen,originals=panel()
     rows=[]

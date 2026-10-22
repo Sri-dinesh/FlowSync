@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from research.experiments.run_city_scalability import run_city_network_experiment, run_scalability_benchmark
+from research.legacy.run_city_scalability import run_city_network_experiment, run_scalability_benchmark
 from research.profiling.latency_profiler import profile_pipeline_latency, get_hardware_info
 from research.cv.shadow_mode_replay import generate_empirical_replay_schedule, evaluate_shadow_replay
 

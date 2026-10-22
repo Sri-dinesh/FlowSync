@@ -68,7 +68,7 @@ Run from the project root:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -u \
-  research/collect_action_rank_dataset.py \
+  research/datasets/collect_action_rank_dataset.py \
   results/research_training/update_pressure_5qyi9cmv \
   --output "results/action_rank_dataset/broader_$(date -u +%Y%m%dT%H%M%SZ)" \
   --max-wall-seconds 3300

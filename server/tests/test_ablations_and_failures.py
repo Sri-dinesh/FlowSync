@@ -8,7 +8,7 @@ import pytest
 import torch
 from server.app.controllers import D3QNController
 
-from research.experiments.run_ablations import build_ablation_controllers, run_ablation_experiments
+from research.legacy.run_ablations import build_ablation_controllers, run_ablation_experiments
 from research.analysis.failure_analysis import (
     FailureMode,
     classify_run_failure,

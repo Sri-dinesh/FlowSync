@@ -54,7 +54,7 @@ The full pilot has **not** been launched by the assistant; the user previously
 chose to run longer batches personally.
 
 ```bash
-bash research/run_margin_release_pilot.sh
+bash research/pilots/launchers/run_margin_release_pilot.sh
 ```
 
 The printed batch folder includes `comparison.json`. The comparison audits

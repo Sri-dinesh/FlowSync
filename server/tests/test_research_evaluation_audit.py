@@ -8,7 +8,7 @@ import torch
 from research.experiments.engine import ExperimentRunner
 from research.experiments.runtime import ObservedState, SignalAudit, apply_scenario_step
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
-from research.run_headless_evaluation import make_controller
+from research.evaluation.run_headless_evaluation import make_controller
 from research.scenarios.scenario_schema import DemandProfile, ScenarioConfig
 from server.app.controllers import D3QNController, FixedController, MaxPressureController
 from server.app.controllers.base import ControllerContext

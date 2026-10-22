@@ -74,7 +74,7 @@ diagnostics, not whole-episode losses or performance guarantees.
 From the project root:
 
 ```bash
-bash research/run_update_pressure_pilot.sh
+bash research/pilots/launchers/run_update_pressure_pilot.sh
 ```
 
 Inspect the resulting `comparison.json`, each `summary.json` and logs. Status 0

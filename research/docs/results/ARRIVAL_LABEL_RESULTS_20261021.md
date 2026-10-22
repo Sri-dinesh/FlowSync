@@ -1,7 +1,7 @@
 # Arrival-label diagnostic: mechanics verified, full panel pending
 
 Protocol: [fixed-state future-arrival comparison](../protocols/ARRIVAL_LABEL_PROTOCOL_20261020.md).
-Implementation: `research/audit_arrival_label_stability.py`.
+Implementation: `research/audits/audit_arrival_label_stability.py`.
 Verified smoke output: `results/arrival_label_stability/smoke_20261021`.
 
 ## What is implemented
@@ -69,7 +69,7 @@ Run from the repository root:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -u \
-  research/audit_arrival_label_stability.py \
+  research/audits/audit_arrival_label_stability.py \
   results/action_rank_dataset/broader_20261020T134122Z \
   --output "results/arrival_label_stability/panel_$(date -u +%Y%m%dT%H%M%SZ)" \
   --max-wall-seconds 1800

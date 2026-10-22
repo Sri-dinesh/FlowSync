@@ -1,6 +1,6 @@
 # Averaged labels: full frozen-choice experiment passed its development screen
 
-Implementation: `research/evaluate_averaged_action_labels.py`.
+Implementation: `research/evaluation/evaluate_averaged_action_labels.py`.
 [Protocol](../protocols/AVERAGED_LABEL_PROTOCOL_20261021.md).
 Input: `results/arrival_label_stability/panel_20261021T063020Z`.
 
@@ -94,7 +94,7 @@ Run from the repository root:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -u \
-  research/evaluate_averaged_action_labels.py \
+  research/evaluation/evaluate_averaged_action_labels.py \
   results/arrival_label_stability/panel_20261021T063020Z \
   --output "results/averaged_action_labels/panel_$(date -u +%Y%m%dT%H%M%SZ)" \
   --max-wall-seconds 1800

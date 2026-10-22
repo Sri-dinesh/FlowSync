@@ -83,7 +83,7 @@ all three paired seeds. No common online checkpoint means comparison unavailable
 not a successful performance experiment. Long training remains user-run.
 
 ```bash
-bash research/run_temporal_pilot.sh
+bash research/pilots/launchers/run_temporal_pilot.sh
 ```
 
 Inspect the printed folder's `comparison.json`, summaries and logs. Check

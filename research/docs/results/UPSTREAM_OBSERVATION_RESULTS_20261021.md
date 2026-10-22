@@ -1,7 +1,7 @@
 # Upstream-demand observation audit
 
 Protocol: [UPSTREAM_OBSERVATION_PROTOCOL_20261021.md](../protocols/UPSTREAM_OBSERVATION_PROTOCOL_20261021.md).
-Runner: `research/audit_upstream_observation.py`.
+Runner: `research/audits/audit_upstream_observation.py`.
 Initial artifact: `results/upstream_observation_audit/fit_20261021`.
 Descriptive pressure extension: `results/upstream_observation_audit/pressure_20261021`.
 

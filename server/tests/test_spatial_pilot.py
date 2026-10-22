@@ -8,7 +8,7 @@ import zipfile
 import pytest
 import torch
 
-from research.compare_spatial_pilot import ARMS, EXPECTED, checks_against, compare
+from research.pilots.compare_spatial_pilot import ARMS, EXPECTED, checks_against, compare
 from server.tests.test_temporal_pilot import paired_bundle
 from server.tests.test_update_pressure_pilot import pressure_bundle
 
@@ -102,14 +102,14 @@ def test_improving_degraded_control_does_not_mean_parent_gain():
 def test_launcher_parameters_and_failure_propagation(tmp_path, exit_code):
     executable = tmp_path / "server/venv/bin/python"
     executable.parent.mkdir(parents=True)
-    (tmp_path / "research").mkdir()
-    (tmp_path / "research/train_policy.py").touch()
+    (tmp_path / "research/training").mkdir(parents=True)
+    (tmp_path / "research/training/train_policy.py").touch()
     batch = tmp_path / "batch with spaces"
     batch.mkdir()
     for seed in (101, 202, 303):
         (batch / f"parent_{seed}.txt").write_text(f"/parent path/{seed}.pt\n")
     executable.write_text(f'''#!/bin/sh
-if [ "$1" = "research/prepare_spatial_pilot.py" ]; then
+if [ "$1" = "research/pilots/prepare_spatial_pilot.py" ]; then
   printf '%s\\n' '{batch}'
   exit 0
 fi
@@ -117,7 +117,7 @@ printf '%s\\n' "$@"
 exit {exit_code}
 ''')
     executable.chmod(0o700)
-    result = subprocess.run(["bash", str(ROOT / "research/run_spatial_pilot.sh")], cwd=tmp_path,
+    result = subprocess.run(["bash", str(ROOT / "research/pilots/launchers/run_spatial_pilot.sh")], cwd=tmp_path,
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == int(exit_code != 0)
     for arm in (["control"] if exit_code else ARMS):
@@ -132,7 +132,7 @@ exit {exit_code}
 
 
 def test_prepare_freezes_referenced_sensor_protocol(tmp_path, monkeypatch):
-    from research import prepare_margin_pilot
+    from research.pilots import prepare_margin_pilot
     parent_root = tmp_path / "parents"
     for seed in (101, 202, 303):
         folder = parent_root / f"seed_{seed}"
@@ -143,7 +143,10 @@ def test_prepare_freezes_referenced_sensor_protocol(tmp_path, monkeypatch):
             sha256=hashlib.sha256(cp.read_bytes()).hexdigest(), evaluation_controller="d3qn_shield")))
     (tmp_path / "results/research_training").mkdir(parents=True)
     (tmp_path / "research").mkdir()
-    for name in ("launch.sh", "protocol.md", "sensor.md"):
+    launchers = tmp_path / "research/pilots/launchers"
+    launchers.mkdir(parents=True)
+    (launchers / "launch.sh").write_text("launch.sh")
+    for name in ("protocol.md", "sensor.md"):
         (tmp_path / "research" / name).write_text(name)
     monkeypatch.setattr(prepare_margin_pilot, "ROOT", tmp_path)
     monkeypatch.setattr(prepare_margin_pilot, "PILOT", parent_root)

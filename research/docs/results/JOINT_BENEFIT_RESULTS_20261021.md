@@ -1,7 +1,7 @@
 # Joint-benefit fitting-data comparison: failed continuation
 
 Protocol: [JOINT_BENEFIT_PROTOCOL_20261021.md](../protocols/JOINT_BENEFIT_PROTOCOL_20261021.md).
-Implementation: `research/compare_joint_benefit.py`.
+Implementation: `research/analysis/compare_joint_benefit.py`.
 Output: `results/joint_benefit_comparison/grouped_20261021`.
 
 ## Question and separation

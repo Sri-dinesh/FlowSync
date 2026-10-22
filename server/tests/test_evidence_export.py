@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from research.export_evidence import controller_summary, export
+from research.evidence.export_evidence import controller_summary, export
 
 
 def test_shield_only_is_not_merged_with_full_uq():

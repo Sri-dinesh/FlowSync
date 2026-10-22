@@ -80,8 +80,9 @@ Tests do not establish research superiority or deployment readiness.
 Start with the [research index](research/README.md),
 [evaluation audit](research/EVALUATION_AUDIT.md) and
 [current status](research/RESEARCH_STATUS.md). Dated protocols, findings and
-manuscripts are grouped under `research/docs/`. Python entry points retain
-their original paths for compatibility with recorded commands and imports.
+manuscripts are grouped under `research/docs/`. Python tools use purpose-based
+packages and the `python -m research` command; saved source snapshots retain
+their original command paths.
 
 Learned-controller evaluation requires an explicit compatible checkpoint.
 Preserve training replicates, distinguish development from final evaluation,

@@ -7,7 +7,7 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from research.audit_fixed_replay import (ARMS, SEEDS, STEPS, batch_for, bellman_targets,
+from research.audits.audit_fixed_replay import (ARMS, SEEDS, STEPS, batch_for, bellman_targets,
     load_cases, metrics, new_agent, summarize, tensorize)
 from server.app.rl.dqn_agent import DQNAgent
 

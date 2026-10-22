@@ -37,7 +37,7 @@ establish generalization, superiority, real-world safety or publication readines
 ## Read-only output checks
 
 After the batch finishes, pass all three individual seed directories to
-`server/venv/bin/python research/audit_training_results.py`. This prints JSON;
+`server/venv/bin/python research/audits/audit_training_results.py`. This prints JSON;
 it does not mutate artifacts or launch simulations. It checks recorded validation
 cell coverage, finite traffic metrics, checkpoint file hashes, paired arrival
 hashes, recomputed selection scores, summary consistency and the first minimum

@@ -115,7 +115,7 @@ pedestrian safety, correct real wiring or hardware certification.
 From the repository root, start with a small inspectable run:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python research/run_headless_evaluation.py \
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python research/evaluation/run_headless_evaluation.py \
   --suite smoke --seeds 2 \
   --checkpoint server/models/76734963-e987-4024-aaa0-d21c048194c5/checkpoint_1000.pt \
   --record-trajectories
@@ -124,7 +124,7 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python research/run_headless_evaluatio
 A limited all-scenario/latency diagnostic matrix:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python research/run_headless_evaluation.py \
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python research/evaluation/run_headless_evaluation.py \
   --suite full --seeds 2 --bootstrap 100 \
   --controllers fixed,max_pressure,d3qn,flowsync_uq \
   --conditions clean,miss_30,latency_1000ms \

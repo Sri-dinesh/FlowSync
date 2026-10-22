@@ -5,11 +5,11 @@ import numpy as np
 import pytest
 import torch
 
-from research.audit_spatial_inputs import audit_source, probe_networks, short_branches, weight_report
+from research.audits.audit_spatial_inputs import audit_source, probe_networks, short_branches, weight_report
 from research.experiments.engine import ExperimentRunner
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
 from research.scenarios.scenario_schema import ScenarioConfig
-from research.train_policy import collect_episode
+from research.training.train_policy import collect_episode
 from server.app.controllers.base import ControllerContext
 from server.app.controllers.d3qn import D3QNController
 from server.app.controllers.flowsync_uq import FlowSyncUQController
@@ -81,7 +81,7 @@ def test_probes_and_branches_preserve_natural_trajectory(spatial_model, fault):
 
 
 def test_branch_preserves_hold_schedule_and_deduplicates(monkeypatch):
-    from research import audit_spatial_inputs as module
+    from research.audits import audit_spatial_inputs as module
     import copy
     context = ControllerContext(200, time_in_phase=10., valid_action_mask=np.ones(4, bool))
     from server.app.controllers.safety_shield import SafetyShield
@@ -128,9 +128,9 @@ def test_artifact_verifier_checks_scores_beyond_updated_hashes(tmp_path, spatial
     import hashlib
     import json
     import zipfile
-    from research import verify_spatial_input_audit as verifier
-    from research.audit_spatial_inputs import ARMS, STAGES, summarize
-    from research.train_policy import file_hash
+    from research.audits import verify_spatial_input_audit as verifier
+    from research.audits.audit_spatial_inputs import ARMS, STAGES, summarize
+    from research.training.train_policy import file_hash
     _, model = spatial_model
     with torch.no_grad():
         model.agent.online_net.feature_layer[0].weight[:,36:] = 0.
