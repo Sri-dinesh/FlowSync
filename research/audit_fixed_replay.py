@@ -26,7 +26,7 @@ from server.app.rl.dqn_agent import DQNAgent
 ARMS = ("fixed_labels", "moving_selector", "moving_target")
 ONLINE_CASES = (1, 16, 31, 46, 61, 76)
 STEPS = (0, 25, 50, 100, 200)
-PROTOCOL = ROOT/"research/FIXED_REPLAY_PROTOCOL_20261017.md"
+PROTOCOL = ROOT/"research/docs/protocols/FIXED_REPLAY_PROTOCOL_20261017.md"
 
 
 def sha(path):

@@ -26,7 +26,7 @@ from server.app.controllers import get_controller
 from server.app.rl.dqn_agent import DQNAgent
 from server.app.rl.observations import SPATIAL_CONTROL_VERSION, SPATIAL_VERSION, SPATIAL_SCHEMA
 
-PROTOCOL = ROOT / "research/SPATIAL_INPUT_EXPERIMENT_PLAN_20261021.md"
+PROTOCOL = ROOT / "research/docs/protocols/SPATIAL_INPUT_EXPERIMENT_PLAN_20261021.md"
 SEED = 97301
 EVALUATION_SEED = 97302
 ARMS = {"control": SPATIAL_CONTROL_VERSION, "spatial": SPATIAL_VERSION}

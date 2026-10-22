@@ -15,7 +15,7 @@ import numpy as np
 from research.action_rank_policy import RankingModel, TARGET_SCALE, action_features
 from research.scenarios.scenario_schema import ScenarioConfig
 
-PROTOCOL = ROOT / "research/ACTION_RANK_UNCERTAINTY_PROTOCOL_20261020.md"
+PROTOCOL = ROOT / "research/docs/protocols/ACTION_RANK_UNCERTAINTY_PROTOCOL_20261020.md"
 SEEDS = (101, 202, 303)
 METRICS = ("delay_vehicle_seconds", "throughput_vehicles", "endpoint_wait_seconds")
 

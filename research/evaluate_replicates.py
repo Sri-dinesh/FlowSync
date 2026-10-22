@@ -157,7 +157,7 @@ def main():
     p.add_argument("--seed-start", type=int, default=51001)
     p.add_argument("--exclude-seeds-from", type=Path, action="append", default=[],
                    help="Prior evaluation manifest; reject reused traffic seeds (repeatable)")
-    p.add_argument("--protocol", type=Path, default=ROOT/"research/RESEARCH_PROTOCOL_20261014.md")
+    p.add_argument("--protocol", type=Path, default=ROOT/"research/docs/protocols/RESEARCH_PROTOCOL_20261014.md")
     p.add_argument("--workers", type=int, default=3)
     p.add_argument("--matched-shield", action="store_true",
                    help="Require shield-selected checkpoints; compare bare/shield/UQ and shielded Max-Pressure")
@@ -230,7 +230,7 @@ def main():
             snapshot.write(ROOT/source, source)
         for path in sorted((ROOT/"research/scenarios").rglob("*.yaml")):
             snapshot.write(path, str(path.relative_to(ROOT)))
-        snapshot.write(ROOT/"research/RESEARCH_PROTOCOL_20261014.md", "research/RESEARCH_PROTOCOL_20261014.md")
+        snapshot.write(ROOT/"research/docs/protocols/RESEARCH_PROTOCOL_20261014.md", "research/docs/protocols/RESEARCH_PROTOCOL_20261014.md")
         snapshot.write(args.output/"protocol.md", "evaluation_protocol.md")
     print(f"Frozen evaluation: {len(jobs)} runs; {len(choices)} training seeds; traffic seeds {traffic_seeds[0]}–{traffic_seeds[-1]}", flush=True)
     rows = []

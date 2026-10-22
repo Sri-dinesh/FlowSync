@@ -19,7 +19,7 @@ from research.calibrate_action_rank import choose, read_role
 from research.collect_action_rank_dataset import HORIZON, PARENTS
 from research.train_policy import BudgetExceeded, RunBudget, VALIDATION_FAULTS, file_hash, load_split
 
-PROTOCOL = ROOT / "research/ARRIVAL_LABEL_PROTOCOL_20261020.md"
+PROTOCOL = ROOT / "research/docs/protocols/ARRIVAL_LABEL_PROTOCOL_20261020.md"
 REPLICATES = 8
 SOURCE_SEED = 95001
 

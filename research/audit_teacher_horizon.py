@@ -20,7 +20,7 @@ from research.branch_prefixes import rollout_prefixes
 from research.train_policy import BudgetExceeded, RunBudget, file_hash
 from server.app.controllers.d3qn import D3QNController
 
-PROTOCOL=ROOT/"research/TEACHER_HORIZON_PROTOCOL_20261022.md"
+PROTOCOL=ROOT/"research/docs/protocols/TEACHER_HORIZON_PROTOCOL_20261022.md"
 HORIZONS=(200,600)
 
 

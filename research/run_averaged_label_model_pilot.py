@@ -23,7 +23,7 @@ from research.evaluate_averaged_action_labels import (
 )
 from research.train_policy import BudgetExceeded, RunBudget, VALIDATION_FAULTS, file_hash, load_split
 
-PROTOCOL = ROOT / "research/AVERAGED_LABEL_MODEL_PROTOCOL_20261021.md"
+PROTOCOL = ROOT / "research/docs/protocols/AVERAGED_LABEL_MODEL_PROTOCOL_20261021.md"
 
 
 def load_evidence(path):

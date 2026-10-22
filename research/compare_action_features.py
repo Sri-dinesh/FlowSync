@@ -16,7 +16,7 @@ from research.action_rank_policy import RIDGE, TARGET_SCALE, action_features
 from research.calibrate_action_rank import choose, read_role
 from research.collect_action_rank_dataset import PARENTS, ROLES
 
-PROTOCOL = ROOT / "research/ACTION_FEATURE_PROTOCOL_20261020.md"
+PROTOCOL = ROOT / "research/docs/protocols/ACTION_FEATURE_PROTOCOL_20261020.md"
 VARIANTS = ("compact", "full_state")
 
 

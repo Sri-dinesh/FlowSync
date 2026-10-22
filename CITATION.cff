@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: Cite the software and the specific versioned experiment artifacts used in your work.
+title: FlowSync
+type: software
+authors:
+  - name: FlowSync contributors
+repository-code: https://github.com/Sri-dinesh/FlowSync
+license: MIT
+abstract: Traffic-signal simulation, reinforcement-learning experiments and an interactive research dashboard.

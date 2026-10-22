@@ -28,7 +28,7 @@ SEEDS=(101,202,303)
 VALIDATION_SEEDS=(25001,25002)
 VARIANTS=("mean","uncertain")
 BASELINES=("max_pressure_shield","max_pressure","greedy","fixed","actuated")
-PROTOCOL=ROOT/"research/ACTION_RANK_PILOT_PROTOCOL_20261020.md"
+PROTOCOL=ROOT/"research/docs/protocols/ACTION_RANK_PILOT_PROTOCOL_20261020.md"
 
 
 def read(path):

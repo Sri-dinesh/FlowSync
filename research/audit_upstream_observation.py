@@ -24,7 +24,7 @@ from server.app.simulation.traffic_math import MOVEMENT_KEYS
 from server.app.simulation.traffic_signal import PHASE_DEMAND_MOVEMENTS
 from server.app.rl.observations import encode_policy_observation
 
-PROTOCOL = ROOT / "research/UPSTREAM_OBSERVATION_PROTOCOL_20261021.md"
+PROTOCOL = ROOT / "research/docs/protocols/UPSTREAM_OBSERVATION_PROTOCOL_20261021.md"
 SOURCE_SEED = 96301
 
 

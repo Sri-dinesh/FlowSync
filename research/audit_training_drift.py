@@ -154,7 +154,7 @@ def main():
         if cases[f"control_seed_{seed}"] != cases[f"temporal_seed_{seed}"]:
             raise ValueError("Recorded training cases differ across arms")
     sources = [p for base in (ROOT/"research", ROOT/"server/app") for p in sorted(base.rglob("*.py"))]
-    protocol = ROOT/"research/TRAINING_DRIFT_PROTOCOL_20261016.md"
+    protocol = ROOT/"research/docs/protocols/TRAINING_DRIFT_PROTOCOL_20261016.md"
     sources.append(protocol)
     args.output.mkdir(parents=True, exist_ok=False)
     manifest = dict(batch=str(args.batch.resolve()), cases=cases, input_sha256=hashes, planned_runs=72,

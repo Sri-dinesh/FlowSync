@@ -18,7 +18,7 @@ SEEDS = (101,202,303)
 SCENARIOS = ("train_low_balanced_01","train_mod_balanced_01","train_platoon_burst_01")
 TRAFFIC_SEED = 94001
 HORIZON = 400
-PROTOCOL = ROOT/"research/ACTION_RANK_PROTOCOL_20261020.md"
+PROTOCOL = ROOT/"research/docs/protocols/ACTION_RANK_PROTOCOL_20261020.md"
 
 
 def summarize(rows):

@@ -9,6 +9,17 @@ ROOT = Path(__file__).resolve().parents[1]
 PILOT = ROOT/"results/research_training/pilot_v5_kbW0lsY3"
 
 
+def document_path(name):
+    """Resolve grouped research docs, retaining custom fixture/launcher paths."""
+    original = ROOT / "research" / name
+    if original.is_file():
+        return original
+    matches = list((ROOT / "research/docs").rglob(name))
+    if len(matches) != 1:
+        raise FileNotFoundError(f"Expected one research document named {name}")
+    return matches[0]
+
+
 def prepare(prefix="margin_release_", launcher="run_margin_release_pilot.sh",
             protocol="MARGIN_RELEASE_PROTOCOL_20261016.md", extra_sources=()):
     parents = {}
@@ -24,8 +35,8 @@ def prepare(prefix="margin_release_", launcher="run_margin_release_pilot.sh",
                              selection_sha256=hashlib.sha256(selection.read_bytes()).hexdigest())
     output = Path(tempfile.mkdtemp(prefix=prefix, dir=ROOT/"results/research_training"))
     sources = [p for base in (ROOT/"research", ROOT/"server/app") for p in sorted(base.rglob("*.py"))]
-    sources += [ROOT/"research"/launcher, ROOT/"research"/protocol]
-    sources += [ROOT/"research"/name for name in extra_sources]
+    sources += [ROOT/"research"/launcher, document_path(protocol)]
+    sources += [document_path(name) for name in extra_sources]
     sources += sorted((ROOT/"research/scenarios").glob("train/*.yaml"))
     sources += sorted((ROOT/"research/scenarios").glob("validation/*.yaml"))
     manifest = dict(parents=parents, source_hashes={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()

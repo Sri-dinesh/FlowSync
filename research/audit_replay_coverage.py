@@ -22,7 +22,7 @@ from server.app.controllers import get_controller
 
 ARMS = ("narrow", "broader")
 EXTRA_ONLINE = (2, 17, 32, 47, 62, 77)
-PROTOCOL = ROOT/"research/REPLAY_COVERAGE_PROTOCOL_20261017.md"
+PROTOCOL = ROOT/"research/docs/protocols/REPLAY_COVERAGE_PROTOCOL_20261017.md"
 
 
 def read(path):

@@ -16,7 +16,7 @@ import torch
 from research.audit_policy_decisions import audit_run
 from research.train_policy import BudgetExceeded, RunBudget, VALIDATION_FAULTS, file_hash, load_split
 
-PROTOCOL = ROOT / "research/ACTION_RANK_DATA_PROTOCOL_20261020.md"
+PROTOCOL = ROOT / "research/docs/protocols/ACTION_RANK_DATA_PROTOCOL_20261020.md"
 ROLES = {"fit": tuple(range(95001, 95007)),
          "calibration": tuple(range(95101, 95111)),
          "probe": (95201, 95202)}

@@ -21,7 +21,7 @@ from research.calibrate_action_rank import choose
 from research.collect_action_rank_dataset import HORIZON, PARENTS
 from research.train_policy import BudgetExceeded, RunBudget, VALIDATION_FAULTS, file_hash, load_split
 
-PROTOCOL = ROOT / "research/AVERAGED_LABEL_PROTOCOL_20261021.md"
+PROTOCOL = ROOT / "research/docs/protocols/AVERAGED_LABEL_PROTOCOL_20261021.md"
 FIT_IDS = tuple(range(8))
 EVAL_IDS = tuple(range(8, 16))
 SMOKE_IDS = tuple(range(100, 108))

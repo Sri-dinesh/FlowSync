@@ -18,7 +18,7 @@ from research.calibrate_action_rank import choose
 from research.evaluate_averaged_action_labels import aggregate, score_source, validate_futures, write
 from research.train_policy import VALIDATION_FAULTS, file_hash, load_split
 
-PROTOCOL = ROOT / "research/JOINT_BENEFIT_PROTOCOL_20261021.md"
+PROTOCOL = ROOT / "research/docs/protocols/JOINT_BENEFIT_PROTOCOL_20261021.md"
 FIT_HASH = "11f2cd40cd0b72389e81237c5d680453e3833df79b327aa142b4e0d59d7286a2"
 ARMS = ("parent", "regression", "joint")
 # Reuse the existing paired-future scorer without changing its historical API.

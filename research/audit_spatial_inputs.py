@@ -30,7 +30,7 @@ from server.app.controllers.max_pressure import MaxPressureController
 from server.app.rl.hyperparams import HyperParams
 from server.app.rl.observations import SPATIAL_VERSION, encode_policy_observation
 
-PROTOCOL = ROOT / "research/SPATIAL_INPUT_AUDIT_PROTOCOL_20261022.md"
+PROTOCOL = ROOT / "research/docs/audits/SPATIAL_INPUT_AUDIT_PROTOCOL_20261022.md"
 EPISODES = (1, 46, 90)
 DEMOS = (1, 12, 24)
 STAGES = ("initial", "30", "60", "90")

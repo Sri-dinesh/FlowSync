@@ -18,7 +18,7 @@ from research.collect_action_rank_dataset import PARENTS, ROLES, selected_steps,
 from research.scenarios.scenario_schema import ScenarioConfig
 from research.train_policy import VALIDATION_FAULTS
 
-PROTOCOL = ROOT / "research/ACTION_RANK_CALIBRATION_PROTOCOL_20261020.md"
+PROTOCOL = ROOT / "research/docs/protocols/ACTION_RANK_CALIBRATION_PROTOCOL_20261020.md"
 
 
 def sha(path):

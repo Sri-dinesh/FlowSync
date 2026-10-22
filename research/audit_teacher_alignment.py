@@ -23,7 +23,7 @@ from research.train_policy import BudgetExceeded, RunBudget, file_hash
 from research.verify_spatial_input_audit import verify
 from server.app.controllers.d3qn import D3QNController
 
-PROTOCOL = ROOT/"research/SPATIAL_TEACHER_ALIGNMENT_PLAN_20261022.md"
+PROTOCOL = ROOT/"research/docs/protocols/SPATIAL_TEACHER_ALIGNMENT_PLAN_20261022.md"
 FUTURES = {"first": tuple(range(400, 408)), "excluded": tuple(range(408, 416))}
 HORIZON = 200
 EPS = 1e-7  # Floating-point comparison tolerance, not a traffic-benefit threshold.
