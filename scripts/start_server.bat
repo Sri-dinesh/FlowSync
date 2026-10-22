@@ -4,6 +4,11 @@
 
 cd /d "%~dp0\.."
 echo [FlowSync] Starting backend with project venv...
-echo [FlowSync] Python: server\venv\Scripts\python.exe
-
-server\venv\Scripts\uvicorn app.main:app --reload --port 8000 --app-dir server
+set "FLOWSYNC_PYTHON=server\.venv\Scripts\python.exe"
+if not exist "%FLOWSYNC_PYTHON%" set "FLOWSYNC_PYTHON=server\venv\Scripts\python.exe"
+if not exist "%FLOWSYNC_PYTHON%" (
+    echo Create server/.venv first; see docs/setup.md.
+    exit /b 1
+)
+echo [FlowSync] Python: %FLOWSYNC_PYTHON%
+"%FLOWSYNC_PYTHON%" -m uvicorn app.main:app --reload --port 8000 --app-dir server

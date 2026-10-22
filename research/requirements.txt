@@ -1,0 +1,6 @@
+-r ../server/requirements.txt
+
+# Statistical analysis and data-derived evidence exports.
+scipy>=1.11
+pandas>=2.2
+matplotlib>=3.8
