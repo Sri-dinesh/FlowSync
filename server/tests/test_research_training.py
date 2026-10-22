@@ -284,3 +284,33 @@ def test_budget_stop_preserves_only_completed_selection(tmp_path, monkeypatch, s
         assert selection["score"] == 10.
         assert selection["path"].endswith("checkpoint_initial.pt")
     assert summary["episodes_completed"] == (1 if stage == "validation_1" else 0)
+
+
+def test_explicit_research_timing_does_not_import_api_credentials():
+    import subprocess
+    import sys
+    from pathlib import Path
+    ROOT = Path(__file__).resolve().parents[2]
+
+    script = """
+import importlib.abc
+import sys
+class BlockAPISettings(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in {'app.config', 'server.app.config'}:
+            raise AssertionError('Explicit simulation timing must not load API credentials')
+sys.meta_path.insert(0, BlockAPISettings())
+from research.experiments.runtime import build_environment
+from pathlib import Path
+ROOT = Path.cwd()
+from research.scenarios.scenario_schema import ScenarioConfig
+load_scenario = lambda name: ScenarioConfig.load(ROOT / ("research/scenarios/train/" + name + ".yaml"))
+scenario = load_scenario('train_mod_balanced_01')
+env, _ = build_environment(scenario)
+env.reset(seed=101)
+env.step(0)
+assert env.intersection.signal.red_duration == scenario.red_duration
+"""
+    result = subprocess.run([sys.executable, "-c", script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
