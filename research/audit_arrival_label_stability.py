@@ -35,12 +35,19 @@ def replace_future_rng(state, seed):
 
 
 def resample_branches(parent, env, sensor, injector, controller, context,
-                     scenario, step, horizon, original_action, budget=None):
+                     scenario, step, horizon, original_action, budget=None, *, replicate_indices=None,
+                     source_seed=SOURCE_SEED):
+    indices = tuple(range(REPLICATES) if replicate_indices is None else replicate_indices)
+    if (len(indices) != REPLICATES or len(set(indices)) != REPLICATES or
+            any(type(i) is not int or i < 0 for i in indices)):
+        raise ValueError("Expected eight distinct nonnegative future indices")
+    if type(source_seed) is not int or source_seed < 0:
+        raise ValueError("Expected nonnegative source seed")
     proposal = controller.d3qn.get_diagnostics()["selected_action"]
     original_rng = copy.deepcopy(env.intersection.spawner._rng.bit_generator.state)
     result = []
-    for replicate in range(REPLICATES):
-        seed = future_seed(parent, scenario.scenario_id, SOURCE_SEED, step, replicate)
+    for replicate in indices:
+        seed = future_seed(parent, scenario.scenario_id, source_seed, step, replicate)
         branches = []
         for candidate, valid in enumerate(context.valid_action_mask):
             if not valid:
