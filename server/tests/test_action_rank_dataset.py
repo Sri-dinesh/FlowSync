@@ -3,8 +3,8 @@ import copy
 import pytest
 import torch
 
-from research.audit_policy_decisions import audit_run
-from research.collect_action_rank_dataset import ROLES, plan_cells, selected_steps, verify_replay
+from research.audits.audit_policy_decisions import audit_run
+from research.datasets.collect_action_rank_dataset import ROLES, plan_cells, selected_steps, verify_replay
 from research.noise.fault_injector import FaultProfile
 from research.scenarios.scenario_schema import ScenarioConfig
 from server.app.rl.dqn_agent import DQNAgent

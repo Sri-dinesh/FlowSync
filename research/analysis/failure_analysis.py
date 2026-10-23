@@ -24,7 +24,7 @@ from server.app.controllers import get_controller
 from research.noise.fault_injector import PerceptionFaultInjector, FaultProfile
 from research.experiments.engine import ExperimentRunner, ExperimentResult
 from research.analysis.table_generator import TableGenerator
-from research.run_suite import load_scenario
+from research.scenarios.loader import load_scenario
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("failure_analysis")

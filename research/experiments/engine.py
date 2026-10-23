@@ -38,8 +38,23 @@ from server.app.simulation.benchmark_harness import seed_everything
 from server.app.simulation.spawner import TrafficProfile
 from research.scenarios.scenario_schema import ScenarioConfig
 from research.experiments.runtime import ObservedState, SignalAudit, apply_scenario_step, build_environment
+from server.app.rl.observations import SPATIAL_VERSIONS
 
 logger = logging.getLogger(__name__)
+
+
+def requires_spatial_observation(controller):
+    """Follow only the supported policy/shield wrappers; no silent v9 fallback."""
+    seen = set()
+    while controller is not None:
+        if id(controller) in seen:
+            raise ValueError("Cyclic controller wrapper")
+        seen.add(id(controller))
+        version = getattr(getattr(controller, "agent", None), "obs_version", None)
+        if version in SPATIAL_VERSIONS or getattr(controller, "requires_spatial_observation", False):
+            return True
+        controller = getattr(controller, "d3qn", getattr(controller, "controller", None))
+    return False
 
 
 @dataclass
@@ -180,6 +195,7 @@ class ExperimentRunner:
         record_trajectory: bool = True,
         fault_injector: Optional[Any] = None,
         allow_untrained: bool = False,
+        spatial_observation: Optional[bool] = None,
     ) -> ExperimentResult:
         """
         Execute deterministic simulation run.
@@ -213,7 +229,11 @@ class ExperimentRunner:
 
         # Environment reset with seed
         obs, _ = env.reset(seed=seed)
-        observed_state = ObservedState()
+        needs_spatial = requires_spatial_observation(controller)
+        if spatial_observation is False and needs_spatial:
+            raise ValueError("Controller requires the spatial sensor boundary")
+        spatial_observation = needs_spatial if spatial_observation is None else spatial_observation
+        observed_state = ObservedState(spatial=spatial_observation)
         signal_audit = SignalAudit()
         arrival_trace = hashlib.sha256()
         observation_error = 0.0
@@ -407,7 +427,7 @@ class ExperimentRunner:
                                   "min_green_s": signal.min_green_duration,
                                   "yellow_s": signal.yellow_duration,
                                   "all_red_s": signal.red_duration,
-                                  "sensor_model": "synthetic_count_sensor_v2"},
+                                  "sensor_model": "synthetic_partitioned_count_sensor_v3" if spatial_observation else "synthetic_count_sensor_v2"},
             trajectory=trajectory,
             events=events,
         )

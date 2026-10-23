@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import pytest
 
-from research.calibrate_action_rank import (
+from research.calibration.calibrate_action_rank import (
     PARENTS, ROLES, calibrate, choose, fit_point, probe_predictions,
     residual_margin, role_arrays, summarize,
 )

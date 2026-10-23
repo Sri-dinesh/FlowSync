@@ -7,8 +7,8 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from research.fit_benefit_gate import fit, samples
-from research.evaluate_validation import benefit_gate_variants
+from research.calibration.fit_benefit_gate import fit, samples
+from research.evaluation.evaluate_validation import benefit_gate_variants
 from research.uncertainty.benefit_gate import FEATURE_NAMES, FallbackBenefitGate, observable_features
 from server.app.controllers.base import ControllerContext
 from server.app.controllers.flowsync_uq import FlowSyncUQController
@@ -194,7 +194,7 @@ def test_real_rollout_allow_all_gate_preserves_original_trajectory(tmp_path):
     from research.experiments.engine import ExperimentRunner
     from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
     from research.scenarios.scenario_schema import ScenarioConfig
-    from research.train_policy import file_hash
+    from research.training.train_policy import file_hash
     from research.uncertainty.estimator import UncertaintyFeatures
     from server.app.rl.dqn_agent import DQNAgent
 

@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from research import build_paper_evidence as paper
+from research.evidence import build_paper_evidence as paper
 
 
 @pytest.fixture
@@ -118,7 +118,7 @@ def test_existing_output_never_overwritten(tmp_path):
 
 
 def test_legacy_script_cannot_regenerate_historical_figures(tmp_path):
-    script = Path(__file__).resolve().parents[2] / "research/analysis/generate_paper_figures.py"
+    script = Path(__file__).resolve().parents[2] / "research/legacy/generate_paper_figures.py"
     result = subprocess.run([sys.executable, str(script)], cwd=tmp_path,
                             capture_output=True, text=True)
     assert result.returncode != 0

@@ -12,6 +12,8 @@ Improvements in this version:
   Previously used:
     Q(s,a) = V(s) + A(s,a) - mean_{all 4 actions} A(s, a')   ← BUG-05
 """
+from typing import Optional
+
 import torch
 import torch.nn as nn
 try:

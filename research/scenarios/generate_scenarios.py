@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from research.scenarios.scenario_schema import DemandProfile, ScenarioConfig
 

@@ -1,0 +1,25 @@
+# Recorded experiment results
+
+Dated records are retained for provenance. Read [current research status](../../RESEARCH_STATUS.md) before launching work. A historical plan is not authorization to rerun a completed or failed experiment.
+
+- [Richer observed features: grouped comparison did not pass](ACTION_FEATURE_RESULTS_20261020.md)
+- [Broader dataset verified; calibrated correction screen failed](ACTION_RANK_CALIBRATION_RESULTS_20261020.md)
+- [Action-ranking correction pilot: primary screen failed](ACTION_RANK_PILOT_RESULTS_20261020.md)
+- [All-action label feasibility result](ACTION_RANK_RESULTS_20261020.md)
+- [Action-ranking uncertainty: prediction bounds are not calibrated](ACTION_RANK_UNCERTAINTY_RESULTS_20261020.md)
+- [Complete arrival-label panel: single-future choices are unstable](ARRIVAL_LABEL_PANEL_RESULTS_20261021.md)
+- [Arrival-label diagnostic: mechanics verified, full panel pending](ARRIVAL_LABEL_RESULTS_20261021.md)
+- [Observed-input averaged-label model pilot](AVERAGED_LABEL_MODEL_RESULTS_20261021.md)
+- [Averaged labels: full frozen-choice experiment passed its development screen](AVERAGED_LABEL_RESULTS_20261021.md)
+- [Benefit-gate experiment: completed, not promoted](BENEFIT_GATE_RESULTS_20261016.md)
+- [Expanded validation results — 2026-10-16](EXPANDED_VALIDATION_RESULTS_20261016.md)
+- [Fixed-replay diagnostic: outcome](FIXED_REPLAY_RESULTS_20261017.md)
+- [Joint-benefit fitting-data comparison: failed continuation](JOINT_BENEFIT_RESULTS_20261021.md)
+- [Policy decision audit and next short learning test](POLICY_DECISION_RESULTS_20261016.md)
+- [Replay-coverage outcome (verified 2026-10-20)](REPLAY_COVERAGE_RESULTS_20261020.md)
+- [Spatial-input implementation, mechanics smoke and failed learning pilot](SPATIAL_INPUT_RESULTS_20261021.md)
+- [Validation-only supervisor diagnosis](SUPERVISOR_ABLATION_20261015.md)
+- [Upstream teacher alignment and horizon sensitivity — failed](TEACHER_ALIGNMENT_RESULTS_20261022.md)
+- [Continued-training diagnostic results](TRAINING_DRIFT_RESULTS_20261016.md)
+- [Update-pressure pilot: verified outcome](UPDATE_PRESSURE_RESULTS_20261017.md)
+- [Upstream-demand observation audit](UPSTREAM_OBSERVATION_RESULTS_20261021.md)

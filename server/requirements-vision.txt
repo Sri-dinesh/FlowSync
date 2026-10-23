@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# Optional camera inference, dataset preparation, training and model export.
+ultralytics>=8.3.0
+onnx>=1.16.1
+onnxruntime>=1.19.2
+roboflow>=1.1.48
+albumentations>=1.4.14

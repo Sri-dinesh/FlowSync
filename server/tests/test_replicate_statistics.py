@@ -1,9 +1,9 @@
 import numpy as np
 import json
 import pytest
-from research.evaluate_replicates import crossed_bootstrap, evaluation_seeds
-from research.evaluate_validation import supervisor_variants
-from research.check_horizon import extend_scenario
+from research.evaluation.evaluate_replicates import crossed_bootstrap, evaluation_seeds
+from research.evaluation.evaluate_validation import supervisor_variants
+from research.audits.check_horizon import extend_scenario
 from research.scenarios.scenario_schema import ScenarioConfig, DemandProfile
 
 

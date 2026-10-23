@@ -7,7 +7,6 @@ import gymnasium as gym
 import numpy as np
 from gymnasium.spaces import Box, Discrete
 
-from ..config import settings
 from ..schemas.simulation_schema import SimulationFrame, build_frame
 from .intersection import Intersection
 from .traffic_signal import SignalColor
@@ -52,11 +51,13 @@ class TrafficEnv(gym.Env):
             raise ValueError(f"Unsupported reward version: {reward_version}")
         self.reward_version = reward_version
         self.enable_watchdogs = enable_watchdogs
+        if red_duration is None:
+            from ..config import settings
+
+            red_duration = settings.signal_red_duration
         self.intersection = Intersection(
             spawn_lambda=HP.TRAINING_LAMBDA,
-            red_duration=(
-                settings.signal_red_duration if red_duration is None else red_duration
-            ),
+            red_duration=red_duration,
         )
         self.observation_space = Box(
             # Forecast growth/trend features are signed.

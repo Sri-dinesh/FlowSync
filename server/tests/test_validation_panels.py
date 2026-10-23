@@ -1,8 +1,8 @@
 import pytest
 import copy
 
-from research.evaluate_validation import baseline_variants, policy_pair_variants
-from research.report_expanded_validation import validate_panel
+from research.evaluation.evaluate_validation import baseline_variants, policy_pair_variants
+from research.analysis.report_expanded_validation import validate_panel
 
 
 def test_policy_pair_has_identical_protections_and_explicit_parent():

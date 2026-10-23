@@ -16,7 +16,8 @@ from server.app.simulation.traffic_math import (
 from server.app.simulation.traffic_signal import PHASE_DEMAND_MOVEMENTS
 from server.app.simulation.environment import TrafficEnv
 from server.app.simulation.spawner import TrafficProfile
-from server.app.rl.observations import DeliveredHistory, TEMPORAL_KEY
+from server.app.rl.observations import DeliveredHistory, TEMPORAL_KEY, SPATIAL_KEY
+from research.noise.spatial_counts import bounded_upstream
 
 RESEARCH_REWARD_VERSION = "v5_single_switch_delay"
 
@@ -68,7 +69,8 @@ def apply_scenario_step(intersection, profile, demand, step):
 class ObservedState:
     """Recompute policy features/masks only from the delivered sensor packet."""
 
-    def __init__(self):
+    def __init__(self, *, spatial=False):
+        self.spatial = spatial
         self.forecaster = ArrivalForecaster()
         self.phase_waits = {p: 0.0 for p in range(4)}
         self.delivered_history = DeliveredHistory()
@@ -85,10 +87,18 @@ class ObservedState:
                              "phase_wait_semantics": "continuous observed demand without phase green; not individual vehicle wait"},
         )
         obs = np.copy(clean_obs)
+        upstream_counts = env.intersection.get_upstream_movement_counts() if self.spatial else None
+        upstream = [upstream_counts[m] for m in MOVEMENT_KEYS] if self.spatial else None
         if injector is not None:
-            obs = injector.corrupt_observation(obs, step=step, context=ctx)
+            if self.spatial:
+                obs = injector.corrupt_observation(obs, step=step, context=ctx, upstream_counts=upstream)
+            else:
+                obs = injector.corrupt_observation(obs, step=step, context=ctx)
         else:
             ctx.extra_telemetry["observation_age_ms"] = 0.0
+            if self.spatial:
+                total = np.rint(15.0 * np.arctanh(np.clip(obs[:12], 0, .999999))).astype(int)
+                ctx.extra_telemetry[SPATIAL_KEY] = np.tanh(bounded_upstream(upstream, total) / 15.).astype(np.float32).tolist()
         ctx.extra_telemetry[TEMPORAL_KEY] = self.delivered_history.update(obs, ctx).tolist()
         # tanh(count/15) is the trained policy encoding, not count/MAX_CAP.
         counts = np.rint(15.0 * np.arctanh(np.clip(obs[:12], 0, 0.999999))).astype(int)

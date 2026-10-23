@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from research.compare_update_pressure_pilot import ARMS, EXPECTED, OVERRIDES, compare, screen_against
-from research.train_policy import fixed_episode_updates
+from research.pilots.compare_update_pressure_pilot import ARMS, EXPECTED, OVERRIDES, compare, screen_against
+from research.training.train_policy import fixed_episode_updates
 from server.tests.test_temporal_pilot import paired_bundle, fake_agent
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,14 +41,14 @@ def test_less_bad_than_control_is_not_a_parent_improvement():
 def test_launcher_matches_budget_and_stops_on_worker_failure(tmp_path, worker_exit):
     executable = tmp_path/"server/venv/bin/python"
     executable.parent.mkdir(parents=True)
-    (tmp_path/"research").mkdir()
-    (tmp_path/"research/train_policy.py").touch()
+    (tmp_path/"research/training").mkdir(parents=True)
+    (tmp_path/"research/training/train_policy.py").touch()
     batch = tmp_path/"batch with spaces"
     batch.mkdir()
     for seed in (101, 202, 303):
         (batch/f"parent_{seed}.txt").write_text(f"/parent with spaces/{seed}.pt\n")
     executable.write_text(f'''#!/bin/sh
-if [ "$1" = "research/prepare_update_pressure_pilot.py" ]; then
+if [ "$1" = "research/pilots/prepare_update_pressure_pilot.py" ]; then
   printf '%s\\n' '{batch}'
   exit 0
 fi
@@ -56,7 +56,7 @@ printf '%s\\n' "$@"
 exit {worker_exit}
 ''')
     executable.chmod(0o700)
-    result = subprocess.run(["bash", str(ROOT/"research/run_update_pressure_pilot.sh")], cwd=tmp_path,
+    result = subprocess.run(["bash", str(ROOT/"research/pilots/launchers/run_update_pressure_pilot.sh")], cwd=tmp_path,
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == int(worker_exit != 0)
     for arm in (["control"] if worker_exit else ARMS):

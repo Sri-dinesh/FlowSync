@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import torch
 
-from research import evaluate_replicates as evaluator
+from research.evaluation import evaluate_replicates as evaluator
 from research.experiments.engine import ExperimentRunner
 from research.experiments.shielded_controller import ShieldedController
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector

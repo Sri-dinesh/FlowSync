@@ -3,10 +3,16 @@
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir   = Split-Path -Parent $ScriptDir
-$Uvicorn   = Join-Path $RootDir "server\venv\Scripts\uvicorn.exe"
+$Python = Join-Path $RootDir "server\.venv\Scripts\python.exe"
+if (-not (Test-Path $Python)) {
+    $Python = Join-Path $RootDir "server\venv\Scripts\python.exe"
+}
+if (-not (Test-Path $Python)) {
+    throw "Create server/.venv first; see docs/setup.md."
+}
 
 Write-Host "[FlowSync] Starting backend with project venv..." -ForegroundColor Cyan
-Write-Host "[FlowSync] Uvicorn: $Uvicorn" -ForegroundColor DarkGray
+Write-Host "[FlowSync] Python: $Python" -ForegroundColor DarkGray
 
 Set-Location (Join-Path $RootDir "server")
-& $Uvicorn app.main:app --reload --port 8000
+& $Python -m uvicorn app.main:app --reload --port 8000

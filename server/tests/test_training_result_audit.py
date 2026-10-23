@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from research.audit_training_results import audit_run
+from research.audits.audit_training_results import audit_run
 
 
 def write(path, value):

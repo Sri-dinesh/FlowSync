@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import torch
 
-from research.audit_training_drift import EPISODES, ProbedPolicy, load_cases, score_actions, summarize
-from research.compare_temporal_pilot import ARMS, SEEDS
+from research.audits.audit_training_drift import EPISODES, ProbedPolicy, load_cases, score_actions, summarize
+from research.pilots.compare_temporal_pilot import ARMS, SEEDS
 from research.experiments.engine import ExperimentRunner
 from research.scenarios.scenario_schema import ScenarioConfig
 from server.app.controllers.flowsync_uq import FlowSyncUQController

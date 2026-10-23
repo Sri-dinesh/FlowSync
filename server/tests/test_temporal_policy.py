@@ -9,8 +9,8 @@ from research.experiments.engine import ExperimentRunner
 from research.experiments.runtime import ObservedState, build_environment
 from research.noise.fault_injector import FaultProfile, PerceptionFaultInjector
 from research.scenarios.scenario_schema import ScenarioConfig
-from research.temporal_initialization import initialize_parent
-from research.train_policy import collect_episode
+from research.training.temporal_initialization import initialize_parent
+from research.training.train_policy import collect_episode
 from server.app.controllers.base import ControllerContext
 from server.app.controllers.d3qn import D3QNController
 from server.app.controllers.flowsync_uq import FlowSyncUQController

@@ -29,6 +29,8 @@ import numpy as np
 
 from server.app.controllers.base import ControllerContext
 from server.app.simulation.traffic_math import MOVEMENT_KEYS
+from server.app.rl.observations import SPATIAL_KEY
+from research.noise.spatial_counts import bounded_upstream, thin_partition, jitter_partition
 
 
 @dataclass
@@ -149,14 +151,15 @@ class PerceptionFaultInjector:
         clean_obs: np.ndarray,
         step: int = 0,
         context: Optional[ControllerContext] = None,
+        *, upstream_counts=None,
     ) -> np.ndarray:
         """
         Produce corrupted observation vector according to the active FaultProfile.
         Clean observation remains untouched.
         """
-        return self._corrupt_packet(clean_obs, step, context)
+        return self._corrupt_packet(clean_obs, step, context, upstream_counts)
 
-    def _corrupt_packet(self, clean_obs, step, context):
+    def _corrupt_packet(self, clean_obs, step, context, upstream_counts=None):
         """Corrupt vehicle counts, arrivals and outflow together; retain frame age.
 
         A missed detection is a Bernoulli trial per vehicle sample. Synthetic
@@ -178,19 +181,36 @@ class PerceptionFaultInjector:
         clean_counts = np.rint(15.0 * np.arctanh(np.clip(obs[:12], 0, 0.999999))).astype(int)
         self.total_visible_vehicle_samples += int(clean_counts.sum())
         counts = rng.binomial(clean_counts, 1.0 - self.profile.miss_rate)
+        spatial = None
+        spatial_rng = None
+        if upstream_counts is not None:
+            if context is None:
+                raise ValueError("Spatial packets require a delivery context")
+            # An independent stream preserves EVERY legacy aggregate draw.
+            spatial_rng = np.random.default_rng(np.random.SeedSequence([self.seed or 0, step, 9048]))
+            spatial = thin_partition(bounded_upstream(upstream_counts, clean_counts), clean_counts, counts, spatial_rng)
         if in_burst:
             for i, movement in enumerate(MOVEMENT_KEYS):
                 if movement.split("_")[0] in self.profile.burst_approaches:
                     counts[i] = 0
+                    if spatial is not None:
+                        spatial[i] = 0
         self.total_missed_detections += int((clean_counts - counts).sum())
         ghosts = rng.poisson(self.profile.false_positive_lambda / 12.0, size=12)
         self.total_false_positives += int(ghosts.sum())
         counts += ghosts
+        if spatial is not None:
+            spatial += spatial_rng.binomial(ghosts, .5)
         if self.profile.jitter_std:
+            before_jitter = counts.copy()
             counts = np.maximum(0, np.rint(counts + rng.normal(0, self.profile.jitter_std * 15, 12))).astype(int)
+            if spatial is not None:
+                spatial = jitter_partition(spatial, before_jitter, counts, spatial_rng)
         if rng.random() < self.profile.lane_misclass_prob:
             pair = int(rng.choice([0, 3, 6, 9]))
             counts[pair], counts[pair + 1] = counts[pair + 1], counts[pair]
+            if spatial is not None:
+                spatial[pair], spatial[pair + 1] = spatial[pair + 1], spatial[pair]
         obs[:12] = np.tanh(counts / 15.0)
 
         outgoing = {}
@@ -203,7 +223,7 @@ class PerceptionFaultInjector:
             if in_burst:
                 for d in self.profile.burst_approaches:
                     outgoing[d] = 0
-        packet = (step, obs, outgoing, arrivals)
+        packet = (step, obs, outgoing, arrivals, None if spatial is None else np.tanh(spatial / 15.).astype(np.float32))
         self._packets.append(packet)
         selected = self._packets[0]
         if drop and self._last_packet is not None:
@@ -212,6 +232,11 @@ class PerceptionFaultInjector:
         repeated = self._last_packet is not None and selected[0] == self._last_packet[0]
         self._last_packet = selected
         if context is not None:
+            context.extra_telemetry.pop(SPATIAL_KEY, None)
+            if upstream_counts is not None:
+                if selected[4] is None:
+                    raise ValueError("Spatial packet mode changed without resetting the injector")
+                context.extra_telemetry[SPATIAL_KEY] = selected[4].copy().tolist()
             context.outgoing_counts = dict(selected[2])
             context.extra_telemetry.update(
                 observation_age_ms=(step - selected[0]) * 100.0,
