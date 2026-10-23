@@ -1,9 +1,179 @@
-# Research status — verified 2026-10-22 IST
+# Research status — updated 2026-10-23 IST
 
 **The requested superiority/research-readiness goal is not achieved.** The
 execution pipeline is substantially more auditable, but the learned controllers
 still trail strong classical baselines. Do not describe this as an RL method
 that outperforms every controller or as a validated real-world traffic system.
+
+## Current project scope: robustness study complete; component series closed
+
+The user stopped the paper-writing task. Current work is project code,
+diagnostics, tests and bounded experiments; existing writing files are preserved.
+
+The [initial-phase/horizon robustness study](docs/results/SUMO_ROBUSTNESS_20261023.md)
+completes all 24 runs and 86,400 unique signal samples in 379.23 s. Saved-data
+verification passes again with no traffic rerun or measured signal violations.
+Both starts and fixed 180/360-second endpoints are retained. At the 360-second
+primary endpoint, total counts raise mean waiting by 0.337531 s / 4.3577% and
+average within-run p95 by 7.378333 s while completing 6.666667 more trips per
+run. Mean waiting worsens in five of six seeds and p95 in all six, after
+averaging starts. One balanced seed improves mean waiting while worsening
+p95/trips; it remains in every table. Neither phase nor horizon has a strict
+seed-level mean-wait sign reversal in this panel.
+
+Lower-rate-axis mean/p95 waiting worsens in all eight asymmetric seed/start
+contexts at both endpoints, while higher-rate-axis mean/p95 improves. Primary
+lower-rate mean waiting rises 6.149682 -> 17.153860 s and completed trips fall
+by 5.5 on that axis; higher-rate mean falls 8.439932 -> 5.640937 s and trips
+rise by 14.625. This supports the observed throughput/distributional trade-off
+under the tested changes, not a population fairness/optimality guarantee.
+
+**The planned component series is closed. Do not repeat or expand its launchers.**
+These are six traffic replicates and twelve paired start contexts; prefixes,
+starts and vehicles are not additional independent samples. Families/topology
+remain known, with two seeds per family, and this is not independent final
+validation. No new policy tuning, training, manuscript editing or promotion
+follows. Old controllers, physical engine and data/archives remain unchanged.
+The read-only closure export saves eight CSV tables and input/output provenance
+at `results/sumo_robustness/closure_20261023`, retaining all outcomes and both
+endpoints. The implementation-stage targeted suite passed 147 tests; full
+application/frontend suites were not rerun for result recording/export.
+
+## Latest completed result: total-count ablation and distributional diagnosis
+
+The [executed total-count ablation](docs/results/SUMO_COUNT_ABLATION_20261023.md)
+completes all fifteen new runs / 27,000 new signal samples in 165.20 s, inside
+the 360-second cap. Its reused reference remains 45 runs / 81,000 samples.
+Saved-data verification passes again with zero traffic reruns and no measured
+new signal violations. Mean waiting is 6.362864 s for total counts versus
+pressure's 5.935522: **7.1997% worse**, with average within-run p95 higher by
+6.430667 s. Completed trips increase by 2.466667 per run. Mean/p95 waiting
+worsen in thirteen cases; extra throughput does not establish primary benefit.
+The full-job anchor/repeat flags are false because those smoke-only checks are
+not rerun; their separately preserved mechanics checks passed exactly.
+
+The [saved-trace distributional diagnosis](docs/audits/SUMO_COUNT_TRADEOFF_20261023.md)
+analyzes all thirty total/pressure trajectories without new traffic. Across
+all ten asymmetric-demand cases, lower-demand-axis mean/p95 waiting worsens
+and higher-demand-axis mean/p95 waiting improves. Lower-demand mean waiting
+rises 4.480273 -> 14.725864 s while higher-demand mean falls 6.696174 ->
+4.457403 s. Longer demanded absence of green accompanies the lower-demand
+harm; phase exposure is distinct from vehicle waiting and no isolated timing
+cause is claimed. The combined targeted SUMO suite passes 118 tests.
+
+**Close this component collection and retain pressure as the waiting-oriented
+reference.** All classical/future/count launchers remain historical; do not
+repeat them. Cases/families are consumed development data with a fixed initial
+NS phase and finite horizon, not fresh final confirmation. No new learned or
+uncertainty benefit, model promotion or training continuation follows. An
+initial-phase/horizon robustness study has now completed and closed the series,
+as recorded above. Preserve all original code/archives.
+
+## Latest completed result: executed SUMO classical comparison and diagnosis
+
+The [executed baseline comparison](docs/results/SUMO_CLASSICAL_BASELINES_20261023.md)
+has completed all 45 runs and 81,000 signal samples in 467.89 s, inside its
+900-second cap. Saved-data verification passes again without traffic reruns.
+All measured lamp/clearance checks pass. Mean stopped waiting per requested
+vehicle is 6.784512 s halted, 10.238577 s Fixed and 5.935522 s Max-Pressure.
+Pressure saves 12.5137% against halted and 42.0279% against Fixed at the
+equal-case aggregate level. Mean completed trips are 95.133333, 98.666667
+and 101.400000 respectively. This is a classical development result with no
+FlowSync checkpoint evaluation or learned-method/uncertainty benefit.
+
+Against halted, pressure improves mean waiting in fourteen of fifteen cases,
+but p95 worsens in three and completed trips fall in one. Against Fixed,
+pressure lowers mean/p95 waiting in all cases but completes fewer trips in
+four. The result note retains every case, family, tail and throughput trade-off.
+Known topology/families and the now-inspected traffic seeds are development
+data, not fresh final confirmation. **Both full SUMO collections are closed;
+do not rerun their launchers.**
+
+The [saved-data diagnosis](docs/audits/SUMO_CLASSICAL_DIAGNOSIS_20261023.md)
+checks all 45 trajectories with zero new rollouts. All fifteen halted/pressure
+histories match exactly until their first differing proposal. Total incoming
+counts match pressure at fourteen initial splits; outgoing subtraction changes
+73/377 eligible decisions later on pressure trajectories. This supports an
+executed total-count ablation as the next component test, not a causal claim
+that moving or outgoing counts explain the full measured gain. Its protocol,
+implementation and full result are now complete, as recorded above. The earlier targeted
+SUMO suite passed 70 tests. No long learning batch or promotion is warranted.
+
+## Latest action-choice diagnosis from the closed branch panel
+
+The [saved-trace mechanism audit](docs/audits/SUMO_ACTION_MECHANISM_20261023.md)
+reconstructs all 204 existing SUMO branches without new traffic rollouts.
+At the successful state 109102, the halted-count continuation sees NS/EW
+stopped counts 0/3 and requests a switch despite fifteen incoming moving NS
+vehicles versus seven incoming EW vehicles. Holding for one extra two-second
+decision interval saves 60.2875 NS-origin vehicle-seconds and adds 12.5625 EW
+vehicle-seconds, giving the recorded 47.725 mean net saving.
+
+Total-count and pressure shadow proposals match both frozen hindsight selectors
+at all six inspected states, differing from the acting baseline only at 109102.
+This is post-hoc proposal agreement, not a full-run pressure evaluation or
+learned-control improvement. Timing/prefix analysis also reveals phase shifts
+and finite-horizon effects; the full delay difference is not attributed solely
+to clearance. Other-state holds retain substantial harms.
+
+The subsequent executed classical comparison is now complete, as recorded
+above. This earlier six-state shadow diagnosis does not substitute for it.
+All consumed source/future outcomes remain development data. The mechanism
+audit, shared analysis helpers and targeted tests are implemented; no policy
+default, checkpoint, old protocol/result or manuscript is changed by this task.
+
+## Latest result: independent SUMO future-arrival panel completed and verified
+
+The [frozen independent panel](docs/results/SUMO_FUTURE_PANEL_RESULTS_20261023.md)
+completes 204 forty-second branches at six source gates in 16.69 minutes.
+Raw-trace verification passes for 4,040 source ticks and 81,600 branch ticks,
+with zero measured signal timing/conflict violations. Postprocessing reruns
+zero traffic trajectories. The original FlowSync checkpoints are not used.
+
+Across 48 check cases, alternative delay gain is >+1 vehicle-second in 26,
+<-1 in nineteen and within the deadband in three. Four of six gates exhibit
+both signs. This replicates future-sensitive action labels in the declared
+independent SUMO setup; it does not estimate population prevalence.
+
+Single and mean-eight hindsight selectors choose the same action at every gate,
+changing only source 109102. All eight check cases there qualify; mean savings
+are 47.725 vehicle-seconds at that state and 7.954167 averaged across all six.
+Aggregate completed-trip gain is zero and endpoint-wait saving is 0.233333 s.
+There are no harmful changed cases in this sample, but all gain comes from
+one state. No added averaging benefit, learned-controller transfer or full-run
+superiority is established. Publication readiness remains false.
+
+**This bounded panel is closed.** Do not repeat/expand it to seek
+larger gains or reinterpret its hindsight choices as a trained controller.
+The manuscript and `results/paper_evidence/sumo_future_20261023` retain every
+source and both the local positive finding and averaging-null result.
+
+## Earlier writing assets and verified evidence export
+
+The user accepts an empirical paper and needs the complete writing by October
+31. The [unified draft](docs/papers/PAPER_DRAFT_EMPIRICAL_20261023.md) focuses on
+matched controller benefit, same-state input/action sensitivity and future-label
+stability/learnability. Its numerical auditor reconstructs eight preserved
+custom-simulator panels and the separate SUMO panel, including model
+refits/predictions, without traffic rollouts. Generated
+diagnostic figures and the numerical ledger remain separate from frozen data.
+The [primary-source comparison](docs/papers/EMPIRICAL_RELATED_WORK_20261023.md)
+records close precedents and unresolved full-text access; novelty is not established.
+
+An isolated SUMO 1.24.0 setup and two bounded mechanics smokes are complete.
+Snapshot reconstruction failed continuation checks; full source replay passed.
+The separate ten-branch runner smoke and saved-trace verification pass, but
+neither is a scientific replication or learned-policy evaluation. The
+[frozen 204-branch independent arrival-future panel](docs/protocols/SUMO_FUTURE_PANEL_20261023.md)
+subsequently [completed](docs/results/SUMO_FUTURE_PANEL_RESULTS_20261023.md),
+as recorded above. Historical setup/launch instructions remain for provenance,
+not a request to run it again. It supplies no automatic learning continuation
+or policy promotion.
+
+All earlier negative spatial/teacher/averaged-model decisions remain in force.
+No training, old final-test traffic rollout, Supabase upload or default model
+replacement occurred during this paper preparation. Manuscript completion and
+publication/novelty readiness remain different questions.
 
 ## Latest result: teacher alignment fails; longer horizon does not rescue it
 

@@ -2,6 +2,7 @@
 
 Headless training, paired evaluation, synthetic perception faults, diagnostics
 and evidence export for FlowSync's custom single-intersection simulator.
+Independent SUMO diagnostics have a separate optional environment and metrics.
 
 ## Read first
 
@@ -13,6 +14,39 @@ and evidence export for FlowSync's custom single-intersection simulator.
 Reliable superiority over Max-Pressure and useful added uncertainty/fallback
 benefit remain unestablished. Completed failed recipes must not be repeated,
 expanded or promoted just because their historical launcher is still present.
+
+The [empirical manuscript](docs/papers/PAPER_DRAFT_EMPIRICAL_20261023.md) now
+consolidates the audited results. The independent SUMO action/future panel is
+[complete and verified](docs/results/SUMO_FUTURE_PANEL_RESULTS_20261023.md):
+four of six states have future-dependent delay-gain signs, while both hindsight
+selectors choose the same one-state improvement. It does not port/train the
+FlowSync policy or establish added averaging benefit. Do not repeat the closed panel.
+
+Current work is project implementation/evaluation; paper-writing work is stopped.
+The [executed SUMO baseline comparison](docs/results/SUMO_CLASSICAL_BASELINES_20261023.md)
+is complete and verified: 45 runs and 81,000 signal samples. Pressure mean
+waiting is 12.51% below halted control and 42.03% below the declared Fixed plan,
+with case-level tail/throughput trade-offs retained. This is a classical
+development result, not a learned-controller win. The [saved-data diagnosis](docs/audits/SUMO_CLASSICAL_DIAGNOSIS_20261023.md)
+checks moving/outgoing input effects without new traffic. Both full SUMO
+collections are closed; do not repeat their launchers.
+
+The [total-incoming-count ablation](docs/results/SUMO_COUNT_ABLATION_20261023.md)
+is complete and verified: fifteen new runs worsen mean waiting by 7.20% and
+average p95 by 6.43 s versus pressure, while completing 2.47 more trips per run.
+The [saved-trace diagnosis](docs/audits/SUMO_COUNT_TRADEOFF_20261023.md) locates
+the cost on lower-demand axes in all ten asymmetric cases. Retain pressure
+as the waiting-oriented reference. This consumed development panel is closed;
+no training or model promotion follows.
+
+The [last planned component robustness study](docs/results/SUMO_ROBUSTNESS_20261023.md)
+is complete and verified: 24 runs, six traffic seeds, both starting greens and
+fixed 180/360-second measurements. The aggregate waiting/throughput trade-off
+persists: at 360 s total counts add 0.338 s mean waiting and 7.38 s average p95,
+while completing 6.67 more trips. Lower-rate-axis waiting worsens in all eight
+asymmetric start contexts at both endpoints. All seeds and exceptions remain
+in the raw report and CSV closure tables. **This component series is closed**;
+do not repeat its launchers. The linked note records scope and verification.
 
 ## Install and inspect
 
