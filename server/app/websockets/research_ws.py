@@ -9,6 +9,7 @@ Handles real-time streaming of:
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 import logging
@@ -26,14 +27,14 @@ for _p in [str(_ROOT), str(_SERVER)]:
 import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
-from ..controllers import get_controller
 from ..controllers.base import ControllerContext
 from ..controllers.flowsync_uq import FlowSyncUQController
 from ..controllers.physical_fsm import PhysicalSignalFSM
 from ..simulation.benchmark_harness import seed_everything
 from ..simulation.environment import TrafficEnv
 from ..simulation.spawner import TrafficProfile
-from research.noise.fault_injector import FAULT_PRESETS, PerceptionFaultInjector, FaultProfile
+from ..services.research_contract import live_controller, runtime_contract
+from research.noise.fault_injector import FAULT_PRESETS, PerceptionFaultInjector
 from research.scenarios.scenario_schema import ScenarioConfig
 
 logger = logging.getLogger(__name__)
@@ -76,17 +77,7 @@ def _load_scenario(scenario_id: str) -> ScenarioConfig:
             if full_path.exists():
                 return ScenarioConfig.load(full_path)
     
-    # Direct file fallback
-    for p in (_RESEARCH / "scenarios").rglob(f"*{scenario_id}*.yaml"):
-        return ScenarioConfig.load(p)
-
-    # Synthetic fallback config
-    return ScenarioConfig(
-        scenario_id=scenario_id,
-        split="test",
-        name=scenario_id.replace("_", " ").title(),
-        duration_steps=1200,
-    )
+    raise ValueError(f"Unknown or missing research scenario: {scenario_id}")
 
 
 def _build_vehicle_list(env: TrafficEnv, fault_injector: Optional[PerceptionFaultInjector] = None) -> List[Dict[str, Any]]:
@@ -160,13 +151,20 @@ class ExperimentSession:
         self.seek_step = None
         self.set_speed(speed)
         
-        scenario = _load_scenario(scenario_id)
+        try:
+            ctrl = live_controller(controller_name)
+            scenario = _load_scenario(scenario_id)
+            if noise_preset not in FAULT_PRESETS:
+                raise ValueError(f"Unknown noise preset: {noise_preset}")
+        except ValueError as exc:
+            self.is_running = False
+            await research_manager.send_json(self.websocket, {"type": "experiment_error", "error": str(exc)})
+            return
         seed_everything(seed)
         
         # Controller
         if isinstance(controller_name, dict):
             controller_name = controller_name.get("id") or controller_name.get("name") or "flowsync_uq"
-        ctrl = get_controller(controller_name)
         ctrl.reset(seed=seed)
 
         # FSM
@@ -174,7 +172,7 @@ class ExperimentSession:
         fsm.reset()
 
         # Fault Injector
-        fault_profile = FAULT_PRESETS.get(noise_preset, FaultProfile(name=noise_preset))
+        fault_profile = copy.deepcopy(FAULT_PRESETS[noise_preset])
         if noise_params:
             for k, val in noise_params.items():
                 if hasattr(fault_profile, k):
@@ -221,6 +219,7 @@ class ExperimentSession:
             "seed": seed,
             "total_steps": num_steps,
             "noise_profile": fault_profile.to_dict(),
+            "runtime": runtime_contract(),
         })
 
         try:
@@ -356,7 +355,8 @@ class ExperimentSession:
                     "scenario_hash": scenario.scenario_hash,
                     "seed": seed,
                     "controller": controller_name,
-                    "model_hash": "d3qn_canonical_v6_best",
+                    "model_hash": "",
+                    "runtime": runtime_contract(),
                     "step": step,
                     "sim_time_s": round(step * 0.1, 1),
                     "signal": {
@@ -421,8 +421,8 @@ class ExperimentSession:
                         "missed_count": missed_n,
                         "false_positive_count": 0,
                         "occluded_count": missed_n,
-                        "cv_latency_ms": 57.2 if not fault_injector else 65.3,
-                        "track_confidence_avg": 1.0 if not fault_injector else round(max(0.2, 1.0 - fault_profile.miss_rate), 2),
+                        "cv_latency_ms": None,
+                        "track_confidence_avg": None,
                         "noise_type": fault_profile.name,
                         "noise_intensity": fault_profile.miss_rate,
                         "active_cues": ["detector_dispersion", "tracking_fragmentation"] if fault_injector and fault_profile.miss_rate > 0 else [],
@@ -455,6 +455,9 @@ class ExperimentSession:
                 "premature_switch_attempts": premature_attempts,
                 "executed_violations": executed_violations,
                 "status": "COMPLETED",
+                "runtime": runtime_contract(),
+                "model_hash": "",
+                "noise_preset": noise_preset,
             }
 
             if save_bundle:
@@ -496,7 +499,16 @@ class ExperimentSession:
         self.is_paused = False
         self.seek_step = None
         self.set_speed(speed)
-        scenario = _load_scenario(scenario_id)
+        try:
+            ctrl_a = live_controller(controller_a_name)
+            ctrl_b = live_controller(controller_b_name)
+            scenario = _load_scenario(scenario_id)
+            if noise_preset not in FAULT_PRESETS:
+                raise ValueError(f"Unknown noise preset: {noise_preset}")
+        except ValueError as exc:
+            self.is_running = False
+            await research_manager.send_json(self.websocket, {"type": "experiment_error", "error": str(exc)})
+            return
         num_steps = scenario.duration_steps
 
         # CRN Seed
@@ -507,17 +519,15 @@ class ExperimentSession:
         if isinstance(controller_b_name, dict):
             controller_b_name = controller_b_name.get("id") or controller_b_name.get("name") or "flowsync_uq"
 
-        ctrl_a = get_controller(controller_a_name)
         ctrl_a.reset(seed=seed)
         fsm_a = PhysicalSignalFSM(min_green=8.0, yellow_duration=3.0, all_red_duration=1.0)
         fsm_a.reset()
 
-        ctrl_b = get_controller(controller_b_name)
         ctrl_b.reset(seed=seed)
         fsm_b = PhysicalSignalFSM(min_green=8.0, yellow_duration=3.0, all_red_duration=1.0)
         fsm_b.reset()
 
-        fault_profile = FAULT_PRESETS.get(noise_preset, FaultProfile(name=noise_preset))
+        fault_profile = copy.deepcopy(FAULT_PRESETS[noise_preset])
         fault_injector_a = PerceptionFaultInjector(profile=fault_profile, seed=seed + 999) if fault_profile.name != "clean" else None
         fault_injector_b = PerceptionFaultInjector(profile=fault_profile, seed=seed + 999) if fault_profile.name != "clean" else None
 

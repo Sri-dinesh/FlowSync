@@ -1,12 +1,12 @@
 """
 research.py — Research REST Router for FlowSync-UQ
 ===================================================
-Provides authoritative research endpoints for:
+Provides application research endpoints for:
 - Frozen scenarios (manifest, splits, hashes)
 - Available research controllers and capabilities
 - Frozen CRN evaluation seeds
 - Canonical noise disturbance presets
-- Immutable publication benchmark results (results/final/)
+- Runtime availability and explicit historical-evidence status
 - Recorded experiment run bundles and trajectories
 """
 from __future__ import annotations
@@ -17,6 +17,9 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+from ..services.research_contract import (
+    LIVE_CONTROLLERS, LEARNED_CONTROLLERS, LEARNED_UNAVAILABLE, runtime_contract,
+)
 
 _ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _RESEARCH = _ROOT / "research"
@@ -74,18 +77,25 @@ def list_scenarios() -> Dict[str, Any]:
 def list_controllers() -> Dict[str, Any]:
     """Return available research controllers and their capabilities."""
     from ..controllers import get_controller
+    from ..controllers.base import ControllerCapabilities
     
     controllers = []
     unique_names = ["fixed", "greedy", "actuated", "max_pressure", "dqn", "d3qn", "flowsync_uq"]
     
     for name in unique_names:
         try:
-            ctrl = get_controller(name)
-            caps = ctrl.get_capabilities().to_dict()
+            if name in LEARNED_CONTROLLERS:
+                caps = ControllerCapabilities(
+                    name=name, is_learning_based=True, supports_training=True,
+                    supports_uncertainty=name == "flowsync_uq",
+                    supports_fallback=name == "flowsync_uq",
+                ).to_dict()
+            else:
+                caps = get_controller(name).get_capabilities().to_dict()
             display_name = {
-                "fixed": "Fixed-Time (Webster)",
+                "fixed": "Fixed-Time",
                 "greedy": "Greedy (Max-Queue)",
-                "actuated": "Actuated (NEMA VAT)",
+                "actuated": "Actuated (Gap-Out)",
                 "max_pressure": "Max-Pressure (Varaiya)",
                 "dqn": "Deep Q-Network (DQN)",
                 "d3qn": "Dueling Double DQN (D3QN)",
@@ -96,7 +106,7 @@ def list_controllers() -> Dict[str, Any]:
                 "fixed": "Deterministic pre-timed round-robin phase cycling.",
                 "greedy": "Max-Queue heuristic serving highest instantaneous backlog.",
                 "actuated": "Vehicle-actuated gap-out logic with minimum and maximum green.",
-                "max_pressure": "Proven analytical queue differential optimization without value approximation.",
+                "max_pressure": "Queue-differential pressure heuristic; theoretical guarantees are not established for this runtime.",
                 "dqn": "Deep Q-Network reinforcement learning without dueling architecture.",
                 "d3qn": "Dueling Double Deep Q-Network with value-advantage decomposition.",
                 "flowsync_uq": "Calibrated perception uncertainty estimation, hysteretic fallback, and safety shielding.",
@@ -108,6 +118,8 @@ def list_controllers() -> Dict[str, Any]:
                 "description": description,
                 "is_proposed_method": name == "flowsync_uq",
                 "capabilities": caps,
+                "available_live": name in LIVE_CONTROLLERS,
+                "unavailable_reason": LEARNED_UNAVAILABLE if name in LEARNED_CONTROLLERS else None,
             })
         except Exception as e:
             controllers.append({
@@ -116,12 +128,20 @@ def list_controllers() -> Dict[str, Any]:
                 "description": str(e),
                 "is_proposed_method": name == "flowsync_uq",
                 "capabilities": {},
+                "available_live": False,
+                "unavailable_reason": "Controller initialization failed.",
             })
 
     return {
         "controllers": controllers,
         "count": len(controllers),
+        "runtime": runtime_contract(),
     }
+
+
+@router.get("/runtime")
+def get_runtime_contract() -> Dict[str, Any]:
+    return runtime_contract()
 
 
 @router.get("/seeds")
@@ -177,27 +197,13 @@ def list_noise_presets() -> Dict[str, Any]:
 
 @router.get("/summary")
 def get_publication_summary() -> Dict[str, Any]:
-    """Return immutable publication benchmark summary and statistical test report."""
-    summary_path = _RESULTS_FINAL / "final_hardened_suite_summary.json"
-    stat_path = _RESULTS_FINAL / "statistical_report_v2.json"
-    env_path = _RESULTS_FINAL / "environment.json"
-
-    summary_data = {}
-    stat_data = {}
-    env_data = {}
-
-    if summary_path.exists():
-        summary_data = json.loads(summary_path.read_text(encoding="utf-8"))
-    if stat_path.exists():
-        stat_data = json.loads(stat_path.read_text(encoding="utf-8"))
-    if env_path.exists():
-        env_data = json.loads(env_path.read_text(encoding="utf-8"))
-
+    """Retired checkpoint-free tables are never served as validated evidence."""
     return {
-        "status": "frozen_publication_data",
-        "benchmark_summary": summary_data,
-        "statistical_report": stat_data,
-        "provenance": env_data,
+        "status": "historical_invalid",
+        "benchmark_summary": {},
+        "statistical_report": {},
+        "provenance": {},
+        "reason": "The historical checkpoint-free evaluation cannot support trained-policy claims. See CONTENT.md.",
     }
 
 
