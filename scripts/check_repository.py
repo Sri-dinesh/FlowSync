@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 LINK = re.compile(r"!?\[[^\]]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
 OPTIONAL_ARTIFACTS = ("results/", "server/models/", "data/", "models/")
+FROZEN_EVIDENCE = ("research/docs/", "research/RESEARCH_STATUS.md", "research/EVALUATION_AUDIT.md")
 
 
 def repository_files(root):
@@ -40,6 +41,8 @@ def check_links(root, files):
         if path.suffix != ".md":
             continue
         name = path.relative_to(root).as_posix()
+        if name.startswith(FROZEN_EVIDENCE):
+            continue  # Frozen records retain original paths/bytes; CONTENT.md is maintained.
         if name.startswith(("docs/archive/", "research/docs/archive/")) and path.name != "README.md":
             continue  # Historical line/path references are evidence, not maintained guides.
         for line_number, line in enumerate(path.read_text().splitlines(), 1):
@@ -128,6 +131,10 @@ def check_hygiene(root):
         if not name or not (root / name).exists():
             continue
         path = Path(name)
+        if path.suffix == ".md" and not name.startswith((*FROZEN_EVIDENCE, ".github/")) and name not in {
+            "CONTENT.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
+        }:
+            issues.append(f"{name}: consolidate maintained project documentation into CONTENT.md")
         if path.suffix in {".pyc", ".pyo", ".pt", ".pth", ".ckpt"} or "__pycache__" in path.parts:
             issues.append(f"{name}: generated/model artifact must not be tracked")
         if (path.name == ".env" or path.name.startswith(".env.")) and path.name != ".env.example":

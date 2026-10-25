@@ -1,7 +1,6 @@
 # Contributing
 
-Start with [setup](docs/setup.md), [architecture](docs/architecture.md) and the
-[research index](research/README.md). Use Python 3.11 for a fresh CPU environment
+Start with [CONTENT.md](CONTENT.md), the maintained project reference. Use Python 3.11 for a fresh CPU environment
 and Node.js 24/npm for the client. Preserve existing local environments and data.
 
 ## Development workflow
@@ -18,6 +17,7 @@ From the repository root:
 python scripts/check_repository.py
 npm --prefix client run lint
 npm --prefix client run typecheck
+npm --prefix client test
 PYTHONDONTWRITEBYTECODE=1 server/.venv/bin/python -m pytest server/tests --no-cov -p no:cacheprovider
 npm --prefix client run build
 ```
@@ -44,7 +44,9 @@ core installation; research analysis dependencies belong in `research/requiremen
 - Do not copy historical README/paper figures into new claims. Data-derived
   exports must verify their raw source and provenance.
 
-Research docs belong in `research/docs/`; application guides belong in `docs/`.
+Maintain project documentation in `CONTENT.md`. Dated research protocols,
+audits and manuscript snapshots under `research/docs/` are preserved evidence;
+do not rewrite them to update current instructions or create parallel guides.
 Stable research Python/CLI paths are compatibility interfaces. Archived source
 and result files must not be rewritten when reorganizing the live codebase.
 
