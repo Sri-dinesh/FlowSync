@@ -16,10 +16,10 @@ export default function ResearchComparePage() {
   const activeNoise = useResearchStore((s) => s.activeNoise);
 
   // NOTE: ids MUST match backend FAULT_PRESETS keys in
-  // research/noise/fault_injector.py — unknown ids silently run as clean.
+  // research/noise/fault_injector.py. Unknown ids are rejected by the backend.
   const presets = [
     { id: "clean", name: "Clean", desc: "No camera faults" },
-    { id: "miss_30", name: "30% missed", desc: "Camera drops 30% of vehicles (benchmark standard)" },
+    { id: "miss_30", name: "30% missed", desc: "Synthetic count misses at a nominal rate of 30%" },
     { id: "burst_occlusion", name: "Burst occlusion", desc: "Prolonged line-of-sight loss, north/south" },
     { id: "combined_severe", name: "Combined", desc: "Missed + latency + burst + ghosts" },
   ];
@@ -40,7 +40,7 @@ export default function ResearchComparePage() {
         {/* Fault + provenance row */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-neutral-500">
-            Camera fault:
+            Synthetic fault:
           </span>
           {presets.map((preset) => {
             const isSelected = activeNoise.id === preset.id;

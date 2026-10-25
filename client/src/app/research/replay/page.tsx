@@ -96,43 +96,12 @@ function ResearchReplayContent({ initialRunId }: { initialRunId?: string }) {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.warn("Backend runs fetch failed, showing demo preview:", err);
+        console.warn("Backend run catalog unavailable:", err);
         setCatalogError(
-          `Cannot reach backend catalog at ${httpUrl}/research/runs. Showing a read-only demo preview — start the backend to replay real runs.`
+          `Cannot reach backend catalog at ${httpUrl}/research/runs. Start the backend to load recorded runs.`
         );
-        // Clearly-labelled demo rows (not replayable) instead of silent mock data.
-        const demoRuns: SavedRun[] = [
-          {
-            run_id: "demo_flowsync_uq_clean",
-            scenario: "test_clean_balanced_01",
-            controller: "FlowSync-UQ (Ours)",
-            seed: 1101,
-            steps: 1200,
-            duration_s: 120.0,
-            avg_delay: 16.36,
-            p95_delay: 18.79,
-            throughput: 2462,
-            status: "DEMO",
-            timestamp: "2026-10-01T10:00:00Z",
-            demo: true,
-          },
-          {
-            run_id: "demo_d3qn_corrupted30",
-            scenario: "test_clean_balanced_01",
-            controller: "D3QN (Unshielded)",
-            seed: 1101,
-            steps: 1200,
-            duration_s: 120.0,
-            avg_delay: 18.21,
-            p95_delay: 24.4,
-            throughput: 2410,
-            status: "DEMO",
-            timestamp: "2026-10-01T11:00:00Z",
-            demo: true,
-          },
-        ];
-        setRuns(demoRuns);
-        if (!selectedRunId) setSelectedRunId(demoRuns[0].run_id);
+        setRuns([]);
+        setSelectedRunId("");
         setIsLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

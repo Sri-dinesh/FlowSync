@@ -24,6 +24,8 @@ export interface ResearchController {
   name: string;
   description: string;
   is_proposed_method: boolean;
+  available_live: boolean;
+  unavailable_reason: string | null;
   capabilities: {
     handles_continuous_obs?: boolean;
     produces_q_values?: boolean;
@@ -110,7 +112,7 @@ export interface SafetyState {
   fsm_deferred: boolean;
   reason: string;
   premature_switch_attempts: number;
-  executed_violations: number; // Always 0 under PhysicalSignalFSM
+  executed_violations: number; // Recorded counter, not a universal safety guarantee
   [key: string]: unknown;
 }
 
@@ -160,8 +162,8 @@ export interface PerceptionHealthState {
   missed_count: number;
   false_positive_count: number;
   occluded_count: number;
-  cv_latency_ms: number;
-  track_confidence_avg: number;
+  cv_latency_ms: number | null;
+  track_confidence_avg: number | null;
   noise_type: string;
   noise_intensity: number;
   active_cues: string[];
@@ -193,6 +195,7 @@ export interface ResearchTelemetryFrame {
   seed: number;
   controller: string;
   model_hash: string;
+  runtime?: { runtime: string; audited_headless_parity: boolean };
   step: number;
   sim_time_s: number;
   sim_time?: number;
@@ -220,6 +223,16 @@ export interface PairedControllerState {
   uncertainty?: number;
   fallback_active?: boolean;
   vehicles: ResearchVehicleState[];
+}
+
+export interface ResearchSceneFrame {
+  vehicles: ResearchVehicleState[];
+  signal_phase?: number;
+  signal?: SignalState;
+  fsm?: ResearchFsmState;
+  actions?: ResearchActionsState;
+  metrics?: Partial<ResearchMetricsState>;
+  perception?: PerceptionHealthState;
 }
 
 export interface PairedTelemetryFrame {

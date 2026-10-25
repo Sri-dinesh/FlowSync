@@ -12,6 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

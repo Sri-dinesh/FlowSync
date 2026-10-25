@@ -5,10 +5,10 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { Research3DScene } from "./Research3DScene";
-import type { ResearchTelemetryFrame } from "@/types/research";
+import type { ResearchSceneFrame } from "@/types/research";
 
 interface ResearchCanvasProps {
-  frameOverride?: ResearchTelemetryFrame | null;
+  frameOverride?: ResearchSceneFrame | null;
   label?: string;
   quality?: "performance" | "high";
 }

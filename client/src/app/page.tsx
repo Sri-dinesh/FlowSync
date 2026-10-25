@@ -151,11 +151,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-medium">1. Simulate</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Experience a high-fidelity 4-way intersection simulation.
-                    Vehicles are dynamically generated using a Poisson
-                    distribution to model real-world traffic patterns. A robust
-                    fixed-timer controller provides the baseline performance
-                    metric.
+                    Explore a simplified four-way intersection with configurable synthetic arrivals, vehicle spacing and signal phases. Compare fixed and demand-responsive control under the selected scenario.
                   </p>
                 </CardContent>
               </Card>
@@ -167,11 +163,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-medium">2. Train</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Deploy a Deep Q-Network (DQN) agent that learns through
-                    trial and error. By observing lane queue lengths and vehicle
-                    wait times, the AI receives rewards for optimizing flow,
-                    eventually discovering complex timing strategies that
-                    traditional systems miss.
+                    Train a dueling Double-DQN policy on numeric traffic observations. Inspect rewards, checkpoint identity and learning history. Training progress does not guarantee a control advantage.
                   </p>
                 </CardContent>
               </Card>
@@ -183,11 +175,7 @@ export default function LandingPage() {
                   </div>
                   <h3 className="text-xl font-medium">3. Compare</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Evaluate the AI&apos;s performance against the baseline.
-                    Watch as average wait times decrease and throughput
-                    increases in real-time. Our dashboard provides granular
-                    metrics, showing exactly how much more efficient the AI is
-                    compared to fixed intervals.
+                    Compare waiting and throughput under declared conditions. Preserve improvements and regressions. The application visualizes exploratory runs; audited research comparisons use separate checkpoint-explicit tools.
                   </p>
                 </CardContent>
               </Card>
@@ -227,7 +215,7 @@ export default function LandingPage() {
                 {
                   icon: Database,
                   title: "Persistent History",
-                  body: "Every simulation, episode, and model checkpoint is saved to Supabase. Load any past model and replay its behavior.",
+                  body: "Configured application services store run history and checkpoints in Supabase and local storage. Inspect the actual checkpoint metadata before loading a compatible model.",
                 },
                 {
                   icon: Settings2,

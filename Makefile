@@ -12,6 +12,7 @@ typecheck:
 	npm --prefix client run typecheck
 
 test:
+	npm --prefix client test
 	PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest server/tests --no-cov -p no:cacheprovider
 
 build:

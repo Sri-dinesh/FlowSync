@@ -21,7 +21,7 @@ export const PerceptionHealthPanel = memo(function PerceptionHealthPanel() {
   const falsePositives = perception?.false_positive_count ?? 0;
   const occluded = perception?.occluded_count ?? 0;
   const cvLatency = perception?.cv_latency_ms ?? 0;
-  const trackConfidence = perception?.track_confidence_avg ?? 1.0;
+  const trackConfidence = perception?.track_confidence_avg;
 
   const healthTone = isHealthy
     ? "border-neutral-700 bg-white/[0.03] text-neutral-300"
@@ -124,13 +124,13 @@ export const PerceptionHealthPanel = memo(function PerceptionHealthPanel() {
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-neutral-500">Track confidence</span>
           <span className="font-mono tabular-nums font-medium text-neutral-200">
-            {(trackConfidence * 100).toFixed(0)}%
+            {trackConfidence == null ? "Not measured" : `${(trackConfidence * 100).toFixed(0)}%`}
           </span>
         </div>
         <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
           <div
             className="h-full rounded-full bg-neutral-300 transition-all duration-300"
-            style={{ width: `${Math.min(100, Math.max(0, trackConfidence * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, (trackConfidence ?? 0) * 100))}%` }}
           />
         </div>
       </div>

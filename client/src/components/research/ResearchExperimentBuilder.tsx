@@ -20,6 +20,7 @@ import type {
   NoisePresetKey,
 } from "@/types/research";
 import { getFastApiUrls } from "@/lib/utils";
+import { parseControllers } from "@/lib/research-data";
 
 export default function ResearchExperimentBuilder() {
   const activeScenario = useResearchStore((s) => s.activeScenario);
@@ -66,18 +67,14 @@ export default function ResearchExperimentBuilder() {
             // Default to first test scenario only if the current selection
             // is missing from the catalog (e.g. stale default id).
             const currentId = useResearchStore.getState().activeScenario?.scenario_id;
-            const stillValid = list.some((s: ResearchScenario) => s.scenario_id === currentId);
-            if (!stillValid) {
-              const defaultSc =
-                list.find((s: ResearchScenario) => s.split === "test") || list[0];
-              setConfig({ scenario: defaultSc });
-            }
+            const current = list.find((s: ResearchScenario) => s.scenario_id === currentId);
+            setConfig({ scenario: current || list.find((s: ResearchScenario) => s.split === "test") || list[0] });
           }
         }
 
         if (!cancelled && ctrlRes.ok) {
           const ctrlData = await ctrlRes.json();
-          setControllers(ctrlData.controllers || []);
+          setControllers(parseControllers(ctrlData));
         }
 
         if (!cancelled && seedsRes.ok) {
@@ -117,7 +114,7 @@ export default function ResearchExperimentBuilder() {
   }, []);
 
   const handleLaunch = () => {
-    if (!activeScenario) return;
+    if (!activeScenario || !selectedController?.available_live || !seedValid) return;
     const finalSeed = isCustomSeed && customSeedInput ? parseInt(customSeedInput, 10) : activeSeed;
     const ctrlId =
       typeof activeController === "object" && activeController !== null
@@ -129,7 +126,7 @@ export default function ResearchExperimentBuilder() {
   const handleLaunchPaired = () => {
     if (!activeScenario) return;
     const finalSeed = isCustomSeed && customSeedInput ? parseInt(customSeedInput, 10) : activeSeed;
-    startPairedComparison(activeScenario.scenario_id, "d3qn", "flowsync_uq", finalSeed, activeNoisePreset);
+    startPairedComparison(activeScenario.scenario_id, "max_pressure", "fixed", finalSeed, activeNoisePreset);
   };
 
   const handleSpeedChange = (vals: number[]) => {
@@ -154,7 +151,7 @@ export default function ResearchExperimentBuilder() {
     ])
       .then(([sc, ctrl, seedsData, noise]) => {
         if (sc?.scenarios) setScenarios(sc.scenarios);
-        if (ctrl?.controllers) setControllers(ctrl.controllers);
+        if (ctrl?.controllers) setControllers(parseControllers(ctrl));
         if (seedsData?.seeds) setSeeds(seedsData.seeds);
         if (noise?.presets) setNoisePresets(noise.presets);
         if (!sc || !ctrl) {
@@ -167,7 +164,13 @@ export default function ResearchExperimentBuilder() {
       .finally(() => setLoading(false));
   };
 
-  const launchDisabledReason = loading
+  const selectedId = typeof activeController === "string" ? activeController : activeController.id;
+  const selectedController = controllers.find((c) => c.id === selectedId);
+  const seedValid = !isCustomSeed || (/^\d+$/.test(customSeedInput) && Number.isSafeInteger(Number(customSeedInput)));
+  const launchDisabledReason = !selectedController?.available_live
+    ? selectedController?.unavailable_reason || "Select an available controller"
+    : !seedValid ? "Enter a nonnegative integer seed"
+    : loading
     ? "Loading scenario catalog…"
     : !isConnected
       ? "Waiting for backend stream — your run will queue and start on connect"
@@ -270,8 +273,8 @@ export default function ResearchExperimentBuilder() {
               className="w-full rounded-md border border-neutral-800 bg-black/30 px-2.5 py-2 text-[13px] text-white focus:outline-none focus:border-neutral-600"
             >
               {controllers.map((ctrl) => (
-                <option key={ctrl.id} value={ctrl.id} className="bg-neutral-900 text-white">
-                  {ctrl.name} {ctrl.is_proposed_method ? "★" : ""}
+                <option disabled={!ctrl.available_live} key={ctrl.id} value={ctrl.id} className="bg-neutral-900 text-white">
+                  {ctrl.name}{ctrl.available_live ? "" : " (replay / CLI only)"}
                 </option>
               ))}
             </select>
@@ -283,7 +286,7 @@ export default function ResearchExperimentBuilder() {
           {/* 3. Noise Disturbance Preset */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-neutral-400">
-              Camera fault
+              Synthetic sensor fault
             </label>
             <select
               value={activeNoisePreset}
@@ -298,7 +301,7 @@ export default function ResearchExperimentBuilder() {
             </select>
             <div className="text-[11px] text-neutral-500 flex items-center gap-1.5 pt-0.5">
               {activeNoisePreset === "clean" ? (
-                <span className="text-emerald-300/90">Clean cameras</span>
+                <span className="text-emerald-300/90">Clean synthetic sensing</span>
               ) : (
                 <span className="text-amber-300/90 flex items-center gap-1">
                   <ShieldAlert className="h-3 w-3" /> Fault injected
@@ -379,8 +382,8 @@ export default function ResearchExperimentBuilder() {
             size="sm"
             variant="outline"
             onClick={handleLaunchPaired}
-            disabled={runStatus === "running" || runStatus === "starting" || loading}
-            title={launchDisabledReason ?? "Run D3QN vs FlowSync-UQ side-by-side under identical traffic"}
+            disabled={runStatus === "running" || runStatus === "starting" || loading || !isConnected || !seedValid}
+            title={launchDisabledReason ?? "Compare Max-Pressure and Fixed under the same requested traffic"}
             className="border-neutral-700 bg-transparent hover:bg-white/5 text-neutral-300 text-xs gap-1.5"
           >
             <Activity className="h-3.5 w-3.5" />
@@ -390,7 +393,7 @@ export default function ResearchExperimentBuilder() {
           <Button
             size="sm"
             onClick={handleLaunch}
-            disabled={runStatus === "running" || runStatus === "starting" || loading}
+            disabled={!!launchDisabledReason}
             title={launchDisabledReason ?? "Start a single simulation run with the selected configuration"}
             className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5"
           >

@@ -12,73 +12,24 @@ import {
   Layers,
   Sparkles,
 } from "lucide-react";
+import { useResearchControllers } from "@/hooks/useResearchControllers";
 import { useResearchSocket } from "@/hooks/useResearchSocket";
 import { useResearchStore } from "@/store/researchStore";
-import type { PairedControllerState, ResearchTelemetryFrame, NoisePresetKey } from "@/types/research";
+import type { PairedControllerState, ResearchSceneFrame, NoisePresetKey } from "@/types/research";
 
 const ResearchCanvas = dynamic(
   () => import("@/components/research/ResearchCanvas").then((mod) => mod.ResearchCanvas),
   { ssr: false }
 );
 
-function toTelemetryFrame(
-  ctrl: PairedControllerState | undefined,
-  step: number,
-  simTime: number
-): ResearchTelemetryFrame | null {
+function toTelemetryFrame(ctrl: PairedControllerState | undefined): ResearchSceneFrame | null {
   if (!ctrl) return null;
   return {
-    step,
-    sim_time: simTime,
     signal_phase: ctrl.phase,
-    fsm: {
-      current_state: ctrl.fsm_state,
-      remaining_in_state_s: 0,
-      min_green_remaining_s: 0,
-      premature_switch_attempts: 0,
-      executed_safety_violations: 0,
-    },
-    actions: {
-      executed: ctrl.phase,
-      proposed_d3qn: ctrl.phase,
-      fallback: ctrl.phase,
-      supervisor_selected: ctrl.phase,
-      shield_validated: ctrl.phase,
-    },
-    metrics: {
-      delay_mean_s: ctrl.mean_delay,
-      delay_p95_s: ctrl.mean_delay * 1.35,
-      queue_area_veh_s: ctrl.queue_area,
-      throughput_total_veh: ctrl.throughput,
-      service_rate_vph: ctrl.throughput * 12,
-      starvation_count: 0,
-      spillback_seconds: 0,
-      queue_length_north: Math.round(ctrl.queue_area / 40),
-      queue_length_south: Math.round(ctrl.queue_area / 45),
-      queue_length_east: Math.round(ctrl.queue_area / 50),
-      queue_length_west: Math.round(ctrl.queue_area / 42),
-    },
-    vehicles: ctrl.vehicles || [],
-    uncertainty: {
-      composite_u: ctrl.uncertainty ?? 0,
-      tau_high: 0.65,
-      tau_low: 0.50,
-      cues: { entropy: 0, ensemble_variance: 0, track_loss: 0, occlusion_rate: 0 },
-    },
-    perception: {
-      camera_health: ctrl.fallback_active ? "DEGRADED" : "HEALTHY",
-      detected_count: ctrl.vehicles?.length ?? 0,
-      ground_truth_count: ctrl.vehicles?.length ?? 0,
-      missed_count: 0,
-      false_positive_count: 0,
-      occluded_count: 0,
-      cv_latency_ms: 8.2,
-      track_confidence_avg: ctrl.fallback_active ? 0.55 : 0.92,
-      noise_type: "NONE",
-      noise_intensity: 0,
-      active_cues: [],
-    },
-  } as unknown as ResearchTelemetryFrame;
+    fsm: { current_state: ctrl.fsm_state },
+    metrics: { mean_delay_s: ctrl.mean_delay, throughput: ctrl.throughput, queue_area_veh_s: ctrl.queue_area },
+    vehicles: ctrl.vehicles,
+  };
 }
 
 export const ControllerComparison = memo(function ControllerComparison() {
@@ -89,9 +40,12 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const activeNoise = useResearchStore((s) => s.activeNoise);
   const runStatus = useResearchStore((s) => s.runStatus);
 
-  const [controllerA, setControllerA] = useState("d3qn");
-  const [controllerB, setControllerB] = useState("flowsync_uq");
+  const [controllerA, setControllerA] = useState("max_pressure");
+  const [controllerB, setControllerB] = useState("fixed");
 
+  const { controllers, error: catalogError } = useResearchControllers();
+  const available = controllers.filter((c) => c.available_live);
+  const canStart = isConnected && available.some((c) => c.id === controllerA) && available.some((c) => c.id === controllerB);
   const ctrlA = pairedFrame?.controller_a;
   const ctrlB = pairedFrame?.controller_b;
   const deltas = pairedFrame?.deltas;
@@ -101,12 +55,13 @@ export const ControllerComparison = memo(function ControllerComparison() {
   const isStarting = runStatus === "starting";
   const step = pairedFrame?.step ?? 0;
   const simTime = pairedFrame?.sim_time_s ?? 0;
-  const traceHash = pairedFrame?.trace_hash ?? `crn_seed_${activeSeed}_${activeScenario?.id || "arterial"}`;
+  const traceHash = pairedFrame?.trace_hash ?? "Not recorded";
 
-  const frameA = toTelemetryFrame(ctrlA, step, simTime);
-  const frameB = toTelemetryFrame(ctrlB, step, simTime);
+  const frameA = toTelemetryFrame(ctrlA);
+  const frameB = toTelemetryFrame(ctrlB);
 
   const handleStartComparison = () => {
+    if (!canStart) return;
     const scId = activeScenario?.scenario_id || activeScenario?.id || "test_clean_balanced_01";
     // activeNoise.id is synced to backend FAULT_PRESETS keys by the compare page pills.
     const presetKey = (activeNoise?.id || "miss_30") as NoisePresetKey;
@@ -140,6 +95,7 @@ export const ControllerComparison = memo(function ControllerComparison() {
 
   return (
     <div className="flex flex-col gap-4">
+      <p role={catalogError ? "alert" : "status"} className="text-xs text-neutral-400">{catalogError || "Interactive comparison uses the application runtime. Learned policies require the checkpoint-explicit headless workflow."}</p>
       {/* Synchronized Shared Experiment Header */}
       <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -167,8 +123,8 @@ export const ControllerComparison = memo(function ControllerComparison() {
                 disabled={isRunning || isStarting}
                 className="rounded-md border border-neutral-800 bg-black/30 px-2 py-1 text-xs text-white focus:outline-none focus:border-neutral-600"
               >
-                {["d3qn", "dqn", "flowsync_uq", "max_pressure", "greedy", "actuated", "fixed"].map((c) => (
-                  <option key={c} value={c} className="bg-neutral-900">{c}</option>
+                {controllers.map((c) => (
+                  <option disabled={!c.available_live} key={c.id} value={c.id} className="bg-neutral-900">{c.name}{c.available_live ? "" : " (CLI / replay)"}</option>
                 ))}
               </select>
             </label>
@@ -181,8 +137,8 @@ export const ControllerComparison = memo(function ControllerComparison() {
                 disabled={isRunning || isStarting}
                 className="rounded-md border border-neutral-800 bg-black/30 px-2 py-1 text-xs text-white focus:outline-none focus:border-neutral-600"
               >
-                {["flowsync_uq", "d3qn", "dqn", "max_pressure", "greedy", "actuated", "fixed"].map((c) => (
-                  <option key={c} value={c} className="bg-neutral-900">{c}</option>
+                {controllers.map((c) => (
+                  <option disabled={!c.available_live} key={c.id} value={c.id} className="bg-neutral-900">{c.name}{c.available_live ? "" : " (CLI / replay)"}</option>
                 ))}
               </select>
             </label>
@@ -200,7 +156,7 @@ export const ControllerComparison = memo(function ControllerComparison() {
             <div className="flex flex-col items-end gap-1.5">
               <button
                 onClick={handleStartComparison}
-                disabled={isStarting}
+                disabled={isStarting || !canStart}
                 title={
                   isConnected
                     ? "Start both controllers on identical traffic"
@@ -308,7 +264,7 @@ export const ControllerComparison = memo(function ControllerComparison() {
           </div>
 
           <div className="h-[420px] rounded-md overflow-hidden relative">
-            <ResearchCanvas frameOverride={frameA} label="D3QN Baseline" quality="performance" />
+            <ResearchCanvas frameOverride={frameA} label={ctrlA?.name ?? controllerA} quality="performance" />
             {!hasPairedData && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 p-6 pointer-events-none">
                 <p className="text-xs text-white/70 text-center max-w-xs leading-relaxed bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3">
@@ -365,7 +321,7 @@ export const ControllerComparison = memo(function ControllerComparison() {
           </div>
 
           <div className="h-[420px] rounded-md overflow-hidden relative">
-            <ResearchCanvas frameOverride={frameB} label="FlowSync-UQ (Ours)" quality="performance" />
+            <ResearchCanvas frameOverride={frameB} label={ctrlB?.name ?? controllerB} quality="performance" />
             {!hasPairedData && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/55 p-6 pointer-events-none">
                 <p className="text-xs text-white/70 text-center max-w-xs leading-relaxed bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3">

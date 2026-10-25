@@ -17,9 +17,9 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
   const activeSeed = useResearchStore((s) => s.activeSeed);
   const activeNoise = useResearchStore((s) => s.activeNoise);
 
-  const uScore = currentFrame?.uncertainty?.composite_u ?? 0.0;
+  const uScore = currentFrame?.uncertainty?.score ?? currentFrame?.uncertainty?.composite_u;
   const isFallback = (currentFrame?.supervisor?.mode ?? "").toUpperCase() === "FALLBACK";
-  const delayMean = currentFrame?.metrics?.delay_mean_s ?? 0.0;
+  const delayMean = currentFrame?.metrics?.mean_delay_s ?? currentFrame?.metrics?.delay_mean_s ?? 0.0;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#07090e] text-white flex flex-col p-6 overflow-y-auto">
@@ -30,7 +30,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
             Viva & Conference Presentation Mode
           </div>
           <h1 className="text-xl font-black tracking-tight text-slate-100">
-            FlowSync-UQ: Uncertainty-Aware Safe Fallback for Vision-Based Traffic Control
+            FlowSync: Application telemetry
           </h1>
         </div>
 
@@ -63,7 +63,7 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
           <div>
             <div className="text-xs uppercase text-slate-400">Active Control Authority</div>
             <div className="text-2xl font-black mt-1">
-              {isFallback ? "FALLBACK (MAX-PRESSURE)" : "D3QN (UNCERTAINTY OK)"}
+              {currentFrame?.supervisor?.active_controller || currentFrame?.controller || "Awaiting telemetry"}
             </div>
           </div>
           <Shield className="w-8 h-8 opacity-80" />
@@ -75,10 +75,10 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
             <div className="text-xs uppercase text-slate-400">Composite Uncertainty U(st)</div>
             <div
               className={`text-2xl font-black mt-1 ${
-                uScore >= 0.65 ? "text-rose-400" : uScore >= 0.5 ? "text-amber-400" : "text-emerald-400"
+                uScore != null && uScore >= (currentFrame?.uncertainty.threshold_high ?? 0.65) ? "text-rose-400" : uScore != null && uScore >= (currentFrame?.uncertainty.threshold_low ?? 0.5) ? "text-amber-400" : "text-emerald-400"
               }`}
             >
-              {uScore.toFixed(3)}
+              {uScore == null ? "Not reported" : uScore.toFixed(3)}
             </div>
           </div>
           <Activity className="w-8 h-8 text-sky-400" />
@@ -96,8 +96,8 @@ export const ResearchPresentationMode = memo(function ResearchPresentationMode({
         {/* Safety Violations */}
         <div className="p-5 rounded-lg border border-neutral-800 bg-black/40 flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase text-slate-400">Physical FSM Violations</div>
-            <div className="text-2xl font-black text-emerald-400 mt-1">0 (PROVABLY SAFE)</div>
+            <div className="text-xs uppercase text-slate-400">Recorded signal violations</div>
+            <div className="text-2xl font-black text-emerald-400 mt-1">{currentFrame?.safety?.executed_violations ?? "Not reported"}</div>
           </div>
           <Shield className="w-8 h-8 text-emerald-400" />
         </div>

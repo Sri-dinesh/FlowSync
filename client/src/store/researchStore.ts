@@ -112,20 +112,20 @@ const defaultScenario: ResearchScenario = {
   scenario_id: "test_clean_balanced_01",
   name: "Test: Clean Balanced Arterial",
   split: "test",
-  scenario_hash: "sha256:test_clean_balanced_01",
+  scenario_hash: "",
   duration_steps: 1200,
   duration_seconds: 120,
   yaml_file: "test_clean_balanced_01.yaml",
-  exists: true,
+  exists: false,
   traffic_density: "medium",
   red_duration: 3.0,
   base_lambda: 0.4,
-  description: "Balanced 4-way test arterial with nominal demand (frozen IEEE test split)",
+  description: "Select a scenario from the backend catalog to load its actual configuration.",
 };
 
 export const useResearchStore = create<ResearchState>((set) => ({
   activeScenario: defaultScenario,
-  activeController: { id: "flowsync_uq", name: "FlowSync-UQ" },
+  activeController: { id: "max_pressure", name: "Max-Pressure" },
   activeSeed: 1101,
   activeNoisePreset: "clean",
   activeNoise: {
@@ -136,7 +136,7 @@ export const useResearchStore = create<ResearchState>((set) => ({
     desc: "Zero corruption on camera sensors",
   },
   speedMultiplier: 1.0,
-  experimentId: "exp_live_active",
+  experimentId: "",
 
   isWsConnected: false,
   runStatus: "idle",
@@ -145,8 +145,8 @@ export const useResearchStore = create<ResearchState>((set) => ({
   history: [],
 
   isPairedMode: false,
-  controllerA: "d3qn",
-  controllerB: "flowsync_uq",
+  controllerA: "max_pressure",
+  controllerB: "fixed",
   pairedFrame: null,
   pairedHistory: [],
   pairedSummary: null,
@@ -198,6 +198,7 @@ export const useResearchStore = create<ResearchState>((set) => ({
       const shouldPromote = state.runStatus === "idle" || state.runStatus === "starting";
       return {
         currentFrame: frame,
+        experimentId: frame.experiment_id,
         history: trimmed,
         runStatus: shouldPromote ? "running" : state.runStatus,
       };

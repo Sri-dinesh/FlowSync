@@ -85,6 +85,7 @@ function ensureResearchSocket() {
             clearTimeout(startTimeoutTimer);
             startTimeoutTimer = null;
           }
+          if (typeof data.experiment_id === "string") store.setExperimentId(data.experiment_id);
           store.setRunStatus("running");
         } else if (data.type === "experiment_completed" || data.type === "replay_completed") {
           store.setRunStatus("completed");
@@ -179,15 +180,15 @@ export function useResearchSocket() {
   const startExperiment = useCallback(
     (
       scenarioId: string,
-      controller: string | { id?: string; name?: string } = "flowsync_uq",
+      controller: string | { id?: string; name?: string } = "max_pressure",
       seed: number = 1101,
       noisePreset: NoisePresetKey = "clean",
       speed: number = speedMultiplier,
     ) => {
       const ctrlId =
         typeof controller === "object" && controller !== null
-          ? controller.id || controller.name || "flowsync_uq"
-          : controller || "flowsync_uq";
+          ? controller.id || controller.name || "max_pressure"
+          : controller || "max_pressure";
 
       // Reset previous run data and transition to starting state
       const store = useResearchStore.getState();
@@ -218,20 +219,20 @@ export function useResearchSocket() {
   const startPairedComparison = useCallback(
     (
       scenarioId: string,
-      controllerA: string | { id?: string; name?: string } = "d3qn",
-      controllerB: string | { id?: string; name?: string } = "flowsync_uq",
+      controllerA: string | { id?: string; name?: string } = "fixed",
+      controllerB: string | { id?: string; name?: string } = "max_pressure",
       seed: number = 1101,
       noisePreset: NoisePresetKey = "miss_30",
       speed: number = speedMultiplier,
     ) => {
       const ctrlAId =
         typeof controllerA === "object" && controllerA !== null
-          ? controllerA.id || controllerA.name || "d3qn"
-          : controllerA || "d3qn";
+          ? controllerA.id || controllerA.name || "fixed"
+          : controllerA || "fixed";
       const ctrlBId =
         typeof controllerB === "object" && controllerB !== null
-          ? controllerB.id || controllerB.name || "flowsync_uq"
-          : controllerB || "flowsync_uq";
+          ? controllerB.id || controllerB.name || "max_pressure"
+          : controllerB || "max_pressure";
 
       const store = useResearchStore.getState();
       store.resetRun();

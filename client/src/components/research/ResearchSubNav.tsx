@@ -62,7 +62,7 @@ export function ResearchSubNav({
     <div className="border-b border-neutral-800 bg-[#0a0a0a]/90 backdrop-blur-md sticky top-0 z-20">
       <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8 py-2">
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 overflow-x-auto py-0.5">
+        <nav aria-label="Research navigation" className="flex min-w-0 items-center gap-1 overflow-x-auto py-0.5">
           {navItems.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
@@ -88,7 +88,7 @@ export function ResearchSubNav({
         </nav>
 
         {/* Right Info & Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* Stream status dot */}
           <span
             className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-neutral-500"
@@ -115,7 +115,7 @@ export function ResearchSubNav({
             <button
               onClick={onOpenExport}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-colors"
-              title="Export Table I, II, and VI CSV/LaTeX data"
+              title="Export the current recorded application snapshot"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Export</span>

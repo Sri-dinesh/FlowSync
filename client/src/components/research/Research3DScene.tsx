@@ -8,7 +8,7 @@ import Road from "@/components/simulation/Road";
 import TrafficLight from "@/components/simulation/TrafficLight";
 import Vehicle from "@/components/simulation/Vehicle";
 import { useResearchStore } from "@/store/researchStore";
-import type { ResearchTelemetryFrame } from "@/types/research";
+import type { ResearchSceneFrame } from "@/types/research";
 import type { VehicleState } from "@/types/simulation";
 
 function getQueueColor(count: number) {
@@ -31,7 +31,7 @@ function resolveLightColor(
   const isNS = direction === "north" || direction === "south";
   const isEW = direction === "east" || direction === "west";
 
-  const colorState = fsmState === "YELLOW_CLEARANCE" ? "yellow" : fsmState === "ALL_RED_CLEARANCE" ? "red" : "green";
+  const colorState = (fsmState === "YELLOW_CLEARANCE" || fsmState === "YELLOW") ? "yellow" : (fsmState === "ALL_RED_CLEARANCE" || fsmState === "RED") ? "red" : "green";
 
   if (isNS) {
     if (phase === 0) return colorState as "green" | "yellow" | "red";
@@ -44,13 +44,13 @@ function resolveLightColor(
 }
 
 interface QueueLabelProps {
-  queueCount: number;
+  queueCount: number | undefined;
   avgWait: number;
   position: [number, number, number];
 }
 
 function QueueLabel({ queueCount, avgWait, position }: QueueLabelProps) {
-  const queueColor = getQueueColor(queueCount);
+  const queueColor = getQueueColor(queueCount ?? 0);
   const waitColor = getWaitColor(avgWait);
   const waitStr = avgWait > 0 ? avgWait.toFixed(0) + "s" : "-";
 
@@ -69,7 +69,7 @@ function QueueLabel({ queueCount, avgWait, position }: QueueLabelProps) {
           QUEUED
         </Text>
         <Text position={[0, 0.1, 0.02]} fontSize={0.44} color={queueColor} anchorX="center" anchorY="middle" fontWeight="bold">
-          {queueCount}
+          {queueCount ?? "—"}
         </Text>
         <mesh position={[0, -0.17, 0.02]}>
           <planeGeometry args={[1.3, 0.012]} />
@@ -154,7 +154,7 @@ function GhostVehicle({ lane, type, positionIndex }: GhostVehicleProps) {
 }
 
 interface Research3DSceneProps {
-  frameOverride?: ResearchTelemetryFrame | null;
+  frameOverride?: ResearchSceneFrame | null;
   label?: string;
 }
 
@@ -163,7 +163,7 @@ export function Research3DScene({ frameOverride, label }: Research3DSceneProps) 
   const showPerceptionDebug = useResearchStore((s) => s.showPerceptionDebug);
 
   const frame = frameOverride !== undefined ? frameOverride : storeFrame;
-  const fsmState = frame?.fsm?.current_state ?? "GREEN";
+  const fsmState = frame?.signal?.fsm_state ?? frame?.fsm?.current_state ?? "RED";
   const executedPhase: number =
     frame?.actions?.executed ?? frame?.signal_phase ?? frame?.signal?.current_phase ?? 0;
   const remainingInState = frame?.fsm?.remaining_in_state_s ?? 0;
@@ -171,13 +171,13 @@ export function Research3DScene({ frameOverride, label }: Research3DSceneProps) 
   const vehicles: VehicleState[] = (frame?.vehicles as unknown as VehicleState[]) ?? [];
 
   const queueLengths = {
-    north: frame?.metrics?.queue_length_north ?? 0,
-    south: frame?.metrics?.queue_length_south ?? 0,
-    east: frame?.metrics?.queue_length_east ?? 0,
-    west: frame?.metrics?.queue_length_west ?? 0,
+    north: frame?.metrics?.queue_length_north,
+    south: frame?.metrics?.queue_length_south,
+    east: frame?.metrics?.queue_length_east,
+    west: frame?.metrics?.queue_length_west,
   };
 
-  const avgWait = frame?.metrics?.delay_mean_s ?? 0;
+  const avgWait = frame?.metrics?.mean_delay_s ?? frame?.metrics?.delay_mean_s ?? 0;
 
   // Ghost vehicles for perception debug mode
   const missedCount = frame?.perception?.missed_count ?? 0;
