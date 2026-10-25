@@ -1,5 +1,5 @@
 """
-BayeTrack vehicle tracking wrapper — persistent IDs across frames.
+Centroid vehicle tracking — persistent IDs across frames.
 """
 from __future__ import annotations
 
@@ -12,16 +12,10 @@ from ..models.schemas import BoundingBox, TrackState, VehicleDetection
 
 
 class VehicleTracker:
-    """
-    Wraps ultralytics ByteTrack for persistent vehicle ID tracking.
+    """Greedy nearest-centroid association with short track history and expiry.
 
-    Why tracking matters:
-    - Consistent vehicle IDs -> measure actual per-vehicle wait time
-    - Distinguishes new arrivals from already-queued vehicles
-    - Reduces detection flickering (vehicle keeps ID even if missed 1-2 frames)
-    - Required for accurate moving vs queued classification
-
-    Note: tracker.update() must be called with every frame, even if no detections.
+    This implementation does not call Ultralytics ByteTrack. Pixel movement and
+    time since first sighting are heuristics, not calibrated physical waiting.
     """
 
     # Class-level counter shared across all instances
@@ -43,8 +37,7 @@ class VehicleTracker:
     def _ensure_initialized(self) -> None:
         if not self._initialized:
             try:
-                # ByteTrack is built into ultralytics as model.track()
-                # We maintain our own state since we call YOLO separately
+                # This path maintains its own centroid tracks after detection.
                 self._initialized = True
             except Exception:
                 self._initialized = True
@@ -53,7 +46,7 @@ class VehicleTracker:
         """
         Add/update track_id for each bbox.
         Returns updated VehicleDetection with track_ids assigned.
-        Uses simple IoU-based matching as lightweight tracker.
+        Uses centroid-distance matching as a lightweight tracker.
         """
         self._ensure_initialized()
         now_ms = time.time() * 1000

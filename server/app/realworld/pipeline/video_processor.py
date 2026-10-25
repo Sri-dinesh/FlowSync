@@ -1,6 +1,6 @@
 """
 Frame extraction from video files, RTSP streams, or live YouTube broadcasts.
-Provides frames at configurable FPS, with zero-lag real-time grabber for live streams.
+Provides frames at configurable FPS, with latest-frame buffering for live streams.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class RealtimeFrameGrabber:
     Dedicated daemon background thread for live streams (RTSP, HLS, YouTube).
     Continuously calls cap.grab() to drain hardware/network buffers at native stream rate.
     Maintains an atomic single-frame slot (self._latest_frame) so downstream AI inference
-    always retrieves the absolute newest real-time frame with 0.0ms queue lag.
+    reads the most recently retrieved frame. Capture and transport lag are not measured here.
     """
 
     def __init__(self, cap) -> None:
