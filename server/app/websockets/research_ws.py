@@ -268,7 +268,7 @@ class ExperimentSession:
                 action = ctrl.get_action(obs, ctx)
 
                 # Policy telemetry extraction
-                q_values = [0.0, 0.0, 0.0, 0.0]
+                q_values = []
                 d3qn_proposed = int(action) if action is not None else 0
                 fallback_proposed = None
                 supervisor_selected = d3qn_proposed
@@ -389,7 +389,7 @@ class ExperimentSession:
                         "mode": supervisor_mode,
                         "reason": supervisor_reason,
                         "fallback_action": fallback_proposed,
-                        "active_controller": supervisor_mode,
+                        "active_controller": controller_name,
                         "dwell_remaining_s": round(getattr(getattr(ctrl, "supervisor", None), "_dwell_timer", 0.0), 1) if isinstance(ctrl, FlowSyncUQController) else 0.0,
                     },
                     "safety": {

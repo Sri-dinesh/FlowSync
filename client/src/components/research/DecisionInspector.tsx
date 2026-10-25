@@ -55,7 +55,7 @@ export default function DecisionInspector() {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         {/* Step 1: D3QN Proposed */}
         <div className="rounded-md border border-neutral-800 bg-black/30 p-2.5 flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-neutral-500">AI proposes</span>
+          <span className="text-[11px] font-medium text-neutral-500">Controller proposes</span>
           <div className="text-[13px] font-semibold text-white font-mono tabular-nums">
             {PHASE_SHORT[d3qnAction] ?? `P${d3qnAction}`}
           </div>

@@ -42,10 +42,10 @@ export default function QValuePanel() {
     };
   }, [policy]);
 
-  if (!policy) {
+  if (!policy?.q_values?.length) {
     return (
       <div className="rounded-lg border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-500">
-        Waiting for Q-values — run a simulation to see what the AI policy prefers.
+        {currentFrame ? "This controller reports no learned Q-values." : "Waiting for recorded policy telemetry."}
       </div>
     );
   }

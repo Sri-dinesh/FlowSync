@@ -67,6 +67,8 @@ def test_classical_session_streams_actual_telemetry_without_a_fake_checkpoint(mo
     assert len(frames) == 2
     assert frames[0]["model_hash"] == ""
     assert frames[0]["controller"] == "fixed"
+    assert frames[0]["supervisor"]["active_controller"] == "fixed"
+    assert frames[0]["policy"]["q_values"] == []
     assert frames[0]["runtime"]["audited_headless_parity"] is False
     assert frames[0]["perception"]["cv_latency_ms"] is None
     assert messages[-1]["type"] == "experiment_completed"
