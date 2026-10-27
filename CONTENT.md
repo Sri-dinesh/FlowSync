@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-10-25, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-10-27, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -1304,6 +1304,7 @@ Do not pool custom/SUMO delay means, attach the custom confidence interval to SU
 | `results/sumo_classical_panel/full_20261023/` and `results/sumo_classical_analysis/audit_20261023/` | All classical raw episodes, paired outcomes, first proposal splits and waiting partitions. |
 | `results/sumo_count_ablation/full_20261023/` and `results/sumo_count_analysis/audit_20261023/` | New component episodes, anchored references, per-case axes, 2,135 paired-vehicle rows, signal exposure and source provenance. |
 | `results/sumo_robustness/full_20261023/` and `results/sumo_robustness/closure_20261023/` | All final robustness traces/reports and eight verified CSV tables, retaining every seed/start/endpoint and exceptions. |
+| `results/sumo_wait_accounting/analysis_20261027/` | Retrospective axis-weighting and disjoint-window accounting from the same robustness traces. Two 24-row CSVs, a PNG/PDF/SVG figure, exact input/output hashes and analysis source archive. No new traffic samples. See section 36.6. |
 
 Most result directories are ignored local artifacts and are absent from a fresh clone. The [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) describes this boundary. Source code and Markdown summaries alone do not provide downloadable raw evidence. Artifact packaging/accessibility and final paper tables must be handled explicitly before a reproducibility claim about public availability.
 
@@ -1343,6 +1344,57 @@ SUMO adds an established simulator but uses one generated straight-only topology
 Executed conflict/clearance samples establish finite simulated lamp behavior under the declared audit. They do not prove collision freedom across all conditions, formal real-world safety, acceptable individual waiting or deployable cabinet control. Hardware latency, camera accuracy and end-to-end website equivalence remain separate open requirements.
 
 All experiments described here retain their original outcomes and scope. The SUMO component series is closed; no new long training command is warranted. Current evidence can inform the user's empirical paper by its October 31 writing deadline, while paper drafting itself remains outside this project-only task. No model is promoted and no real-world readiness claim follows.
+
+### 36.6 How aggregate waiting combines gains and harms
+
+The October 27 [waiting-accounting analysis](research/analysis/analyze_sumo_wait_accounting.py) addresses two remaining interpretation questions using the closed robustness collection: how demand weighting combines unequal axis outcomes, and whether lower-demand harm continues to accumulate after the first 180 seconds. This is explicitly retrospective. The earlier aggregate and axis results were already inspected before these questions were selected. No controller, threshold, demand schedule, horizon or original result was changed.
+
+For each paired seed/start context and cumulative endpoint, let $N_a$ be the requested vehicles on axis $a$ and $W_{c,a}$ its accumulated stopped waiting under controller $c$. External entry backlog and unfinished vehicles remain included. With total incoming counts denoted $T$ and pressure denoted $P$, the identity is:
+
+$$
+\Delta\bar{w}=\frac{\sum_a(W_{T,a}-W_{P,a})}{\sum_a N_a}
+=\sum_a\frac{N_a}{\sum_b N_b}\left(\frac{W_{T,a}-W_{P,a}}{N_a}\right).
+$$
+
+Positive values mean extra waiting under total counts. The script checks paired axis denominators and conservation of waiting before evaluating the identity. It uses each context's actual requested counts, not nominal 25%/75% shares or products of panel averages. Both starts are averaged within each seed, then seeds are weighted equally. The largest numerical identity residual across all 24 endpoint contexts is below $10^{-15}$ seconds. These are ordinary weighted-mean and additive-integral identities, not new algorithms or external code implementations.
+
+At the 360 s primary endpoint, the four asymmetric seeds give the following decomposition:
+
+| Quantity | Value | Interpretation |
+| --- | ---: | --- |
+| Lower-demand requested share | 25.122948% | Mean of the actual per-seed shares. The role follows configured rates, not which axis happened to receive fewer vehicles. |
+| Lower-demand mean waiting cost | +11.004178 s | Extra wait per requested lower-demand vehicle. |
+| Higher-demand mean waiting cost | −2.798995 s | Saving per requested higher-demand vehicle. |
+| Lower-demand contribution to overall mean cost | +2.730318 s | Axis cost multiplied by its actual requested share in each context. |
+| Higher-demand contribution to overall mean cost | −2.100981 s | Offsets 76.9501% of the lower-demand contribution after aggregation. |
+| Overall mean cost, asymmetric subset | +0.629337 s | Sum of the two contributions. This is not the all-six-seed mean cost of about +0.3375 s. |
+| Equal-axis mean cost, asymmetric subset | +4.102592 s | Alternative descriptive weighting, giving each axis half the weight. It changes the reporting objective and is not the primary metric. |
+
+A concrete case is seed `112101`: overall mean cost is **+0.006452 s**, while lower-demand vehicles incur **+7.769014 s** and higher-demand vehicles save **2.643269 s** on average across starts. This illustrates how a nearly unchanged overall mean can coexist with appreciable subgroup harm. All six seeds, including both balanced cases and the favorable overall result for `112002`, remain in the exports and figure. This example is selected to explain cancellation, not to replace the complete panel.
+
+The second analysis partitions accumulated waiting into the disjoint time windows 0–180 and 180–360 s. It subtracts cumulative vehicle-seconds, not endpoint means or percentiles. Dividing a window's waiting integral by its 180 s duration gives the average number of stopped active vehicles plus pending entry requests. Vehicles can contribute to both windows, and the later window includes vehicles carried over from the earlier window. This is neither mean delay among newly arriving vehicles nor a separate rollout.
+
+| Window | Extra lower-demand waiting inventory | Higher-demand waiting inventory change | Overall change, asymmetric seeds | Overall change, all six seeds |
+| --- | ---: | ---: | ---: | ---: |
+| 0–180 s | +1.795764 vehicles | −1.246597 vehicles | +0.549167 vehicles | +0.323657 vehicles |
+| 180–360 s | +2.738958 vehicles | −2.230903 vehicles | +0.508056 vehicles | +0.261759 vehicles |
+
+In both windows, all eight asymmetric seed/start contexts accumulate additional lower-demand waiting and reduced higher-demand waiting under total counts. Thus the subgroup cost is not confined to waiting accumulated in the first 180 seconds. This does not exclude lasting startup effects or establish steady state. Seed `112101` is an explicit exception to overall window deterioration: its second-half overall waiting inventory improves by **0.422778 vehicles**, while its lower-demand inventory worsens by **1.496111 vehicles**. A favorable overall window can still contain lower-demand harm.
+
+The bounded empirical finding is that the count ablation's small aggregate waiting change combines opposing axis outcomes, and the lower-demand burden also accumulates in the later half of these runs. The accounting adds interpretability to the existing waiting/throughput trade-off. It does not establish a novel controller, a population-level fairness theorem, a causal role for destination subtraction alone or superiority of learned control. There are still six traffic seeds, four asymmetric seeds, one topology and two dependent starts per seed. No significance claim or independent confirmation is added.
+
+The command below re-verifies all original raw traces before generating a new export. It refuses existing outputs and writes outside the frozen collection. Use a new output directory to reproduce the analysis; the recorded directory is preserved.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.analysis.analyze_sumo_wait_accounting \
+  results/sumo_robustness/full_20261023 \
+  --output results/sumo_wait_accounting/reproduction_20261027
+```
+
+The recorded export is `results/sumo_wait_accounting/analysis_20261027/`. `endpoints.csv` retains every seed/start at both cumulative endpoints; `windows.csv` retains every seed/start in both disjoint windows. `report.json` contains the retrospective specification, hierarchical summaries, input/output hashes, source hashes and verification scope. `analysis_source.zip` preserves the analyser and its verification dependencies. `waiting_accounting.png`, `.pdf` and `.svg` show every seed. The earlier `audit_20261027` local development export is retained but is not the cited artifact. Generated results remain local artifacts under the existing ignore policy.
+
+The complete raw robustness verifier passed again. Eleven new arithmetic/validation tests and the related robustness/count-analysis tests passed, **51 tests total**. Checks cover demand-weighting cancellation, role assignment, missing/duplicate contexts, denominator/partition corruption, non-finite input, window subtraction and output preservation. Existing dependency deprecation warnings remain. This update runs no new simulation or training and writes no manuscript. Values reconstructed from waiting integrals can differ below one microsecond from older summaries that subtract six-decimal stored means.
 
 ---
 
