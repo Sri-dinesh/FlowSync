@@ -82,7 +82,7 @@ export default function Header() {
             variant="outline"
             className="border-blue-500/30 bg-blue-900/20 text-blue-300"
           >
-            {isResearch ? "Interactive" : mode === "ai" ? "AI Mode" : "Fixed Mode"}
+            {pathname === "/realworld" ? "Observation only" : isResearch ? "Interactive" : mode === "ai" ? "AI Mode" : "Fixed Mode"}
           </Badge>
         </div>
       </div>

@@ -1,12 +1,12 @@
 """
 CCTVPipeline — Main orchestrator. Ties all pipeline steps into a single async loop.
 Runs at PIPELINE_FPS (2Hz), handling video frames, YOLO detection, quadrant-based
-vehicle counting, temporal smoothing, annotation, and WebSocket broadcast.
+image-direction proxies, temporal smoothing, annotation, and WebSocket broadcast.
 
-ROI polygons are NOT required. The QuadrantCounter assigns vehicles to directions
-based on where their bounding-box bottom-center falls within the frame.
+Each box has at most one image-direction assignment. This does not measure turns
+or calibrated road approaches. The output contract marks learned control unavailable.
 
-Task 7.1: Added detection confidence monitoring and automated fallback safeguard.
+Detection confidence monitoring applies only to displayed counts.
 When rolling average detection confidence drops below CONFIDENCE_FALLBACK_THRESHOLD
 the pipeline falls back to last-known-good lane counts and logs a warning.
 """
@@ -23,11 +23,13 @@ logger = logging.getLogger(__name__)
 from ..models.config import PIPELINE_FPS
 from ..models.schemas import (
     CCTVFrame,
+    CameraObservationContract,
     LaneCounts,
+    VehicleTypeBreakdown,
     WeightedLaneCounts,
 )
 from .frame_annotator import FrameAnnotator
-from .quadrant_counter import QuadrantCounter
+from .quadrant_counter import QuadrantCounter, image_direction
 from .vehicle_tracker import VehicleTracker
 from .video_processor import VideoProcessor
 from .yolo_detector import YOLODetector
@@ -155,23 +157,20 @@ class CCTVPipeline:
 
         for bbox in detection.bboxes:
             if bbox.track_id is not None and bbox.track_id not in self._recorded_track_ids:
-                cx = ((bbox.x1 + bbox.x2) / 2) / fw
-                cy = bbox.y2 / fh
-
-                if abs(cy - 0.5) >= abs(cx - 0.5):
-                    direction = "north" if cy < 0.5 else "south"
-                else:
-                    direction = "west" if cx < 0.5 else "east"
-
-                turn_options = ["straight", "straight", "straight", "left", "right"]
-                turn = turn_options[bbox.track_id % len(turn_options)]
+                direction = image_direction(bbox, fw, fh)
+                if direction is None:
+                    continue
 
                 event = {
                     "type": "vehicle_arrival",
                     "vehicle_id": f"cctv_{bbox.track_id}",
                     "time_s": time_s,
                     "lane": direction,
-                    "turn": turn,
+                    "turn": None,
+                    "event_semantics": "first_track_sighting_not_stop_line_arrival",
+                    "direction_source": "image_direction_proxy",
+                    "turn_source": "unobserved",
+                    "time_source": "processing_cadence_proxy",
                     "vehicle_type": bbox.class_name if bbox.class_name in ("car", "bus", "truck", "motorcycle", "auto_rickshaw") else "car",
                     "timestamp_ms": time.time() * 1000,
                 }
@@ -209,7 +208,7 @@ class CCTVPipeline:
                 )
                 self._confidence_fallback_active = True
             self._fallback_frame_count += 1
-            # Freeze last-known-good counts during confidence drops to prevent erratic signal switching.
+            # Last-good display values are estimates; this pipeline issues no signal proposals.
             if self._last_good_weighted_counts is not None:
                 weighted_dict = self._last_good_weighted_counts
                 weighted_counts = WeightedLaneCounts.from_dict(weighted_dict)
@@ -226,7 +225,6 @@ class CCTVPipeline:
         smoothed_weighted = WeightedLaneCounts.from_dict(smoothed_dict)
 
         total_pressure = sum(smoothed_dict.values())
-        estimated_wait = min(120.0, total_pressure * 2.5)
         pressure_ratio = total_pressure / (4 * 10.0)  # 4 main directions * max ~10 vehicles
         if pressure_ratio < 0.3:
             congestion = "LOW"
@@ -270,7 +268,14 @@ class CCTVPipeline:
             weighted_counts=smoothed_weighted,
             detection_fps=self._metrics.get_fps(),
             annotated_frame_b64=annotated_b64,
-            estimated_avg_wait=estimated_wait,
+            vehicle_types=VehicleTypeBreakdown(**{
+                name: sum(b.class_name == name for b in detection.bboxes)
+                for name in VehicleTypeBreakdown.model_fields
+            }),
+            observation_contract=CameraObservationContract(
+                detected_boxes=len(detection.bboxes), assigned_boxes=sum(raw_counts_dict.values()),
+                unassigned_boxes=len(detection.bboxes)-sum(raw_counts_dict.values()),
+            ),
             congestion_level=congestion,
             status=model_status,
         )

@@ -56,10 +56,10 @@ export default function LaneQueuePanel({ frame }: Props) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
         <h2 className="text-xs uppercase tracking-[0.14em] text-white/35 font-semibold">
-          Lane Queues
+          Image direction counts
         </h2>
         <span className="text-[10px] text-white/25 font-mono">
-          raw · weighted
+          raw · smoothed
         </span>
       </div>
 
@@ -70,7 +70,7 @@ export default function LaneQueuePanel({ frame }: Props) {
             {dirIdx > 0 && (
               <div className="h-px bg-white/[0.04] my-1.5" />
             )}
-            {LANE_KEYS.filter((k) => k.startsWith(dir)).map((lane) => {
+            {LANE_KEYS.filter((k) => k === `${dir}_straight`).map((lane) => {
               const raw = rawCounts[lane] ?? 0;
               const weighted = weightedCounts[lane] ?? 0;
               const barPct = (raw / maxRaw) * 100;
@@ -86,7 +86,7 @@ export default function LaneQueuePanel({ frame }: Props) {
 
                   {/* lane name */}
                   <span className="text-[10px] text-white/35 w-[88px] shrink-0 capitalize truncate">
-                    {lane.replace(/_/g, " ")}
+                    {dir}
                   </span>
 
                   {/* bar */}
@@ -106,7 +106,7 @@ export default function LaneQueuePanel({ frame }: Props) {
 
                   {/* weighted */}
                   <span className="text-[10px] text-white/20 w-[36px] text-right shrink-0 font-mono">
-                    {weighted.toFixed(1)}w
+                    {weighted.toFixed(1)}
                   </span>
                 </div>
               );
@@ -114,6 +114,9 @@ export default function LaneQueuePanel({ frame }: Props) {
           </div>
         ))}
       </div>
+      <p className="px-3 pb-3 text-xs text-white/40">
+        Image position is a direction estimate. Road approaches, turning movements and stopped queues have not been calibrated.
+      </p>
     </div>
   );
 }

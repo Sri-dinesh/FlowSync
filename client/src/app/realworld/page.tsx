@@ -26,14 +26,25 @@ export type CCTVFrameData = {
   vehicle_types: Record<string, number>;
   detection_fps: number;
   observation: number[];
-  signal_phase: number;
-  signal_phase_name: string;
+  signal_phase: number | null;
+  signal_phase_name: string | null;
   q_values: number[];
-  confidence_pct: number;
+  confidence_pct: number | null;
+  observation_contract?: {
+    schema_version: "camera_observation_v1";
+    count_semantics: "exclusive_image_direction_proxy";
+    control_status: "unavailable";
+    physical_actuation: false;
+    movement_counts_available: false;
+    detected_boxes: number;
+    assigned_boxes: number;
+    unassigned_boxes: number;
+    missing_inputs: string[];
+  };
   annotated_frame_b64: string | null;
   fixed_timer_phase: number | null;
   fixed_timer_phase_name: string | null;
-  estimated_avg_wait: number;
+  estimated_avg_wait: number | null;
   congestion_level: "LOW" | "MODERATE" | "HIGH" | "CRITICAL";
   status: string;
 };
@@ -49,7 +60,7 @@ export interface VehicleArrivalEvent {
   vehicle_id: string;
   time_s: number;
   lane: string;
-  turn: string;
+  turn: string | null;
   vehicle_type: string;
 }
 
@@ -59,6 +70,8 @@ export interface TwinData {
   total_vehicles_detected: number;
   video_duration_s?: number;
   arrivals?: VehicleArrivalEvent[];
+  replay_inputs_complete?: boolean;
+  replay_unavailable_reason?: string | null;
   aggregate_counts: Record<string, number>;
   peak_counts: Record<string, number>;
   avg_counts: Record<string, number>;
@@ -229,7 +242,7 @@ export default function RealWorldPage() {
                 {label}
                 {id === "twin" && twinData && (
                   <span className="ml-1.5 px-1 py-0.5 text-[8px] bg-emerald-500/20 text-emerald-400 rounded font-bold">
-                    READY
+                    {twinData.replay_inputs_complete === true ? "INPUTS COMPLETE" : "INCOMPLETE"}
                   </span>
                 )}
               </button>

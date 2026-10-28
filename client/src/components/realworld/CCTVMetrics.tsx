@@ -58,8 +58,8 @@ export default function CCTVMetrics({ frame }: Props) {
 
       <div className="p-3 grid grid-cols-2 gap-2">
         <MetricCard
-          label="Est. Wait"
-          value={frame ? frame.estimated_avg_wait.toFixed(1) : "—"}
+          label="Measured Wait"
+          value={frame?.estimated_avg_wait?.toFixed(1) ?? "Not measured"}
           unit="s"
         />
         <MetricCard

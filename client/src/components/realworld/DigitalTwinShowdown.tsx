@@ -5,30 +5,12 @@ import dynamic from "next/dynamic";
 import BenchmarkResults, { BenchmarkResultsData } from "./BenchmarkResults";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { SimulationFrame } from "@/types/simulation";
+import type { TwinData } from "@/app/realworld/page";
 
 const SimulationCanvas = dynamic(
   () => import("@/components/simulation/SimulationCanvas"),
   { ssr: false }
 );
-
-export interface VehicleArrivalEvent {
-  vehicle_id: string;
-  time_s: number;
-  lane: string;
-  turn: string;
-  vehicle_type: string;
-}
-
-export interface TwinData {
-  session_id: string;
-  total_frames_processed: number;
-  total_vehicles_detected: number;
-  video_duration_s?: number;
-  arrivals?: VehicleArrivalEvent[];
-  aggregate_counts: Record<string, number>;
-  peak_counts: Record<string, number>;
-  avg_counts: Record<string, number>;
-}
 
 export interface RLModel {
   id: string;
@@ -136,6 +118,7 @@ export default function DigitalTwinShowdown({
 
   // Connect to simulation WebSocket
   useEffect(() => {
+    if (twinData?.replay_inputs_complete !== true) return;
     const ws = new WebSocket(`${WS_URL}/ws/simulation`);
     wsRef.current = ws;
 
@@ -210,7 +193,7 @@ export default function DigitalTwinShowdown({
     return () => {
       ws.close();
     };
-  }, [setStoreFrame, setStoreConnected, setStoreRunning]);
+  }, [setStoreFrame, setStoreConnected, setStoreRunning, twinData?.replay_inputs_complete]);
 
   const injectScenario = useCallback(async (counts: Record<string, number>) => {
     setInjecting(true);
@@ -229,13 +212,13 @@ export default function DigitalTwinShowdown({
 
   // Inject initial scenario when counts change
   useEffect(() => {
-    if (!initialCounts) return;
+    if (!initialCounts || twinData?.replay_inputs_complete !== true) return;
     const timer = setTimeout(() => {
       setScenarioCounts(initialCounts);
       void injectScenario(initialCounts);
     }, 0);
     return () => clearTimeout(timer);
-  }, [initialCounts, injectScenario]);
+  }, [initialCounts, injectScenario, twinData?.replay_inputs_complete]);
 
   const sendWsCommand = useCallback((data: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -244,7 +227,7 @@ export default function DigitalTwinShowdown({
   }, []);
 
   const handleRunBenchmark = useCallback(() => {
-    if (benchmarkState === "running" || !isWsConnected) return;
+    if (benchmarkState === "running" || !isWsConnected || twinData?.replay_inputs_complete !== true) return;
     setBenchmarkState("running");
     setBenchmarkResults(null);
     setBenchmarkProgress(null);
@@ -299,6 +282,19 @@ export default function DigitalTwinShowdown({
     );
   }
 
+  if (twinData?.replay_inputs_complete !== true) {
+    return (
+      <section className="m-auto max-w-lg space-y-4 p-6 text-sm text-white/65">
+        <h2 className="text-lg font-semibold text-amber-300">Recording needs calibrated replay inputs</h2>
+        <p>{twinData?.replay_unavailable_reason ?? "This recording has no verified replay input contract."}</p>
+        <p>Review movement assignments and video timestamps before running a simulation comparison. No traffic or turns are generated from missing observations.</p>
+        <button disabled className="rounded-lg border border-white/10 px-4 py-2 text-white/40">
+          Run simulation comparison
+        </button>
+      </section>
+    );
+  }
+
   const MODE_LABELS: Record<string, string> = { ai: "DQN AI", fixed: "Fixed Timer", greedy: "Greedy" };
   const MODES_ORDER = ["ai", "fixed", "greedy"];
 
@@ -320,7 +316,7 @@ export default function DigitalTwinShowdown({
               <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Traffic Profile</span>
               <span className="text-[9px] text-emerald-400 font-medium flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Chronological Influx
+                Supplied event sequence
               </span>
             </div>
 
@@ -336,7 +332,7 @@ export default function DigitalTwinShowdown({
             </div>
 
             <p className="text-[9.5px] text-white/40 leading-relaxed bg-white/[0.01] border border-white/[0.04] rounded-lg p-2">
-              ℹ Replays vehicles dynamically at their exact recorded video timestamps. Simulation runs until <strong className="text-white/80">all {totalVehicles} vehicles clear the intersection</strong>.
+              Simulates the supplied movement events and timestamps. Input completeness does not establish real-camera accuracy or field performance.
             </p>
           </div>
 
@@ -479,15 +475,20 @@ export default function DigitalTwinShowdown({
               ) : (
                 <button
                   onClick={handleRunBenchmark}
-                  disabled={injecting || !isWsConnected}
+                  disabled={injecting || !isWsConnected || twinData?.replay_inputs_complete !== true}
                   className={`w-full py-3 rounded-xl text-xs uppercase tracking-wider font-bold transition-all duration-200 ${
-                    isWsConnected && !injecting
+                    isWsConnected && !injecting && twinData?.replay_inputs_complete === true
                       ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
                       : "bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]"
                   }`}
                 >
-                  ▶ Run Full Comparison
+                  Run simulation comparison
                 </button>
+              )}
+              {twinData?.replay_inputs_complete !== true && (
+                <p className="text-xs text-amber-300">
+                  {twinData?.replay_unavailable_reason ?? "Replay requires recorded movements and arrival times. This camera session has no verified replay input contract."}
+                </p>
               )}
 
               {!isWsConnected && (

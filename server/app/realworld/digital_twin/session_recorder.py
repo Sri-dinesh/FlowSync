@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from ..models.config import SESSION_DIR
 from ..models.schemas import CCTVFrame
+from .arrival_contract import replay_input_error
 
 LANE_KEYS = [
     "north_straight", "north_left", "north_right",
@@ -85,40 +86,16 @@ class SessionRecorder:
         self._arrivals = list(arrivals)
 
     def get_twin_data(self) -> Dict[str, Any]:
-        """Returns data suitable for chronological Digital Twin simulation replay."""
+        """Preserve observations and report whether required replay fields exist."""
         avg_counts = {
             k: round(self._count_sums[k] / self._frame_count)
             if self._frame_count > 0 else 0
             for k in LANE_KEYS
         }
 
-        # Use tracked arrivals if available, or synthesize a realistic arrival schedule
+        # Empty observations remain empty; tracks alone do not identify movements.
         arrivals = sorted(self._arrivals, key=lambda a: a.get("time_s", 0.0))
-
-        if not arrivals:
-            # Fallback synthesizer: distribute vehicles realistically across the video duration
-            vid_dur = max(15.0, round(self._frame_count / 2.0, 1))
-            dirs = ["north", "south", "east", "west"]
-            turns = ["straight", "straight", "straight", "left", "right"]
-            types = ["car", "car", "car", "motorcycle", "truck"]
-            
-            # Determine count from peak or aggregate
-            peak_sum = sum(self._peak_counts.values())
-            num_synth = max(12, min(36, peak_sum if peak_sum >= 8 else 16))
-            step = vid_dur / (num_synth + 1)
-
-            for i in range(num_synth):
-                t = round((i + 1) * step, 1)
-                d = dirs[i % len(dirs)]
-                tr = turns[i % len(turns)]
-                vt = types[i % len(types)]
-                arrivals.append({
-                    "vehicle_id": f"cctv_v{i+1}",
-                    "time_s": t,
-                    "lane": d,
-                    "turn": tr,
-                    "vehicle_type": vt,
-                })
+        replay_error = replay_input_error(arrivals)
 
         video_dur = max(10.0, round(self._frame_count / 2.0, 1))
         if arrivals:
@@ -131,6 +108,8 @@ class SessionRecorder:
             "total_vehicles_detected": len(arrivals),
             "video_duration_s": round(video_dur, 1),
             "arrivals": arrivals,
+            "replay_inputs_complete": replay_error is None,
+            "replay_unavailable_reason": replay_error,
             "aggregate_counts": self._aggregate_counts,
             "peak_counts": self._peak_counts,
             "avg_counts": avg_counts,

@@ -100,7 +100,7 @@ export default function CCTVControls({
 
         {sourceMode === "stream" && (
           <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-            0ms buffer
+            Video input
           </span>
         )}
       </div>
@@ -234,7 +234,7 @@ export default function CCTVControls({
             <div>
               <p className="text-[11px] text-emerald-300 font-semibold">Session Recorded</p>
               <p className="text-[10px] text-white/40">
-                {totalVehiclesDetected.toLocaleString()} total vehicles ready for Digital Twin Showdown
+                {totalVehiclesDetected.toLocaleString()} tracks recorded; review replay requirements
               </p>
             </div>
           </div>

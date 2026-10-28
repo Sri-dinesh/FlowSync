@@ -24,7 +24,7 @@ def test_session_recorder_arrival_logging(tmp_path):
     assert twin_data["arrivals"][2]["lane"] == "east"
 
 
-def test_session_recorder_fallback_synthesis(tmp_path):
+def test_empty_session_does_not_invent_replay_vehicles(tmp_path):
     recorder = SessionRecorder(session_id="test_synth_01", output_dir=str(tmp_path))
     
     frame = CCTVFrame(frame_id=1, timestamp_ms=1000)
@@ -32,10 +32,9 @@ def test_session_recorder_fallback_synthesis(tmp_path):
     recorder.record_frame(frame)
 
     twin_data = recorder.get_twin_data()
-    assert len(twin_data["arrivals"]) >= 12
-    assert all("time_s" in a and "lane" in a and "turn" in a for a in twin_data["arrivals"])
-    times = [a["time_s"] for a in twin_data["arrivals"]]
-    assert times == sorted(times)
+    assert twin_data["arrivals"] == []
+    assert twin_data["total_vehicles_detected"] == 0
+    assert twin_data["replay_inputs_complete"] is False
 
 
 def test_chronological_spawning_and_clearance():

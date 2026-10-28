@@ -5,7 +5,7 @@ All data models for the CCTV pipeline, detection outputs, ROI configs, and train
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,7 +26,7 @@ class BoundingBox(BaseModel):
     confidence: float          # 0.0 - 1.0
     class_id: int              # 0-6 (unified class IDs)
     class_name: str            # "car", "auto_rickshaw", etc.
-    track_id: Optional[int] = None    # ByteTrack ID (None if tracking disabled)
+    track_id: Optional[int] = None    # Local centroid-association ID
 
     @property
     def center(self) -> Tuple[float, float]:
@@ -173,6 +173,24 @@ class ROIConfig(BaseModel):
 # Pipeline Output Schema
 # ══════════════════════════════════════════════════════════════════════════════
 
+class CameraObservationContract(BaseModel):
+    """Current camera path can display detections but cannot supply a policy state."""
+    schema_version: Literal["camera_observation_v1"] = "camera_observation_v1"
+    count_semantics: Literal["exclusive_image_direction_proxy"] = "exclusive_image_direction_proxy"
+    control_status: Literal["unavailable"] = "unavailable"
+    physical_actuation: Literal[False] = False
+    movement_counts_available: Literal[False] = False
+    detected_boxes: int = Field(default=0, ge=0)
+    assigned_boxes: int = Field(default=0, ge=0)
+    unassigned_boxes: int = Field(default=0, ge=0)
+    missing_inputs: List[str] = Field(default_factory=lambda: [
+        "Calibrated movement counts and downstream coverage",
+        "Observed signal phase, clearance state and service history",
+        "Measured arrival timing and observation freshness",
+        "Compatible trained checkpoint and observed-input runtime",
+    ])
+
+
 class CCTVFrame(BaseModel):
     """Complete output from one pipeline cycle."""
     model_config = ConfigDict(frozen=False)
@@ -185,18 +203,19 @@ class CCTVFrame(BaseModel):
     vehicle_types: VehicleTypeBreakdown = Field(default_factory=VehicleTypeBreakdown)
     detection_fps: float = 0.0
     # RL outputs
-    observation: List[float] = Field(default_factory=lambda: [0.0] * 20)
-    signal_phase: int = 0
-    signal_phase_name: str = "NS_STRAIGHT"
-    q_values: List[float] = Field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
-    confidence_pct: float = 0.0
+    observation: List[float] = Field(default_factory=list)
+    signal_phase: Optional[int] = None
+    signal_phase_name: Optional[str] = None
+    q_values: List[float] = Field(default_factory=list)
+    confidence_pct: Optional[float] = None
+    observation_contract: CameraObservationContract = Field(default_factory=CameraObservationContract)
     # Frame (base64 for WebSocket streaming)
     annotated_frame_b64: Optional[str] = None
     # Fixed timer comparison
     fixed_timer_phase: Optional[int] = None
     fixed_timer_phase_name: Optional[str] = None
     # Metrics
-    estimated_avg_wait: float = 0.0
+    estimated_avg_wait: Optional[float] = None
     congestion_level: str = "LOW"
     # Status
     status: str = "ok"  # "ok" | "video_ended" | "roi_required" | "model_loading"
@@ -311,7 +330,7 @@ class VehicleArrivalEvent(BaseModel):
     vehicle_id: str
     time_s: float                    # Time offset from video start in seconds
     lane: str                        # "north", "south", "east", "west"
-    turn: str = "straight"           # "straight", "left", "right"
+    turn: Optional[str] = None       # Unknown until a movement is observed or supplied
     vehicle_type: str = "car"        # "car", "bus", "truck", "motorcycle", "auto_rickshaw"
     initial_speed: float = 0.15
 

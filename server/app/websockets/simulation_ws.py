@@ -24,6 +24,7 @@ except ImportError:
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ..realworld.models.config import SESSION_DIR
+from ..realworld.digital_twin.arrival_contract import replay_input_error
 from ..schemas.simulation_schema import build_frame
 from ..services import supabase_service
 from ..simulation.demand_forecast import ArrivalForecaster
@@ -384,8 +385,8 @@ async def _run_timed_benchmark(
     Runs all requested modes sequentially for comparison.
 
     Two execution modes:
-    1. REAL-WORLD DIGITAL TWIN REPLAY (when arrivals list is provided):
-       - Chronologically injects real-world vehicle arrivals at their exact recorded video timestamps (time_s).
+    1. SUPPLIED ARRIVAL REPLAY (when arrivals list is provided):
+       - Injects supplied movement events at time_s; field validation does not establish camera accuracy.
        - Runs each mode until 100% of vehicles have cleared the intersection (total_passed >= total_vehicles).
        - Measures clearance_time (seconds to clear all vehicles) and avg_wait_time.
     2. STANDARD MULTI-MODE BENCHMARK (when arrivals is None):
@@ -393,6 +394,12 @@ async def _run_timed_benchmark(
        - Runs each mode for duration_seconds of simulation time.
        - Broadcasts real-time 10Hz frames driving the 3-D canvas.
     """
+    if arrivals is not None:
+        error = replay_input_error(arrivals)
+        if error:
+            await websocket.send_json({"type": "error", "message": error})
+            return
+
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
     TICK_SLEEP = 0.10      # wall-clock seconds between ticks (normal 1.0x real-time speed)
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
@@ -2318,9 +2325,14 @@ async def simulation_socket(websocket: WebSocket) -> None:
                     app.state.sim_intersection.trigger_emergency_override(lane)
 
             elif command == "run_timed_benchmark":
+                arrivals = message.get("arrivals", None)
+                if arrivals is not None:
+                    error = replay_input_error(arrivals)
+                    if error:
+                        await websocket.send_json({"type": "error", "message": error})
+                        continue
                 duration_seconds = int(message.get("duration_seconds", 30))
                 scenario_counts = message.get("scenario_counts", None)
-                arrivals = message.get("arrivals", None)
                 modes = message.get("modes", ["ai", "fixed", "greedy"])
                 model_id = message.get("model_id")
                 model_episode = message.get("model_episode")

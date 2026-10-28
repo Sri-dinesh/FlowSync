@@ -70,7 +70,8 @@ class FrameAnnotator:
             annotated = self._draw_queue_hud(annotated, lane_counts, cv2)
 
         # Draw signal decision badge
-        if cctv_frame is not None:
+        if (cctv_frame is not None and cctv_frame.signal_phase_name is not None
+                and cctv_frame.confidence_pct is not None):
             annotated = self._draw_signal_badge(
                 annotated,
                 cctv_frame.signal_phase_name,
