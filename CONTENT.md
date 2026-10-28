@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-10-27, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-10-28, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -163,13 +163,17 @@ Rule checks, test coverage and finite lamp audits do not amount to formal synthe
 
 ## 10. Camera and digital-twin workflow
 
-The actual orchestrator is [cctv_pipeline.py](server/app/realworld/pipeline/cctv_pipeline.py). It extracts a frame, runs Ultralytics YOLO detection in a worker thread, updates tracks, counts by frame quadrant, smooths counts, annotates and broadcasts/logs the result. Configured pipeline rate is separate from measured end-to-end latency. Stream resolution and latest-frame buffering do not guarantee zero capture/network/decoding delay.
+The actual orchestrator is [cctv_pipeline.py](server/app/realworld/pipeline/cctv_pipeline.py). It extracts a frame, runs Ultralytics YOLO detection in a worker thread, updates tracks, assigns exclusive image-direction proxies, smooths counts, annotates and broadcasts/logs the result. Configured pipeline rate is separate from measured end-to-end latency. Stream resolution and latest-frame buffering do not guarantee zero capture/network/decoding delay.
 
 The default detector family is YOLOv8n, with local production/pretrained paths and optional upstream weight fallback. This is third-party software/model use, not a FlowSync detector architecture. Record actual weight identity, dataset/model provenance and upstream licensing separately from this repository's source license.
 
 [VehicleTracker.update](server/app/realworld/pipeline/vehicle_tracker.py) greedily associates nearest previous centroids within an 80-pixel distance and prunes tracks after three seconds. It does **not** execute ByteTrack's two-stage association, despite legacy comments. ByteTrack is related work only until its implementation is actually wired. Likewise, detector IDs or time since first sighting do not automatically provide calibrated individual stopped waiting.
 
-The active counting path uses bottom-centre locations and frame quadrants. ROI/homography utilities exist separately; their presence does not establish that the current orchestrator applies a calibrated homography. Smoothed/last-good counts and confidence heuristics must be identified as estimates. The digital twin is experimental replay/state construction, not calibrated equivalence to the observed intersection. Recorded footage and ground-truth traffic labels were not supplied for validation.
+The active counting path uses bottom-centre locations and assigns the dominant displacement from the image centre to at most one direction. Centre/diagonal ties and invalid locations remain unassigned. This repairs the historical counter's two-to-four assignments per box. The legacy `*_straight` keys are compatibility slots for image-direction proxies, not measured turning movements. ROI/homography utilities exist separately; their presence does not establish that the current orchestrator applies a calibrated homography. Smoothed/last-good counts and confidence heuristics remain estimates.
+
+`CCTVFrame.observation_contract` reports detected, assigned and unassigned box counts, unavailable movement information and missing control inputs. The current pipeline has no loaded control-policy inference path or observed signal feedback. It emits empty observations/Q values and null phase, policy confidence and waiting measurements. The former queue-times-2.5 waiting estimate has been removed. The frontend displays these limitations instead of a default green, numerical Q vector or apparent policy confidence.
+
+First track sightings retain `turn:null` and explicit provenance: image-direction proxy, unobserved turn and processing-cadence timestamp proxy. Track IDs no longer generate fictional turns. Empty recordings remain empty. [arrival_contract.py](server/app/realworld/digital_twin/arrival_contract.py) checks required replay fields and rejects these incomplete sightings before simulation state changes. The recorder publishes `replay_inputs_complete` and a reason; the UI disables replay and automatic count injection for incomplete sessions. Field completeness does not establish measured-camera validity for legacy or manually supplied events. The digital twin remains experimental simulation, not calibrated equivalence to a real intersection. Recorded footage and ground-truth traffic labels were not supplied for validation. Section 36.7 records the synthetic contract and frozen-model diagnostic.
 
 ## 11. Model, history and persistence workflow
 
@@ -741,7 +745,7 @@ The research HTTP endpoints include `GET /research/runtime`, `/scenarios`, `/con
 
 WebSockets are mounted at `/ws/simulation`, `/ws/training`, `/ws/city`, `/ws/cctv` and `/ws/research`. Research messages use a `command` field with values including `start_experiment`, `start_paired_comparison`, `pause`, `resume`, `stop`, `set_speed`, `seek` and `replay_run`. Inputs such as `scenario_id`, controller(s), seed and `noise_preset` are top-level fields in the current handler, not the old nested `type/config` example. Live/replayed research frames use `research_frame`.
 
-Read [research_ws.py](server/app/websockets/research_ws.py) and [research types](client/src/types/research.ts) together before integrating a client. The live handler has application-specific scenario fallback/session behavior; it is not equivalent to strict headless scenario validation merely because both import common modules. This documentation update does not alter that behavior.
+Read [research_ws.py](server/app/websockets/research_ws.py) and [research types](client/src/types/research.ts) together before integrating a client. The live handler rejects unknown scenarios/noise presets and unavailable learned controllers. Its interactive runtime remains distinct from the audited headless path despite those input checks and shared modules.
 
 ### 26.3 Persistence and model identity
 
@@ -755,7 +759,7 @@ Earlier user reports included Supabase HTTP/2 `RemoteProtocolError` on model que
 
 Camera code is organized under `server/app/realworld/{pipeline,digital_twin,training,models,utils}/`. It includes stream resolution, video processing, detection/tracking, ROI/count/state construction, session recording/replay and model training/export helpers. Vision extras and weights are optional installation/data concerns, not bundled validated field assets.
 
-The city UI and simulation modules provide a separate network application path. Neither camera/city existence nor UI explanation panels validate the audited single-intersection demand model, camera accuracy, network generalization, physical hardware operation or research/UI equality. Recorded-camera replay, measured traffic calibration, shadow recommendations and operator/intersection engineering remain future validation work.
+The city UI and simulation modules provide a separate network application path. Neither camera/city existence nor UI explanation panels validate the audited single-intersection demand model, camera accuracy, network generalization, physical hardware operation or research/UI equality. The camera contract now prevents incomplete sightings from becoming automatic replay inputs. Recorded-camera replay with measured movements/timing, traffic calibration, shadow recommendations and operator/intersection engineering remain future validation work.
 
 <a id="27-installation-operations-security-and-open-source-conventions"></a>
 ## 27. Installation, Operations, Security and Open-Source Conventions
@@ -1305,6 +1309,7 @@ Do not pool custom/SUMO delay means, attach the custom confidence interval to SU
 | `results/sumo_count_ablation/full_20261023/` and `results/sumo_count_analysis/audit_20261023/` | New component episodes, anchored references, per-case axes, 2,135 paired-vehicle rows, signal exposure and source provenance. |
 | `results/sumo_robustness/full_20261023/` and `results/sumo_robustness/closure_20261023/` | All final robustness traces/reports and eight verified CSV tables, retaining every seed/start/endpoint and exceptions. |
 | `results/sumo_wait_accounting/analysis_20261027/` | Retrospective axis-weighting and disjoint-window accounting from the same robustness traces. Two 24-row CSVs, a PNG/PDF/SVG figure, exact input/output hashes and analysis source archive. No new traffic samples. See section 36.6. |
+| `results/camera_boundary/final_20261027/` | Synthetic geometry contract audit and 4,104 frozen-policy evaluations of 1,368 hypothetical states. Preserved counter predecessor, full inputs/Q values/masks/proposals, ambiguity witnesses, specification and hashes. Recomputed by the audit's `--verify` mode. See section 36.7. |
 
 Most result directories are ignored local artifacts and are absent from a fresh clone. The [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) describes this boundary. Source code and Markdown summaries alone do not provide downloadable raw evidence. Artifact packaging/accessibility and final paper tables must be handled explicitly before a reproducibility claim about public availability.
 
@@ -1395,6 +1400,70 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
 The recorded export is `results/sumo_wait_accounting/analysis_20261027/`. `endpoints.csv` retains every seed/start at both cumulative endpoints; `windows.csv` retains every seed/start in both disjoint windows. `report.json` contains the retrospective specification, hierarchical summaries, input/output hashes, source hashes and verification scope. `analysis_source.zip` preserves the analyser and its verification dependencies. `waiting_accounting.png`, `.pdf` and `.svg` show every seed. The earlier `audit_20261027` local development export is retained but is not the cited artifact. Generated results remain local artifacts under the existing ignore policy.
 
 The complete raw robustness verifier passed again. Eleven new arithmetic/validation tests and the related robustness/count-analysis tests passed, **51 tests total**. Checks cover demand-weighting cancellation, role assignment, missing/duplicate contexts, denominator/partition corruption, non-finite input, window subtraction and output preservation. Existing dependency deprecation warnings remain. This update runs no new simulation or training and writes no manuscript. Values reconstructed from waiting integrals can differ below one microsecond from older summaries that subtract six-decimal stored means.
+
+### 36.7 Camera information and controller recommendation ambiguity
+
+The [camera-boundary audit](research/cv/audit_camera_boundary.py), started October 27 and documented October 28, examines a prerequisite for the real-CCTV objective: whether the camera output preserves the information needed by the existing controller. It separates implementation defects from information that a detection pipeline has never measured. These are synthetic engineering diagnostics; no CCTV footage, detector accuracy labels, traffic rollouts or cabinet commands are involved.
+
+**Count conservation.** The historical `QuadrantCounter` from Git revision `4e1dbe5` is archived with SHA-256 `6ae867986a5379b74b7280d79cd07a91e9e5988dbf0ac9ff859a2ec59764fb57`. The diagnostic supplies one box at each of 361 bottom-centre positions on a 19×19 grid in a 1000×1000 frame, all with supplied confidence 0.99. It exercises the actual old and corrected functions:
+
+| Number of directional assignments for one box | Historical counter: grid cases | Corrected counter: grid cases |
+| --- | ---: | ---: |
+| 0 | 0 | 37 |
+| 1 | 0 | 324 |
+| 2 | 196 | 0 |
+| 3 | 140 | 0 |
+| 4 | 25 | 0 |
+
+The correction conserves assignments and exposes ambiguity instead of duplicating boxes. The 37 centre/diagonal positions remain unassigned. This does not establish correct road assignment: image directions still need camera calibration. The supplied confidence value demonstrates that downstream bookkeeping can be wrong even when every detector output carries high confidence. These are deterministic geometry cases, not independent sampled images or a measured detection-accuracy percentage. Duplicate detector boxes, occlusion and tracking errors remain separate concerns.
+
+**Frozen-policy input sufficiency.** The diagnostic uses all three unchanged v7/v5 parents from section 25. Its finite input specification is saved before network scores are evaluated. It assumes exact approach totals, an observed current phase and hypothetical fixed non-movement features, then varies only how each approach's vehicles split between straight and left:
+
+| Design element | Fixed specification |
+| --- | --- |
+| Approach order | North, south, east, west. |
+| Approach-total patterns | `[2,2,2,2]`, `[8,8,2,2]`, `[2,2,8,8]`, `[8,2,4,2]`, `[0,0,6,6]`, `[6,6,0,0]`. |
+| Current phase | Each of the four phases, giving 24 aggregate-input groups. |
+| Turning completions | Left fraction 0, 0.5 or 1 independently per approach; remaining vehicles straight; no right turns. Duplicate completions on zero-count approaches are removed. |
+| Other features | Green age 15 s, no clearance, zero downstream counts, zero service timers and forecast features. These are hypothetical supplied values, not camera estimates. |
+| Encoding and masks | Shared v7 encoder; masks reconstructed from completed movement demand with current phase retained. Raw Q ranking is also reported before action exclusion. |
+| Coverage | Four positive-count patterns × 81 completions, two zero-axis patterns × 9 completions, each at four phases: 1,368 input states and 4,104 policy evaluations across three parents. |
+
+| Controller / training seed | Groups with different masked recommendations | Groups with different raw Q argmax recommendations |
+| --- | ---: | ---: |
+| D3QN / 101 | 24/24 | 24/24 |
+| D3QN / 202 | 24/24 | 24/24 |
+| D3QN / 303 | 24/24 | 24/24 |
+| Max-Pressure | 24/24 | Not applicable; no neural Q function. |
+
+For every group, `group_results` preserves a pair of input IDs witnessing a changed masked recommendation. Both witnesses are checked through the actual `D3QNController.act` path against batch scores/proposals. Raw-Q ambiguity means changes are not explained solely by excluding actions with a demand mask. The dueling centering offset is common to all actions and cannot change their raw ordering.
+
+A simple shared witness is input `0` versus input `80`: both have exactly two vehicles per approach and current phase NS straight. When all vehicles are straight-going, all three parents choose NS straight, action 0. When all are left-turning, all choose NS left, action 2, both before and after masking. Max-Pressure also changes from 0 to 2. Approach totals alone cannot distinguish the two inputs.
+
+Formally, if aggregation $h$ gives $h(s_1)=h(s_2)$ while the frozen controller gives $\pi(s_1)\ne\pi(s_2)$, a deterministic function of $h(s)$ alone cannot reproduce both recommendations. This is an elementary information-loss argument, not a new theorem. Our enumerated witnesses establish it for the recorded hypothetical inputs. Their occurrence frequency and dynamic reachability in real traffic have not been established. No probability distribution is assigned to completions; 24/24 is finite diagnostic coverage, not a deployment failure-rate estimate. Agreement across sampled completions would not certify robustness over all possible hidden inputs.
+
+The practical result is a concrete deployment requirement for these frozen models: supply measured movement information, use a validated inference model with explicit uncertainty, or train/evaluate a controller for the coarser observation contract. Higher detector confidence and switching to the current pressure fallback do not recover omitted turning information. This does not show that every aggregate-input controller must fail, that calibrated video cannot identify turns, or that different proposals have different traffic performance. The audit evaluates proposals before optional shielding and physical signal execution.
+
+**Prior work and contribution boundary.** Missing traffic observations and vision-based RL signal control are established research topics. [Mei, Li, Shi and Wei, IJCAI 2023](https://arxiv.org/html/2304.10722v2) address intersections without sensors through state and reward imputation. Their missing-data setting and learned remedies differ from this finite audit of an existing camera/model interface. [Garg, Chli and Vogiatzis, AAMAS 2022](https://www.ifaamas.org/Proceedings/aamas2022/pdfs/p454.pdf) study visual signal control with domain randomization. Their real-image section reports attention visualization without executing control actions in that experiment. We do not reproduce either method or inherit their reported results. These primary sources were checked October 27–28; this targeted comparison is not an exhaustive novelty review.
+
+The candidate empirical contribution is the linked, reproducible diagnosis: high-confidence boxes can violate count conservation; conserved approach totals can still omit policy-relevant movements; and software contracts can prevent those unknowns from being silently turned into apparent recommendations or calibrated replay. The exclusive assignment rule, input validation, finite completion enumeration and information-loss argument are established techniques. A publication must justify the value of this combined case study against prior work; novelty, acceptance and a superior learned controller remain unestablished.
+
+The final local artifact is `results/camera_boundary/final_20261027/`. It contains the specification, every geometry case, every hypothetical model input, masks, pressure proposals, all learned Q values/actions, witness pairs, parent checkpoint metadata/hashes, the historical counter and source archive. The earlier `audit_20261027/` export remains a development snapshot. Verification rechecks file/source hashes and exactly recomputes all geometry, inputs, network outputs and summaries in the recorded runtime. It does not rerun vehicle dynamics or evaluate real video. Commands require the preserved local parent checkpoints:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  server/venv/bin/python -m research.cv.audit_camera_boundary \
+  --verify results/camera_boundary/final_20261027
+
+# Optional reproduction into a new directory; no training or traffic rollout.
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  server/venv/bin/python -m research.cv.audit_camera_boundary \
+  --output results/camera_boundary/reproduction_20261028
+```
+
+The next real-camera evidence requires a permitted recorded intersection clip with movement/stop-line geometry, labeled movement counts or trajectories, video timestamps and signal phase/timing observations. Those data have not been supplied. A held-out clip must remain separate from calibration. Initial evaluation should measure counting/assignment/freshness errors and shadow recommendations without physical actuation. Traffic-delay or optimal-control claims then require an independently validated traffic model or appropriate field study; the current synthetic diagnostic cannot supply them.
+
+Verification on October 28: **693 backend/research tests passed**, including actual pipeline-cycle tests with supplied detections, replay rejection before worker-side mutation and input-completion/mask checks. Final review also moved rejection ahead of WebSocket task scheduling, so malformed replay cannot cancel an existing benchmark; the subsequent focused suite passed **40 tests**, including a new test through the actual WebSocket handler. These counts overlap and must not be added. Five frontend tests, TypeScript checking, lint and the production build pass. Targeted Chromium checks used the actual pipeline and recorder with synthetic supplied boxes in a temporary API harness: the unavailable-control contract appeared, unknown metrics remained unknown, incomplete replay was disabled, no simulation mutation was issued and no uncaught browser exception occurred. Incomplete sessions now avoid opening the simulation connection or rendering a misleading 3D replay. The test did not run YOLO on real footage, connect cloud storage or operate a traffic signal. Existing dependency and chart-sizing build warnings remain. The frozen-policy audit verifier reproduced all 4,104 evaluations exactly in the current runtime.
 
 ---
 
