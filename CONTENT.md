@@ -336,6 +336,55 @@ This fills a recorded-observation interface gap using standard interval lookup a
 
 Timeline verification on October 29: **120 focused backend tests passed**, including 21 timeline schema/lookup/API/pipeline/recorder/WebSocket cases. Counts overlap earlier suites. Five frontend tests, TypeScript checking, lint and the production build passed. A Chromium workflow using a synthetic video, threshold detections and supplied timeline rejected a wrong video hash, displayed a partial green with unknown onset, retained yellow/all-red/green/unknown/gap observations in the saved session, and left controller output fields null. No uncaught browser exception occurred. This is application integration verification, not real lamp recognition, synchronization accuracy or field control validation. Existing dependency and chart-sizing build warnings remain.
 
+### 10.5 Movement-label evaluation and when predictions become available
+
+[evaluate_movements.py](research/cv/evaluate_movements.py) adds an offline evaluation workflow for straight, left, right and U-turn labels. It reuses the crossing evaluator's video/calibration checks, event reconstruction, exhaustive windows and frozen approach/time matching protocol. **The application still has no turn classifier.** Its recorded crossing `turn` values remain `null`; legacy `*_straight` count slots are approach totals and are never converted into turn predictions. Adding an evaluation class for U-turns does not add a U-turn phase, policy input or supported physical movement to the controller.
+
+The input annotation schema is `movement_annotations_v1`. It has the same video/calibration identities, origin, declared data role, annotation method, time resolution and exhaustive windows as crossing annotations. Every event additionally requires an explicit `turn`: `straight`, `left`, `right`, `u_turn` or `null`. Unknown turns require a nonblank `unknown_reason`; known turns must not include one. Label approach and crossing time independently of predictions, then follow that same vehicle to its destination where visible. A vehicle that disappears before its exit is known stays unknown. Do not label all northbound detections straight or drop unobservable destinations from the crossing inventory. Which exits are visible and which labels remain unknown can affect interpretation; the evaluator does not establish unbiased camera coverage or annotation correctness.
+
+Example event entries, to be placed inside the full annotation object described in section 10.3 with the new schema version:
+
+```json
+[
+  {"event_id":"vehicle-001","approach":"north","time_s":12.4,"turn":"left"},
+  {"event_id":"vehicle-002","approach":"north","time_s":14.2,"turn":null,"unknown_reason":"Vehicle exits the image before its destination can be determined."}
+]
+```
+
+Without `--predictions`, the evaluator uses the current recorded pipeline as an explicit abstaining baseline. Each crossing has an unknown turn and becomes available at its later bracketing frame, not at the interpolated earlier crossing time. No weights, predictions or labels are generated to fill the missing classifier.
+
+A future classifier can supply a separate JSON with schema `movement_predictions_v1`. It must identify the exact original session bytes (`session_sha256`), video bytes (`video_sha256`) and calibration (`calibration_sha256`), declare `origin` (`model` or `synthetic_fixture`), and describe `producer_id` and `producer_method`. Its `events` must contain exactly one row for **every** index in the session's `stop_line_crossings`, including crossings outside scored windows and explicit abstentions. Each row contains `prediction_index`, nullable `turn` and `available_time_s`. Duplicate/missing/extra indices and different source identities are rejected. A standalone row looks like `{"prediction_index":0,"turn":"left","available_time_s":15.8}`. This is a file interface for evaluating a separately implemented producer, not an automatic turn-inference feature or permission to use human annotations as predictions.
+
+Availability uses video-position seconds. It must be at or after the crossing's later bracketing frame and within the recorded source-time extent. The report preserves each matched prediction's availability and its delay from the estimated crossing, with mean/maximum delay for classified matches having known truth. These values are producer declarations: `availability_times_verified:false` remains explicit. They do not measure wall-clock processing latency or prove that a model used only earlier frames. A turn inferred after reaching an exit is retrospective discharge information. It cannot be inserted into the policy's earlier queued-movement state as if it were observable before discharge. The evaluator neither populates queued-movement inputs nor enables camera control/replay.
+
+Matching does **not** consult turn labels. It first fixes the existing maximum-cardinality, minimum-time-error approach/window matches, then scores turns on those pairs. A wrong turn cannot obtain a better match by swapping vehicle labels. Dense same-approach traffic can still make time-based identity assignment ambiguous; this is not ground-truth identity matching or tracking validation.
+
+The report contains aggregate and per-approach summaries, all matched labels/predictions, the full crossing report, and a confusion table. Rows distinguish the four known turns and unknown truth; columns distinguish the four predictions, abstention and missed crossing. Metrics distinguish:
+
+- **Classification coverage:** classified matches / matches with known turn truth. This excludes crossings that were never detected.
+- **Accuracy among classified known matches:** correct / classified matches with known truth. It can be perfect even when many vehicles are missed or receive no turn prediction.
+- **Correct-turn fraction of all known labels:** correct / all known-turn annotations, including missed crossings and abstentions in the denominator. This measures successful recovery of known labels; it does not penalize extra predictions, so read it alongside crossing precision and unmatched-prediction counts.
+- **Unknown truth and unmatched predictions:** unknown labels stay in the confusion table but never become accuracy targets. Unmatched predictions are listed separately with per-turn and abstention counts. Predictions outside labeled windows remain unscored in the nested crossing report.
+
+Ratios with zero denominators remain `null`. Frame/event counts are not independent camera or traffic replicates. The tool supplies no confidence interval, automatic promotion, novelty judgment or real-world readiness decision. A declared held-out split is not verified independence. Classifier outputs, labels, tolerance and windows must be fixed independently of scoring if the evaluation is intended to support a confirmatory claim.
+
+Run with a fingerprinted session, independently reviewed movement annotations and the existing crossing protocol format:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research.cv.evaluate_movements \
+  --session /path/to/session.json --video /path/to/unchanged-clip.mp4 \
+  --annotations /path/to/movement-annotations.json --protocol /path/to/protocol.json \
+  --output results/movement_evaluation/clip_study_01
+
+# Add --predictions /path/to/movement-predictions.json to evaluate a future producer.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research.cv.evaluate_movements \
+  --verify results/movement_evaluation/clip_study_01 --video /path/to/unchanged-clip.mp4
+```
+
+Output directories must be new. Reports archive exact input JSONs, the evaluator and its crossing/model dependencies, input/source hashes and Python/Pydantic versions. Original video bytes are hashed, not copied. Verification reconstructs scoring from the stored inputs with matching current source/runtime; it does not rerun detection or attest prediction availability. Existing crossing evaluation schemas, reports and runtime camera contracts remain unchanged.
+
+Verification on October 29: **147 focused backend tests passed**, including **27 movement-evaluation cases** covering missing crossings, abstentions, incorrect/swapped turns, unknown truth, empty denominators, unmatched/unscored predictions, complete detector outage, wrong evidence identities, incomplete/duplicate prediction rows, invalid availability times, output overwrite prevention and report tampering. Totals overlap earlier suites. The actual CLI and verifier also ran against the previously decoded synthetic rectangle recording, producing `results/movement_evaluation/synthetic_20261029/` with annotations in `results/movement_evaluation/fixture_20261029/`. Its one crossing matched, but its destination exit is absent: the annotation and prediction both remain unknown, and turn accuracy is `null`. This reuses existing mechanics data; it is not a new independent traffic sample, turn-recognition result or real-camera experiment. Artifacts remain local/ignored. No frontend files changed, and no new browser/build run is claimed for this offline evaluator.
+
 ## 11. Model, history and persistence workflow
 
 FastAPI model/history services use Supabase API/Storage and local `server/models` checkpoints. Next.js server routes use Prisma/PostgreSQL for application views. `model-checkpoints` is the configured checkpoint bucket, not an automatically provisioned public dataset. Credentials remain private and server-only secrets must never enter `NEXT_PUBLIC_` variables.
