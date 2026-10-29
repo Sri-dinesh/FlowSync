@@ -2,11 +2,11 @@
 
 <a id="top"></a>
 
-Updated 2026-10-29, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-10-30, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
-This reference describes the actual application first. Separate experiment results begin at section 17. Camera accuracy, physical signal operation, hardware latency, public production hardening and complete application/headless parity remain unestablished. No new training, experiment or model promotion is part of this architecture update.
+This reference describes the actual application first. Separate experiment results begin at section 17. Camera accuracy, physical signal operation, hardware latency, public production hardening and complete application/headless parity remain unestablished. Research-only training and diagnostics do not automatically change application defaults or promote models.
 
 ## Contents
 
@@ -49,6 +49,7 @@ This reference describes the actual application first. Separate experiment resul
 - [37. Episode-level switch-margin calibration](#37-episode-level-switch-margin-calibration)
 - [38. Decision-cadence opportunity prerequisite](#38-decision-cadence-opportunity-prerequisite)
 - [39. Supervised count-restoration pilot](#39-supervised-count-restoration-pilot)
+- [40. On-policy PPO with frozen count restoration](#40-on-policy-ppo-with-frozen-count-restoration)
 
 ## 1. Project scope and ownership
 
@@ -1937,5 +1938,48 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/py
 Verification on October 28: **693 backend/research tests passed**, including actual pipeline-cycle tests with supplied detections, replay rejection before worker-side mutation and input-completion/mask checks. Final review also moved rejection ahead of WebSocket task scheduling, so malformed replay cannot cancel an existing benchmark; the subsequent focused suite passed **40 tests**, including a new test through the actual WebSocket handler. These counts overlap and must not be added. Five frontend tests, TypeScript checking, lint and the production build pass. Targeted Chromium checks used the actual pipeline and recorder with synthetic supplied boxes in a temporary API harness: the unavailable-control contract appeared, unknown metrics remained unknown, incomplete replay was disabled, no simulation mutation was issued and no uncaught browser exception occurred. Incomplete sessions now avoid opening the simulation connection or rendering a misleading 3D replay. The test did not run YOLO on real footage, connect cloud storage or operate a traffic signal. Existing dependency and chart-sizing build warnings remain. The frozen-policy audit verifier reproduced all 4,104 evaluations exactly in the current runtime.
 
 ---
+
+## 40. On-policy PPO with frozen count restoration
+
+### 40.1 Learning hypothesis and attribution
+
+The count restorer in section 39 improved observed-count reconstruction while its frozen D3QN controller failed the control screen. Earlier TD-update pilots also failed to improve reliably over their unchanged parents. This motivates a different learning-method comparison: optimize an explicit action policy from on-policy rollouts while keeping each restorer frozen. It does not establish that the DQN optimizer was defective, that perception is solved, or that PPO must succeed.
+
+[Proximal Policy Optimization (Schulman et al., 2017)](https://arxiv.org/abs/1707.06347) supplies the clipped policy-gradient objective. [Generalized Advantage Estimation (Schulman et al., 2015/2016)](https://arxiv.org/abs/1506.02438) supplies the value-based advantage estimator. These are established algorithms. The project-specific work is their adapter to the audited variable-duration decisions, delivered sensor packets, additional shield and provenance workflow. This implementation is not evidence of a new algorithm or a superior controller.
+
+### 40.2 Actor, critic and completed-macro workflow
+
+[ppo.py](research/policies/ppo.py) copies the complete v7/v5 parent dueling network as a masked categorical actor. Its scores become **policy logits**, with fixed temperature 1; they are no longer trained or reported as Q-values. Keeping the complete actor computation preserves the parent's initial greedy decisions. The common value head is frozen; the feature layers and advantage head receive policy gradients. A separate 36–64–64–1 tanh critic starts with a zero output layer. Critic gradients cannot update the actor. No application registry, website default, Supabase upload or camera interface is changed.
+
+[training/ppo.py](research/training/ppo.py) collects stochastic proposals using a local Torch generator, independently of traffic RNG. The additional shield filters proposals on every microtick and the existing physical FSM executes lamps. The saved action/log probability is the **proposal**, including when the shield overrides it. All policy inputs, masks and shield state come from delivered observations; simulator truth supplies the research training reward and evaluation metrics.
+
+Only completed decision-to-decision transitions enter training. A macro reward discounts each physical-tick reward by `gamma^(elapsed_ticks/20)`. Its bootstrap discount is `gamma^(macro_ticks/20)`, and GAE's trace factor is `(gamma*lambda)^(macro_ticks/20)`, with gamma 0.99 and lambda 0.95. The final complete transition bootstraps its next decision state. A final incomplete macro is dropped and counted. GAE resets at every episode boundary. The batch keeps its original log probabilities, values and return targets fixed; stale proposal likelihoods are rejected before updating.
+
+### 40.3 Frozen bounded development protocol
+
+[run_ppo_restoration_pilot.py](research/pilots/run_ppo_restoration_pilot.py) contains the executable `PLAN`. All three original parents (101/202/303) and the three restorer hashes from section 39 remain fixed. Raw-input PPO is the matched control; restored-input PPO is the predefined primary. The two arms share architecture, parent weights, training randomness, exogenous episode plans and optimization settings. This compares restoration during new policy learning; neither arm re-fits the restorer.
+
+- **Budget:** six workers, at most three processes, 600 seconds total with cooperative stops. Each has 90 episodes of 1,200 ticks, grouped in six-episode batches. A stopped worker makes the endpoint incomplete; it cannot qualify for continuation.
+- **Training:** the six existing train templates are shuffled once per batch and domain-randomized using the existing training-only routine. Episode seeds are `1331001 + zero-based episode index`, paired across all workers. Known clean/mixed sensing presets alternate. These faults and families are development support, not unseen transfer.
+- **Optimization:** first six episodes warm up only the independent critic (20 full-batch updates). Remaining batches use at most four clipped actor epochs and eight critic epochs each. Adam learning rates are actor 1e-4 and critic 1e-3; clipping epsilon 0.2, entropy coefficient 0.01, gradient norm cap 0.5. A sampled approximate-KL target of 0.02 can stop later actor epochs; it is not a guaranteed KL bound. Maximum per worker: 56 actor and 132 critic updates. There are no demonstrations, TD targets, target networks or experience replay in this experiment.
+- **Retention:** initial, critic-warmup/episode-6, 30, 60 and 90 checkpoints; every episode/proposal summary, completed-state batch and optimizer log. No checkpoint or replicate is selected by its validation outcome. Initial and critic-warmup greedy results must match corresponding frozen parents.
+- **Evaluation:** three existing validation templates, new traffic seeds `1333001 + template index`, clean/mixed conditions: six cases at each of five stages per worker (180 runs). Ninety additional runs cover each original parent raw/restored/default UQ, shielded pressure raw/EMA/restored per model, and bare raw pressure. All receive paired requested arrivals and matched sensing/shield rules where applicable. This is known-family development, not independent final confirmation.
+- **Continuation:** the episode-90 restored policy across all three parents must improve mean delay at least 2% against raw PPO, original raw/restored parents, and each raw/EMA/restored shielded or bare pressure reference. No aggregate p95/throughput loss against any of those references; no replicate more than 1% worse in delay than its corresponding reference. Complete coverage, initial/warmup parity, paired arrivals and zero measured signal violations are also required. A winning intermediate checkpoint, one parent, or the raw-input ablation cannot replace a failed primary endpoint.
+
+The runner rejects existing output directories and changed frozen checkpoints. It archives source hashes before collection. Output includes raw evaluation bundles, per-worker checkpoints and saved optimizer batches. Verification reconstructs case coverage, hashes, pairing, curves and the frozen screen; `--refit` also repeats optimizer updates from saved states/returns and compares tensors exactly. That mode does **not** rerun traffic trajectories or add independent traffic samples.
+
+At protocol freeze, **38 focused PPO/restoration/margin tests pass, including 14 new PPO cases**. They cover all three parents' initial masked-score/action parity, hand-computed duration-aware GAE, episode boundaries, clipping gradients, stochastic masks, critic isolation, local sampling RNG, explicit checkpoint compatibility, saved-batch reconstruction, actual shield overrides retaining proposed actions, stale-likelihood rejection, and complete-replicate screening. These totals overlap earlier suites and are not additive independent coverage.
+
+The two-arm training-only integration smoke at `results/ppo_restoration/smoke_20261030/` completed in **16.425 seconds**. With parent 101 and one training case, initial greedy policies match raw/restored parents, actor updates change weights, saved-batch optimizer replay reproduces logs and tensors exactly, and all 9,600 executed signal samples (two training rollouts plus six evaluations) have zero measured violations. The smoke does not constitute a performance screen, additional training replicates or unseen-family validation. Its dedicated traffic seed is 1330901.
+
+The six-worker performance panel has not yet run at protocol freeze. No gain or continuation claim follows from implementation checks. To execute once in a new directory and verify afterward:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.run_ppo_restoration_pilot --output results/ppo_restoration/new_bounded_pilot
+
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.run_ppo_restoration_pilot --verify results/ppo_restoration/new_bounded_pilot --refit
+```
 
 [Back to Top](#top)
