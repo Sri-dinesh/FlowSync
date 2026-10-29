@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import os
 import math
+import hashlib
 import threading
 import time
 from pathlib import Path
@@ -90,10 +91,12 @@ class VideoProcessor:
         self._last_frame_time: float = 0.0
         self.source_time_s: float | None = None
         self._last_source_time_s: float | None = None
+        self.source_video_sha256: str | None = None
 
     async def open(self) -> VideoMetadata:
         """Open video source (resolving stream URLs if necessary) and return metadata."""
         self.source_time_s = self._last_source_time_s = None
+        self.source_video_sha256 = None
         try:
             import cv2
         except ImportError:
@@ -145,6 +148,11 @@ class VideoProcessor:
             raise RuntimeError(f"Cannot open video source: {self.source}")
 
         self._cap = cap
+        if not self.is_live:
+            def fingerprint():
+                with open(self.source, "rb") as video_file:
+                    return hashlib.file_digest(video_file, "sha256").hexdigest()
+            self.source_video_sha256 = await asyncio.to_thread(fingerprint)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         source_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0

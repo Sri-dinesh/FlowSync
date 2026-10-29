@@ -36,6 +36,7 @@ class SessionRecorder:
         model_name: Optional[str] = None,
         model_episodes: Optional[int] = None,
         calibration: Optional[CameraCalibration] = None,
+        source_video_sha256: Optional[str] = None,
     ) -> None:
         self.session_id = session_id
         self.output_dir = Path(output_dir)
@@ -44,6 +45,7 @@ class SessionRecorder:
         self.model_name = model_name
         self.model_episodes = model_episodes
         self.calibration = calibration
+        self.source_video_sha256 = source_video_sha256
         self._frames: List[Dict] = []
         self._start_time = time.time()
         self._frame_count = 0
@@ -143,6 +145,7 @@ class SessionRecorder:
         """Save session to JSON file. Returns path to saved file."""
         output_path = self.output_dir / f"{self.session_id}.json"
         session_data = {
+            "source_video_sha256": self.source_video_sha256,
             "calibration": self.calibration.model_dump(mode="json") if self.calibration else None,
             "calibration_sha256": self.calibration.sha256 if self.calibration else None,
             "session_id": self.session_id,

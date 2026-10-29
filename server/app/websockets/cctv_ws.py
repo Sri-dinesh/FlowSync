@@ -180,6 +180,7 @@ async def cctv_socket(websocket: WebSocket) -> None:
                     model_name=active_model,
                     model_episodes=active_eps,
                     calibration=calibration,
+                    source_video_sha256=video_proc.source_video_sha256,
                 )
 
                 try:

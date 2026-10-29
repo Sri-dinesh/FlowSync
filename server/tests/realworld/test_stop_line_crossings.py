@@ -157,13 +157,23 @@ async def test_decoder_clock_not_processing_cadence_and_end_to_end_recording(tmp
     assert times == pytest.approx([0,.5,1,1.5,2,2.5])
     events=[e for f in frames for e in f.crossing_observation.events]
     assert len(events)==1 and events[0].estimated_time_s == pytest.approx(1.25,abs=.03)
-    recorder=SessionRecorder("crossing",str(tmp_path),calibration=config)
+    recorder=SessionRecorder("crossing",str(tmp_path),calibration=config,source_video_sha256=video.source_video_sha256)
     for frame in frames: recorder.record_frame(frame)
     recorder.set_arrivals(pipeline.arrival_events)
     data=json.loads(open(recorder.save()).read())
     assert len(data["stop_line_crossings"])==1
     assert not data["twin_data"]["replay_inputs_complete"]
     assert len(data["twin_data"]["stop_line_crossings"])==1
+    from research.cv.evaluate_crossings import Annotations, Protocol, Session, evaluate, video_digest
+    annotations=Annotations(schema_version="crossing_annotations_v1",video_sha256=video_digest(source),
+        calibration_sha256=config.sha256,origin="synthetic_fixture",split="development",
+        annotation_method="Crossing specified from the synthetic rectangle motion before pipeline inference.",
+        time_resolution_s=.5,windows=[dict(window_id="north",approach="north",start_s=0,end_s=2.5,exhaustive=True)],
+        events=[dict(event_id="fixture_crossing",approach="north",time_s=1.25)])
+    protocol=Protocol(schema_version="crossing_evaluation_v1",protocol_id="fixture",match_tolerance_s=.1)
+    report=evaluate(Session.model_validate(data),annotations,protocol,video_digest(source))
+    assert report["metrics"]["true_positive"]==1
+    assert report["metrics"]["false_positive"]==report["metrics"]["false_negative"]==0
 
 
 @pytest.mark.asyncio
