@@ -53,7 +53,7 @@ export default function CameraConfigInput({ kind, source, disabled, onChange }: 
   return (
     <fieldset disabled={disabled || selection.kind === "loading"} className="space-y-2 rounded-lg border border-white/15 p-3 text-xs text-white/70">
       <legend className="px-1 font-medium">{title} (optional)</legend>
-      <p>{geometry ? "Import polygons and stop lines for this camera. Geometry is checked; counting accuracy still needs labeled video."
+      <p>{geometry ? "Import approach polygons and stop lines; optional exit regions enable departure labels. Geometry is checked; accuracy still needs labeled video."
         : "Import annotated green, yellow, all-red and unknown intervals. Video identity is checked on Start. This does not issue signal commands."}</p>
       <label className="block space-y-1">
         <span>{title} JSON</span>

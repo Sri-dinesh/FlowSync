@@ -21,6 +21,18 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export type CCTVFrameData = {
+  trajectory_observation?: {
+    status: "available" | "observation_unavailable";
+    pending_count: number;
+    classified_count: number;
+    unresolved_count: number;
+    last_event: {
+      approach: string;
+      turn: "straight" | "left" | "right" | "u_turn" | null;
+      reason: string;
+      available_time_s: number | null;
+    } | null;
+  } | null;
   recorded_signal?: {
     status: "available" | "unknown" | "gap" | "source_timing_unavailable" | "video_mismatch";
     origin: string;
