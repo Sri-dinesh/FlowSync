@@ -61,8 +61,8 @@ class MovementPredictions(StrictModel):
 
 def prediction_rows(session, predictions, session_sha256, coverage):
     if predictions is None:
-        # The recorded pipeline has no turn classifier. Do not reinterpret its
-        # legacy *_straight count slots as observed vehicle movements.
+        # Explicit abstaining baseline. Retrospective exit outcomes require the
+        # separate trajectory export; *_straight count slots are not turns.
         return {i: MovementPrediction(prediction_index=i, turn=None, available_time_s=event.time_interval_s[1])
                 for i, event in enumerate(session.stop_line_crossings)}
     if (predictions.session_sha256 != session_sha256
@@ -132,7 +132,7 @@ def evaluate(session, annotations, protocol, video_hash, session_hash, predictio
         schema_version="movement_evaluation_v1", complete=True,
         prediction_source=predictions.model_dump(exclude={"events"}) if predictions else {
             "origin": "recorded_pipeline", "producer_id": "unavailable_turn_classifier",
-            "producer_method": "All recorded crossing turns are unknown; no classification is inferred."},
+            "producer_method": "Crossing-only abstaining baseline; retrospective exit outcomes are not imported without a predictions file."},
         crossing_evaluation=crossing_report,
         metrics=summarize(annotations.events, by_label, rows),
         per_approach={approach: summarize([label for label in annotations.events if label.approach == approach], by_label, rows)

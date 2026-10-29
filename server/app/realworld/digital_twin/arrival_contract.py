@@ -11,7 +11,7 @@ def replay_input_error(arrivals):
             return "Each replay arrival must be an object."
         if row.get("event_semantics") == "first_track_sighting_not_stop_line_arrival":
             return "Camera track sightings lack measured movement and arrival timing; calibrated replay is unavailable."
-        if row.get("event_semantics") == "inferred_stop_line_discharge":
+        if row.get("event_semantics") in ("inferred_stop_line_discharge", "retrospective_crossing_to_exit"):
             return "Stop-line discharges are not incoming demand and cannot seed arrival replay."
         if row.get("lane") not in ("north", "south", "east", "west") or row.get("turn") not in ("straight", "left", "right"):
             return "Replay requires an explicit approach and turning movement for every arrival."

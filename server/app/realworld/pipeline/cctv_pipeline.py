@@ -34,6 +34,7 @@ from .frame_annotator import FrameAnnotator
 from .quadrant_counter import QuadrantCounter, image_direction
 from .camera_geometry import assign_approaches, draw_calibration
 from .stop_line_crossings import StopLineCrossings
+from .trajectory_turns import TrajectoryTurns
 from .vehicle_tracker import VehicleTracker
 from .video_processor import VideoProcessor
 from .yolo_detector import YOLODetector
@@ -77,6 +78,7 @@ class CCTVPipeline:
         self.annotate_frames = annotate_frames
         self.calibration = calibration
         self._crossings = StopLineCrossings(calibration) if calibration else None
+        self._turns = TrajectoryTurns(calibration) if calibration and calibration.exits else None
         self._signal_reader = SignalTimelineReader(signal_timeline) if signal_timeline else None
 
         self._tracker = VehicleTracker()
@@ -177,6 +179,7 @@ class CCTVPipeline:
         crossings = self._crossings.update(
             detection, directions, geometry, source_time_s
         ) if self._crossings else None
+        turns = self._turns.update(detection, crossings) if self._turns else None
 
         for bbox, direction in zip(detection.bboxes, directions):
             if bbox.track_id is not None and bbox.track_id not in self._recorded_track_ids:
@@ -312,6 +315,7 @@ class CCTVPipeline:
             geometry_observation=geometry,
             crossing_observation=crossings,
             recorded_signal=recorded_signal,
+            trajectory_observation=turns,
             congestion_level=congestion,
             status=model_status,
         )

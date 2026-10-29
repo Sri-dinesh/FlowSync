@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .calibration import GeometryObservation
 from .crossings import CrossingObservation
 from .signal_timeline import RecordedSignal
+from .trajectory_turns import TrajectoryObservation
 
 from .config import LANE_KEYS
 
@@ -215,6 +216,7 @@ class CCTVFrame(BaseModel):
     geometry_observation: Optional[GeometryObservation] = None
     crossing_observation: Optional[CrossingObservation] = None
     recorded_signal: Optional[RecordedSignal] = None
+    trajectory_observation: Optional[TrajectoryObservation] = None
     # Frame (base64 for WebSocket streaming)
     annotated_frame_b64: Optional[str] = None
     # Fixed timer comparison

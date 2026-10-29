@@ -48,4 +48,9 @@ def draw_calibration(frame, calibration: CameraCalibration):
         cv2.line(output, start, end, (0, 180, 255), 3)
         x, y = points.mean(axis=0).astype(int)
         cv2.putText(output, region.approach, (x, y), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
+    for region in calibration.exits:
+        points = np.array([(round(x*width), round(y*height)) for x, y in region.vertices], dtype=np.int32)
+        cv2.polylines(output, [points], True, (180, 80, 220), 2)
+        x, y = points.mean(axis=0).astype(int)
+        cv2.putText(output, f"exit {region.exit_id}", (x, y), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
     return output

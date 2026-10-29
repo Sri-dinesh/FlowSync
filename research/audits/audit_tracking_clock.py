@@ -31,6 +31,7 @@ SOURCES = (
     "server/app/realworld/models/calibration.py", "server/app/realworld/models/crossings.py",
     "server/app/realworld/models/schemas.py", "server/app/realworld/models/config.py",
     "server/app/realworld/models/signal_timeline.py",
+    "server/app/realworld/models/trajectory_turns.py",
 )
 
 

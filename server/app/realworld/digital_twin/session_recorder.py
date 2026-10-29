@@ -56,6 +56,7 @@ class SessionRecorder:
         self._passed_vehicles = 0
         self._arrivals: List[Dict[str, Any]] = []
         self._crossings: List[Dict[str, Any]] = []
+        self._trajectory_turns: List[Dict[str, Any]] = []
 
         # Aggregate per-lane counts across all frames
         self._aggregate_counts: Dict[str, int] = {k: 0 for k in LANE_KEYS}
@@ -71,6 +72,8 @@ class SessionRecorder:
         self._frames.append(frame_data)
         if frame.crossing_observation:
             self._crossings.extend(event.model_dump(mode="json") for event in frame.crossing_observation.events)
+        if frame.trajectory_observation:
+            self._trajectory_turns.extend(event.model_dump(mode="json") for event in frame.trajectory_observation.events)
         self._frame_count += 1
         self._total_detections += frame.vehicle_types.total()
 
@@ -162,6 +165,7 @@ class SessionRecorder:
             "twin_data": self.get_twin_data(),
             "frames": self._frames,
             "stop_line_crossings": self._crossings,
+            "trajectory_turns": self._trajectory_turns,
         }
         with open(output_path, "w") as f:
             json.dump(session_data, f, indent=2, default=str)
