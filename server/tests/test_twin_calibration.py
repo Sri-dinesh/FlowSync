@@ -3,9 +3,7 @@ test_twin_calibration.py — Unit Tests for CV Validation & Digital Twin Calibra
 ===================================================================================
 Task E4 & Task F2: Validates CV state estimation metrics and digital-twin flow calibration.
 """
-from pathlib import Path
 import json
-import numpy as np
 import pytest
 
 from research.cv.validation_tool import CVStateValidator, CVValidationReport
@@ -13,7 +11,7 @@ from research.calibration.twin_calibrator import DigitalTwinCalibrator, TwinCali
 
 
 def test_cv_state_validator_metrics():
-    """CVStateValidator must accurately compute precision, recall, MAE, and correlation."""
+    """Count errors are measurable; object identity and timing are not supplied."""
     validator = CVStateValidator()
 
     # Synthetic reference data: 5 frames
@@ -35,17 +33,17 @@ def test_cv_state_validator_metrics():
     report = validator.evaluate(predicted_frames, annotated_frames)
     assert isinstance(report, CVValidationReport)
     assert report.total_frames_evaluated == 5
-    assert report.precision > 0.85
-    assert report.recall > 0.70
-    assert report.count_mae >= 0.0
-    assert report.lane_assignment_accuracy_pct > 70.0
+    assert report.precision is report.recall is report.f1_score is None
+    assert report.count_mae == pytest.approx(8 / 60)
+    assert report.lane_assignment_accuracy_pct is None
+    assert report.arrival_time_mae_s is report.uncertainty_error_correlation is None
 
 
 def test_digital_twin_calibration_profile(tmp_path):
     """DigitalTwinCalibrator must evaluate flow error and save versioned profile artifact."""
     calibrator = DigitalTwinCalibrator()
 
-    # Real CCTV detection session data
+    # Synthetic count fixtures, not measured CCTV data.
     real_data = {
         "duration_s": 120.0,
         "aggregate_counts": {
@@ -79,7 +77,7 @@ def test_digital_twin_calibration_profile(tmp_path):
     assert profile.overall_turn_error_pts < 10.0  # Within Task F2 tolerance (<= 10 pts)
 
     # Save to disk
-    out_file = Path("research/calibration/profiles/calib_profile_v1.json")
+    out_file = tmp_path / "calib_profile_v1.json"
     profile.save(out_file)
     assert out_file.exists()
 
