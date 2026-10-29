@@ -50,6 +50,7 @@ class SessionRecorder:
         self._total_detections = 0
         self._passed_vehicles = 0
         self._arrivals: List[Dict[str, Any]] = []
+        self._crossings: List[Dict[str, Any]] = []
 
         # Aggregate per-lane counts across all frames
         self._aggregate_counts: Dict[str, int] = {k: 0 for k in LANE_KEYS}
@@ -63,6 +64,8 @@ class SessionRecorder:
         """Record a single frame (excluding annotated_frame_b64 to save space)."""
         frame_data = frame.model_dump(mode="json", exclude={"annotated_frame_b64"})
         self._frames.append(frame_data)
+        if frame.crossing_observation:
+            self._crossings.extend(event.model_dump(mode="json") for event in frame.crossing_observation.events)
         self._frame_count += 1
         self._total_detections += frame.vehicle_types.total()
 
@@ -111,6 +114,7 @@ class SessionRecorder:
             "total_vehicles_detected": len(arrivals),
             "video_duration_s": round(video_dur, 1),
             "arrivals": arrivals,
+            "stop_line_crossings": list(self._crossings),
             "replay_inputs_complete": replay_error is None,
             "replay_unavailable_reason": replay_error,
             "aggregate_counts": self._aggregate_counts,
@@ -149,6 +153,7 @@ class SessionRecorder:
             "stats": self.get_stats(),
             "twin_data": self.get_twin_data(),
             "frames": self._frames,
+            "stop_line_crossings": self._crossings,
         }
         with open(output_path, "w") as f:
             json.dump(session_data, f, indent=2, default=str)

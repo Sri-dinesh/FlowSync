@@ -50,6 +50,9 @@ class VehicleTracker:
         """
         self._ensure_initialized()
         now_ms = time.time() * 1000
+        # Expired tracks must not be resurrected by the next nearby detection.
+        self._active_tracks = {tid: track for tid, track in self._active_tracks.items()
+                               if now_ms-track.last_seen_ms <= 3000.0}
 
         # Match detections to existing tracks via centroid distance
         updated_bboxes = []
@@ -113,15 +116,6 @@ class VehicleTracker:
                 )
             updated_bboxes.append(new_bbox)
 
-        # Prune stale tracks (not seen in last 3 seconds)
-        stale_threshold_ms = 3000.0
-        stale_ids = [
-            tid for tid, track in self._active_tracks.items()
-            if (now_ms - track.last_seen_ms) > stale_threshold_ms
-        ]
-        for tid in stale_ids:
-            del self._active_tracks[tid]
-
         return VehicleDetection(
             frame_id=detection.frame_id,
             timestamp_ms=detection.timestamp_ms,
@@ -129,6 +123,7 @@ class VehicleTracker:
             inference_time_ms=detection.inference_time_ms,
             frame_width=detection.frame_width,
             frame_height=detection.frame_height,
+            model_not_loaded=detection.model_not_loaded,
         )
 
     def _get_next_id(self) -> int:

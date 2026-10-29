@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import math
 import threading
 import time
 from pathlib import Path
@@ -69,7 +70,7 @@ class VideoProcessor:
     - MJPEG / HLS HTTP stream
 
     Provides frames at configurable FPS, independent of source FPS.
-    For live streams: uses RealtimeFrameGrabber to ensure 0ms buffer delay.
+    Live streams use latest-frame buffering; capture/transport delay is not measured.
     """
 
     def __init__(
@@ -87,9 +88,12 @@ class VideoProcessor:
         self._frame_interval = 1
         self._metadata: Optional[VideoMetadata] = None
         self._last_frame_time: float = 0.0
+        self.source_time_s: float | None = None
+        self._last_source_time_s: float | None = None
 
     async def open(self) -> VideoMetadata:
         """Open video source (resolving stream URLs if necessary) and return metadata."""
+        self.source_time_s = self._last_source_time_s = None
         try:
             import cv2
         except ImportError:
@@ -151,7 +155,7 @@ class VideoProcessor:
         self._source_fps = source_fps
         self._frame_interval = max(1, int(source_fps / self.target_fps))
 
-        # Start low-latency zero-buffer background grabber for live streams
+        # Start latest-frame buffering for live streams.
         if self.is_live:
             self._grabber = RealtimeFrameGrabber(self._cap)
             for _ in range(40):
@@ -173,12 +177,13 @@ class VideoProcessor:
     async def read_frame(self) -> Optional[np.ndarray]:
         """
         Read next frame at target_fps.
-        For live streams: retrieves the latest real-time frame with 0ms queue delay.
+        For live streams: retrieves the latest decoded frame; source time is unavailable.
         For file playback: steps through frames sequentially.
         Returns BGR numpy array, or None if end of stream.
         """
         if self._cap is None:
             raise RuntimeError("VideoProcessor not opened. Call open() first.")
+        self.source_time_s = None
 
         if self.is_live:
             # Enforce target FPS pacing for live ingestion
@@ -193,6 +198,7 @@ class VideoProcessor:
             return frame
 
         def _read_file():
+            import cv2
             # Skip frames to match target FPS
             frame = None
             for _ in range(self._frame_interval):
@@ -201,6 +207,11 @@ class VideoProcessor:
                     return None
                 frame = f
             self._frame_counter += self._frame_interval
+            timestamp = self._cap.get(cv2.CAP_PROP_POS_MSEC)/1000.0
+            if math.isfinite(timestamp) and timestamp >= 0 and (
+                self._last_source_time_s is None or timestamp > self._last_source_time_s
+            ):
+                self.source_time_s = self._last_source_time_s = timestamp
             return frame
 
         frame = await asyncio.to_thread(_read_file)

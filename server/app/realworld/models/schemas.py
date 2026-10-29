@@ -9,6 +9,7 @@ from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 from .calibration import GeometryObservation
+from .crossings import CrossingObservation
 
 from .config import LANE_KEYS
 
@@ -211,6 +212,7 @@ class CCTVFrame(BaseModel):
     confidence_pct: Optional[float] = None
     observation_contract: CameraObservationContract = Field(default_factory=CameraObservationContract)
     geometry_observation: Optional[GeometryObservation] = None
+    crossing_observation: Optional[CrossingObservation] = None
     # Frame (base64 for WebSocket streaming)
     annotated_frame_b64: Optional[str] = None
     # Fixed timer comparison
