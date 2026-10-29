@@ -4,7 +4,6 @@ Centroid vehicle tracking — persistent IDs across frames.
 from __future__ import annotations
 
 import math
-import time
 from typing import Dict, Set
 
 from ..models.config import MOVEMENT_THRESHOLD_PX
@@ -18,9 +17,6 @@ class VehicleTracker:
     time since first sighting are heuristics, not calibrated physical waiting.
     """
 
-    # Class-level counter shared across all instances
-    _next_id_counter: int = 1
-
     def __init__(
         self,
         track_thresh: float = 0.4,
@@ -31,25 +27,23 @@ class VehicleTracker:
         self.track_buffer = track_buffer
         self.match_thresh = match_thresh
         self._active_tracks: Dict[int, TrackState] = {}
-        self._tracker = None
-        self._initialized = False
+        self._next_id = 1
+        self._last_time_s: float | None = None
 
-    def _ensure_initialized(self) -> None:
-        if not self._initialized:
-            try:
-                # This path maintains its own centroid tracks after detection.
-                self._initialized = True
-            except Exception:
-                self._initialized = True
-
-    def update(self, detection: VehicleDetection) -> VehicleDetection:
+    def update(self, detection: VehicleDetection, *, observation_time_s: float | None) -> VehicleDetection:
         """
         Add/update track_id for each bbox.
         Returns updated VehicleDetection with track_ids assigned.
-        Uses centroid-distance matching as a lightweight tracker.
+        Use video-position seconds for files, monotonic receipt time for live
+        sources. The clock must be fixed for this tracker instance. Missing or
+        nonadvancing time breaks association; wall time is never substituted.
         """
-        self._ensure_initialized()
-        now_ms = time.time() * 1000
+        if (observation_time_s is None or not math.isfinite(observation_time_s) or observation_time_s < 0
+            or (self._last_time_s is not None and observation_time_s <= self._last_time_s)):
+            self._active_tracks.clear()
+            return detection.model_copy(update={"bboxes": [box.model_copy(update={"track_id": None}) for box in detection.bboxes]})
+        self._last_time_s = observation_time_s
+        now_ms = observation_time_s * 1000
         # Expired tracks must not be resurrected by the next nearby detection.
         self._active_tracks = {tid: track for tid, track in self._active_tracks.items()
                                if now_ms-track.last_seen_ms <= 3000.0}
@@ -127,8 +121,8 @@ class VehicleTracker:
         )
 
     def _get_next_id(self) -> int:
-        tid = VehicleTracker._next_id_counter
-        VehicleTracker._next_id_counter += 1
+        tid = self._next_id
+        self._next_id += 1
         return tid
 
     def get_active_tracks(self) -> Dict[int, TrackState]:
@@ -142,6 +136,6 @@ class VehicleTracker:
         }
 
     def reset(self) -> None:
-        """Clear all track state."""
+        """Clear association and its clock without reusing this instance's IDs."""
         self._active_tracks.clear()
-        VehicleTracker._next_id_counter = 1
+        self._last_time_s = None

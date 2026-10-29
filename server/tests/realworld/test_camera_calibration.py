@@ -109,7 +109,7 @@ async def test_pipeline_and_recording_use_configured_counts_without_turn_or_repl
         return detection()
     async def emit(frame):
         frames.append(frame)
-    pipeline = CCTVPipeline(SimpleNamespace(read_frame=read_frame, is_live=False), SimpleNamespace(detect=detect),
+    pipeline = CCTVPipeline(SimpleNamespace(read_frame=read_frame, is_live=False, source_time_s=0.), SimpleNamespace(detect=detect),
                             emit, calibration=calibration, annotate_frames=True)
     await pipeline._tick()
     frame = frames[-1]

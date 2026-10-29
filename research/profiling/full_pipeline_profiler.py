@@ -5,7 +5,7 @@ Task 4 (P0): Measures true end-to-end real-time feasibility from raw incoming vi
 to final safe traffic signal execution:
 1. Frame Decode & Ingestion (JPEG/video buffer decompression)
 2. YOLOv8 Nano Vehicle Detection
-3. ByteTrack Multi-Object Association & Track State Maintenance
+3. Greedy Centroid Association & Track State Maintenance
 4. Lane / ROI Spatial Mapping & Count Extraction
 5. Camera-Observable State Construction
 6. Multidimensional Perception Uncertainty Estimation & Calibration
@@ -125,7 +125,7 @@ def profile_full_perception_and_control(
         results = yolo(frame, verbose=False)
         t2 = time.perf_counter()
 
-        # Stage 3: ByteTrack Association
+        # Stage 3: Centroid association on synthetic frames, using processing time.
         # Extract bboxes from YOLO results
         bboxes = []
         if len(results) > 0 and results[0].boxes is not None:
@@ -141,7 +141,7 @@ def profile_full_perception_and_control(
             bboxes.append(BoundingBox(x1=300.0, y1=250.0, x2=370.0, y2=330.0, confidence=0.79, class_id=2, class_name="car"))
 
         det = VehicleDetection(timestamp_ms=time.time() * 1000.0, frame_id=i, bboxes=bboxes)
-        tracked_det = tracker.update(det)
+        tracked_det = tracker.update(det, observation_time_s=time.monotonic())
         t3 = time.perf_counter()
 
         # Stage 4: ROI Quadrant Mapping

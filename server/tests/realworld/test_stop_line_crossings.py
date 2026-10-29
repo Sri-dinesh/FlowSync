@@ -113,15 +113,12 @@ def test_duplicate_identity_and_missing_detector_clear_pending_evidence():
         assert not update(engine,3,1,620).events
 
 
-def test_tracker_preserves_detector_status_and_expires_before_association(monkeypatch):
-    now = [10.]
-    monkeypatch.setattr("app.realworld.pipeline.vehicle_tracker.time.time",lambda: now[0])
+def test_tracker_preserves_detector_status_and_expires_before_association():
     tracker = VehicleTracker()
-    first = tracker.update(detection(1,580)).bboxes[0].track_id
-    now[0] += 4
+    first = tracker.update(detection(1,580), observation_time_s=10.).bboxes[0].track_id
     packet = detection(2,600)
     packet.model_not_loaded = True
-    result = tracker.update(packet)
+    result = tracker.update(packet, observation_time_s=14.)
     assert result.model_not_loaded and result.bboxes[0].track_id != first
 
 

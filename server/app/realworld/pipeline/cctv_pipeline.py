@@ -154,8 +154,10 @@ class CCTVPipeline:
             return
 
         self._frame_id += 1
+        source_time_s = getattr(self.video_processor, "source_time_s", None)
+        tracking_time_s = time.monotonic() if self.video_processor.is_live else source_time_s
         recorded_signal = self._signal_reader.at(
-            getattr(self.video_processor, "source_time_s", None),
+            source_time_s,
             getattr(self.video_processor, "source_video_sha256", None),
         ) if self._signal_reader else None
 
@@ -163,7 +165,7 @@ class CCTVPipeline:
         detection.frame_id = self._frame_id
         detection.timestamp_ms = time.time() * 1000
 
-        detection = self._tracker.update(detection)
+        detection = self._tracker.update(detection, observation_time_s=tracking_time_s)
         fw = detection.frame_width or 1
         fh = detection.frame_height or 1
         time_s = round((self._frame_id - 1) / PIPELINE_FPS, 2)
@@ -173,7 +175,7 @@ class CCTVPipeline:
         else:
             directions = [image_direction(b, fw, fh) for b in detection.bboxes]
         crossings = self._crossings.update(
-            detection, directions, geometry, getattr(self.video_processor, "source_time_s", None)
+            detection, directions, geometry, source_time_s
         ) if self._crossings else None
 
         for bbox, direction in zip(detection.bboxes, directions):

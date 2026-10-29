@@ -57,13 +57,16 @@ def test_unknown_camera_control_outputs_are_not_zero_or_a_default_green():
 @pytest.mark.asyncio
 async def test_actual_pipeline_emits_conserved_counts_unknown_turns_and_no_fake_controller(tmp_path):
     outputs = []
+    video = SimpleNamespace(is_live=False, source_time_s=-.5)
     async def read_frame():
+        video.source_time_s += .5
         return np.zeros((1000, 1000, 3), dtype=np.uint8)
     async def detect(_):
         return detection([box(500, 100), box(900, 500), box(500, 500)])
     async def on_frame(frame):
         outputs.append(frame)
-    pipeline = CCTVPipeline(SimpleNamespace(read_frame=read_frame, is_live=False),
+    video.read_frame = read_frame
+    pipeline = CCTVPipeline(video,
                             SimpleNamespace(detect=detect), on_frame, annotate_frames=False)
     await pipeline._tick()
     await pipeline._tick()
