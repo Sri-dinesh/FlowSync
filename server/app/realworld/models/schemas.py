@@ -217,6 +217,7 @@ class CCTVFrame(BaseModel):
     crossing_observation: Optional[CrossingObservation] = None
     recorded_signal: Optional[RecordedSignal] = None
     trajectory_observation: Optional[TrajectoryObservation] = None
+    trajectory_detection: Optional[VehicleDetection] = None
     # Frame (base64 for WebSocket streaming)
     annotated_frame_b64: Optional[str] = None
     # Fixed timer comparison

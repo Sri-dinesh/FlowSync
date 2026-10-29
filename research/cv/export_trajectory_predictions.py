@@ -7,17 +7,24 @@ from pydantic import BaseModel
 
 from research.cv.evaluate_crossings import Session, check_session, digest
 from research.cv.evaluate_movements import MovementPredictions
+from server.app.realworld.models.crossings import CrossingObservation
+from server.app.realworld.models.schemas import VehicleDetection
 from server.app.realworld.models.trajectory_turns import TrajectoryObservation, TrajectoryTurn
+from server.app.realworld.pipeline.camera_geometry import assign_approaches
+from server.app.realworld.pipeline.stop_line_crossings import StopLineCrossings
+from server.app.realworld.pipeline.trajectory_turns import TrajectoryTurns
 
 
 class TurnFrame(BaseModel):
     frame_id: int
     trajectory_observation: TrajectoryObservation | None = None
+    trajectory_detection: VehicleDetection | None = None
+    crossing_observation: CrossingObservation | None = None
 
 
 class TurnSession(BaseModel):
     trajectory_turns: list[TrajectoryTurn]
-    frames: list[TurnFrame]  # Full crossing frames are validated separately by Session.
+    frames: list[TurnFrame]
 
 
 def export(session_bytes):
@@ -26,36 +33,29 @@ def export(session_bytes):
     turns = TurnSession.model_validate_json(session_bytes)
     if not session.calibration.exits:
         raise ValueError("Session has no configured exit regions.")
-    # Keep the exact frame-level and aggregate evidence linked before converting.
-    flattened = [event for frame in turns.frames if frame.trajectory_observation
-                 for event in frame.trajectory_observation.events]
-    if flattened != turns.trajectory_turns:
-        raise ValueError("Aggregate turn outcomes differ from recorded frame events.")
-    keys = {(event.track_id, event.approach, event.frame_id): i for i, event in enumerate(session.stop_line_crossings)}
-    source_times = {frame.frame_id: frame.crossing_observation for frame in session.frames if frame.crossing_observation}
-    outcomes = {}
+    crossing_engine, turn_engine = StopLineCrossings(session.calibration), TrajectoryTurns(session.calibration)
+    reconstructed = []
     for frame in turns.frames:
-        observation = frame.trajectory_observation
-        if observation is None:
+        if frame.crossing_observation is None:
+            if frame.trajectory_detection is not None or frame.trajectory_observation is not None:
+                raise ValueError("Trajectory evidence requires its crossing observation.")
             continue
-        if observation.calibration_sha256 != session.calibration_sha256:
-            raise ValueError("Trajectory observation calibration mismatch.")
-        for event in observation.events:
-            key = (event.track_id, event.approach, event.crossing_frame_id)
-            if key not in keys or key in outcomes or event.frame_id != frame.frame_id or event.calibration_sha256 != session.calibration_sha256:
-                raise ValueError("Turn outcome identity, frame or calibration mismatch.")
-            crossing = session.stop_line_crossings[keys[key]]
-            if event.frame_id < crossing.frame_id:
-                raise ValueError("Turn outcome precedes its crossing.")
-            if event.turn is not None:
-                source = source_times.get(frame.frame_id)
-                region = next((r for r in session.calibration.exits if r.exit_id == event.exit_id), None)
-                if (observation.status != "available" or source is None or source.status != "available"
-                    or source.source_time_s != event.available_time_s or frame.frame_id <= crossing.frame_id
-                    or event.available_time_s < crossing.time_interval_s[1]
-                    or region is None or region.turns_from.get(event.approach) != event.turn):
-                    raise ValueError("Confirmed turn does not match recorded time or configured exit mapping.")
-            outcomes[key] = event
+        if frame.trajectory_detection is None or frame.trajectory_observation is None:
+            raise ValueError("Recording lacks tracked detection evidence; record a new session rather than retrofit inputs.")
+        detection = frame.trajectory_detection
+        if detection.frame_id != frame.frame_id:
+            raise ValueError("Tracked detection frame identity mismatch.")
+        assignments, geometry = assign_approaches(detection, session.calibration)
+        crossings = crossing_engine.update(detection, assignments, geometry, frame.crossing_observation.source_time_s)
+        if crossings != frame.crossing_observation:
+            raise ValueError("Crossings do not reconstruct from saved tracked boxes and source times.")
+        observation = turn_engine.update(detection, crossings)
+        if observation != frame.trajectory_observation:
+            raise ValueError("Turn observations do not reconstruct from saved tracked boxes and source times.")
+        reconstructed.extend(observation.events)
+    if reconstructed != turns.trajectory_turns:
+        raise ValueError("Aggregate turn outcomes differ from reconstructed frame events.")
+    outcomes = {(event.track_id, event.approach, event.crossing_frame_id): event for event in reconstructed}
     rows = []
     for event in session.stop_line_crossings:
         outcome = outcomes.get((event.track_id, event.approach, event.frame_id))
@@ -66,7 +66,7 @@ def export(session_bytes):
         schema_version="movement_predictions_v1", session_sha256=digest(session_bytes),
         video_sha256=session.source_video_sha256, calibration_sha256=session.calibration_sha256,
         origin="model", producer_id="continuous_crossing_exit_v1",
-        producer_method="Retrospective continuous centroid track from stop-line crossing into a mapped exit for two frames. Unresolved/unfinished tracks abstain at the recorded endpoint; availability is not independently attested.",
+        producer_method="Crossing and two-frame exit rules re-executed from recorded tracked boxes and source times before export. Unfinished/unresolved tracks abstain at the endpoint. Detector accuracy, track identity and source timing are not independently attested.",
         events=rows)
 
 

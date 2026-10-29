@@ -316,6 +316,7 @@ class CCTVPipeline:
             crossing_observation=crossings,
             recorded_signal=recorded_signal,
             trajectory_observation=turns,
+            trajectory_detection=detection if self._turns else None,
             congestion_level=congestion,
             status=model_status,
         )

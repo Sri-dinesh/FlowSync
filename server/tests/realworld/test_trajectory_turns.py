@@ -159,6 +159,7 @@ async def test_decoded_video_pipeline_records_exports_and_evaluates_turn(tmp_pat
     assert len(predictions.events) == 1 and predictions.events[0].turn == ("left" if complete else None)
     assert predictions.events[0].available_time_s == (1.5 if complete else 1.)
     saved = json.loads(raw)
+    assert all(frame["trajectory_detection"] is not None for frame in saved["frames"])
     assert saved["stop_line_crossings"][0]["turn"] is None
     assert not saved["twin_data"]["replay_inputs_complete"]
     annotation = dict(schema_version="movement_annotations_v1",video_sha256=video.source_video_sha256,
@@ -178,4 +179,17 @@ async def test_decoded_video_pipeline_records_exports_and_evaluates_turn(tmp_pat
         else:
             for event in (bad["trajectory_turns"][0],bad["frames"][3]["trajectory_observation"]["events"][0]):
                 event["turn" if fault == "mapping" else "available_time_s"] = "right" if fault == "mapping" else .5
+        with pytest.raises(ValueError): export(json.dumps(bad).encode())
+    for fault in ("missing_evidence", "missing_observation", "wrong_frame", "wrong_counts", "missing_confirmation", "changed_id"):
+        bad = copy.deepcopy(saved)
+        if fault == "missing_evidence": bad["frames"][0]["trajectory_detection"] = None
+        elif fault == "missing_observation": bad["frames"][0]["trajectory_observation"] = None
+        elif fault == "wrong_frame": bad["frames"][0]["trajectory_detection"]["frame_id"] = 999
+        elif fault == "wrong_counts": bad["frames"][0]["trajectory_observation"]["pending_count"] = 1
+        else:
+            if fault == "missing_confirmation" and not complete:
+                continue  # Both input sequences still legitimately end pending.
+            box = bad["frames"][2]["trajectory_detection"]["bboxes"][0]
+            if fault == "changed_id": box["track_id"] = 999
+            else: box.update(y1=620.,y2=630.)
         with pytest.raises(ValueError): export(json.dumps(bad).encode())
