@@ -78,7 +78,7 @@ flowchart TB
     Models --> DB
     Models --> Storage[Local checkpoints and Supabase Storage]
     Sessions --> Custom[Custom simulator and application RL]
-    Video[Video source] --> Camera[Detector / centroid tracking / quadrant counts]
+    Video[Video source] --> Camera[Detector / tracking / approach geometry / crossing events]
     Camera --> Sessions
     CLI[Research CLI] --> Observed[Scenario runtime / delivered sensor packet]
     Observed --> Policy[Checkpoint-explicit policy or classical controller]
@@ -243,6 +243,60 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 
 Crossing verification on October 29: **78 focused backend tests passed**, including 19 crossing/timing/tracker tests; counts overlap the earlier calibration suite. Five frontend tests, TypeScript, lint and the production build passed. A Chromium check exercised video upload, geometry validation, actual decoding/tracking, crossing display and recording with the synthetic clip and threshold detector. It displayed and saved one crossing estimated at 1.25 seconds in [1, 1.5], kept replay incomplete, and raised no uncaught browser exception. Existing dependency and chart-sizing build warnings remain. No real footage, YOLO accuracy, hardware latency, signal actuation or traffic-delay improvement was evaluated.
 
+### 10.3 Crossing evaluation against labeled video
+
+[evaluate_crossings.py](research/cv/evaluate_crossings.py) compares recorded discharge events with separately supplied annotations. It requires a saved session, the original video bytes, an annotation JSON and a matching-protocol JSON. Local-file recording now fingerprints the video with SHA-256 when opening it; `SessionRecorder` saves that value as `source_video_sha256`. Live sources have no file fingerprint. Old sessions without this identity are rejected by this evaluator: do not retrofit a hash and present it as original capture provenance. Hashing at opening binds recorded metadata to those bytes, but does not continuously attest that a file remained immutable during processing. Source files must be kept unchanged.
+
+Annotations identify the video hash and calibration hash, declare `origin` (`human` or `synthetic_fixture`), a data role (`calibration`, `development` or `held_out`), labeling method and time resolution. A role is an annotator declaration; software cannot establish that a supposedly held-out clip was never inspected. Every label needs a unique event ID, approach and time in the same video-position coordinate system used by the pipeline. Labels must come from reviewing the video independently of predictions, not copying exported events. Field validation cannot certify annotation correctness or independence.
+
+Specify exhaustive, nonoverlapping **[start, end)** windows per approach. Every real crossing in each window must be labeled, including crossings during detector/timing outages. Windows must fit within the recorded source-time extent and configured approaches. Unlabeled time is not assumed to contain no crossings. Predictions outside scored windows are retained as unscored indices. The report exposes available/unavailable crossing-frame counts and the largest gap between available source timestamps. `scored_approach_seconds` sums window duration across approaches and is not unique wall-clock duration or a count of independent samples.
+
+Matching operates separately within each approach/window, using the protocol's fixed absolute time tolerance. It maximizes the number of one-to-one matches, then minimizes total absolute timing error, with deterministic tie handling. The implementation uses a sorted dynamic program; a two-million-cell budget per window bounds computation. Declare shorter windows before evaluation if needed. The tolerance and window choices should be frozen before examining results, with labeling resolution justified separately. Saving/hashing a protocol does not itself prove preregistration.
+
+Outputs include matched prediction/annotation IDs, every unmatched event, per-window and aggregate TP/FP/FN, precision, recall, F1, matched-event timing MAE and signed bias. A positive bias means the predicted crossing is later. Ratios with zero denominators are `null`; timing metrics are `null` without matches. Timing error is conditional on successful matching and must be read alongside misses and extras. A wrong approach becomes a miss/extra only where both relevant approaches are exhaustively scored. Time/approach matching in dense traffic does not establish vehicle identity, detector-box precision, tracking IDF1 or turn accuracy.
+
+Before scoring, the evaluator reconstructs cumulative counts and the session-level event list from frame events, checks duplicate track/approach events, calibration identity and bracketing frame times, and rejects inconsistencies. It also requires the video hash to agree with both session and annotations. It does not independently rerun detection or establish the accuracy of recorded geometry. Every report copies the exact session, annotations and protocol, records their hashes, saves the evaluator and model-schema sources, and records Python/Pydantic versions. Output directories must be new. Verification recomputes matching and checks inputs, report and archived/current source identity; historical reports require their saved code/runtime. The original video is hashed but not copied into the report directory.
+
+Example protocol (the tolerance is illustrative, not a tuned or validated recommendation):
+
+```json
+{"schema_version":"crossing_evaluation_v1","protocol_id":"clip-study-01","match_tolerance_s":0.25}
+```
+
+Start annotations as a **draft**, replace hashes/extent/method from the actual study, add independently reviewed events, and only mark `exhaustive:true` once review is complete. The following draft deliberately fails evaluation:
+
+```json
+{
+  "schema_version": "crossing_annotations_v1",
+  "video_sha256": "REPLACE_WITH_RECORDED_VIDEO_HASH",
+  "calibration_sha256": "REPLACE_WITH_RECORDED_CALIBRATION_HASH",
+  "origin": "human",
+  "split": "development",
+  "annotation_method": "REPLACE_WITH_REVIEW_METHOD_AND_ANNOTATOR_RECORD",
+  "time_resolution_s": 0.04,
+  "windows": [{"window_id":"north-01","approach":"north","start_s":0,"end_s":30,"exhaustive":false}],
+  "events": []
+}
+```
+
+An event has the shape `{"event_id":"vehicle-001","approach":"north","time_s":12.4}`; its time must be labeled, not inferred from this example. Session paths are under `data/sessions` relative to the backend working directory. With actual files prepared, run from the repository root:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research.cv.evaluate_crossings \
+  --session /path/to/session.json --video /path/to/unchanged-clip.mp4 \
+  --annotations /path/to/annotations.json --protocol /path/to/protocol.json \
+  --output results/crossing_evaluation/clip_study_01
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research.cv.evaluate_crossings \
+  --verify results/crossing_evaluation/clip_study_01 --video /path/to/unchanged-clip.mp4
+```
+
+The final local mechanics check is `results/crossing_evaluation/synthetic_final_20261029/`, with source fixture files in `results/crossing_evaluation/fixture_20261029/`. The earlier `synthetic_20261029/` report remains a development snapshot. A generated rectangle trajectory and analytic crossing label were specified before inference. The actual decoder, threshold detector fixture, tracker, crossing pipeline and recorder produced one match, no misses/extras and zero matched timing error. CLI verification reconstructs the final report. These numbers describe one deliberately simple synthetic fixture; they are **not** camera precision/recall evidence or a new independent traffic experiment. `annotation_origin:synthetic_fixture`, `publication_ready:false` and `policy_promoted:false` remain explicit. No labeled real footage has been supplied, and no model was trained or promoted. These local artifacts remain outside Git under the existing results policy.
+
+Evaluation verification on October 29: **99 focused backend tests passed**, including exhaustive small-panel matching comparisons, greedy-matching counterexamples, empty denominators, wrong video/configuration hashes, inconsistent stored events, incomplete/overlapping windows, out-of-window predictions, output overwrite prevention and report tampering. A complete detector outage with valid decoder timestamps retains the labeled window and records its events as misses; it is not silently excluded. Tests also cover actual video decoding, fingerprinted recording and evaluator integration. The CLI report verifier passed. These tests overlap earlier totals. No frontend files changed in this evaluation step, and no new frontend build or real-camera trial is claimed.
+
+**Legacy CV evidence correction.** [validate_perception_quality.py](research/cv/validate_perception_quality.py) previously drew random values around hard-coded regime scores and described them as 1,000 manually annotated real-world frames. It now fails explicitly before writing any report. Its historical outputs cannot support measured perception or ByteTrack claims. [validation_tool.py](research/cv/validation_tool.py) previously treated equal aggregate counts as object matches, returned an unmeasured 0.35-second arrival error and substituted correlation 0.70 when insufficient data existed. It now returns only supplied paired-count errors and a computed correlation when eligible supplied confidences/data exist; object precision/recall/F1, lane-assignment accuracy and arrival timing are `null`. Missing correlation is `null` rather than invented. The count helper assumes omitted movement keys are zero and is not an exhaustive camera annotation protocol. Existing saved files were preserved. Use the new event evaluator for crossing labels; broader detection/tracking validation still needs corresponding labeled boxes and identities.
+
 ## 11. Model, history and persistence workflow
 
 FastAPI model/history services use Supabase API/Storage and local `server/models` checkpoints. Next.js server routes use Prisma/PostgreSQL for application views. `model-checkpoints` is the configured checkpoint bucket, not an automatically provisioned public dataset. Credentials remain private and server-only secrets must never enter `NEXT_PUBLIC_` variables.
@@ -383,7 +437,7 @@ The formerly flat research scripts have been grouped by responsibility. Maintain
 | [scenarios](research/scenarios/) and [manifests](research/manifests/) | Scenario files, schema/loader and declared experimental input lists. |
 | [analysis](research/analysis/) | Statistical summaries, grouped feature/model comparisons, SUMO trace/axis/endpoint measurements and reporting. |
 | [evidence](research/evidence/) | Provenance-checked tables/figures, teacher/SUMO exports, manuscript numerical auditing and closed-study CSV export. |
-| [profiling](research/profiling/) and [cv](research/cv/) | Profiling and camera-surrogate utilities; optional dependencies may be required. |
+| [profiling](research/profiling/) and [cv](research/cv/) | Profiling, camera input audits and labeled crossing evaluation; optional dependencies may be required. The legacy random CV report generator is disabled. |
 | [legacy](research/legacy/) | Earlier exploratory runners/configuration and deliberately retired figure entry points. |
 | [docs](#30-evidence-and-maintenance-index) | Protocols, results, audits, workflow guides and paper drafts in separate indexed collections. |
 
