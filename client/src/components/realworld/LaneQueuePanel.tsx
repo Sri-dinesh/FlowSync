@@ -44,6 +44,7 @@ interface Props {
 }
 
 export default function LaneQueuePanel({ frame }: Props) {
+  const geometry = frame?.geometry_observation;
   const rawCounts = frame?.raw_counts ?? {};
   const weightedCounts = frame?.weighted_counts ?? {};
   const maxRaw = Math.max(...LANE_KEYS.map((k) => rawCounts[k] ?? 0), 1);
@@ -56,10 +57,10 @@ export default function LaneQueuePanel({ frame }: Props) {
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
         <h2 className="text-xs uppercase tracking-[0.14em] text-white/35 font-semibold">
-          Image direction counts
+          {geometry ? "Configured approach counts" : "Image direction counts"}
         </h2>
         <span className="text-[10px] text-white/25 font-mono">
-          raw · smoothed
+          {geometry ? "current frame" : "raw · smoothed"}
         </span>
       </div>
 
@@ -71,6 +72,9 @@ export default function LaneQueuePanel({ frame }: Props) {
               <div className="h-px bg-white/[0.04] my-1.5" />
             )}
             {LANE_KEYS.filter((k) => k === `${dir}_straight`).map((lane) => {
+              if (geometry && (geometry.status !== "matched" || !geometry.configured_approaches.includes(dir))) {
+                return <p key={lane} className="py-1 text-xs text-white/60 capitalize">{dir}: unavailable</p>;
+              }
               const raw = rawCounts[lane] ?? 0;
               const weighted = weightedCounts[lane] ?? 0;
               const barPct = (raw / maxRaw) * 100;
@@ -106,7 +110,7 @@ export default function LaneQueuePanel({ frame }: Props) {
 
                   {/* weighted */}
                   <span className="text-[10px] text-white/20 w-[36px] text-right shrink-0 font-mono">
-                    {weighted.toFixed(1)}
+                    {geometry ? "" : weighted.toFixed(1)}
                   </span>
                 </div>
               );
@@ -115,7 +119,8 @@ export default function LaneQueuePanel({ frame }: Props) {
         ))}
       </div>
       <p className="px-3 pb-3 text-xs text-white/40">
-        Image position is a direction estimate. Road approaches, turning movements and stopped queues have not been calibrated.
+        {geometry ? `Region occupancy only; turns and stopped queues are unknown. ${geometry.ambiguous_boxes} boundary-ambiguous boxes. Geometry status: ${geometry.status}.`
+          : "Image position is a direction estimate. Road approaches, turning movements and stopped queues have not been calibrated."}
       </p>
     </div>
   );

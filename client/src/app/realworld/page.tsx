@@ -32,7 +32,7 @@ export type CCTVFrameData = {
   confidence_pct: number | null;
   observation_contract?: {
     schema_version: "camera_observation_v1";
-    count_semantics: "exclusive_image_direction_proxy";
+    count_semantics: "exclusive_image_direction_proxy" | "configured_approach_region";
     control_status: "unavailable";
     physical_actuation: false;
     movement_counts_available: false;
@@ -41,6 +41,15 @@ export type CCTVFrameData = {
     unassigned_boxes: number;
     missing_inputs: string[];
   };
+  geometry_observation?: {
+    status: "matched" | "frame_size_mismatch" | "detector_unavailable";
+    calibration_sha256: string;
+    configured_approaches: string[];
+    approach_counts: Record<string, number>;
+    ambiguous_boxes: number;
+    unassigned_boxes: number;
+    assigned_boxes: number;
+  } | null;
   annotated_frame_b64: string | null;
   fixed_timer_phase: number | null;
   fixed_timer_phase_name: string | null;
@@ -84,6 +93,7 @@ export default function RealWorldPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [currentFrame, setCurrentFrame] = useState<CCTVFrameData | null>(null);
   const [pipelineStatus, setPipelineStatus] = useState<string>("idle");
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [frameHistory, setFrameHistory] = useState<CCTVFrameData[]>([]);
   const [sessionId, setSessionId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<Tab>("live");
@@ -111,7 +121,9 @@ export default function RealWorldPage() {
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === "video_progress") {
+        if (data.type === "error") {
+          setPipelineError(typeof data.message === "string" ? data.message : "Camera request failed.");
+        } else if (data.type === "video_progress") {
           setProcessingProgress({
             frame_id: data.frame_id,
             total_frames: data.total_frames ?? null,
@@ -186,13 +198,14 @@ export default function RealWorldPage() {
   );
 
   const handleStartProcessing = useCallback(
-    (videoPath: string) => {
+    (videoPath: string, calibrationJson?: string) => {
+      setPipelineError(null);
       setProcessingProgress(null);
       setTwinData(null);
       setTotalVehiclesDetected(0);
       setCurrentFrame(null);
       setFrameHistory([]);
-      sendCommand("start_processing", { video_path: videoPath });
+      sendCommand("start_processing", { video_path: videoPath, ...(calibrationJson ? { calibration_json: calibrationJson } : {}) });
     },
     [sendCommand]
   );
@@ -292,6 +305,7 @@ export default function RealWorldPage() {
         {activeTab === "live" && (
           <aside className="w-[400px] flex-shrink-0 flex flex-col h-full overflow-y-auto bg-black/60 backdrop-blur-xl border-l border-white/10 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30 shadow-2xl z-10">
             <div className="p-3 flex flex-col gap-3">
+              {pipelineError && <p role="alert" className="rounded-lg border border-rose-400/30 p-3 text-sm text-rose-300">{pipelineError}</p>}
               <CCTVControls
                 isConnected={isConnected}
                 pipelineStatus={pipelineStatus}
