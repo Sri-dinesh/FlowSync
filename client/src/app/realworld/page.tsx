@@ -6,6 +6,7 @@ import VideoFeed from "@/components/realworld/VideoFeed";
 import CCTVControls from "@/components/realworld/CCTVControls";
 import LaneQueuePanel from "@/components/realworld/LaneQueuePanel";
 import SignalDecisionPanel from "@/components/realworld/SignalDecisionPanel";
+import StopLinePanel from "@/components/realworld/StopLinePanel";
 import CCTVMetrics from "@/components/realworld/CCTVMetrics";
 import TrafficFlowChart from "@/components/realworld/TrafficFlowChart";
 import dynamic from "next/dynamic";
@@ -49,6 +50,17 @@ export type CCTVFrameData = {
     ambiguous_boxes: number;
     unassigned_boxes: number;
     assigned_boxes: number;
+  } | null;
+  crossing_observation?: {
+    status: "available" | "source_timing_unavailable" | "geometry_unavailable";
+    source_time_s: number | null;
+    counts: Record<string, number>;
+    last_event: {
+      track_id: number;
+      approach: string;
+      time_interval_s: [number, number];
+      estimated_time_s: number;
+    } | null;
   } | null;
   annotated_frame_b64: string | null;
   fixed_timer_phase: number | null;
@@ -315,6 +327,7 @@ export default function RealWorldPage() {
                 totalVehiclesDetected={totalVehiclesDetected}
               />
               <SignalDecisionPanel frame={currentFrame} />
+              <StopLinePanel frame={currentFrame} />
               <LaneQueuePanel frame={currentFrame} />
               <CCTVMetrics frame={currentFrame} />
             </div>
