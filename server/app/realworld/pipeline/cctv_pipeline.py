@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 from ..models.config import PIPELINE_FPS
 from ..models.calibration import CameraCalibration
+from ..models.signal_timeline import SignalTimeline, SignalTimelineReader
 from ..models.schemas import (
     CCTVFrame,
     CameraObservationContract,
@@ -65,6 +66,7 @@ class CCTVPipeline:
         session_id: str = "session_001",
         annotate_frames: bool = True,
         calibration: Optional[CameraCalibration] = None,
+        signal_timeline: Optional[SignalTimeline] = None,
     ) -> None:
         self.video_processor = video_processor
         self.yolo_detector = yolo_detector
@@ -75,6 +77,7 @@ class CCTVPipeline:
         self.annotate_frames = annotate_frames
         self.calibration = calibration
         self._crossings = StopLineCrossings(calibration) if calibration else None
+        self._signal_reader = SignalTimelineReader(signal_timeline) if signal_timeline else None
 
         self._tracker = VehicleTracker()
         self._quadrant_counter = QuadrantCounter()
@@ -151,6 +154,10 @@ class CCTVPipeline:
             return
 
         self._frame_id += 1
+        recorded_signal = self._signal_reader.at(
+            getattr(self.video_processor, "source_time_s", None),
+            getattr(self.video_processor, "source_video_sha256", None),
+        ) if self._signal_reader else None
 
         detection = await self.yolo_detector.detect(frame)
         detection.frame_id = self._frame_id
@@ -302,12 +309,16 @@ class CCTVPipeline:
             ),
             geometry_observation=geometry,
             crossing_observation=crossings,
+            recorded_signal=recorded_signal,
             congestion_level=congestion,
             status=model_status,
         )
 
         if self._confidence_fallback_active:
             cctv_frame.status = f"confidence_fallback_active | {model_status}"
+
+        if recorded_signal and recorded_signal.status == "available":
+            cctv_frame.observation_contract.missing_inputs[1] = "Complete signal timing and phase-service history"
 
         await self.on_frame(cctv_frame)
 

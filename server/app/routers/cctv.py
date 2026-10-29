@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from ..realworld.models.calibration import CameraCalibration
+from ..realworld.models.signal_timeline import SignalTimeline
 
 from ..realworld.models.config import (
     SESSION_DIR,
@@ -27,6 +28,13 @@ async def validate_camera_calibration(body: CameraCalibration) -> Dict[str, Any]
     """Validate image geometry, not its accuracy for the depicted intersection."""
     return {"calibration_json": body.canonical_json(), "sha256": body.sha256,
             "source": body.source, "approaches": len(body.approaches)}
+
+
+@router.post("/signal-timeline/validate")
+async def validate_signal_timeline(body: SignalTimeline) -> Dict[str, Any]:
+    """Validate annotation structure; source binding is checked when opening video."""
+    return {"signal_timeline_json": body.canonical_json(), "sha256": body.sha256,
+            "video_sha256": body.video_sha256, "segments": len(body.segments)}
 
 
 @router.post("/upload")

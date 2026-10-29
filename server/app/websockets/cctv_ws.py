@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from ..realworld.models.config import SESSION_DIR
 from ..realworld.models.schemas import CCTVFrame
 from ..realworld.models.calibration import CameraCalibration
+from ..realworld.models.signal_timeline import SignalTimeline
 from ..realworld.pipeline.cctv_pipeline import CCTVPipeline
 from ..realworld.pipeline.video_processor import VideoProcessor
 from ..realworld.pipeline.yolo_detector import YOLODetector
@@ -118,6 +119,15 @@ async def cctv_socket(websocket: WebSocket) -> None:
 
             if cmd == "start_processing":
                 video_path = payload.get("video_path", "").strip()
+                signal_timeline = None
+                if "signal_timeline_json" in payload:
+                    try:
+                        signal_timeline = SignalTimeline.model_validate_json(payload["signal_timeline_json"])
+                    except (ValidationError, ValueError, TypeError) as error:
+                        await cctv_manager.send(websocket, {
+                            "type": "error", "code": "INVALID_SIGNAL_TIMELINE", "message": str(error),
+                        })
+                        continue
                 calibration = None
                 if "calibration_json" in payload:
                     try:
@@ -131,6 +141,12 @@ async def cctv_socket(websocket: WebSocket) -> None:
                         continue
 
                 is_stream = StreamResolver.is_stream_url(video_path)
+                if is_stream and signal_timeline is not None:
+                    await cctv_manager.send(websocket, {
+                        "type": "error", "code": "RECORDED_VIDEO_REQUIRED",
+                        "message": "Signal timelines require a recorded video with matching bytes and source timestamps.",
+                    })
+                    continue
                 if not is_stream and not os.path.exists(video_path):
                     await cctv_manager.send(websocket, {
                         "type": "error",
@@ -143,6 +159,8 @@ async def cctv_socket(websocket: WebSocket) -> None:
                 video_proc = VideoProcessor(video_path)
                 try:
                     metadata = await video_proc.open()
+                    if signal_timeline and signal_timeline.video_sha256 != video_proc.source_video_sha256:
+                        raise ValueError("Signal timeline belongs to different video bytes.")
                     if calibration and (metadata.width, metadata.height) != (calibration.frame_width, calibration.frame_height):
                         raise ValueError("Calibration frame size differs from the video; update the geometry for this source.")
                 except Exception as error:
@@ -181,6 +199,7 @@ async def cctv_socket(websocket: WebSocket) -> None:
                     model_episodes=active_eps,
                     calibration=calibration,
                     source_video_sha256=video_proc.source_video_sha256,
+                    signal_timeline=signal_timeline,
                 )
 
                 try:
@@ -192,6 +211,7 @@ async def cctv_socket(websocket: WebSocket) -> None:
                         on_arrival=on_arrival,
                         session_id=session_id,
                         calibration=calibration,
+                        signal_timeline=signal_timeline,
                     )
                     _pipelines[conn_id] = pipeline
                     _recorders[conn_id] = recorder
