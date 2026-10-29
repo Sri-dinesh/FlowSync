@@ -1,10 +1,10 @@
 """
 CCTVPipeline — Main orchestrator. Ties all pipeline steps into a single async loop.
-Runs at PIPELINE_FPS (2Hz), handling video frames, YOLO detection, quadrant-based
-image-direction proxies, temporal smoothing, annotation, and WebSocket broadcast.
+Runs at PIPELINE_FPS (2Hz), handling video frames, YOLO detection, optional configured
+approach occupancy or image-direction proxies, annotation, and WebSocket broadcast.
 
-Each box has at most one image-direction assignment. This does not measure turns
-or calibrated road approaches. The output contract marks learned control unavailable.
+Each box has at most one assignment. Configured geometry measures region occupancy,
+not turns or stopped queues. The output contract marks learned control unavailable.
 
 Detection confidence monitoring applies only to displayed counts.
 When rolling average detection confidence drops below CONFIDENCE_FALLBACK_THRESHOLD
@@ -21,6 +21,7 @@ from typing import Any, Awaitable, Callable, Deque, Dict, List, Optional, Set
 logger = logging.getLogger(__name__)
 
 from ..models.config import PIPELINE_FPS
+from ..models.calibration import CameraCalibration
 from ..models.schemas import (
     CCTVFrame,
     CameraObservationContract,
@@ -30,6 +31,7 @@ from ..models.schemas import (
 )
 from .frame_annotator import FrameAnnotator
 from .quadrant_counter import QuadrantCounter, image_direction
+from .camera_geometry import assign_approaches, draw_calibration
 from .vehicle_tracker import VehicleTracker
 from .video_processor import VideoProcessor
 from .yolo_detector import YOLODetector
@@ -61,6 +63,7 @@ class CCTVPipeline:
         on_arrival: Optional[Callable[[Dict], Awaitable[None]]] = None,
         session_id: str = "session_001",
         annotate_frames: bool = True,
+        calibration: Optional[CameraCalibration] = None,
     ) -> None:
         self.video_processor = video_processor
         self.yolo_detector = yolo_detector
@@ -69,6 +72,7 @@ class CCTVPipeline:
         self.on_arrival = on_arrival
         self.session_id = session_id
         self.annotate_frames = annotate_frames
+        self.calibration = calibration
 
         self._tracker = VehicleTracker()
         self._quadrant_counter = QuadrantCounter()
@@ -154,10 +158,14 @@ class CCTVPipeline:
         fw = detection.frame_width or 1
         fh = detection.frame_height or 1
         time_s = round((self._frame_id - 1) / PIPELINE_FPS, 2)
+        geometry = None
+        if self.calibration is not None:
+            directions, geometry = assign_approaches(detection, self.calibration)
+        else:
+            directions = [image_direction(b, fw, fh) for b in detection.bboxes]
 
-        for bbox in detection.bboxes:
+        for bbox, direction in zip(detection.bboxes, directions):
             if bbox.track_id is not None and bbox.track_id not in self._recorded_track_ids:
-                direction = image_direction(bbox, fw, fh)
                 if direction is None:
                     continue
 
@@ -168,7 +176,8 @@ class CCTVPipeline:
                     "lane": direction,
                     "turn": None,
                     "event_semantics": "first_track_sighting_not_stop_line_arrival",
-                    "direction_source": "image_direction_proxy",
+                    "direction_source": "configured_approach_region" if geometry else "image_direction_proxy",
+                    "calibration_sha256": geometry.calibration_sha256 if geometry else None,
                     "turn_source": "unobserved",
                     "time_source": "processing_cadence_proxy",
                     "vehicle_type": bbox.class_name if bbox.class_name in ("car", "bus", "truck", "motorcycle", "auto_rickshaw") else "car",
@@ -183,7 +192,10 @@ class CCTVPipeline:
                     except Exception as err:
                         print(f"[CCTVPipeline] on_arrival error: {err}")
 
-        raw_counts_dict = self._quadrant_counter.count(detection)
+        raw_counts_dict = self._quadrant_counter.count(detection) if geometry is None else {
+            key: geometry.approach_counts.get(key.split("_")[0], 0) if key.endswith("_straight") else 0
+            for key in self._aggregate_counts
+        }
         raw_counts = LaneCounts(**raw_counts_dict)
 
         for k, v in raw_counts_dict.items():
@@ -200,7 +212,7 @@ class CCTVPipeline:
 
         rolling_conf = sum(self._confidence_window) / max(len(self._confidence_window), 1)
 
-        if rolling_conf < self._CONFIDENCE_FALLBACK_THRESHOLD:
+        if geometry is None and rolling_conf < self._CONFIDENCE_FALLBACK_THRESHOLD:
             if not self._confidence_fallback_active:
                 logger.warning(
                     "[CCTVPipeline] Low confidence (%.2f < %.2f) — activating fallback to last-known-good counts.",
@@ -222,6 +234,9 @@ class CCTVPipeline:
             self._last_good_weighted_counts = dict(weighted_dict)
 
         smoothed_dict = self._smoother.update(weighted_dict)
+        if geometry is not None:
+            # Configured occupancy is current-frame evidence, never last-good imputation.
+            smoothed_dict = {key: float(value) for key, value in raw_counts_dict.items()}
         smoothed_weighted = WeightedLaneCounts.from_dict(smoothed_dict)
 
         total_pressure = sum(smoothed_dict.values())
@@ -239,8 +254,11 @@ class CCTVPipeline:
 
         annotated_b64 = None
         if self.annotate_frames:
+            annotated = self._annotator.annotate_simple(frame, detection)
+            if self.calibration is not None:
+                annotated = draw_calibration(annotated, self.calibration)
             annotated_b64 = self._annotator.encode_frame_b64(
-                self._annotator.annotate_simple(frame, detection)
+                annotated
             )
 
         self._metrics.log_frame(detection, raw_counts)
@@ -273,9 +291,11 @@ class CCTVPipeline:
                 for name in VehicleTypeBreakdown.model_fields
             }),
             observation_contract=CameraObservationContract(
+                count_semantics="configured_approach_region" if geometry else "exclusive_image_direction_proxy",
                 detected_boxes=len(detection.bboxes), assigned_boxes=sum(raw_counts_dict.values()),
                 unassigned_boxes=len(detection.bboxes)-sum(raw_counts_dict.values()),
             ),
+            geometry_observation=geometry,
             congestion_level=congestion,
             status=model_status,
         )

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from ..models.config import SESSION_DIR
 from ..models.schemas import CCTVFrame
+from ..models.calibration import CameraCalibration
 from .arrival_contract import replay_input_error
 
 LANE_KEYS = [
@@ -34,6 +35,7 @@ class SessionRecorder:
         mode: str = "ai",
         model_name: Optional[str] = None,
         model_episodes: Optional[int] = None,
+        calibration: Optional[CameraCalibration] = None,
     ) -> None:
         self.session_id = session_id
         self.output_dir = Path(output_dir)
@@ -41,6 +43,7 @@ class SessionRecorder:
         self.mode = mode
         self.model_name = model_name
         self.model_episodes = model_episodes
+        self.calibration = calibration
         self._frames: List[Dict] = []
         self._start_time = time.time()
         self._frame_count = 0
@@ -136,6 +139,8 @@ class SessionRecorder:
         """Save session to JSON file. Returns path to saved file."""
         output_path = self.output_dir / f"{self.session_id}.json"
         session_data = {
+            "calibration": self.calibration.model_dump(mode="json") if self.calibration else None,
+            "calibration_sha256": self.calibration.sha256 if self.calibration else None,
             "session_id": self.session_id,
             "mode": self.mode,
             "model_name": self.model_name,

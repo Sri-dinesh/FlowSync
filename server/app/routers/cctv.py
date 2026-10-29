@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from pydantic import BaseModel
+from ..realworld.models.calibration import CameraCalibration
 
 from ..realworld.models.config import (
     SESSION_DIR,
@@ -19,6 +20,13 @@ from ..realworld.models.config import (
 )
 
 router = APIRouter(prefix="/cctv", tags=["cctv"])
+
+
+@router.post("/calibration/validate")
+async def validate_camera_calibration(body: CameraCalibration) -> Dict[str, Any]:
+    """Validate image geometry, not its accuracy for the depicted intersection."""
+    return {"calibration_json": body.canonical_json(), "sha256": body.sha256,
+            "source": body.source, "approaches": len(body.approaches)}
 
 
 @router.post("/upload")

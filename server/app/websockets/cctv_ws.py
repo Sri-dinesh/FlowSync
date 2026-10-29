@@ -1,6 +1,6 @@
 """
 CCTV WebSocket Handler — /ws/cctv
-Redesigned: No ROI required. Uses QuadrantCounter for full-frame detection.
+Optional validated approach geometry; otherwise image-direction proxies only.
 Broadcasts progress events during video processing.
 """
 from __future__ import annotations
@@ -11,9 +11,11 @@ import uuid
 from typing import Dict, Optional, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
+from pydantic import ValidationError
 
 from ..realworld.models.config import SESSION_DIR
 from ..realworld.models.schemas import CCTVFrame
+from ..realworld.models.calibration import CameraCalibration
 from ..realworld.pipeline.cctv_pipeline import CCTVPipeline
 from ..realworld.pipeline.video_processor import VideoProcessor
 from ..realworld.pipeline.yolo_detector import YOLODetector
@@ -116,6 +118,17 @@ async def cctv_socket(websocket: WebSocket) -> None:
 
             if cmd == "start_processing":
                 video_path = payload.get("video_path", "").strip()
+                calibration = None
+                if "calibration_json" in payload:
+                    try:
+                        calibration = CameraCalibration.model_validate_json(payload["calibration_json"])
+                        if calibration.source != video_path:
+                            raise ValueError("Calibration source must exactly match the selected video path or URL.")
+                    except (ValidationError, ValueError, TypeError) as error:
+                        await cctv_manager.send(websocket, {
+                            "type": "error", "code": "INVALID_CALIBRATION", "message": str(error),
+                        })
+                        continue
 
                 is_stream = StreamResolver.is_stream_url(video_path)
                 if not is_stream and not os.path.exists(video_path):
@@ -126,9 +139,24 @@ async def cctv_socket(websocket: WebSocket) -> None:
                     })
                     continue
 
-                # Stop any running pipeline first
+                # Check the source geometry before replacing an active session.
+                video_proc = VideoProcessor(video_path)
+                try:
+                    metadata = await video_proc.open()
+                    if calibration and (metadata.width, metadata.height) != (calibration.frame_width, calibration.frame_height):
+                        raise ValueError("Calibration frame size differs from the video; update the geometry for this source.")
+                except Exception as error:
+                    await video_proc.close()
+                    await cctv_manager.send(websocket, {
+                        "type": "error", "code": "SOURCE_CONFIGURATION_FAILED", "message": str(error),
+                    })
+                    continue
+
                 if pipeline:
                     await pipeline.stop()
+                    if recorder:
+                        recorder.set_arrivals(pipeline.arrival_events)
+                        recorder.save()
 
                 # Get YOLO detector from app state
                 yolo_detector: YOLODetector = getattr(websocket.app.state, 'yolo_detector', None)
@@ -140,7 +168,7 @@ async def cctv_socket(websocket: WebSocket) -> None:
                     except Exception as e:
                         print(f"[cctv_ws] YOLO detector not available: {e}")
 
-                session_id = f"session_{conn_id[:8]}"
+                session_id = f"session_{uuid.uuid4().hex}"
                 app_state = getattr(websocket, "app", None)
                 active_mode = getattr(app_state.state, "mode", "ai") if app_state and hasattr(app_state, "state") else "ai"
                 active_model = getattr(app_state.state, "active_model_id", None) if app_state and hasattr(app_state, "state") else None
@@ -151,12 +179,10 @@ async def cctv_socket(websocket: WebSocket) -> None:
                     mode=active_mode,
                     model_name=active_model,
                     model_episodes=active_eps,
+                    calibration=calibration,
                 )
 
                 try:
-                    video_proc = VideoProcessor(video_path)
-                    await video_proc.open()
-
                     pipeline = CCTVPipeline(
                         video_processor=video_proc,
                         yolo_detector=yolo_detector,
@@ -164,6 +190,7 @@ async def cctv_socket(websocket: WebSocket) -> None:
                         on_progress=on_progress,
                         on_arrival=on_arrival,
                         session_id=session_id,
+                        calibration=calibration,
                     )
                     _pipelines[conn_id] = pipeline
                     _recorders[conn_id] = recorder
@@ -175,8 +202,10 @@ async def cctv_socket(websocket: WebSocket) -> None:
                         "session_id": session_id,
                         "is_live": is_stream,
                         "source_type": video_proc.metadata.source_type if video_proc.metadata else "file",
+                        "calibration_sha256": calibration.sha256 if calibration else None,
                     })
                 except Exception as err:
+                    await video_proc.close()
                     print(f"[cctv_ws] Stream open failed: {err}")
                     await cctv_manager.send(websocket, {
                         "type": "error",
@@ -223,6 +252,8 @@ async def cctv_socket(websocket: WebSocket) -> None:
         if pipeline:
             await pipeline.stop()
         if recorder:
+            if pipeline:
+                recorder.set_arrivals(pipeline.arrival_events)
             recorder.save()
         _pipelines.pop(conn_id, None)
         _recorders.pop(conn_id, None)

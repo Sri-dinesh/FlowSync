@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
+from .calibration import GeometryObservation
 
 from .config import LANE_KEYS
 
@@ -176,7 +177,7 @@ class ROIConfig(BaseModel):
 class CameraObservationContract(BaseModel):
     """Current camera path can display detections but cannot supply a policy state."""
     schema_version: Literal["camera_observation_v1"] = "camera_observation_v1"
-    count_semantics: Literal["exclusive_image_direction_proxy"] = "exclusive_image_direction_proxy"
+    count_semantics: Literal["exclusive_image_direction_proxy", "configured_approach_region"] = "exclusive_image_direction_proxy"
     control_status: Literal["unavailable"] = "unavailable"
     physical_actuation: Literal[False] = False
     movement_counts_available: Literal[False] = False
@@ -209,6 +210,7 @@ class CCTVFrame(BaseModel):
     q_values: List[float] = Field(default_factory=list)
     confidence_pct: Optional[float] = None
     observation_contract: CameraObservationContract = Field(default_factory=CameraObservationContract)
+    geometry_observation: Optional[GeometryObservation] = None
     # Frame (base64 for WebSocket streaming)
     annotated_frame_b64: Optional[str] = None
     # Fixed timer comparison

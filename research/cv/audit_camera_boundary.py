@@ -167,6 +167,7 @@ def run(output):
     (output/"legacy_quadrant_counter.py").write_bytes(baseline)
     source_files = [Path(__file__).resolve().relative_to(ROOT).as_posix(), COUNTER_PATH,
         "server/app/realworld/models/schemas.py", "server/app/realworld/models/config.py",
+        "server/app/realworld/models/calibration.py",
         "server/app/controllers/d3qn.py", "server/app/controllers/max_pressure.py", "server/app/controllers/base.py",
         "server/app/rl/observations.py", "server/app/rl/dqn_agent.py", "server/app/rl/dqn_network.py",
         "server/app/rl/hyperparams.py", "server/app/rl/replay_buffer.py",
