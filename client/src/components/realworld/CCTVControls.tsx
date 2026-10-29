@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import CalibrationInput from "./CalibrationInput";
+import CameraConfigInput from "./CameraConfigInput";
 
 interface ProcessingProgress {
   frame_id: number;
@@ -13,7 +13,7 @@ interface ProcessingProgress {
 interface Props {
   isConnected: boolean;
   pipelineStatus: string;
-  onStartProcessing: (videoPath: string, calibrationJson?: string) => void;
+  onStartProcessing: (input: { videoPath: string; calibrationJson?: string; signalTimelineJson?: string }) => void;
   onStop: () => void;
   processingProgress: ProcessingProgress | null;
   totalVehiclesDetected?: number;
@@ -39,6 +39,7 @@ export default function CCTVControls({
   const [uploading, setUploading] = useState(false);
   const [uploadedFilename, setUploadedFilename] = useState("");
   const [calibration, setCalibration] = useState<{ source: string; json: string | undefined; blocked: boolean } | null>(null);
+  const [timeline, setTimeline] = useState<{ source: string; json: string | undefined; blocked: boolean } | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
   const isRunning = pipelineStatus === "started" || pipelineStatus === "processing";
@@ -72,6 +73,7 @@ export default function CCTVControls({
   const effectiveSource = sourceMode === "stream" ? streamUrl.trim() : videoPath;
   const selectedCalibration = calibration?.source === effectiveSource ? calibration : null;
   const calibrationBlocked = calibration !== null && (calibration.blocked || calibration.source !== effectiveSource);
+  const timelineBlocked = timeline !== null && (timeline.blocked || timeline.source !== effectiveSource);
   const pct = processingProgress?.pct_complete;
   const vehiclesFound = processingProgress?.vehicles_detected_so_far ?? totalVehiclesDetected;
 
@@ -244,9 +246,12 @@ export default function CCTVControls({
           </div>
         )}
 
-        <CalibrationInput source={effectiveSource} disabled={isRunning || !effectiveSource}
+        <CameraConfigInput kind="geometry" source={effectiveSource} disabled={isRunning || !effectiveSource}
           onChange={(json, blocked) => setCalibration(json === undefined && !blocked ? null : { source: effectiveSource, json, blocked })} />
         {calibration && calibration.source !== effectiveSource && <p role="alert" className="text-xs text-amber-300">Source changed. Remove or reload the calibration before starting.</p>}
+        <CameraConfigInput kind="signal_timeline" source={effectiveSource} disabled={isRunning || !effectiveSource}
+          onChange={(json, blocked) => setTimeline(json === undefined && !blocked ? null : { source: effectiveSource, json, blocked })} />
+        {timeline && timeline.source !== effectiveSource && <p role="alert" className="text-xs text-amber-300">Source changed. Remove or reload the signal timeline before starting.</p>}
 
         {/* Start / Stop button */}
         <button
@@ -254,10 +259,10 @@ export default function CCTVControls({
             if (isRunning) {
               onStop();
             } else if (effectiveSource && isConnected) {
-              onStartProcessing(effectiveSource, selectedCalibration?.json);
+              onStartProcessing({ videoPath: effectiveSource, calibrationJson: selectedCalibration?.json, signalTimelineJson: timeline?.json });
             }
           }}
-          disabled={!isConnected || (!isRunning && (!effectiveSource || calibrationBlocked))}
+          disabled={!isConnected || (!isRunning && (!effectiveSource || calibrationBlocked || timelineBlocked))}
           className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
             isRunning
               ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20"

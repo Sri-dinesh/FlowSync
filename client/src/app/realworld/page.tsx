@@ -7,6 +7,7 @@ import CCTVControls from "@/components/realworld/CCTVControls";
 import LaneQueuePanel from "@/components/realworld/LaneQueuePanel";
 import SignalDecisionPanel from "@/components/realworld/SignalDecisionPanel";
 import StopLinePanel from "@/components/realworld/StopLinePanel";
+import RecordedSignalPanel from "@/components/realworld/RecordedSignalPanel";
 import CCTVMetrics from "@/components/realworld/CCTVMetrics";
 import TrafficFlowChart from "@/components/realworld/TrafficFlowChart";
 import dynamic from "next/dynamic";
@@ -20,6 +21,15 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8000";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export type CCTVFrameData = {
+  recorded_signal?: {
+    status: "available" | "unknown" | "gap" | "source_timing_unavailable" | "video_mismatch";
+    origin: string;
+    state: "green" | "yellow" | "all_red" | "unknown" | null;
+    phase: number | null;
+    green_elapsed_s: number | null;
+    onset_observed: boolean;
+    time_resolution_s: number;
+  } | null;
   frame_id: number;
   timestamp_ms: number;
   raw_counts: Record<string, number>;
@@ -210,14 +220,16 @@ export default function RealWorldPage() {
   );
 
   const handleStartProcessing = useCallback(
-    (videoPath: string, calibrationJson?: string) => {
+    ({ videoPath, calibrationJson, signalTimelineJson }: { videoPath: string; calibrationJson?: string; signalTimelineJson?: string }) => {
       setPipelineError(null);
       setProcessingProgress(null);
       setTwinData(null);
       setTotalVehiclesDetected(0);
       setCurrentFrame(null);
       setFrameHistory([]);
-      sendCommand("start_processing", { video_path: videoPath, ...(calibrationJson ? { calibration_json: calibrationJson } : {}) });
+      sendCommand("start_processing", { video_path: videoPath,
+        ...(calibrationJson ? { calibration_json: calibrationJson } : {}),
+        ...(signalTimelineJson ? { signal_timeline_json: signalTimelineJson } : {}) });
     },
     [sendCommand]
   );
@@ -327,6 +339,7 @@ export default function RealWorldPage() {
                 totalVehiclesDetected={totalVehiclesDetected}
               />
               <SignalDecisionPanel frame={currentFrame} />
+              <RecordedSignalPanel frame={currentFrame} />
               <StopLinePanel frame={currentFrame} />
               <LaneQueuePanel frame={currentFrame} />
               <CCTVMetrics frame={currentFrame} />
