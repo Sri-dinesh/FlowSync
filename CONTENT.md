@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-10-28, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-10-29, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -169,11 +169,50 @@ The default detector family is YOLOv8n, with local production/pretrained paths a
 
 [VehicleTracker.update](server/app/realworld/pipeline/vehicle_tracker.py) greedily associates nearest previous centroids within an 80-pixel distance and prunes tracks after three seconds. It does **not** execute ByteTrack's two-stage association, despite legacy comments. ByteTrack is related work only until its implementation is actually wired. Likewise, detector IDs or time since first sighting do not automatically provide calibrated individual stopped waiting.
 
-The active counting path uses bottom-centre locations and assigns the dominant displacement from the image centre to at most one direction. Centre/diagonal ties and invalid locations remain unassigned. This repairs the historical counter's two-to-four assignments per box. The legacy `*_straight` keys are compatibility slots for image-direction proxies, not measured turning movements. ROI/homography utilities exist separately; their presence does not establish that the current orchestrator applies a calibrated homography. Smoothed/last-good counts and confidence heuristics remain estimates.
+Without a supplied geometry configuration, the counting path uses bottom-centre locations and assigns the dominant displacement from the image centre to at most one direction. Centre/diagonal ties and invalid locations remain unassigned. This repairs the historical counter's two-to-four assignments per box. With a supplied configuration, the pipeline assigns boxes to explicitly configured approach regions instead (section 10.1). The legacy `*_straight` keys remain compatibility slots for approach totals, not measured turning movements. Legacy ROI/homography utilities exist separately; the current orchestrator does not apply a homography. Smoothed/last-good image-proxy counts and confidence heuristics remain estimates. Configured region occupancy uses current detections without last-good imputation.
 
 `CCTVFrame.observation_contract` reports detected, assigned and unassigned box counts, unavailable movement information and missing control inputs. The current pipeline has no loaded control-policy inference path or observed signal feedback. It emits empty observations/Q values and null phase, policy confidence and waiting measurements. The former queue-times-2.5 waiting estimate has been removed. The frontend displays these limitations instead of a default green, numerical Q vector or apparent policy confidence.
 
 First track sightings retain `turn:null` and explicit provenance: image-direction proxy, unobserved turn and processing-cadence timestamp proxy. Track IDs no longer generate fictional turns. Empty recordings remain empty. [arrival_contract.py](server/app/realworld/digital_twin/arrival_contract.py) checks required replay fields and rejects these incomplete sightings before simulation state changes. The recorder publishes `replay_inputs_complete` and a reason; the UI disables replay and automatic count injection for incomplete sessions. Field completeness does not establish measured-camera validity for legacy or manually supplied events. The digital twin remains experimental simulation, not calibrated equivalence to a real intersection. Recorded footage and ground-truth traffic labels were not supplied for validation. Section 36.7 records the synthetic contract and frozen-model diagnostic.
+
+### 10.1 Optional camera approach geometry
+
+The camera pipeline accepts `camera_geometry_v1` configurations through the **Approach geometry** JSON-file input on `/realworld`. This is user-supplied image geometry, not automatic calibration or an accuracy certificate. [calibration.py](server/app/realworld/models/calibration.py) defines immutable validated configurations; [camera_geometry.py](server/app/realworld/pipeline/camera_geometry.py) applies them. This path does not call the legacy `ROIManager`, whose first-match overlapping-region behavior is unsuitable for explicit ambiguity reporting.
+
+Each configuration binds a camera ID to the exact source path/URL and reference frame dimensions. It defines one to four named approaches, each with a strictly convex polygon of 3–16 distinct normalized `(x,y)` vertices in boundary order and a two-point stop line on one boundary edge. Coordinates use the original image origin at top left, with x increasing rightward and y downward. The polygon must describe the upstream road area; mathematical validation cannot establish that the user selected the correct road or stop line. Clockwise and counterclockwise ordering are accepted. Concave/self-crossing/zero-area polygons, overlapping interiors, duplicate approach names, nonfinite/out-of-range coordinates and degenerate/off-boundary stop lines are rejected. Shared region edges are permitted; detections on a shared boundary remain ambiguous and unassigned. No homography, world-distance estimate or inferred intersection orientation is introduced.
+
+Workflow:
+
+1. Select/upload the intended video. Copy the exact **Source** displayed below the calibration input.
+2. Define upstream polygons and stop-line endpoints on a reference frame, normalize coordinates by its width/height, and save the JSON. The example below is synthetic; replace every geometry/source/dimension value using the intended camera. There is no graphical polygon editor yet.
+3. Import the JSON. `POST /cctv/calibration/validate` validates it and returns canonical JSON, a SHA-256 identity and source. Invalid input blocks Start. Changing the source requires removing or reloading the configuration.
+4. Start processing. `/ws/cctv` accepts `start_processing.payload.calibration_json` and validates it again before replacing an active session. Source and decoded video dimensions must match. Configured polygons and orange stop lines are overlaid on the video for review.
+5. Inspect configured approach counts and unassigned/ambiguous boxes. Completed/stopped sessions retain the exact configuration and hash; each frame and track-sighting event records the hash. Restarting processing creates a new session ID instead of overwriting the previous session.
+
+```json
+{
+  "schema_version": "camera_geometry_v1",
+  "camera_id": "example_camera",
+  "source": "REPLACE_WITH_EXACT_SELECTED_SOURCE",
+  "frame_width": 1000,
+  "frame_height": 1000,
+  "approaches": [
+    {
+      "approach": "north",
+      "vertices": [[0.1, 0.1], [0.4, 0.1], [0.4, 0.6], [0.1, 0.6]],
+      "stop_line": [[0.1, 0.6], [0.4, 0.6]]
+    }
+  ]
+}
+```
+
+Assignment uses the detected box's bottom centre. Only a unique containing region receives one count; outside/invalid points and shared-boundary ambiguity receive none. A frame-size mismatch or unavailable detector assigns no boxes and emits an explicit unavailable status. There is no fallback to image-direction guesses or retained counts in this configured path. Unconfigured approaches are absent from `geometry_observation.approach_counts` and displayed as unavailable, not measured zero. Normalized geometry is nevertheless bound to exact dimensions to prevent silent reuse after resizing/cropping; a moved camera or same-size crop cannot be detected by this check and requires operator review. Geometry comparisons use a numerical tolerance of `1e-9` in normalized coordinates, not a physical localization-error bound.
+
+`CCTVFrame.geometry_observation` carries status, configured approaches, approach counts, assigned/unassigned/ambiguous counts and `calibration_sha256`. `observation_contract.count_semantics` becomes `configured_approach_region`; movement availability remains false and control remains unavailable. Legacy twelve-slot counts place each approach total in its `*_straight` compatibility slot for existing charts/recorders. This does **not** observe straight-going vehicles. Occupancy includes moving vehicles in the region; it does not measure a stopped queue, intended turns, stop-line crossing events or discharge rates. Stop lines currently constrain and visualize the region boundary; crossing detection is a subsequent task. Track sightings keep unknown turns and processing-cadence timing, so they remain ineligible for calibrated replay. Signal feedback and trained camera-policy integration are still missing.
+
+This is an engineering prerequisite for a labeled-video study, not a new controller or algorithmic novelty claim. Source matching and hashes establish configuration identity, not geographic truth or camera accuracy. Preserve source-access credentials separately where possible; recorded configuration includes the source string. Real recorded-camera labels, movement counts, phase observations and independent error/performance measurements remain necessary.
+
+Verification on October 29: **59 focused backend tests passed**, including 19 new geometry/API/pipeline/recorder/WebSocket tests; these overlap earlier test totals. The frontend's five tests, type checking, lint and production build pass. A Chromium workflow used a synthetic video and supplied detections through the actual upload API, geometry validation, WebSocket handler, video reader, pipeline and session recorder. Invalid geometry blocked Start. Two of five supplied boxes were assigned, three were unassigned, including one shared-boundary ambiguity. The recorded configuration/hash survived processing, replay remained incomplete, and no uncaught browser exception occurred. This checks integration, not detector accuracy, real-camera counting or controller performance. Existing dependency and chart-sizing build warnings remain. No frozen experiment artifact or trained checkpoint was modified.
 
 ## 11. Model, history and persistence workflow
 
@@ -1451,6 +1490,9 @@ The candidate empirical contribution is the linked, reproducible diagnosis: high
 The final local artifact is `results/camera_boundary/final_20261027/`. It contains the specification, every geometry case, every hypothetical model input, masks, pressure proposals, all learned Q values/actions, witness pairs, parent checkpoint metadata/hashes, the historical counter and source archive. The earlier `audit_20261027/` export remains a development snapshot. Verification rechecks file/source hashes and exactly recomputes all geometry, inputs, network outputs and summaries in the recorded runtime. It does not rerun vehicle dynamics or evaluate real video. Commands require the preserved local parent checkpoints:
 
 ```bash
+# Historical verification: run from frozen commit 05df127 with the preserved
+# local results/checkpoints and Python environment available. Current calibration
+# schema changes intentionally fail the historical verifier's live-source check.
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   server/venv/bin/python -m research.cv.audit_camera_boundary \
   --verify results/camera_boundary/final_20261027
