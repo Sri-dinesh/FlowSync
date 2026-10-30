@@ -50,6 +50,7 @@ This reference describes the actual application first. Separate experiment resul
 - [38. Decision-cadence opportunity prerequisite](#38-decision-cadence-opportunity-prerequisite)
 - [39. Supervised count-restoration pilot](#39-supervised-count-restoration-pilot)
 - [40. On-policy PPO with frozen count restoration](#40-on-policy-ppo-with-frozen-count-restoration)
+- [41. Source-timed arrival-window architecture](#41-source-timed-arrival-window-architecture)
 
 ## 1. Project scope and ownership
 
@@ -2058,5 +2059,111 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/py
 ```
 
 **Close this PPO/restoration recipe without expanding or promoting it.** The implementation and controlled negative outcome extend the empirical record; they do not establish a new controller algorithm, reliable learned superiority or real CCTV readiness. Another experiment needs a directly supported mechanism and a new frozen protocol, rather than more episodes or a favorable seed from this panel.
+
+## 41. Source-timed arrival-window architecture
+
+### 41.1 Research question, alternatives and ownership
+
+The next hypothesis is that **usable timing evidence about already visible approaching vehicles** can improve a small green-extension decision beyond strong pressure control. The previous learned policies and count-restoration studies do not establish that hypothesis. This implementation first tests deterministic control headroom; it does not train another network, promise a breakthrough or declare a newly invented algorithm.
+
+Two independent design candidates were reviewed before implementation. One proposed a 20-second visible-workload queue optimizer; the other proposed a two-second hold versus a declared pressure reference. The root review and a separate cross-review both chose the smaller extension architecture. The optimizer assumes no unseen arrivals over most of a horizon much longer than the simulator's roughly 3.5-second approach traversal. Its fluid queues, terminal penalty and future shield would add unvalidated assumptions. The chosen design retains its exact physical-timing check, explicit reference decision and atomic evidence discipline. Local design artifacts are in `results/arrival_planning_design/20261030/`; the design scores are engineering judgments, not research measurements.
+
+| Module | Owns |
+| --- | --- |
+| [arrival_tracks.py](research/observation/arrival_tracks.py) | Immutable measurement/packet/state types, synthetic capture and transport, causal motion history, derived count subsets. |
+| [arrival_extension.py](research/policies/arrival_extension.py) | Attributed pressure/Advanced-MP references, physical return-time helper, extension rule, cadence and diagnostics. |
+| [run_arrival_window_panel.py](research/pilots/run_arrival_window_panel.py) | Scenario execution, current signal context, shared shield/FSM, truth-side metrics, frozen protocol, atomic bundles and verification. |
+
+The public control call is `ArrivalExtension(method, timing).act(delivered_state, context)`. The controller receives no environment, scenario profile, spawner or simulator vehicle objects. Synthetic capture and offline packet replay feed the same delivery/history implementation. All state used by a method is session-local; worker processes own separate case directories.
+
+```mermaid
+flowchart LR
+    Simulation[Custom simulation] --> Capture[Synthetic lane and position measurements]
+    Capture --> Packet[Misses / position error / delay / frame drops]
+    Packet --> Motion[Causal position history and source age]
+    Packet --> Counts[Visible count subsets]
+    Motion --> Reference[Pressure / Advanced-MP reference]
+    Counts --> Reference
+    Reference --> Extension[Optional two-second green extension]
+    Motion --> Extension
+    Feedback[Current signal feedback] --> Extension
+    Extension --> Shield[Shared additional shield]
+    Shield --> FSM[Shared physical FSM]
+    FSM --> Simulation
+    Simulation --> Metrics[Independent signal audit and truth-side waiting metrics]
+```
+
+This is a new research-only path. Archived count injectors, observation versions, checkpoints, physical simulation code and previous results are unchanged. No website registry/default, Supabase model, CCTV controller or physical-signal integration is added.
+
+### 41.2 Novelty assessment and closest precedents
+
+The literature check found substantial prior art. Neither arrival awareness nor information age is new on its own. These sources are precedents and attribution; their reported performance and theoretical guarantees are not FlowSync results.
+
+| Established work | Relationship to this prototype |
+| --- | --- |
+| [Zhang et al., Advanced-MP / Advanced-XLight](https://arxiv.org/abs/2112.10107) | Already compares current-phase effective running demand with queued movement pressure. The new panel includes a separately labelled one-lane/movement adaptation with weights 1, 2 and 4. |
+| [Wang et al., learning MP with phase-switching loss](https://xingminw.github.io/publication/2022-max-pressure/) | Already learns switching/position-weight curves and accounts for transition losses. Including clearance costs or learning pressure corrections is not a new contribution by itself. |
+| [Hao and Boel, coordinated MPC with a stabilizing pressure reference](https://biblio.ugent.be/publication/01J8QHQCP55ECXP43A61ABGAAX) | Establishes prior use of predictive signal control with a pressure-based reference. This prototype does not reproduce its network model or stability proof. |
+| [Tan et al., Regret-Based Max-Pressure, October 2026 preprint](https://arxiv.org/abs/2610.32290) | Already treats uncertainty through decision-relative pressure loss. A general claim of inventing decision-aware traffic uncertainty would be unsupported. Its results and guarantees are not transferred here. |
+| [Yang, Ji and Wang, NITC report 1235, April 2020](https://rosap.ntl.bts.gov/view/dot/54566/dot_54566_DS1.pdf) | Uses Age of Information in a connected-vehicle signal-control system; freshness-aware control is existing work. |
+| [Caltrans, Advanced Traffic Signal Control Algorithms](https://dot.ca.gov/-/media/dot-media/programs/research-innovation-system-information/documents/final-reports/ca13-2157a-finalreport-a11y.pdf) | Describes predicted platoon impacts and green extension/termination. Predicting a platoon and extending green is not an invention claim. |
+
+**Algorithmic novelty remains unestablished.** The specific empirical question is whether source-time projection, explicit unknown/past-window rejection and conservative moving-prefix support improve complete episodes beyond the same Advanced-MP freshness gate. A gain reproduced by the age-gated reference would not establish added scheduling benefit. A gain reproduced by the point or age-ignored ablation would not establish the claimed temporal/uncertainty component. Venue-level novelty still requires broader assessment even if the bounded screen passes.
+
+### 41.3 Measurement contract and causal data boundary
+
+`source_timed_tracks_v1` contains session-local integer track IDs, calibrated movement-lane labels, normalized path position, capture tick, delivery tick and a calibration hash. Ticks are 100 ms in this research path. The frozen dataclasses validate IDs, movements, positions, duplicate IDs and source/control time ordering; unexpected packet fields are rejected. No velocity, simulator waiting, vehicle state, prospective `turn`, hidden backlog, demand profile or future field is captured. IDs are remapped in deterministic observation order, without using random UUID bytes as features or RNG seeds.
+
+The calibration explicitly requires **synthetic dedicated movement lanes**. It declares stop line 0.42, maximum speed 0.12 normalized units/s, spacing 0.08, position-error engineering bound 0.002, one-second history and minimum motion span 0.4 seconds. These are normalized road-path units, not metres or measured camera speeds. The current CCTV approach polygons and retrospective turns do not provide this prospective movement/road-plane contract. No real-camera adapter fills the missing inputs, and existing replay rejection remains intact.
+
+One sensor applies per-track misses, bounded uniform position error, latency and frame drops before deriving every controller-facing count and motion state. All-visible, upstream and queued subsets therefore come from the **same delivered packet**. Invisible backlog is excluded from every method's observation. All-visible counts include discharged but still visible tracks; upstream means position at/before 0.42. Queued counts conservatively include stopped and unknown-speed tracks. Outgoing counts use the shared canonical destination map, with explicitly defined downstream regions. These new visible-only semantics must not be pooled with old backlog/discharged-inclusive checkpoint evaluations.
+
+Distinct source frames update each same-ID/same-movement history. Repeated frames are idempotent and preserve age; backwards time, changed repeated-frame contents and mismatched calibration fail validation. Stopped tracks have no invented free-flow ETA. Identity/movement discontinuities, large gaps, reversals, insufficient history and implausible speed retain unknown status. Kinematic speed intervals come from measured displacement plus/minus twice the declared position error; their limits respect the declared maximum speed. Position is the only measured motion channel.
+
+Synthetic association is idealized through persistent remapped identities. This first fault panel does not simulate false detections, lane swaps, ID-switch errors or actual detector failures. Source-time and positional envelopes are engineering assumptions, **not calibrated probability intervals or guarantees about actual stop-line crossing time**. A vehicle can stop or be blocked. Track faults use independent per-step/per-ID streams; frame-drop schedules are shared by seed across methods, while identities/visibility can differ after control trajectories diverge. Do not claim identical per-vehicle corruption across counterfactual policies.
+
+### 41.4 Decision rule, physical timing and ablations
+
+The reference is an **age-gated Advanced-MP adaptation with weight 2**. Its signed efficient pressure uses queued incoming minus queued downstream counts; unknown motion remains queued demand. Current running demand counts known-moving vehicles within `vmax × 2 s` of the stop line and preserves the paper's strict weighted-demand comparison. Ties prefer the current phase here. Geometry, cadence, unknown-motion handling, shielding and the custom simulator differ from the published network setup; this is an adaptation, not a claimed exact reproduction.
+
+If packet age exceeds 0.5 seconds or no frame exists, the reference uses upstream-only clipped pressure from the delivered observations. The primary shares this exact reference/freshness gate. When the reference requests a switch, it considers holding current green for two seconds only if maximum-green and observed phase-service guards allow it.
+
+Within each currently served movement, tracks are ordered from the stop line upstream. Only a leading prefix of known-moving tracks with positive, usable kinematic release windows may support extension. A stopped/unknown leader, a window overlapping the past or a vehicle not serviceable within two seconds blocks support from followers. Service times include an approximate spacing/speed headway. The rule never counts an ambiguous possibly departed track as certain extension benefit.
+
+A fresh local `TrafficSignal` computes the earliest possible switch-away, minimum green at the competing phase, and switch-back cycle using declared timings only. With default settings its executable tick guards yield **18.2 s**, versus the idealized arithmetic value 18 s. It has no simulator traffic, lane objects or RNG. If a prefix vehicle's estimated service time is `t_i`, the proxy benefit sums `max(0, return_time - t_i)`. Competing cost is two seconds times all observed competing controlled upstream demand. Extend only when benefit exceeds that cost plus **one vehicle-second**; otherwise follow the reference.
+
+This observed-cohort service proxy is an approximation, **not a lower bound on actual full-run benefit**. Cross-traffic clearing, unknown capacity reductions, future entrants and later phase choices can invalidate it. No 20-second unseen-demand forecast is inserted. Complete-episode performance, rather than the proxy value, determines continuation.
+
+Every real proposal still passes through the unchanged additional shield at 10 Hz and the shared physical FSM: minimum green 8 s, yellow 2 s, scenario all-red (normally 3 s), maximum-green guard 40 s and phase-service threshold 45 s. Phase-service timers are not individual waiting times. Matched methods cache decisions for two seconds and return the current phase during physical locks; native pressure references act at 10 Hz.
+
+The ten frozen methods are all-visible native MP; upstream native MP; upstream MP at two seconds; Advanced-MP weights 1, 2 and 4; age-gated Advanced-MP; point-estimate extension; age-ignored extension; and the primary window extension. The point ablation retains the same gate and uses nominal arrival time. The age-ignored ablation retains actual freshness checks but omits capture-to-control time subtraction. Neither is allowed to replace a failed primary.
+
+### 41.5 Frozen headroom protocol and evidence
+
+The executable `PLAN` freezes six existing **training** templates, new traffic seeds 1341001–1341006 and three synthetic sensing conditions: clean tracks; two-tick latency; and intermittent tracks with 10% misses, three-tick latency, 20% frame drops and bounded position error 0.002. There are **18 cases × 10 methods = 180 complete 1,200-tick runs**. The six traffic seeds, shared across conditions/methods, are not 18 independent traffic replicates. No validation/test files, model fitting or learning are used.
+
+The primary requires at least **2% aggregate mean-delay gain against each of seven classical references**, at least **1% against each point/age ablation**, no aggregate p95/throughput loss against any reference and no case more than 5% worse in delay against any reference. On clean sensing, mean/p95 loss against the age-gated reference must stay within 1%, with no throughput loss. Complete coverage, paired requested arrivals and zero measured signal violations are required. A pass only justifies a separately frozen fresh-development study; neither training nor promotion starts automatically.
+
+Each invocation has a **300-second cooperative cap** and at most three worker processes. One directory per case and atomic per-method compressed bundles allow an externally interrupted invocation to reuse only completed episodes under identical source/protocol/runtime checks. The protocol permits at most two invocations; timing is reported per invocation. A sealed result is immutable and cannot be resumed. Incomplete partial execution adds no independent samples.
+
+Every raw bundle retains all 10 Hz pre-corruption synthetic captures, delivered packets, signal feedback, controller/reference reasons, proposed/executed actions, shield decisions, executed lamps and generated movement arrivals. Completed, active and entry-backlog waiting populations are retained separately for outcome reconstruction. Truth-side populations are never passed to the policy. The verifier reconstructs packet corruption/delivery, causal histories, every action/shield decision and executable signal transition, wait-population metrics, requested-arrival pairing, coverage and the frozen screen. This replay performs no new traffic-kinematics simulation.
+
+### 41.6 Verification before performance collection
+
+The integration smoke at `results/arrival_window/smoke_v3_20261030/` runs four complete training-traffic episodes with dedicated mechanics seed 1340901. It passes pairing and executed-signal checks across **4,800 samples**, with zero measured violations. Its verifier reconstructs all 4,800 sensing/action/lamp frames. It is explicitly `mechanics_only`; it does not apply the scientific continuation screen. Earlier smoke directories are preserved development snapshots.
+
+**63 focused research tests pass, including 23 new arrival-track/controller/panel cases.** They cover missing calibration, malformed/future/duplicate packets, immutable data, source-clock idempotence and rollback after rejected frames, position-derived speed, stopped/unknown/gap states, misses/latency/drop replay, UUID-independent IDs, coherent count subsets, strict Advanced-MP comparison, blockers, source-age/point ablations, exact timing, zero-uncertainty equivalence, service headway, cadence, guards, full-run determinism, generated-vehicle conservation and complete-panel screening. The suite also checks the existing PPO/recovery/restoration/margin paths; totals overlap previous suites. Repository source/link checks and `git diff --check` pass. No frontend build or real-camera test is claimed.
+
+At protocol freeze, the performance panel has not run. Execute once into a new directory; afterward prefer verification for review:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.run_arrival_window_panel --output results/arrival_window/panel_20261030
+
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.run_arrival_window_panel --verify results/arrival_window/panel_20261030
+```
+
+Only after an external interruption, with no sealed `report.json`, the same runner's `--resume results/arrival_window/panel_20261030` reuses completed bundles under the frozen invocation limit. Do not alter seeds, add favorable scenarios, change the margin, retune reference weights or loosen the screen after inspection.
 
 [Back to Top](#top)
