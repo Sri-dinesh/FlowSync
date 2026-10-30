@@ -2228,13 +2228,9 @@ For every recorded support ID at every extension gate, a separate evaluator read
 
 Future captures never enter reconstructed control. A regression test changes the future truth-side captures while retaining all delivered packets: service labels change, while every reconstructed decision/count comparison remains identical. Other tests cover endpoint inclusion, missing/already-discharged targets, horizon censoring, the cadence cache/physical locks and exact equivalence of the audit's native loop with the original simulator runner.
 
-At protocol freeze, **30 focused arrival/audit tests pass, including seven new reference-gap cases**. These overlap prior suites and do not constitute whole-repository coverage. Source/link checks and `git diff --check` also pass. No new matched-control outcomes have been collected. The original panel's performance screen remains failed. Review tools are:
+At protocol freeze, **30 focused arrival/audit tests pass, including seven new reference-gap cases**. After the serialization repair below, **31 pass, including eight reference-gap cases**. These overlap prior suites and do not constitute whole-repository coverage. Source/link checks and `git diff --check` also pass. The diagnostic is now complete (section 42.4); the original panel's performance screen remains failed. Review the completed artifact without collecting another copy:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.audits.audit_arrival_reference_gap results/arrival_window/panel_20261030 \
-  --output results/arrival_reference_gap/audit_v2_20261030
-
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
   -m research.audits.audit_arrival_reference_gap results/arrival_reference_gap/audit_v2_20261030 --verify
 ```
@@ -2246,5 +2242,25 @@ The audit verifier reconstructs the saved-state diagnosis and CSVs, replays ever
 The first audit attempt, `results/arrival_reference_gap/audit_20261030/`, stops at its first native anchor **before collecting any matched-control outcomes**. Its live packet contains tuples, while the saved JSON bundle contains arrays/lists. Direct Python object comparison therefore rejects an otherwise identical replay. Converting the live bundle to its exact JSON value reproduces every saved semantic field, without rounding numbers or excluding trajectory fields. The diagnostic proof is `results/arrival_reference_gap/anchor_comparison_20261030.json`.
 
 The audit now compares the complete serialized value. A regression first reproduced the rejection, then passed with the fix; it still rejects real position and metric changes. This changes the new audit's representation comparison, not a controller, traffic outcome or scientific threshold. The unsealed first attempt and its source archive remain intact. The corrected run uses a new directory and retains the same declared cases, controls, anchors and budget.
+
+### 42.4 Completed diagnosis: service supported, cadence matters
+
+Artifact: `results/arrival_reference_gap/audit_v2_20261030/report.json`. The corrected diagnostic completes in **13.986 seconds**, below its 120-second cap, with `complete: true` and `audit_integrity_passed: true`. It collects **18 matched all-visible pressure controls** and exactly reproduces **two complete native anchor episodes**. The 20 new bundles cover **24,000 signal samples**, with zero measured conflict/clearance violations. These are reused development cases, not fresh confirmation. The original 180-run panel and its failed screen remain unchanged.
+
+Every one of the **27 credited support events** has a recorded stop-line crossing within the chosen two-second hold. None is already discharged at its gate, missing, censored, or associated with an unobserved upstream leader in these selected witnesses. The evaluator finds no last-tick speed above the corresponding history-derived upper estimate. This supports those particular service claims. It does **not** validate every vehicle's timing estimate, establish a probability guarantee, show benefit over switching, or create 27 independent traffic replicates.
+
+Across the 18 saved primary traces, 19,254 ticks are physically locked and 2,346 are switchable. The primary recomputes at 256 gates and returns a cached proposal on 2,090 switchable ticks. Of 694 disagreements with native all-visible pressure, **631 occur during cached intervals**, versus 63 at gates. A fresh same-state primary computation removes **255** of those cached disagreements. Count semantics alone change the pressure proposal on 558 switchable ticks; the freshness gate changes three. These overlapping, trajectory-conditioned counts identify a testable cadence hypothesis; they do not attribute the original delay loss causally to caching.
+
+| Method | Mean delay (s) | Average within-run p95 (s) | Mean passed |
+| --- | ---: | ---: | ---: |
+| All-visible pressure, 10 Hz | 8.595313 | 31.701667 | 47.666667 |
+| All-visible pressure, two seconds; new control | 9.078149 | 31.736667 | 47.333333 |
+| Upstream pressure, 10 Hz | 8.712783 | 29.697222 | 47.333333 |
+| Upstream pressure, two seconds | 8.832918 | 30.876111 | 48.055556 |
+| Original window rule, two seconds | 8.707696 | 31.020833 | 48.388889 |
+
+The controlled all-visible pressure cadence change costs **0.482836 s** of mean delay on this panel, compared with **0.120135 s** for upstream pressure. Their descriptive difference is **0.362701 s**. The primary's gap to native all-visible pressure decomposes algebraically as **+0.112383 = -0.370453 + 0.482836 s**: it beats the matched two-second control but loses to the native reference. This is not a measured effect of speeding up the primary, and it does not rescue its failed screen.
+
+Verification reconstructs the saved-state analysis and CSVs, both semantic anchors, and every new control's delivered packets, decisions, shield output, lamp transitions, outcome populations and counters. It performs **zero new traffic-kinematics reruns**. The verification record is `results/arrival_planning_design/20261030/reference_gap_v2_verification.json`. The diagnostic and serialization fix were committed/pushed as `7f40be1` and `70d7a8c` before the corrected collection. A separate, predefined cadence experiment is justified; no learning, controller promotion or real-camera deployment follows from this audit.
 
 [Back to Top](#top)
