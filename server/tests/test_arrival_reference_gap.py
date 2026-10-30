@@ -1,11 +1,12 @@
 from copy import deepcopy
 from dataclasses import asdict, replace
+import json
 
 import numpy as np
 import pytest
 
 from research.analysis.arrival_reference_gap import analyze_run, service_witness
-from research.audits.audit_arrival_reference_gap import AllVisiblePressure, rollout
+from research.audits.audit_arrival_reference_gap import AllVisiblePressure, rollout, require_anchor_match
 from research.observation.arrival_tracks import Track, TrackFaults, TrackSensor
 from research.pilots import run_arrival_window_panel as panel
 from research.policies.arrival_extension import ArrivalExtension, Timing
@@ -109,3 +110,17 @@ def test_audit_native_loop_matches_original_real_simulation_exactly():
     assert matched["method"] == "mp_all_2s"
     assert matched["result"]["arrival_trace_hash"] == original["result"]["arrival_trace_hash"]
     assert matched["result"]["violations"] == 0
+
+
+def test_native_anchor_compares_json_representation_and_rejects_real_changes():
+    live = dict(frames=[dict(packet=dict(tracks=(dict(track_id=0, position=.3),)))], result=dict(delay=2.34567))
+    saved = json.loads(json.dumps(live))
+    require_anchor_match(live, saved)
+    changed_position = deepcopy(saved)
+    changed_position["frames"][0]["packet"]["tracks"][0]["position"] += .00001
+    with pytest.raises(ValueError, match="Native anchor"):
+        require_anchor_match(live, changed_position)
+    changed_metric = deepcopy(saved)
+    changed_metric["result"]["delay"] += .00001
+    with pytest.raises(ValueError, match="Native anchor"):
+        require_anchor_match(live, changed_metric)

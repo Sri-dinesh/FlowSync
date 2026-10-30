@@ -2233,12 +2233,18 @@ At protocol freeze, **30 focused arrival/audit tests pass, including seven new r
 ```bash
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
   -m research.audits.audit_arrival_reference_gap results/arrival_window/panel_20261030 \
-  --output results/arrival_reference_gap/audit_20261030
+  --output results/arrival_reference_gap/audit_v2_20261030
 
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.audits.audit_arrival_reference_gap results/arrival_reference_gap/audit_20261030 --verify
+  -m research.audits.audit_arrival_reference_gap results/arrival_reference_gap/audit_v2_20261030 --verify
 ```
 
 The audit verifier reconstructs the saved-state diagnosis and CSVs, replays every new control/anchor packet, controller decision, shield decision and lamp state, checks both native anchors and outcome populations, and preserves the original failed-screen flags. It performs no new traffic-kinematics simulations. New control rollouts, deterministic anchor reruns and data-only verification are different counts and must remain separate.
+
+### 42.3 Serialization boundary repair before control collection
+
+The first audit attempt, `results/arrival_reference_gap/audit_20261030/`, stops at its first native anchor **before collecting any matched-control outcomes**. Its live packet contains tuples, while the saved JSON bundle contains arrays/lists. Direct Python object comparison therefore rejects an otherwise identical replay. Converting the live bundle to its exact JSON value reproduces every saved semantic field, without rounding numbers or excluding trajectory fields. The diagnostic proof is `results/arrival_reference_gap/anchor_comparison_20261030.json`.
+
+The audit now compares the complete serialized value. A regression first reproduced the rejection, then passed with the fix; it still rejects real position and metric changes. This changes the new audit's representation comparison, not a controller, traffic outcome or scientific threshold. The unsealed first attempt and its source archive remain intact. The corrected run uses a new directory and retains the same declared cases, controls, anchors and budget.
 
 [Back to Top](#top)

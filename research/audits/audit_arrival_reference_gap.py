@@ -95,6 +95,13 @@ def load_raw(source, row):
         return json.load(stream)
 
 
+def require_anchor_match(live, saved):
+    # Compare the complete serialized value, preserving floats exactly. Frozen
+    # packet tuples become JSON arrays; this is not a traffic/state difference.
+    if json.loads(json.dumps(live, allow_nan=False)) != saved:
+        raise ValueError("Native anchor does not exactly reproduce the frozen full semantic bundle")
+
+
 def trace_analysis(source, reference):
     analyses = [analyze_run(load_raw(source, row)) for row in reference["rows"] if row["method"] == "window_extension"]
     cases = [dict(case_id=a["case_id"], **a["counts"]) for a in analyses]
@@ -192,8 +199,7 @@ def run(source, output):
             case = next(c for c in manifest["cases"] if c["case_id"] == case_id)
             raw = rollout(case, 1, budget)
             old = load_raw(source, next(r for r in reference["rows"] if r["case_id"] == case_id and r["method"] == "mp_all_native"))
-            if raw != old:
-                raise ValueError("Native anchor does not exactly reproduce the frozen full semantic bundle")
+            require_anchor_match(raw, old)
             path = output/"raw"/f"anchor_{case_id}.json.gz"
             with gzip.open(path, "wt") as stream:
                 json.dump(raw, stream, allow_nan=False)
