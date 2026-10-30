@@ -1982,4 +1982,25 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/py
   -m research.pilots.run_ppo_restoration_pilot --verify results/ppo_restoration/new_bounded_pilot --refit
 ```
 
+### 40.4 Recovery after an external server restart
+
+The original `results/ppo_restoration/pilot_20261030/` process was interrupted by a server restart before sealing `report.json`. Its files remain unchanged. Two workers have complete training/evaluation bundles (101/raw and 202/raw). The 101/restored worker completed all 90 episodes and optimizer updates, with 29 of 30 evaluations saved. The other persisted prefixes are 202/restored through episode 34 (last complete update at 30) and 303/raw through episode 72; 303/restored had not started. The original directory is incomplete evidence and cannot pass the scientific screen on its own.
+
+[recover_ppo_restoration_pilot.py](research/pilots/recover_ppo_restoration_pilot.py) freezes a **separate 300-second recovery cap**, three processes and unchanged model settings, traffic seeds, episode endpoints, controls and scientific thresholds. It creates a new directory, inventories/hashes every interrupted file, archives its own source and preserves the original source snapshot. Remaining workers are scheduled by remaining episode count; baseline jobs fill available process slots. This changes execution recovery, not the learning method or selection rule. The original run's final elapsed time was not sealed, so recovery time must be reported separately; no claim that uninterrupted execution met the original 600-second cap is justified.
+
+Completed optimizer batches are replayed exactly to reconstruct actor/critic **and Adam state**. The local sampler is advanced using every recorded proposal's probabilities, including the dropped final macro. All reproduced sampled actions must match. Recovery rolls back an incomplete batch in the new copy to its last complete update; repeated episode summaries must match the interrupted prefix exactly and are retained as repeats, not new samples. Existing checkpoints and completed evaluations are reused. A later interruption can recover into another new directory using the same process.
+
+Before resuming, exact reconstruction succeeded through episodes 90, 30 and 72 for the three unfinished saved workers, and all their 71 saved evaluations were readable. Two recovery tests check sampler state, corrupted-action rejection, actor/critic tensor reproduction, Adam moments and rollback before an uncommitted episode. This validates recovery mechanics; it does not establish a control benefit.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.recover_ppo_restoration_pilot results/ppo_restoration/pilot_20261030 \
+  --output results/ppo_restoration/recovered_20261030
+
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.recover_ppo_restoration_pilot results/ppo_restoration/recovered_20261030 --verify --refit
+```
+
+The recovery verifier also checks that the interrupted original is unchanged, verifies its preserved source and checks exact repeated-prefix summaries and sampler actions. Repeated trajectories do not increase independent sample size. Datasets, checkpoints and raw outcomes remain local under the existing results policy.
+
 [Back to Top](#top)
