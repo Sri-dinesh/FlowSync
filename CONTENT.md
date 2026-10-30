@@ -53,6 +53,7 @@ This reference describes the actual application first. Separate experiment resul
 - [41. Source-timed arrival-window architecture](#41-source-timed-arrival-window-architecture)
 - [42. Arrival reference-gap and service audit](#42-arrival-reference-gap-and-service-audit)
 - [43. Receding arrival decisions: frozen cadence experiment](#43-receding-arrival-decisions-frozen-cadence-experiment)
+- [44. Independent SUMO sensing-fault study](#44-independent-sumo-sensing-fault-study)
 
 ## 1. Project scope and ownership
 
@@ -560,6 +561,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
+| Independent SUMO sensing faults | A fixed-delay/missed-detection interface and frozen 72-episode classical study are implemented (section 44). Verified mechanics precede full collection. This adds neither a learned controller nor a real-camera validation claim. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -2373,5 +2375,95 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/py
 ```
 
 **Close the receding-cadence recipe without expansion or promotion.** The practical contributions are reproducible cadence controls, a causal track interface and honest service-attribution diagnostics. The results do not establish a breakthrough controller, a useful added interval-model benefit or real-CCTV readiness. Any further learning architecture must address a separately demonstrated gap and receive a new frozen protocol; this negative screen is not permission to change margins, cadence or reference weights until a favorable table appears.
+
+## 44. Independent SUMO sensing-fault study
+
+### 44.1 Question and scope
+
+This study asks **whether added measurement delay and missed detections change the performance of the existing SUMO classical controllers**. It extends independent-simulator evidence with a new observation boundary. It does not reopen the failed arrival-window recipes, transfer a custom-simulator checkpoint or train another model. The earlier clean SUMO component series and its historical sources remain unchanged.
+
+The controls are the existing `max_pressure`, `halted` and `fixed` policies. Pressure uses incoming minus straight-movement destination outgoing counts, clipped per movement; halted uses stopped incoming counts; Fixed switches after 30 seconds of actual green. Equations, tie handling, geometry and the two-second decision interval are unchanged. All use the existing two-phase NS/EW FSM: **8 s minimum green, 3 s yellow, 1 s all-red**, initially NS. These are SUMO-specific settings. There is no newly added uncertainty fallback, age-aware control, maximum-green shield or learned policy.
+
+Synthetic thinning and constant transport delay are experimental assumptions, not new algorithms or measured camera performance. Existing Max-Pressure/SUMO attribution in sections 14 and 31 applies. The empirical question and reproducible implementation may support an evaluation contribution; novelty and publication suitability remain unestablished.
+
+### 44.2 Sensor clock and exclusive policy inputs
+
+[sumo_sensing.py](research/observation/sumo_sensing.py) owns immutable fault/delivery types and `CountSensor.step(vehicles, tick)`. Its input is the previous completed-step snapshot: ID, edge, position and speed. Its output is delivered counts and audit timestamps. Adaptive policies receive **Counts and the public signal Clock only**. IDs, source clocks, clean counts, external backlog, requested future arrivals and simulator waiting are not policy features. Fixed receives `None` instead of a count object, while its sensing stream remains logged for the negative control.
+
+Row `t-1` contains positions after that step, at physical time `t × 0.1 s`. A capture before control tick `t` therefore has **source tick `t`**, not `t-1`; zero added delay has age zero. Capture occurs at 10 Hz, while decisions occur every two seconds. The initial empty network is a valid frame at source tick zero. Before a delayed frame is eligible, delivery is explicitly missing (`source_tick: null`, zero counts), distinct from a present empty frame. At tick 20, the first frame with two seconds of added latency is source zero with age 20 ticks.
+
+| Frozen condition | Added latency | Per-frame missed-detection probability |
+| --- | ---: | ---: |
+| `clean` | 0 s | 0 |
+| `delay2s` | 2 s | 0 |
+| `miss30` | 0 s | 0.30 |
+| `delay2s_miss30` | 2 s | 0.30 |
+
+Each vehicle is retained or removed once before incoming/outgoing/halted counts are derived, preserving halted as a subset of incoming. Full snapshots are validated before thinning. Detection marks use SHA-256 of a namespace, traffic seed, source tick and ID, excluding controller, fault label and repeat. Misses-only and mixed arms share the mark for a common ID/source tick; no traffic RNG is advanced. Policy-driven positions and visibility can subsequently differ, so matched corruption processes do not imply identical counterfactual packets.
+
+A bounded delay buffer stores only corrupted counts and source ticks. Captures must be consecutive; future, repeated, skipped and malformed clocks fail validation. Missing delivery never substitutes clean truth. This panel omits false positives, frame drops, jitter, out-of-order packets, lane swaps, ID switches and persistent/correlated CCTV errors. Simulator speed supplies the synthetic stopped classification; this is not a validated video speed estimator.
+
+### 44.3 Execution, replay and negative controls
+
+[sumo_sensing.py](research/experiments/sumo_sensing.py) owns the new loop and trace validation. Every decision supplies an explicit integer proposal to the frozen physical helper. That helper still queries clean halted queues for its historical fallback, but the explicit proposal bypasses those values. They never enter the new policies. A targeted test checks every-gate proposals and Fixed's lack of packet access.
+
+The existing callback verifier expects clean packets. The new verifier first reconstructs and checks **every original faulted sensing record and decision packet**. It then makes a private evaluation-only row view changing just the packet representation expected by the old verifier. Original proposals, clocks, lamps and inventory remain untouched. Its callback ignores the legacy clean argument and recomputes actions from the validated delivered sequence and independently reconstructed signal clock. All deliveries must be consumed exactly, and the original trace remains unmodified.
+
+This preserves audited FSM/lamp, FIFO, inventory and stopped-wait accounting without copying them or replacing live noisy inputs. Tests include a state where clean and delayed packets request different phases. Packet, proposal, clock, lamp, FIFO, wait and final-snapshot changes must still be rejected. Saved-data replay performs no independent SUMO traffic-kinematics reruns.
+
+The smoke repeats every controller/fault cell twice and runs one separate clean Max-Pressure episode through the historical runtime. After removing only the new sensing metadata, clean new-runtime trajectories must exactly match that anchor. Fixed's executed traffic/signal trace must match across faults/repeats after excluding sensor/decision metadata, which receives its own complete reconstruction. These repeats are mechanics checks, not extra traffic replicates or performance wins.
+
+Two independent sketches and a separate cross-review chose this fixed-delay stream and private offline verifier view over a general delivery framework and duplicated inventory accounting. Their scores are engineering judgments. Ignored design artifacts live under `results/sumo_sensing_design/20261030/`. `CONTENT.md` remains the maintained guide.
+
+### 44.4 Frozen cases, analysis and provenance
+
+Full collection is **six schedules × four sensing conditions × three controllers = 72 episodes**, each **1,800 ticks / 180 seconds**. It uses existing per-approach Bernoulli demand, generated straight-only four-arm geometry, deterministic driving and empty starts. New seeds in known families are development realizations, not new traffic families, measured city demand, field validation or a fresh learned-policy final test.
+
+| Demand family | NS / EW rate per approach (vehicles/s) | Full traffic seeds |
+| --- | --- | --- |
+| Balanced | 0.2 / 0.2 | 1350001, 1350002 |
+| NS dominant | 0.3 / 0.1 | 1350101, 1350102 |
+| EW dominant | 0.1 / 0.3 | 1350201, 1350202 |
+
+The mechanics seed is **1350901**, balanced. Its 24 episodes last 800 ticks / 80 seconds each, plus one 800-tick historical anchor. The cooperative cap is **240 seconds** for smoke and **900 seconds** for full collection, covering network generation, simulation and per-episode checks. Environment/mechanics preflight and source archiving precede the cap. Only smoke is run during preparation; the user executes the longer study.
+
+Primary reporting uses stopped waiting per **requested** vehicle, within-run p95 accumulated stopped waiting and completed network-exit trips. Unfinished/backlogged populations remain included. Aggregate p95 averages within-run percentiles; it is not trip travel time. Fault-induced improvements and pressure losses remain in the results. No desired ranking is an integrity criterion.
+
+[sumo_sensing_metrics.py](research/analysis/sumo_sensing_metrics.py) predefines **20 contrasts**: nine own-clean penalties, eight pressure/comparator contrasts and three factorial interactions. Own-clean values are fault minus clean. Pressure savings are comparator-minus-pressure waiting and pressure-minus-comparator trips. Interaction is `both - delay_only - misses_only + clean` per metric. Every seed/contrast is retained.
+
+Uncertainty resamples **traffic seeds jointly across controller/sensing cells**, stratified by family. With two seeds in each of three families, all **64 ordered bootstrap draws** are enumerated; 2.5th/97.5th percentiles use linear interpolation. These intervals describe sensitivity in a small panel. They are not independently calibrated coverage or multiplicity-adjusted superiority across 20 contrasts. Frames, vehicles, fault cells and repeats are not extra traffic replicates. The one-seed mechanics smoke receives no scientific intervals.
+
+[run_sumo_sensing_panel.py](research/pilots/run_sumo_sensing_panel.py) refuses dirty executable sources and existing outputs. It records the plan, complete schedules, git revision, Python/package versions, native SUMO/netconvert hashes, command, topology, source archive and complete output hashes. Full collection requires a verified smoke with identical executable sources and runtime. Collision, teleport, pending-departure, budget and integrity failures preserve partial evidence with an incomplete report. Completion measures coverage/integrity, not controller superiority; promotion and publication-ready flags stay false.
+
+The verifier reconstructs packets, proposals, lamps, inventory/waits, CSVs, complete paired cells, repeats, Fixed invariance and all contrasts. It checks runtime/revision metadata, source/output/command coverage and the mechanics basis. It needs no installed SUMO binary, but requires the recorded executable sources; later incompatible revisions must use the preserved source snapshot.
+
+### 44.5 Environment and bounded commands
+
+The isolated environment at `results/runtime/sumo_1_24_0/` was restored offline from cached packages using **Python 3.11.15** and **eclipse-sumo, traci and sumolib 1.24.0**. On a fresh checkout, create it with an installed Python 3.11 and the pinned requirements; downloads may be necessary there:
+
+```bash
+uv venv --python 3.11 results/runtime/sumo_1_24_0
+uv pip install --python results/runtime/sumo_1_24_0/bin/python -r research/requirements-sumo.txt
+```
+
+Before collection, **30 new sensor/runtime/statistics/evidence checks pass**, including the runtime-metadata omission regression. **65 existing controller/accounting regression checks also pass** in a separate targeted run. Synthetic fixtures do not simulate SUMO kinematics; the genuine smoke remains a separate check. Source/link checks and `git diff --check` pass. This is not full repository or frontend coverage. The predeclared mechanics command is:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_sensing_panel --smoke \
+  --output results/sumo_sensing/smoke_20261030
+```
+
+Full collection remains conditional on verified smoke. It is a bounded empirical comparison, not model training or promotion:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_sensing_panel \
+  --mechanics results/sumo_sensing/smoke_20261030 \
+  --output results/sumo_sensing/full_20261030
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/full_20261030
+```
 
 [Back to Top](#top)
