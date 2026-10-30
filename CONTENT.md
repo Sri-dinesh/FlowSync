@@ -555,6 +555,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | FlowSync-UQ versus its shielded D3QN policy | No reliable added control benefit established, including when fallback actually activates. |
 | Online RL after warm start | Often degrades or fails to improve the frozen parents. More episodes have not resolved this. |
 | On-policy PPO with frozen restoration | Six 90-episode workers and 270 evaluations complete after audited interruption recovery. Fixed episode-90 restored PPO fails; unchanged restored parents and equally informed pressure have lower mean delay (section 40). |
+| Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
@@ -572,7 +573,7 @@ Read the [current research status](research/RESEARCH_STATUS.md) and [evaluation 
 
 `results/final/`, `results/tables/`, the original manuscript assets and the superseded design narrative contain historical material that predates the audited fixes. Preserve them for traceability, but do not cite their numbers as validated research. The corrected experiments below are distinct panels; their means must not be pooled merely because each reports seconds.
 
-The custom-simulator input-use, teacher-alignment and horizon diagnostics are complete. Subsequent independent SUMO branch, classical, component and robustness studies are also complete, as detailed in sections 31–35. The October 29 switch-margin pilot failed its fitting prerequisite (section 37), and the decision-cadence diagnostic failed its opportunity-coverage prerequisite (section 38). The subsequent supervised count-restoration pilot passed its reconstruction prerequisite, reducing probe count MAE by 61–65%, but failed its matched control screen (section 39). The October 30 on-policy PPO comparison also fails at its fixed endpoint after verified recovery from a server restart (section 40). These scientific panels are complete; the interrupted original PPO directory remains an unsealed historical prefix. The frozen recipes are closed. A chronological note proposing one of these investigations is not a current instruction to run it again. Completed outcomes supersede historical “ready to run” text.
+The custom-simulator input-use, teacher-alignment and horizon diagnostics are complete. Subsequent independent SUMO branch, classical, component and robustness studies are also complete, as detailed in sections 31–35. The October 29 switch-margin pilot failed its fitting prerequisite (section 37), and the decision-cadence diagnostic failed its opportunity-coverage prerequisite (section 38). The subsequent supervised count-restoration pilot passed its reconstruction prerequisite, reducing probe count MAE by 61–65%, but failed its matched control screen (section 39). The October 30 on-policy PPO comparison also fails at its fixed endpoint after verified recovery from a server restart (section 40). The later source-timed arrival-extension architecture is implemented; its 180-run headroom/component screen also fails (section 41). These scientific panels are complete; the interrupted original PPO directory remains an unsealed historical prefix. The frozen recipes are closed. A chronological note proposing one of these investigations is not a current instruction to run it again. Completed outcomes supersede historical “ready to run” text.
 
 <a id="18-current-repository-and-research-organization"></a>
 ## 18. Current Repository and Research Organization
@@ -1215,7 +1216,7 @@ Simulator limitations include simplified motion, backlog visibility assumptions,
 
 ### 29.4 Current decisions under the time constraint
 
-The completed spatial, temporal, averaged-label, immediate upstream-teacher, October 29 switch-margin and decision-cadence recipes remain closed/failed at their respective prerequisites. The count-restoration model demonstrates a positive supervised reconstruction result, while its frozen-policy control configuration failed the declared screen; that recipe is also closed. The October 30 on-policy PPO/restoration comparison completes all six workers and fails its episode-90 screen. Its actors change decisions, so its negative result cannot be explained by unchanged weights; this does not identify a specific causal optimizer defect. The subsequent SUMO future, classical, count-ablation and final robustness collections are closed. Do not rerun identical batches, extend to 900/1,000 episodes, cherry-pick seeds/checkpoints, tune on previous final outcomes, loosen screens or silently replace a website default. No completed control-learning study establishes a reproducible input-delivery or reward-direction defect warranting a specific training correction. Later camera-clock and evidence repairs concern the separate CCTV observation path.
+The completed spatial, temporal, averaged-label, immediate upstream-teacher, October 29 switch-margin and decision-cadence recipes remain closed/failed at their respective prerequisites. The count-restoration model demonstrates a positive supervised reconstruction result, while its frozen-policy control configuration failed the declared screen; that recipe is also closed. The October 30 on-policy PPO/restoration comparison completes all six workers and fails its episode-90 screen. Its actors change decisions, so its negative result cannot be explained by unchanged weights; this does not identify a specific causal optimizer defect. The source-timed arrival-window prototype is implemented and its 180-run full-episode/component screen fails; do not use its gain over one reference to bypass stronger comparators or start training. The subsequent SUMO future, classical, count-ablation and final robustness collections are closed. Do not rerun identical batches, extend to 900/1,000 episodes, cherry-pick seeds/checkpoints, tune on previous final outcomes, loosen screens or silently replace a website default. No completed control-learning study establishes a reproducible input-delivery or reward-direction defect warranting a specific training correction. Later camera-clock and evidence repairs concern the separate CCTV observation path.
 
 A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long command is ready or warranted. The October 31 paper-writing deadline and acceptance of an empirical evaluation make accurate methods, complete results and limitations the available evidence direction. This reference supplies project information for that writing without editing the manuscript.
 
@@ -1226,7 +1227,7 @@ A future learned-controller experiment needs a new evidence-based mechanism, mat
 
 | Question | Read / inspect |
 | --- | --- |
-| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [latest PPO outcome](#405-completed-episode-90-result-failed); [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
+| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [PPO outcome](#405-completed-episode-90-result-failed), [arrival-window outcome](#417-completed-full-run-headroom-result-failed); [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
 | Why the old evaluation is invalid | [EVALUATION_AUDIT.md](research/EVALUATION_AUDIT.md) |
 | Current research commands/packages | [research README](#18-current-repository-and-research-organization), [command dispatcher](research/__main__.py) |
 | Protocol/result/archive organization | [research documentation index](#30-evidence-and-maintenance-index) and its protocols/results/audits/papers indexes |
@@ -2154,16 +2155,54 @@ The integration smoke at `results/arrival_window/smoke_v3_20261030/` runs four c
 
 **63 focused research tests pass, including 23 new arrival-track/controller/panel cases.** They cover missing calibration, malformed/future/duplicate packets, immutable data, source-clock idempotence and rollback after rejected frames, position-derived speed, stopped/unknown/gap states, misses/latency/drop replay, UUID-independent IDs, coherent count subsets, strict Advanced-MP comparison, blockers, source-age/point ablations, exact timing, zero-uncertainty equivalence, service headway, cadence, guards, full-run determinism, generated-vehicle conservation and complete-panel screening. The suite also checks the existing PPO/recovery/restoration/margin paths; totals overlap previous suites. Repository source/link checks and `git diff --check` pass. No frontend build or real-camera test is claimed.
 
-At protocol freeze, the performance panel has not run. Execute once into a new directory; afterward prefer verification for review:
+The sensing feature was committed as `2d28872`, followed by the control architecture, tests and executable protocol as `5659939` **before performance collection**. The panel is now complete and failed (section 41.7). Use verification for review; do not launch another copy of this frozen recipe:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.pilots.run_arrival_window_panel --output results/arrival_window/panel_20261030
-
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
   -m research.pilots.run_arrival_window_panel --verify results/arrival_window/panel_20261030
 ```
 
-Only after an external interruption, with no sealed `report.json`, the same runner's `--resume results/arrival_window/panel_20261030` reuses completed bundles under the frozen invocation limit. Do not alter seeds, add favorable scenarios, change the margin, retune reference weights or loosen the screen after inspection.
+For an externally interrupted unsealed run, the runner supports `--resume` under the frozen invocation limit. This particular directory is sealed and cannot be resumed. Do not alter seeds, add favorable scenarios, change the margin, retune reference weights or loosen the screen after inspection.
+
+### 41.7 Completed full-run headroom result: FAILED
+
+Artifact: `results/arrival_window/panel_20261030/report.json`. All **180 full episodes** complete in **70.772 seconds** in one invocation, below the 300-second cap. No budget stop or recovery occurs. The final records cover **216,000 executed signal samples**, with zero measured conflicts/clearance violations. Each method receives the same requested arrivals per case and the declared track-fault process. This is a known-family, training-template headroom test; it is not independent final confirmation or field validation.
+
+| Method | Mean delay (s) | Average within-run p95 (s) | Mean passed |
+| --- | ---: | ---: | ---: |
+| All-visible MP, native cadence | 8.595313 | 31.701667 | 47.666667 |
+| Upstream MP, native cadence | 8.712783 | 29.697222 | 47.333333 |
+| Upstream MP, two-second cadence | 8.832918 | 30.876111 | 48.055556 |
+| Advanced-MP adaptation, weight 1 | 9.608485 | 31.102778 | 46.777778 |
+| Advanced-MP adaptation, weight 2 | 9.139880 | 30.700833 | 47.611111 |
+| Advanced-MP adaptation, weight 4 | 8.793743 | 30.853611 | 47.888889 |
+| Age-gated Advanced-MP, weight 2 | 9.139880 | 30.700833 | 47.611111 |
+| Point-estimate extension | 8.760509 | 31.620833 | 48.444444 |
+| Age-ignored extension | 8.867025 | 31.417778 | 48.333333 |
+| **Window extension, predefined primary** | **8.707696** | **31.020833** | **48.388889** |
+
+The primary improves aggregate mean delay **4.729% versus its age-gated reference**, but is **1.307% worse than all-visible native pressure**, the strongest mean-delay comparator here. Its gains are only **0.058% versus upstream native pressure**, **1.418% versus matched-cadence upstream pressure**, **0.979% versus Advanced-MP weight 4**, and **0.603% versus the point ablation**. Those do not meet the frozen thresholds. It gains **1.797% versus the age-ignored ablation**. Selecting only weight 1/2, the age-ignored comparison or a favorable condition would conceal the failed primary screen.
+
+Aggregate p95 is worse than upstream native/matched pressure, Advanced-MP weights 2/4 and the age-gated reference. Throughput improves against the classical references but is slightly below the point ablation. The no-case-over-5%-delay-loss requirement fails against every classical reference. Against all-visible native pressure, the primary improves 12 cases and worsens six; its mean is still worse. The largest relative loss is **62.844%** on `train_mod_balanced_01_intermittent_tracks`: **10.080392 s versus 6.190196 s**. That unfavorable case remains in the report and exports.
+
+Flags are `complete: true`, `comparison.primary_endpoint_complete: true`, `continue_to_fresh_development: false`, `publication_ready: false` and `automatic_promotion: false`. Successful implementation/execution does not make this a passed performance or novelty screen. No learned forecaster, neural residual, expanded validation or deployment is started from this result.
+
+### 41.8 Trace audit, action attribution and evidence exports
+
+The panel's verifier passes across **all 180 bundles and 216,000 recorded frames**. It reproduces capture-to-packet corruption/delivery, source-time histories, controller proposals, shield decisions and physical lamp transitions. It also reconstructs waiting-population statistics, arrival hashes, counters, case coverage and the failed screen. Verification performs **zero independent traffic-kinematics reruns**; the pre-corruption captures and waiting populations remain simulator-generated evidence, not independently measured traffic.
+
+The primary makes **27 extension proposals at 256 policy gates**, with **zero extension proposals overridden by the real shield**. Other gate reasons are 136 insufficient-proxy-gain decisions, 82 reference holds and 11 phase-service guards. Thus the mechanism is active; its negative result is not explained by a disabled controller or universal shield veto. No stale-support rejection occurs among these recorded primary switch-opportunity decisions, so the panel does not demonstrate useful long-outage freshness behavior merely because the unit tests exercise that guard.
+
+[export_arrival_window.py](research/evidence/export_arrival_window.py) adds an explicitly post-hoc same-state diagnosis on the primary's delivered histories. At its 256 gates, the interval rule differs from the point rule at **five** states, and source-age handling differs from the age-ignored rule at **five** states. These counts must not be added as independent events or interpreted as full-run counterfactual benefits. Of the 27 extensions, **17 match all-visible pressure's separately shielded executed choice** on that same state; four match upstream pressure's choice. This overlap does not prove the remaining choices caused the performance loss, but it limits an interpretation that the gain over weight-2 Advanced-MP reflects wholly new behavior unavailable to a strong pressure comparator.
+
+Local export: `results/paper_evidence/arrival_window_20261030/`. It contains all 180 case rows, ten aggregate rows, 30 sensing-condition summaries, 18 primary same-state summaries, decision reasons, a diagnostic JSON report and standalone PNG/SVG comparisons. The figure includes every method, starts axes at zero, states the failed screen and uses descriptive means without confidence intervals. The exporter checks sealed output hashes and raw summary/screen reconstruction, archives its source and input/output hashes, and performs the same-state proposal comparison. **Full corruption/shield/signal replay is the separate panel verifier**, not a claim made by the export's hash check.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.evidence.export_arrival_window results/arrival_window/panel_20261030 \
+  --output results/paper_evidence/new_arrival_window_export
+```
+
+**The architecture is implemented; this control recipe is closed without promotion.** It supplies a causal track interface, an inspectable decision rule, attributed strong baselines and reproducible empirical evidence. It does not establish algorithmic novelty, reliable superiority over the strongest pressure reference, a new trained traffic model or real CCTV readiness. Code/docs are committed; datasets, raw traces and figures remain local/ignored. A further design must directly address a demonstrated information/control gap and receive its own frozen protocol, rather than changing this recipe after inspecting its outcome.
 
 [Back to Top](#top)
