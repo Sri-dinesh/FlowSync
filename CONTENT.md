@@ -52,6 +52,7 @@ This reference describes the actual application first. Separate experiment resul
 - [40. On-policy PPO with frozen count restoration](#40-on-policy-ppo-with-frozen-count-restoration)
 - [41. Source-timed arrival-window architecture](#41-source-timed-arrival-window-architecture)
 - [42. Arrival reference-gap and service audit](#42-arrival-reference-gap-and-service-audit)
+- [43. Receding arrival decisions: frozen cadence experiment](#43-receding-arrival-decisions-frozen-cadence-experiment)
 
 ## 1. Project scope and ownership
 
@@ -558,6 +559,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | On-policy PPO with frozen restoration | Six 90-episode workers and 270 evaluations complete after audited interruption recovery. Fixed episode-90 restored PPO fails; unchanged restored parents and equally informed pressure have lower mean delay (section 40). |
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
+| Arrival service and cadence diagnosis | All 27 credited service events occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on consumed development cases (section 42). A separately frozen 198-run receding-decision experiment is prepared, with no performance outcome yet (section 43). |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -2262,5 +2264,61 @@ Across the 18 saved primary traces, 19,254 ticks are physically locked and 2,346
 The controlled all-visible pressure cadence change costs **0.482836 s** of mean delay on this panel, compared with **0.120135 s** for upstream pressure. Their descriptive difference is **0.362701 s**. The primary's gap to native all-visible pressure decomposes algebraically as **+0.112383 = -0.370453 + 0.482836 s**: it beats the matched two-second control but loses to the native reference. This is not a measured effect of speeding up the primary, and it does not rescue its failed screen.
 
 Verification reconstructs the saved-state analysis and CSVs, both semantic anchors, and every new control's delivered packets, decisions, shield output, lamp transitions, outcome populations and counters. It performs **zero new traffic-kinematics reruns**. The verification record is `results/arrival_planning_design/20261030/reference_gap_v2_verification.json`. The diagnostic and serialization fix were committed/pushed as `7f40be1` and `70d7a8c` before the corrected collection. A separate, predefined cadence experiment is justified; no learning, controller promotion or real-camera deployment follows from this audit.
+
+## 43. Receding arrival decisions: frozen cadence experiment
+
+### 43.1 Hypothesis and code ownership
+
+Section 42 supports testing whether the arrival rule benefits from recomputing after each delivered observation. It does not yet demonstrate that benefit. The new primary keeps the existing arrival equations, one-second position history, uncertainty envelopes, source-age gate, two-second prediction horizon, proxy margin and physical supervision. It changes the **policy cache interval from two seconds to 0.1 seconds**. After a supported hold, the rule can reconsider on the next tick; it no longer commits to the original two-second cached proposal. This is a change in control cadence, not a shorter prediction horizon or a newly invented algorithm.
+
+[receding_arrival.py](research/policies/receding_arrival.py) declares all method/cadence pairs and wraps the unchanged arrival rule. [track_runtime.py](research/experiments/track_runtime.py) owns new execution and recorded-data replay through an explicit controller interface. It uses the frozen v1 observation, context and metric helpers. Historical runners remain unchanged so their archived source and trajectory evidence stays verifiable. The controller receives only delivered track state and public signal context; future captures remain evaluation data.
+
+The new runtime must reproduce four full historical semantic bundles before collecting new cases: native all-visible pressure and the original two-second window rule, each on the two existing mechanics anchors from section 42. Only the explicit method label is mapped when comparing the old window name. Two unit cases additionally compare the original and shared runtime on actual 150-tick simulations, rather than comparing two summaries that could share the same defect.
+
+### 43.2 Matched methods and observation boundary
+
+| Method label | Underlying rule | Decision interval |
+| --- | --- | ---: |
+| `mp_all_native` | All-visible pressure | 0.1 s |
+| `mp_all_2s` | All-visible pressure | 2 s |
+| `mp_upstream_native` | Upstream pressure | 0.1 s |
+| `advanced_mp_w1`, `advanced_mp_w2`, `advanced_mp_w4` | Advanced-MP adaptations, frozen weights 1/2/4 | 0.1 s |
+| `age_gated_advanced_mp` | Same weight-2 reference and freshness fallback | 0.1 s |
+| `receding_point` | Point-estimate extension ablation | 0.1 s |
+| `receding_no_age` | Age-ignored extension ablation | 0.1 s |
+| `window_2s` | Original window rule, retained control | 2 s |
+| **`receding_window`** | **Window rule, predefined primary** | **0.1 s** |
+
+All Advanced-MP running-demand calculations retain the **two-second horizon** while their decision cadence changes to 10 Hz. This is an explicitly documented control-rate adaptation, not an exact reproduction of the published network experiment. It is included alongside native pressure references, not used to redefine a weak reference after outcomes. Existing attributions and novelty limits in section 41.2 continue to apply.
+
+Each method uses the same sensor model, corruption settings, count definitions, signal timing, shield and requested traffic realization for a case. Closed-loop traffic positions and therefore delivered packet contents can diverge after actions differ. Identical observation models do not mean identical counterfactual states. Simulator truth is never substituted for missing motion observations. No network fitting, checkpoint change, website default change or real-camera actuation is part of this study.
+
+### 43.3 Frozen protocol and continuation screen
+
+[run_receding_arrival_panel.py](research/pilots/run_receding_arrival_panel.py) freezes **18 new known-family cases × 11 methods = 198 complete 1,200-tick episodes**. Six existing training templates receive new traffic seeds **1342001–1342006**, assigned by sorted template ID, and the same three track-sensing conditions. New stochastic realizations of already examined templates/faults are development evidence, not a fresh final-test family or independent external validation.
+
+The runner has three workers and a **180-second cooperative wall-clock budget per invocation**, including the four anchors. At most two invocations are allowed for external interruption recovery. Completed sealed reports cannot be resumed or overwritten. An invocation that exhausts its scientific budget produces an incomplete endpoint rather than permission to enlarge the panel. No intermediate outcome is used to change methods or thresholds.
+
+The predefined primary must meet **every** requirement:
+
+- At least **2% aggregate mean-delay gain against every classical reference and the original two-second window control**.
+- At least **1% aggregate mean-delay gain against each receding point and age-ignored ablation**.
+- No aggregate p95 or throughput loss against any comparator, and no case with more than 5% mean-delay loss against any comparator.
+- On clean sensing, mean delay and p95 no more than 1% worse than the receding age-gated reference, with no passed-vehicle loss.
+- All paired endpoints complete, exact historical anchors, matching requested-arrival hashes and zero measured executed-signal violations.
+
+Results use finite-horizon stopped waiting per arrived vehicle and averages of within-run p95, not trip travel time. Failure closes this recipe. A pass permits separately frozen fresh development validation; it does not establish publication readiness, novelty, learned superiority or equivalence to real CCTV.
+
+The manifest records the preceding diagnostic report hash, original reference report hash, complete case definitions, runtime versions, git revision and executable source hashes; sources are archived before collection. The verifier reconstructs all proposals, corrupted packets, shield decisions, lamps, populations, CSV rows and continuation checks, including the four exact old anchors. This is recorded-data replay with **zero new traffic-kinematics reruns during verification**.
+
+Before performance collection, **37 focused arrival/audit tests pass**, including six new cadence/runtime/screen cases. These overlap prior suites and are not a full repository or frontend suite. Collection begins only after executable sources and this protocol are committed/pushed. The bounded creation command is:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.pilots.run_receding_arrival_panel \
+  --reference results/arrival_window/panel_20261030 \
+  --basis results/arrival_reference_gap/audit_v2_20261030/report.json \
+  --output results/receding_arrival/pilot_20261030
+```
 
 [Back to Top](#top)
