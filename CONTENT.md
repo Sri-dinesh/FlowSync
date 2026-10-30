@@ -51,6 +51,7 @@ This reference describes the actual application first. Separate experiment resul
 - [39. Supervised count-restoration pilot](#39-supervised-count-restoration-pilot)
 - [40. On-policy PPO with frozen count restoration](#40-on-policy-ppo-with-frozen-count-restoration)
 - [41. Source-timed arrival-window architecture](#41-source-timed-arrival-window-architecture)
+- [42. Arrival reference-gap and service audit](#42-arrival-reference-gap-and-service-audit)
 
 ## 1. Project scope and ownership
 
@@ -2204,5 +2205,40 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/py
 ```
 
 **The architecture is implemented; this control recipe is closed without promotion.** It supplies a causal track interface, an inspectable decision rule, attributed strong baselines and reproducible empirical evidence. It does not establish algorithmic novelty, reliable superiority over the strongest pressure reference, a new trained traffic model or real CCTV readiness. Code/docs are committed; datasets, raw traces and figures remain local/ignored. A further design must directly address a demonstrated information/control gap and receive its own frozen protocol, rather than changing this recipe after inspecting its outcome.
+
+## 42. Arrival reference-gap and service audit
+
+### 42.1 Question and frozen diagnostic scope
+
+After section 41 failed, the next task tests the premise that improved timing estimates can usefully change decisions relative to the strongest native pressure reference. This is a **post-hoc diagnosis on consumed development cases**, not another candidate, training run, revised continuation screen or novelty claim. It preserves the failed recipe and all original files.
+
+There are two distinct questions. First, did the visible vehicles credited by the extension rule actually receive stop-line service during the chosen two-second hold? Second, how much does native pressure's decision interval matter under the same all-visible counts? The original panel already contains native and two-second upstream pressure but lacks the corresponding two-second all-visible cell. Filling that cell completes a classical two-by-two count-semantics/cadence comparison. It does not estimate what changing the prototype's cadence would do.
+
+The executable protocol in [audit_arrival_reference_gap.py](research/audits/audit_arrival_reference_gap.py) freezes a **120-second cooperative budget**, the original 18 cases and no fitting. Before any new matched controls, native replay anchors must exactly match complete saved semantic bundles on `train_ew_asymmetric_01_clean_tracks` and `train_mod_balanced_01_intermittent_tracks`. They are the first clean case and the previously documented worst prototype case, selected for mechanics coverage; they are not fresh confirmation or additional independent samples. Then 18 all-visible pressure episodes run with the **only policy change being a two-second cache interval**. Counts, pressure score, tie handling, sensor/fault process, scenario seeds, shield, FSM and metrics remain fixed.
+
+The additional control is a research audit subclass of the unchanged all-visible pressure policy. The audit has a separate execution loop to preserve archived sources. A unit test compares that loop with the original real simulator path, and the two full-run anchors must match before the matched-control stage proceeds. Source archives, per-run bundles and outcome-population checks remain explicit. Completion, integrity and performance interpretation are reported separately; no promotion gate is introduced.
+
+### 42.2 Saved-state decisions and chosen-service witnesses
+
+[arrival_reference_gap.py](research/analysis/arrival_reference_gap.py) reconstructs all 18 primary histories from their delivered packets and current signal feedback. At switchable microticks it compares the actual cached action with native all-visible pressure, upstream pressure and a freshly recomputed primary under the same shield. It distinguishes decision-gate disagreement from cached-interval disagreement, and counts cached disagreements where a fresh primary computation would match native pressure. It also measures count-semantics differences, source-age gate activation and reference-rule disagreements.
+
+Those are **same-state proposal comparisons**, not counterfactual traffic outcomes or proof that recomputing the primary faster would improve delay. The matched classical control supplies a separate full-episode cadence comparison. Its mean differences can be decomposed algebraically; interactions with the prototype's different decision rule remain unmeasured.
+
+For every recorded support ID at every extension gate, a separate evaluator reads future **pre-corruption captured positions**. It checks whether the vehicle was already beyond the stop line, missing at the gate, crossed during the chosen two-second option, remained upstream, was lost in the saved captures or was censored by the episode boundary. Crossing at the two-second endpoint is included; its event time is retained as a 0.1-second observation interval. The evaluator records realized green ticks, unseen leading vehicles and last-tick speed versus the history-derived upper estimate. These are simulator-truth diagnostics about **discharge under the chosen action**, not incoming demand measurements or outcomes under the unchosen action.
+
+Future captures never enter reconstructed control. A regression test changes the future truth-side captures while retaining all delivered packets: service labels change, while every reconstructed decision/count comparison remains identical. Other tests cover endpoint inclusion, missing/already-discharged targets, horizon censoring, the cadence cache/physical locks and exact equivalence of the audit's native loop with the original simulator runner.
+
+At protocol freeze, **30 focused arrival/audit tests pass, including seven new reference-gap cases**. These overlap prior suites and do not constitute whole-repository coverage. Source/link checks and `git diff --check` also pass. No new matched-control outcomes have been collected. The original panel's performance screen remains failed. Review tools are:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.audits.audit_arrival_reference_gap results/arrival_window/panel_20261030 \
+  --output results/arrival_reference_gap/audit_20261030
+
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.audits.audit_arrival_reference_gap results/arrival_reference_gap/audit_20261030 --verify
+```
+
+The audit verifier reconstructs the saved-state diagnosis and CSVs, replays every new control/anchor packet, controller decision, shield decision and lamp state, checks both native anchors and outcome populations, and preserves the original failed-screen flags. It performs no new traffic-kinematics simulations. New control rollouts, deterministic anchor reruns and data-only verification are different counts and must remain separate.
 
 [Back to Top](#top)
