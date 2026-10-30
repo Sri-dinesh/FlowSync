@@ -2311,14 +2311,25 @@ Results use finite-horizon stopped waiting per arrived vehicle and averages of w
 
 The manifest records the preceding diagnostic report hash, original reference report hash, complete case definitions, runtime versions, git revision and executable source hashes; sources are archived before collection. The verifier reconstructs all proposals, corrupted packets, shield decisions, lamps, populations, CSV rows and continuation checks, including the four exact old anchors. This is recorded-data replay with **zero new traffic-kinematics reruns during verification**.
 
-Before performance collection, **37 focused arrival/audit tests pass**, including six new cadence/runtime/screen cases. These overlap prior suites and are not a full repository or frontend suite. Collection begins only after executable sources and this protocol are committed/pushed. The bounded creation command is:
+Before performance collection, **37 focused arrival/audit tests pass**, including six new cadence/runtime/screen cases. These overlap prior suites and are not a full repository or frontend suite. Executable sources and this protocol were committed/pushed as `016e859` before collection. The bounded creation command uses the recovered interpreter described below:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+FLOWSYNC_RESEARCH_RUNTIME="$PWD/results/runtime/python_3_14_7/usr"
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  PYTHONHOME="$FLOWSYNC_RESEARCH_RUNTIME" \
+  LD_LIBRARY_PATH="$FLOWSYNC_RESEARCH_RUNTIME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  PYTHONPATH="$PWD/server/venv/lib/python3.14/site-packages" \
+  "$FLOWSYNC_RESEARCH_RUNTIME/bin/python3.14" \
   -m research.pilots.run_receding_arrival_panel \
   --reference results/arrival_window/panel_20261030 \
   --basis results/arrival_reference_gap/audit_v2_20261030/report.json \
   --output results/receding_arrival/pilot_20261030
 ```
+
+### 43.4 Interpreter recovery before collection
+
+The first launch rejects the reference at its runtime check: the system interpreter was updated from **3.14.7 to 3.14.8**, while the saved reference requires the original version/build string and NumPy 2.5.3. That launch creates no experiment directory, runs no anchors or new cases, and consumes no scientific invocation. Its log is preserved at `results/arrival_planning_design/20261030/receding_panel_preflight_python_3_14_8.log`. The provenance check and scientific protocol remain unchanged.
+
+The cached Arch package `python-3.14.7-1-x86_64.pkg.tar.zst` was extracted into the ignored, isolated directory `results/runtime/python_3_14_7/`. No system package, system link or application virtual environment was modified. Its package SHA-256 is `8a350ce53aae01ae687f043b301931e411bf06333ba480b42b3b5432a0e6c79b`. Interpreter/library hashes and recovery details are recorded in `results/runtime/python_3_14_7/provenance.json`. The interpreter and its standard library come from that package; dependencies come from the existing application environment and OS shared libraries remain current. This restores the recorded Python/build and NumPy versions, rather than claiming a fully containerized historical OS. Exact full-run anchors remain mandatory.
 
 [Back to Top](#top)
