@@ -561,7 +561,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
-| Independent SUMO sensing faults | A fixed-delay/missed-detection interface and frozen 72-episode classical study are implemented (section 44). Verified mechanics precede full collection. This adds neither a learned controller nor a real-camera validation claim. |
+| Independent SUMO sensing faults | The new fixed-delay/missed-detection interface passes a 24-run mechanics smoke plus a historical-loop anchor: 20,000 signal samples, exact repeats/Fixed invariance and successful saved-data replay (section 44). The frozen 72-episode full study is ready for the user to run; it has not run yet. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -1647,7 +1647,7 @@ All four full verifiers passed again during this October 25 reference update. Ea
 
 The combined record supports an empirical account of evaluation defects, negative learning results, future-dependent hindsight labels and observed classical waiting/throughput trade-offs. It preserves local favorable outcomes and case-level exceptions. It does not supply the originally desired superior learned controller, validated useful uncertainty supervisor, accepted novelty claim or justified publication-readiness percentage.
 
-SUMO adds an established simulator but uses one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. It contains no turns, pedestrian validation, network spillback study, camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
+The completed October 23 scientific SUMO collections use one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. Section 44 adds a separately verified mechanics path for synthetic count misses and delay; its full scientific study has not run yet. Neither path validates turns, pedestrians, network spillback, actual camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
 
 Executed conflict/clearance samples establish finite simulated lamp behavior under the declared audit. They do not prove collision freedom across all conditions, formal real-world safety, acceptable individual waiting or deployable cabinet control. Hardware latency, camera accuracy and end-to-end website equivalence remain separate open requirements.
 
@@ -2446,15 +2446,14 @@ uv venv --python 3.11 results/runtime/sumo_1_24_0
 uv pip install --python results/runtime/sumo_1_24_0/bin/python -r research/requirements-sumo.txt
 ```
 
-Before collection, **30 new sensor/runtime/statistics/evidence checks pass**, including the runtime-metadata omission regression. **65 existing controller/accounting regression checks also pass** in a separate targeted run. Synthetic fixtures do not simulate SUMO kinematics; the genuine smoke remains a separate check. Source/link checks and `git diff --check` pass. This is not full repository or frontend coverage. The predeclared mechanics command is:
+Before collection, **30 new sensor/runtime/statistics/evidence checks pass**, including the runtime-metadata omission regression. **65 existing controller/accounting regression checks also pass** in a separate targeted run. Synthetic fixtures do not simulate SUMO kinematics; the genuine smoke is recorded below. Source/link checks and `git diff --check` pass. This is not full repository or frontend coverage. The smoke is sealed; review it without collecting a duplicate:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.pilots.run_sumo_sensing_panel --smoke \
-  --output results/sumo_sensing/smoke_20261030
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/smoke_20261030
 ```
 
-Full collection remains conditional on verified smoke. It is a bounded empirical comparison, not model training or promotion:
+The smoke has passed. Full collection is prepared but **has not run**. It is a bounded empirical comparison, not model training or promotion:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
@@ -2465,5 +2464,15 @@ PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/full_20261030
 ```
+
+### 44.6 Completed mechanics smoke; scientific collection pending
+
+Artifact: `results/sumo_sensing/smoke_20261030/`. The smoke completes in **114.984 seconds**, below its 240-second cap, with no budget stop. The 24 fault/controller/repeat episodes contribute **19,200 signal samples**; the separate historical-loop anchor contributes **800**, for **20,000** executed samples with zero measured signal violations. Every repeated semantic trajectory matches, the new clean Max-Pressure path exactly matches its old-loop anchor, and Fixed's traffic/FSM/lamp trajectories match across all four sensing conditions. This checks implementation and observation independence, not scientific robustness or controller superiority.
+
+Fixed's unchanged trajectory also exposes actual sensing effects without confounding from different control actions. Its clean delivered age and count-feature error are zero. The delay-only condition has one initially missing decision and then **2.0 s** age at all 39 present decisions, with zero source-corruption error. Misses-only removes **261 of 906** source-visible decision samples (**28.81%**); the mixed condition removes **250 of 866** (**28.87%**) while retaining the two-second delay. These are correlated vehicle/frame observations, not independent detection trials or measured CCTV calibration. They demonstrate active faults; they are not traffic-performance gains.
+
+Full saved-data verification passes for every sensor record, packet, proposal, physical lamp state, wait/inventory metric, contrast, CSV, coverage/hash and mechanics flag. The anchor is checked by exact semantic equality to the verified new clean trajectory. The verifier performs **zero new traffic-kinematics reruns**. Its record is `results/sumo_sensing_design/20261030/smoke_verification.json`. Scientific intervals are absent for this one-seed mechanics panel.
+
+The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete executable study/protocol as `6accf66`, both before collection. The smoke manifest records `6accf66`; later results documentation changes do not alter its executable sources. Flags remain `smoke: true`, `complete: true`, `scientific_panel_complete: false`, `policy_promoted: false`, `publication_ready: false`. The full-study source/runtime gate also matches the smoke in `results/sumo_sensing_design/20261030/full_preflight.json`. No full-study delay/ranking conclusion, learned-model gain or real-camera readiness follows yet.
 
 [Back to Top](#top)
