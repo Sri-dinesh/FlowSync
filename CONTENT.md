@@ -553,6 +553,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Learned policies versus Max-Pressure | Reliable superiority remains unestablished across the audited experiments. |
 | FlowSync-UQ versus its shielded D3QN policy | No reliable added control benefit established, including when fallback actually activates. |
 | Online RL after warm start | Often degrades or fails to improve the frozen parents. More episodes have not resolved this. |
+| On-policy PPO with frozen restoration | Six 90-episode workers and 270 evaluations complete after audited interruption recovery. Fixed episode-90 restored PPO fails; unchanged restored parents and equally informed pressure have lower mean delay (section 40). |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
@@ -570,7 +571,7 @@ Read the [current research status](research/RESEARCH_STATUS.md) and [evaluation 
 
 `results/final/`, `results/tables/`, the original manuscript assets and the superseded design narrative contain historical material that predates the audited fixes. Preserve them for traceability, but do not cite their numbers as validated research. The corrected experiments below are distinct panels; their means must not be pooled merely because each reports seconds.
 
-The custom-simulator input-use, teacher-alignment and horizon diagnostics are complete. Subsequent independent SUMO branch, classical, component and robustness studies are also complete, as detailed in sections 31–35. The October 29 switch-margin pilot failed its fitting prerequisite (section 37), and the decision-cadence diagnostic failed its opportunity-coverage prerequisite (section 38). The subsequent supervised count-restoration pilot passed its reconstruction prerequisite, reducing probe count MAE by 61–65%, but failed its matched control screen (section 39). These collections completed successfully. The frozen recipes are closed. A chronological note proposing one of these investigations is not a current instruction to run it again. Completed outcomes supersede historical “ready to run” text.
+The custom-simulator input-use, teacher-alignment and horizon diagnostics are complete. Subsequent independent SUMO branch, classical, component and robustness studies are also complete, as detailed in sections 31–35. The October 29 switch-margin pilot failed its fitting prerequisite (section 37), and the decision-cadence diagnostic failed its opportunity-coverage prerequisite (section 38). The subsequent supervised count-restoration pilot passed its reconstruction prerequisite, reducing probe count MAE by 61–65%, but failed its matched control screen (section 39). The October 30 on-policy PPO comparison also fails at its fixed endpoint after verified recovery from a server restart (section 40). These scientific panels are complete; the interrupted original PPO directory remains an unsealed historical prefix. The frozen recipes are closed. A chronological note proposing one of these investigations is not a current instruction to run it again. Completed outcomes supersede historical “ready to run” text.
 
 <a id="18-current-repository-and-research-organization"></a>
 ## 18. Current Repository and Research Organization
@@ -1213,7 +1214,7 @@ Simulator limitations include simplified motion, backlog visibility assumptions,
 
 ### 29.4 Current decisions under the time constraint
 
-The completed spatial, temporal, averaged-label, immediate upstream-teacher, October 29 switch-margin and decision-cadence recipes remain closed/failed at their respective prerequisites. The count-restoration model demonstrates a positive supervised reconstruction result, while its frozen-policy control configuration failed the declared screen; that recipe is also closed. The subsequent SUMO future, classical, count-ablation and final robustness collections are closed. Do not rerun identical batches, extend to 900/1,000 episodes, cherry-pick seeds/checkpoints, tune on previous final outcomes, loosen screens or silently replace a website default. No completed control-learning study establishes a reproducible input-delivery or reward-direction defect warranting a specific training correction. Later camera-clock and evidence repairs concern the separate CCTV observation path.
+The completed spatial, temporal, averaged-label, immediate upstream-teacher, October 29 switch-margin and decision-cadence recipes remain closed/failed at their respective prerequisites. The count-restoration model demonstrates a positive supervised reconstruction result, while its frozen-policy control configuration failed the declared screen; that recipe is also closed. The October 30 on-policy PPO/restoration comparison completes all six workers and fails its episode-90 screen. Its actors change decisions, so its negative result cannot be explained by unchanged weights; this does not identify a specific causal optimizer defect. The subsequent SUMO future, classical, count-ablation and final robustness collections are closed. Do not rerun identical batches, extend to 900/1,000 episodes, cherry-pick seeds/checkpoints, tune on previous final outcomes, loosen screens or silently replace a website default. No completed control-learning study establishes a reproducible input-delivery or reward-direction defect warranting a specific training correction. Later camera-clock and evidence repairs concern the separate CCTV observation path.
 
 A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long command is ready or warranted. The October 31 paper-writing deadline and acceptance of an empirical evaluation make accurate methods, complete results and limitations the available evidence direction. This reference supplies project information for that writing without editing the manuscript.
 
@@ -1224,7 +1225,7 @@ A future learned-controller experiment needs a new evidence-based mechanism, mat
 
 | Question | Read / inspect |
 | --- | --- |
-| Current research outcome | [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) |
+| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [latest PPO outcome](#405-completed-episode-90-result-failed); [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
 | Why the old evaluation is invalid | [EVALUATION_AUDIT.md](research/EVALUATION_AUDIT.md) |
 | Current research commands/packages | [research README](#18-current-repository-and-research-organization), [command dispatcher](research/__main__.py) |
 | Protocol/result/archive organization | [research documentation index](#30-evidence-and-maintenance-index) and its protocols/results/audits/papers indexes |
@@ -1972,15 +1973,7 @@ At protocol freeze, **38 focused PPO/restoration/margin tests pass, including 14
 
 The two-arm training-only integration smoke at `results/ppo_restoration/smoke_20261030/` completed in **16.425 seconds**. With parent 101 and one training case, initial greedy policies match raw/restored parents, actor updates change weights, saved-batch optimizer replay reproduces logs and tensors exactly, and all 9,600 executed signal samples (two training rollouts plus six evaluations) have zero measured violations. The smoke does not constitute a performance screen, additional training replicates or unseen-family validation. Its dedicated traffic seed is 1330901.
 
-The six-worker performance panel has not yet run at protocol freeze. No gain or continuation claim follows from implementation checks. To execute once in a new directory and verify afterward:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.pilots.run_ppo_restoration_pilot --output results/ppo_restoration/new_bounded_pilot
-
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.pilots.run_ppo_restoration_pilot --verify results/ppo_restoration/new_bounded_pilot --refit
-```
+This protocol and implementation were committed as `426a6dd` before panel collection. The panel is now complete and **failed** (section 40.5); do not launch another copy of this recipe. The implementation checks establish mechanics, not performance. Use the completed-artifact verification command in section 40.4 for review.
 
 ### 40.4 Recovery after an external server restart
 
@@ -1994,13 +1987,76 @@ Before resuming, exact reconstruction succeeded through episodes 90, 30 and 72 f
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
-  -m research.pilots.recover_ppo_restoration_pilot results/ppo_restoration/pilot_20261030 \
-  --output results/ppo_restoration/recovered_20261030
-
-PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
   -m research.pilots.recover_ppo_restoration_pilot results/ppo_restoration/recovered_20261030 --verify --refit
 ```
 
 The recovery verifier also checks that the interrupted original is unchanged, verifies its preserved source and checks exact repeated-prefix summaries and sampler actions. Repeated trajectories do not increase independent sample size. Datasets, checkpoints and raw outcomes remain local under the existing results policy.
+
+### 40.5 Completed episode-90 result: FAILED
+
+Completed artifact: `results/ppo_restoration/recovered_20261030/report.json`. All six workers finish **90 episodes each**, retaining 540 planned training episodes, all five checkpoint stages and **270 evaluation runs**. The recovery implementation/protocol was committed as `e9fe9f2` before resuming. Recovery itself takes **120.186 seconds**, below its separate 300-second cap; the interrupted original's final wall time remains unknown. Two complete worker bundles and 71 other saved evaluations are reused. Four uncommitted-prefix episodes are repeated exactly; they add no independent samples.
+
+Each worker completes 132 critic updates. Actor updates are 101/raw 55, 101/restored 55, 202/raw 56, 202/restored 53, 303/raw 56 and 303/restored 52; the predefined sampled-KL early stop accounts for fewer than the maximum 56. No worker is selected or discarded. The final planned records cover **648,000 training and 324,000 evaluation signal samples**, with zero measured conflict/clearance violations. These 972,000 samples are audit coverage from completed records, not independent safety trials. Replayed prefixes add repeated observations, and interrupted partial executions have no complete audit record; do not inflate the planned sample count with them.
+
+Means below use the same six development cases, with equal weight across all three policy/restorer pairs where present. Delay is finite-horizon stopped waiting per arrived vehicle, not trip travel time. P95 is the average of within-run percentiles.
+
+| Configuration | Mean delay (s) | Average p95 (s) | Mean passed |
+| --- | ---: | ---: | ---: |
+| Original D3QN, raw | 9.298667 | 31.785278 | 83.111111 |
+| Original D3QN, restored | 9.056389 | 30.635556 | 83.722222 |
+| PPO, raw, episode 90 | 9.542111 | 34.434444 | 82.944444 |
+| **PPO, restored, episode 90 (primary)** | **9.555000** | **31.406944** | **82.222222** |
+| Max-Pressure + shield, raw | 9.400333 | 30.715833 | 83.166667 |
+| Max-Pressure + shield, EMA | 9.191500 | 30.819167 | 86.000000 |
+| Max-Pressure + shield, restored | 8.964111 | 31.199167 | 85.333333 |
+| Bare Max-Pressure, raw | 9.073333 | 30.010833 | 81.500000 |
+| Default FlowSync-UQ, raw | 9.298667 | 31.785278 | 83.111111 |
+
+The primary is **5.506% worse than its unchanged restored parents**, **6.592% worse than equally restored shielded pressure**, and **0.135% worse than raw PPO** in mean delay. It also loses throughput against those three references; its aggregate p95 improves against raw PPO but worsens against the restored parent and restored pressure. The declared screen fails. Saved flags are `complete: true`, `comparison.primary_endpoint_complete: true`, `comparison.continue_to_expanded_validation: false`, `publication_ready: false` and `automatic_promotion: false`. Successful execution is not a passed performance screen. No expanded validation, model promotion or website-default replacement follows.
+
+| Parent / training replicate | Unchanged restored parent | PPO raw at 90 | PPO restored at 90 | Matched restored pressure |
+| --- | ---: | ---: | ---: | ---: |
+| 101 | 9.484000 | 10.144500 | 9.878333 | 8.866333 |
+| 202 | 8.659500 | 9.162667 | 8.659000 | 9.175167 |
+| 303 | 9.025667 | 9.319167 | 10.127667 | 8.850833 |
+
+These are seconds on the same development cases. Replicate 202's restored endpoint essentially matches its already strong parent; choosing that replicate alone would not attribute its pressure comparison to new PPO learning.
+
+| Episode | Raw PPO mean delay | Restored PPO mean delay |
+| --- | ---: | ---: |
+| 0 | 9.298667 | 9.056389 |
+| 6, critic warmup only | 9.298667 | 9.056389 |
+| 30 | 9.575222 | 9.485111 |
+| 60 | 9.294167 | 9.703111 |
+| **90, fixed primary endpoint** | **9.542111** | **9.555000** |
+
+Initial and critic-warmup metrics match each corresponding parent. All planned requested-arrival hashes match across training and evaluation arms. Exact verification refits all six workers from their saved batches, reproduces optimizer logs and checkpoint tensors, reconstructs summaries from all 270 raw evaluation bundles and the failed screen, verifies the original directory is unchanged, and checks all four repeated-prefix summaries and recovered sampler actions. It performs **zero new traffic trajectory reruns**. This is deterministic evidence reconstruction, not independent confirmation. The 40 focused PPO/recovery/restoration/margin tests pass, including 16 new PPO/recovery cases; these overlap earlier totals. No frontend build, application-model integration, SUMO policy transfer or camera trial is claimed.
+
+### 40.6 Actor-use diagnosis and reviewable evidence
+
+[export_ppo_restoration.py](research/evidence/export_ppo_restoration.py) validates the panel and recovery provenance before exporting all cases, every checkpoint, per-condition summaries, optimizer telemetry and post-hoc training diagnostics. The final local export is `results/paper_evidence/ppo_restoration_final_20261030/`; the earlier `ppo_restoration_20261030/` directory remains a development export. It includes 270 evaluation rows, 30 per-worker checkpoint rows, 51 condition summaries, six actor-use summaries, 270 paired training-reward contrasts, and standalone PNG/SVG curves. The figure shows all three parents plus equal means, keeps axes at zero, labels the failed episode-90 endpoint and uses no confidence intervals or best-checkpoint selection. The export archives/hashes its own source and inputs. Creating an export adds no traffic evidence.
+
+The same-state diagnosis compares initial and final actors on each worker's **recorded delivered training states and masks**. It does not rerun traffic under alternative actions, compare raw/restored actors on a common independent state distribution, or prove why control worsens.
+
+| Worker | Recorded complete decisions | Initial/final greedy choices differ | Gate proposals overridden by shield |
+| --- | ---: | ---: | ---: |
+| 101 raw | 1,348 | 481 | 32 |
+| 101 restored | 1,163 | 195 | 54 |
+| 202 raw | 1,179 | 211 | 34 |
+| 202 restored | 1,084 | 216 | 40 |
+| 303 raw | 1,270 | 316 | 34 |
+| 303 restored | 1,270 | 418 | 52 |
+
+Initial/final choices differ on **16.8–35.7%** of each worker's recorded states. Thus the failed panel is not explained by unchanged actors. This does not establish that specific input features caused the changes or that a particular optimizer defect caused the negative outcome. Gate overrides differ from the separately recorded microtick shield count, and all unfinished final macro ticks remain explicitly excluded from learning.
+
+A separate exploratory diagnostic sums all recorded full-episode reward components: **zero arithmetic reconstruction failures** across the 540 planned training records. Among 270 paired raw/restored training contrasts, the delay component never prefers the higher-delay outcome, while the complete shaped reward does so in **10/270** contrasts. These contrasts share traffic plans and training histories; they are not independent replicates. They concern **undiscounted full episodes**, whereas PPO trains discounted completed-macro GAE targets. This small post-hoc count does not prove that reward shaping caused degradation or justify selecting a new reward recipe. It is a reproducible diagnostic to examine before another training proposal, not a relaxed performance screen.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.evidence.export_ppo_restoration results/ppo_restoration/recovered_20261030 \
+  --output results/paper_evidence/new_ppo_restoration_export
+```
+
+**Close this PPO/restoration recipe without expanding or promoting it.** The implementation and controlled negative outcome extend the empirical record; they do not establish a new controller algorithm, reliable learned superiority or real CCTV readiness. Another experiment needs a directly supported mechanism and a new frozen protocol, rather than more episodes or a favorable seed from this panel.
 
 [Back to Top](#top)
