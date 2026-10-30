@@ -559,7 +559,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | On-policy PPO with frozen restoration | Six 90-episode workers and 270 evaluations complete after audited interruption recovery. Fixed episode-90 restored PPO fails; unchanged restored parents and equally informed pressure have lower mean delay (section 40). |
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
-| Arrival service and cadence diagnosis | All 27 credited service events occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on consumed development cases (section 42). A separately frozen 198-run receding-decision experiment is prepared, with no performance outcome yet (section 43). |
+| Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -2311,7 +2311,7 @@ Results use finite-horizon stopped waiting per arrived vehicle and averages of w
 
 The manifest records the preceding diagnostic report hash, original reference report hash, complete case definitions, runtime versions, git revision and executable source hashes; sources are archived before collection. The verifier reconstructs all proposals, corrupted packets, shield decisions, lamps, populations, CSV rows and continuation checks, including the four exact old anchors. This is recorded-data replay with **zero new traffic-kinematics reruns during verification**.
 
-Before performance collection, **37 focused arrival/audit tests pass**, including six new cadence/runtime/screen cases. These overlap prior suites and are not a full repository or frontend suite. Executable sources and this protocol were committed/pushed as `016e859` before collection. The bounded creation command uses the recovered interpreter described below:
+Before performance collection, **37 focused arrival/audit tests pass**, including six new cadence/runtime/screen cases. These overlap prior suites and are not a full repository or frontend suite. Executable sources and this protocol were committed/pushed as `016e859` before collection. The panel is now complete and failed (section 43.5). Review it with the recovered interpreter described below; do not collect another copy:
 
 ```bash
 FLOWSYNC_RESEARCH_RUNTIME="$PWD/results/runtime/python_3_14_7/usr"
@@ -2321,9 +2321,7 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   PYTHONPATH="$PWD/server/venv/lib/python3.14/site-packages" \
   "$FLOWSYNC_RESEARCH_RUNTIME/bin/python3.14" \
   -m research.pilots.run_receding_arrival_panel \
-  --reference results/arrival_window/panel_20261030 \
-  --basis results/arrival_reference_gap/audit_v2_20261030/report.json \
-  --output results/receding_arrival/pilot_20261030
+  --verify results/receding_arrival/pilot_20261030
 ```
 
 ### 43.4 Interpreter recovery before collection
@@ -2331,5 +2329,49 @@ PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 The first launch rejects the reference at its runtime check: the system interpreter was updated from **3.14.7 to 3.14.8**, while the saved reference requires the original version/build string and NumPy 2.5.3. That launch creates no experiment directory, runs no anchors or new cases, and consumes no scientific invocation. Its log is preserved at `results/arrival_planning_design/20261030/receding_panel_preflight_python_3_14_8.log`. The provenance check and scientific protocol remain unchanged.
 
 The cached Arch package `python-3.14.7-1-x86_64.pkg.tar.zst` was extracted into the ignored, isolated directory `results/runtime/python_3_14_7/`. No system package, system link or application virtual environment was modified. Its package SHA-256 is `8a350ce53aae01ae687f043b301931e411bf06333ba480b42b3b5432a0e6c79b`. Interpreter/library hashes and recovery details are recorded in `results/runtime/python_3_14_7/provenance.json`. The interpreter and its standard library come from that package; dependencies come from the existing application environment and OS shared libraries remain current. This restores the recorded Python/build and NumPy versions, rather than claiming a fully containerized historical OS. Exact full-run anchors remain mandatory.
+
+### 43.5 Completed cadence experiment: FAILED
+
+Artifact: `results/receding_arrival/pilot_20261030/report.json`. All **198 planned full episodes**, plus the four exact historical anchors, complete in **84.461 seconds** in one scientific invocation, below the 180-second cap. There is no budget stop or scientific recovery. The manifest records commit `e2b62e8`; its executable protocol is unchanged from `016e859`. The new cases provide **237,600 signal samples**, with another 4,800 in the mechanics anchors. All **242,400** show zero measured conflict/clearance violations. They are finite simulated coverage, not independent field safety trials.
+
+| Method | Mean delay (s) | Average within-run p95 (s) | Mean passed |
+| --- | ---: | ---: | ---: |
+| All-visible pressure, 10 Hz | 10.872813 | 36.362778 | 51.777778 |
+| All-visible pressure, two seconds | 10.582325 | 36.099722 | 51.555556 |
+| Upstream pressure, 10 Hz | 10.963248 | 39.050833 | 52.333333 |
+| Advanced-MP adaptation, weight 1, 10 Hz | 11.081020 | 37.385833 | 52.166667 |
+| Advanced-MP adaptation, weight 2, 10 Hz | 10.944231 | 35.673611 | 51.888889 |
+| Advanced-MP adaptation, weight 4, 10 Hz | 11.128422 | 36.016111 | 51.944444 |
+| Age-gated Advanced-MP, weight 2, 10 Hz | 10.940180 | 35.655556 | 51.888889 |
+| Receding point-estimate extension | 10.667287 | 34.442500 | 52.055556 |
+| Receding age-ignored extension | 10.924900 | 35.530833 | 51.944444 |
+| Original window rule, two seconds | 10.099515 | 32.484722 | 51.666667 |
+| **Receding window rule, predefined primary** | **10.655713** | **34.450556** | **52.055556** |
+
+Faster decisions **increase the window rule's aggregate mean delay by 5.507%** versus its original two-second control, and worsen p95. The primary is **0.694% worse than two-second all-visible pressure**. Its gain against native all-visible pressure is **1.9967%**, below the predefined 2% threshold; it also fails other requirements regardless of that small threshold shortfall. Relative to native pressure it improves 11 cases, matches two and worsens five. The worst loss is **52.343%** on `train_low_balanced_01_1342003_delayed_tracks`: **8.339130 versus 5.473913 s**. On the same case it is **78.087% worse** than the original window control's 4.682609 s. These cases remain included.
+
+The gain against the receding point ablation is only **0.1085%**, below its 1% requirement; their mean delays match in 17 of 18 cases. This equality concerns the recorded delay metric, not a separately established identity of complete trajectories. The primary gains **2.464% versus the receding age-ignored ablation** and **2.600% versus the receding age-gated reference**, but favorable comparisons do not replace failed primary/component/tail checks. Aggregate throughput is lower than upstream native pressure and Advanced-MP weight 1. The no-case-over-5%-loss condition fails against seven comparators. The clean-sensing guard, arrival pairing and signal checks pass; the complete continuation screen fails.
+
+The classical cadence effect also changes direction on these new traffic realizations: two-second all-visible pressure is **0.290488 s better** than its 10 Hz counterpart, whereas it was **0.482836 s worse** in section 42. Keep those panels separate. This demonstrates sensitivity of the observed ranking to the sampled traffic in this simulator; it does not establish a universal better cadence. Likewise, the favorable original-window mean in this new comparison does not promote that control or overturn its prior failed screen. Selecting it after seeing the table would substitute an observed winner for the predefined primary.
+
+Flags are `complete: true`, `comparison.primary_endpoint_complete: true`, `continue_to_fresh_development: false`, `publication_ready: false`, `automatic_promotion: false` and `previous_screen_changed: false`. The full verifier passes across **all 198 episodes and four anchors / 242,400 recorded frames**, including packet corruption/delivery, proposals, shield decisions, lamp transitions, outcome populations, counters, CSV reconstruction and frozen continuation checks. It performs **zero new traffic-kinematics reruns**. Its record is `results/arrival_planning_design/20261030/receding_verification.json`.
+
+### 43.6 Post-hoc chosen-service evidence and exports
+
+[export_receding_arrival.py](research/evidence/export_receding_arrival.py) exports every case, all eleven aggregate means, 33 sensing-condition summaries, 180 paired primary/comparator rows and event-level chosen-service witnesses. It checks sealed output hashes and reconstructs raw result summaries and the frozen screen; the separate full verifier supplies observation/controller/signal replay. Sources and input/output hashes are archived with the export. Local artifact: `results/paper_evidence/receding_arrival_20261030/`.
+
+The original window control makes **22 extension proposals at 252 gates**, crediting **23 distinct case/track pairs**. Twenty-two support events have a crossing within two seconds; one is censored by the episode boundary. Twenty-two hold windows retain the full two seconds of executed green; one is censored. The receding primary makes **117 extension proposals at 589 gates**, crediting **125 support events involving only 16 distinct case/track pairs**. Those repeat credits are correlated decisions about the same visible vehicles, not 125 independent vehicles, arrivals or success trials.
+
+Of the receding support events, **119 have a crossing within their two-second evaluation window and six do not**. Six event failures need not represent six distinct vehicles. Only **11** retain the full two seconds of contiguous executed green; **114** have a shorter green. None of the observed crossings occurs after that contiguous green ends, so a shorter hold alone does not demonstrate service loss. The option-service proxy is reconsidered frequently, while the original control commits to its cached proposal. These facts describe chosen trajectories; they do **not** prove that interrupted holds, repeated credits, prediction error or a particular optimizer defect caused the full-run loss. Future positions remain evaluator-only and do not select actions or tune a replacement.
+
+Two additional evidence tests cover repeated support, crossing after a hypothetical shortened green, full holds, explicit horizon censoring, changed future-service labels and rejected noncontiguous traces. The focused suite now has **39 passing tests**, overlapping the earlier 37; source/link checks and `git diff --check` pass. This is not full repository/frontend coverage.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 server/venv/bin/python \
+  -m research.evidence.export_receding_arrival results/receding_arrival/pilot_20261030 \
+  --output results/paper_evidence/new_receding_arrival_export
+```
+
+**Close the receding-cadence recipe without expansion or promotion.** The practical contributions are reproducible cadence controls, a causal track interface and honest service-attribution diagnostics. The results do not establish a breakthrough controller, a useful added interval-model benefit or real-CCTV readiness. Any further learning architecture must address a separately demonstrated gap and receive a new frozen protocol; this negative screen is not permission to change margins, cadence or reference weights until a favorable table appears.
 
 [Back to Top](#top)
