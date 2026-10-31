@@ -157,6 +157,8 @@ Research v5 fixes repeated switch charging and stores completed decision-to-deci
 
 Application resume and fine-tuning use staged, version-compatible checkpoint loading with exact slot selection and actual trained-episode metadata. Resume starts with fresh replay; fine-tuning also resets optimizer state and child counters. Saved milestones publish a separate inference snapshot and matching model identity after checkpoint writes return. Captured inference agents retain their prior tensors.
 
+New website runs preserve selected effective settings, per-episode contexts and an application source archive under `server/models/<model-id>/runs/<run-id>/`. Checkpoints embed matching configuration identity. Declared defaults and actual optimizer/replay/environment values remain distinct; website global RNG state is not recorded. The offline [training-run verifier](research/audits/verify_training_run.py) checks saved configuration/source/episode hashes and optional checkpoint linkage without rerunning traffic.
+
 ## 8. Research observation and data boundary
 
 The headless custom path executes scenario/demand → simulator → delivered synthetic sensor packet → observed context/features → controller proposal → optional fallback → optional shield → physical transition → executed lamps. Truth is permitted for rewards and evaluation metrics. It must not replace noisy delivered controller inputs.
@@ -2493,7 +2495,7 @@ The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete e
 
 This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
 
-The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 26 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
 Three authorities must remain distinct:
 

@@ -179,4 +179,5 @@ async def load_model(payload: LoadModelRequest, request: Request) -> dict:
             "model_id": model_id,
             "episode": actual_episode,
             "checkpoint_episode": chosen_episode,
+            "storage":checkpoint_data.get("storage_provenance"),
         }

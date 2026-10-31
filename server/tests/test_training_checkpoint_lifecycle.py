@@ -24,7 +24,8 @@ def training_fixture(monkeypatch, *, stop_after_setup=True):
     env.get_episode_telemetry.return_value = {}
     env.reset_to_decision.return_value = (np.zeros(28),{"valid_action_mask":np.ones(4,dtype=bool)})
     storage = SimpleNamespace(list_checkpoints=MagicMock(return_value=["checkpoint_0.pt","checkpoint_100.pt"]),
-        load_checkpoint=MagicMock(),save_checkpoint=MagicMock())
+        load_checkpoint=MagicMock(),save_checkpoint=MagicMock(),save_training_configuration=MagicMock(),
+        record_training_episode=MagicMock())
     persistence = SimpleNamespace(save_episode=MagicMock(),save_model_metadata=MagicMock())
     broadcast = AsyncMock()
     trainer = Trainer(env,agent,persistence,storage,broadcast,app_state=state,

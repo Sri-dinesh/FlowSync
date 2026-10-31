@@ -18,8 +18,10 @@ All improvements integrated in this version:
   - Task 5.2: Multi-regime curriculum adjusts λ per episode.
 """
 import asyncio
+from copy import deepcopy
 import logging
 from typing import Any, Awaitable, Callable, Dict, Optional
+from uuid import uuid4
 
 from .dqn_agent import DQNAgent
 from .hyperparams import HyperParams
@@ -62,6 +64,8 @@ class Trainer:
         self.target_episodes = 0
         self.is_resumed = False
         self.resume_model_id: Optional[str] = None
+        self.resume_checkpoint_slot = None
+        self.parent_checkpoint_storage = None
         self.is_finetune = False
         self.finetune_scenario: Optional[str] = None
         self.finetune_lr: float = 1e-4
@@ -72,6 +76,9 @@ class Trainer:
         self.epsilon = self.hyperparams.epsilon_start
         self.enable_curriculum = enable_curriculum
         self.enable_greedy_warmup = enable_greedy_warmup
+        self.run_configuration = None
+        self.run_configuration_sha256 = None
+        self.run_id = None
 
     def _pretrain_on_demonstrations(self, updates: int) -> None:
         """Fit the initialized Q-network to demonstration transitions first."""
@@ -119,6 +126,9 @@ class Trainer:
         if is_finetune and (not resume_model_id or not resume_model_id.strip()):
             raise ValueError("Fine-tuning requires a parent model checkpoint")
         self.is_training = True
+        self.run_configuration = None
+        self.run_configuration_sha256 = None
+        self.run_id = None
         try:
             await self._train_run(simulation_id,num_episodes,resume_model_id,resume_episode,
                 is_finetune,finetune_scenario,finetune_lr,finetune_epsilon,custom_profile)
@@ -169,6 +179,7 @@ class Trainer:
         start_episode = 0
         base_model_id = None
         self.resume_checkpoint_slot = None
+        self.parent_checkpoint_storage = None
         if resume_model_id:
             try:
                 base_model_id,requested_slot = parse_model_request(resume_model_id,resume_episode)
@@ -184,6 +195,7 @@ class Trainer:
                 candidate.online_net.train()
                 self.agent = candidate
                 self.resume_checkpoint_slot = slot
+                self.parent_checkpoint_storage = deepcopy(chk_data.get("storage_provenance"))
                 if self.app_state is not None:
                     self.app_state.training_agent = candidate
                 self._publish_inference(inference,base_model_id,start_episode,slot)
@@ -243,11 +255,26 @@ class Trainer:
             total_episodes=total_target_episodes,
         ) if (self.enable_curriculum and not self.is_finetune) else None
 
+        plan = {"greedy_warmup_enabled":self.enable_greedy_warmup,"teacher_seed":42,
+            "fresh_demo_collection_steps":_GREEDY_WARMUP_STEPS,"demo_pretrain_updates":_GREEDY_PRETRAIN_UPDATES,
+            "resume_demo_collection_steps":self.hyperparams.MIN_REPLAY_SIZE,"resume_min_epsilon":.20,
+            "finetune_seed_transitions":min(self.hyperparams.MIN_REPLAY_SIZE,600),
+            "validation_every_episodes":25,"validation_ticks":1200,"validation_seeds":[104729,130363,155921],
+            "validation_spawn_rate":.5,"validation_all_red_s":3.,"save_every_episodes":25 if self.is_finetune else 50}
+        from .run_configuration import capture_configuration, capture_episode, configuration_hash
+        self.run_configuration,sources = capture_configuration(self,simulation_id,num_episodes,curriculum,plan)
+        self.run_configuration_sha256 = configuration_hash(self.run_configuration)
+        self.run_id = uuid4().hex
+        await asyncio.to_thread(self.model_service.save_training_configuration,simulation_id,self.run_id,
+            self.run_configuration,sources)
+        await self.ws_broadcast_fn({"type":"training_configuration","run_id":self.run_id,
+            "configuration_sha256":self.run_configuration_sha256,"configuration":deepcopy(self.run_configuration)})
+
         if self.is_finetune and profile:
             logger.info("Fine-tuning: seeding replay buffer with base policy on scenario '%s'...", profile_name)
             state, reset_info = self.env.reset_to_decision()
             action_mask = reset_info["valid_action_mask"]
-            seed_steps = min(self.hyperparams.MIN_REPLAY_SIZE, 600)
+            seed_steps = plan["finetune_seed_transitions"]
             for _ in range(seed_steps):
                 action = self.agent.select_action(
                     state, epsilon=self.epsilon, valid_action_mask=action_mask
@@ -306,12 +333,12 @@ class Trainer:
             await asyncio.to_thread(
                 teacher.fill_buffer,
                 self.agent.replay_buffer,
-                _GREEDY_WARMUP_STEPS,
-                42,
+                plan["fresh_demo_collection_steps"],
+                plan["teacher_seed"],
                 report_collection,
             )
-            for completed in range(0, _GREEDY_PRETRAIN_UPDATES, 25):
-                batch_updates = min(25, _GREEDY_PRETRAIN_UPDATES - completed)
+            for completed in range(0, plan["demo_pretrain_updates"], 25):
+                batch_updates = min(25, plan["demo_pretrain_updates"] - completed)
                 await asyncio.to_thread(
                     self._pretrain_on_demonstrations,
                     batch_updates,
@@ -319,7 +346,7 @@ class Trainer:
                 await self._broadcast_warmup_progress(
                     "pretrain",
                     completed + batch_updates,
-                    _GREEDY_PRETRAIN_UPDATES,
+                    plan["demo_pretrain_updates"],
                 )
             await self.ws_broadcast_fn({
                 "type":    "warmup_complete",
@@ -334,13 +361,14 @@ class Trainer:
                 await asyncio.to_thread(
                     teacher.fill_buffer,
                     self.agent.replay_buffer,
-                    self.hyperparams.MIN_REPLAY_SIZE,
+                    plan["resume_demo_collection_steps"],
+                    plan["teacher_seed"],
                 )
                 await asyncio.to_thread(
                     self._pretrain_on_demonstrations,
-                    _GREEDY_PRETRAIN_UPDATES,
+                    plan["demo_pretrain_updates"],
                 )
-            self.epsilon = max(0.20, self.epsilon)
+            self.epsilon = max(plan["resume_min_epsilon"], self.epsilon)
             logger.info(
                 "Resumed episode %d with replay re-warm and epsilon %.2f.",
                 start_episode,
@@ -400,6 +428,7 @@ class Trainer:
             stopped_early = False
 
             self.agent.replay_buffer.anneal_beta(episode_num, total_target_episodes)
+            episode_configuration = capture_episode(self,episode_num,curriculum_status)
 
             decision_step = 0
             while self.env.intersection.timestep < self.env.max_steps:
@@ -470,16 +499,17 @@ class Trainer:
             is_last_episode = episode_index == num_episodes - 1
             validation_metrics: Dict[str, Any] = {}
             is_new_best = False
-            if episode_num % 25 == 0 or is_last_episode:
+            if episode_num % plan["validation_every_episodes"] == 0 or is_last_episode:
                 evaluator = DeterministicEvaluator(
                     agent=self.agent,
                     mode="ai",
-                    spawn_lambda=0.5,
+                    spawn_lambda=plan["validation_spawn_rate"],
+                    red_duration=plan["validation_all_red_s"],
                 )
                 validation = await asyncio.to_thread(
                     evaluator.run_multi_seed,
-                    1200,
-                    [104729, 130363, 155921],
+                    plan["validation_ticks"],
+                    plan["validation_seeds"],
                 )
                 validation_metrics = {
                     "mean_queue_area": validation.mean_queue_area,
@@ -500,6 +530,8 @@ class Trainer:
                     )
 
             episode_telemetry = self.env.get_episode_telemetry()
+            await asyncio.to_thread(self.model_service.record_training_episode,simulation_id,self.run_id,
+                self.run_configuration_sha256,episode_configuration)
             reward_components = episode_telemetry.get("reward_components", {})
             watchdog_rate = episode_telemetry.get("watchdog_override_rate", 0.0)
             watchdog_count = episode_telemetry.get("watchdog_override_count", 0)
@@ -561,11 +593,14 @@ class Trainer:
                     "best_episode":            best_episode if best_episode > 0 else None,
                     "is_new_best":             is_new_best,
                     "validation":              validation_metrics,
+                    "run_id":                  self.run_id,
+                    "configuration_sha256":    self.run_configuration_sha256,
+                    "episode_configuration":   episode_configuration,
                 }
             )
 
             is_stopping = not self.is_training
-            save_interval = 25 if self.is_finetune else 50
+            save_interval = plan["save_every_episodes"]
             should_save_checkpoint = simulation_id and (
                 episode_num % save_interval == 0
                 or is_last_episode
@@ -586,6 +621,8 @@ class Trainer:
                 chk_state["best_validation_queue_area"] = best_validation_queue_area
                 chk_state["validation_metrics"] = validation_metrics
                 chk_state["episode"] = episode_num
+                chk_state["training_run"] = {"run_id":self.run_id,"configuration_sha256":self.run_configuration_sha256,
+                    "configuration":deepcopy(self.run_configuration),"episode_configuration":episode_configuration}
                 if self.is_finetune:
                     chk_state["is_finetuned"] = True
                     chk_state["parent_model_id"] = self.parent_model_id
@@ -595,14 +632,15 @@ class Trainer:
                     if self.custom_profile:
                         chk_state["custom_profile"] = self.custom_profile
 
-                await asyncio.to_thread(
+                receipt = await asyncio.to_thread(
                     self.model_service.save_checkpoint,
                     simulation_id,
                     episode_num,
                     chk_state,
                 )
+                selected_receipt = None
                 if is_new_best:
-                    await asyncio.to_thread(
+                    selected_receipt = await asyncio.to_thread(
                         self.model_service.save_checkpoint,
                         simulation_id,
                         0,  # 0 indicates best checkpoint
@@ -629,6 +667,9 @@ class Trainer:
                         "type":     "checkpoint_saved",
                         "model_id": simulation_id,
                         "episode":  episode_num,
+                        "run_id": self.run_id,"configuration_sha256":self.run_configuration_sha256,
+                        "storage":receipt if isinstance(receipt,dict) else None,
+                        "selected_alias_storage":selected_receipt if isinstance(selected_receipt,dict) else None,
                     }
                 )
 
@@ -649,4 +690,6 @@ class Trainer:
             "parent_episode":    getattr(self, "parent_episode", None),
             "epsilon":           self.epsilon,
             "is_training":       self.is_training,
+            "run_id": self.run_id,"configuration_sha256":self.run_configuration_sha256,
+            "run_configuration":deepcopy(self.run_configuration),
         }

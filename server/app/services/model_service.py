@@ -1,11 +1,13 @@
 import datetime
 import hashlib
 import io
+import json
 from pathlib import Path
 import re
 import threading
 from typing import Any, Dict, List
 import time
+import zipfile
 
 import torch
 
@@ -55,6 +57,15 @@ def _local_checkpoint_path(model_id: str, episode: int) -> Path:
 def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> dict:
     local_path = _local_checkpoint_path(model_id, episode)
     path = _checkpoint_path(model_id, episode)
+    manifest_path = manifest = None
+    if "training_run" in state_dict:
+        from ..rl.run_configuration import configuration_hash
+        run = state_dict["training_run"]
+        manifest_path = _training_run_dir(model_id,run["run_id"])/"manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        if (manifest["configuration_sha256"] != run["configuration_sha256"]
+                or configuration_hash(run["configuration"]) != run["configuration_sha256"]):
+            raise ValueError("Checkpoint run configuration differs from manifest")
     buffer = io.BytesIO()
     torch.save(state_dict, buffer)
     raw_bytes = buffer.getvalue()
@@ -81,6 +92,10 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
     receipt = {"schema_version":"checkpoint_receipt_v1","model_id":parse_model_request(model_id,episode)[0],
         "checkpoint_slot":episode,"sha256":hashlib.sha256(raw_bytes).hexdigest(),"size_bytes":len(raw_bytes),
         "local_saved":True,"cloud_uploaded":uploaded}
+    if manifest is not None:
+        manifest.setdefault("checkpoint_receipts",{})[str(episode)] = receipt
+        from ..rl.run_configuration import canonical_bytes
+        write_bytes_atomic(manifest_path,canonical_bytes(manifest))
     return receipt
 
 
@@ -124,6 +139,62 @@ def list_checkpoints(model_id: str) -> List[str]:
     local_dir = _local_checkpoint_path(clean_id,0).parent
     names.update(path.name for path in local_dir.glob("checkpoint_*.pt") if re.fullmatch(r"checkpoint_\d+\.pt",path.name))
     return [f"{folder}/{name}" for name in sorted(names)]
+
+
+def _training_run_dir(model_id: str, run_id: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{32}",run_id):
+        raise ValueError("Training run ID must be a 32-character lowercase UUID hex string")
+    path = (_local_checkpoint_path(model_id,0).parent/"runs"/run_id).resolve()
+    if not path.is_relative_to(LOCAL_MODELS_DIR.resolve()):
+        raise ValueError("Training run path leaves local model storage")
+    return path
+
+
+def save_training_configuration(model_id: str, run_id: str, configuration: dict, sources: dict[str,bytes]) -> dict:
+    from ..rl.run_configuration import canonical_bytes, configuration_hash
+    if configuration.get("model_id") != parse_model_request(model_id,None)[0]:
+        raise ValueError("Training configuration model identity differs from output")
+    expected = configuration["source_sha256"]
+    if set(sources) != set(expected):
+        raise ValueError("Training configuration source inventory differs")
+    for name,raw in sources.items():
+        if Path(name).is_absolute() or ".." in Path(name).parts or hashlib.sha256(raw).hexdigest() != expected[name]:
+            raise ValueError("Invalid training source archive member or hash")
+    raw = canonical_bytes(configuration)
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive,"w",compression=zipfile.ZIP_DEFLATED) as bundle:
+        for name,contents in sorted(sources.items()):
+            bundle.writestr(name,contents)
+    path = _training_run_dir(model_id,run_id)
+    path.mkdir(parents=True,exist_ok=False)
+    write_bytes_atomic(path/"configuration.json",raw)
+    write_bytes_atomic(path/"source_snapshot.zip",archive.getvalue())
+    manifest = {"schema_version":"website_training_manifest_v1","run_id":run_id,"model_id":configuration["model_id"],
+        "configuration_sha256":configuration_hash(configuration),
+        "source_archive_sha256":hashlib.sha256(archive.getvalue()).hexdigest(),
+        "scope":"Selected effective website settings and source snapshot; not deterministic replay or field validation."}
+    write_bytes_atomic(path/"manifest.json",canonical_bytes(manifest))
+    return manifest
+
+
+def record_training_episode(model_id: str, run_id: str, configuration_sha256: str, record: dict) -> None:
+    from ..rl.run_configuration import canonical_bytes
+    path = _training_run_dir(model_id,run_id)
+    manifest = json.loads((path/"manifest.json").read_bytes())
+    if manifest["configuration_sha256"] != configuration_sha256:
+        raise ValueError("Episode record configuration identity differs from run manifest")
+    episode = record.get("episode")
+    if type(episode) is not int or episode < 1:
+        raise ValueError("Episode record requires a positive integer episode")
+    payload = {**record,"run_id":run_id,"configuration_sha256":configuration_sha256}
+    raw = canonical_bytes(payload)
+    name = f"episodes/episode_{episode}.json"
+    destination = path/name
+    if destination.exists() and destination.read_bytes() != raw:
+        raise ValueError("An episode record already exists with different contents")
+    write_bytes_atomic(destination,raw)
+    manifest.setdefault("episode_sha256",{})[name] = hashlib.sha256(raw).hexdigest()
+    write_bytes_atomic(path/"manifest.json",canonical_bytes(manifest))
 
 
 @retry_on_transient_error(max_retries=3)

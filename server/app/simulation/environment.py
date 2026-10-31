@@ -22,6 +22,7 @@ from .demand_forecast import ArrivalForecaster
 from ..rl.hyperparams import HyperParams
 
 HP = HyperParams()
+SIMULATION_DT = 0.1
 
 OBS_DIM = HP.STATE_DIM  # = 28
 
@@ -131,7 +132,7 @@ class TrafficEnv(gym.Env):
         prev_phase: int | None = None,
         delta_total_wait: float = 0.0,
         delay_incurred: Optional[float] = None,
-        dt: float = 0.1,
+        dt: float = SIMULATION_DT,
     ) -> Tuple[float, Dict[str, float]]:
         """
         Delay-anchored reward with pressure shaping and component decomposition.
@@ -231,7 +232,7 @@ class TrafficEnv(gym.Env):
         prev_color = self.intersection.signal.color
         prev_wait = self.intersection.get_total_wait_time()
 
-        passed_vehicles = self.intersection.tick(dt=0.1, action=requested_action)
+        passed_vehicles = self.intersection.tick(dt=SIMULATION_DT, action=requested_action)
         for pv in passed_vehicles:
             self.passed_vehicle_waits.append(pv.wait_time)
 
@@ -266,7 +267,7 @@ class TrafficEnv(gym.Env):
         delta_total_wait = curr_wait - prev_wait
 
         spawned_this_step = self.intersection._generated_last_tick
-        self.forecaster.tick(dt=0.1, spawned_this_step=max(0, spawned_this_step))
+        self.forecaster.tick(dt=SIMULATION_DT, spawned_this_step=max(0, spawned_this_step))
 
         reward, components = self.compute_reward(
             prev_pressures=prev_pressures,
@@ -277,7 +278,7 @@ class TrafficEnv(gym.Env):
             prev_phase=prev_phase,
             delta_total_wait=delta_total_wait,
             delay_incurred=self.intersection._delay_this_tick,
-            dt=0.1,
+            dt=SIMULATION_DT,
         )
         self._last_reward = reward
 
@@ -399,8 +400,8 @@ class TrafficEnv(gym.Env):
                 committed_action = int(last_info.get("executed_action", committed_action))
                 first_tick = False
             cumulative_reward += discount_weight * reward
-            elapsed += 0.1
-            discount_weight *= HP.GAMMA ** (0.1 / HP.DECISION_DT)
+            elapsed += SIMULATION_DT
+            discount_weight *= HP.GAMMA ** (SIMULATION_DT / HP.DECISION_DT)
 
             at_next_gate = (
                 elapsed + 1e-9 >= HP.DECISION_DT

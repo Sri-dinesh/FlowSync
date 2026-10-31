@@ -271,7 +271,7 @@
             "scope": "Trainer._train_run",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c"
+          "reviewed_ast_sha256": "8ec4cbb497edb826e495f041b726a9e05c91b1b4f41771d96d8221afe318e6f6"
         }
       ]
     },
@@ -433,7 +433,7 @@
             "scope": "Trainer._train_run",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c"
+          "reviewed_ast_sha256": "8ec4cbb497edb826e495f041b726a9e05c91b1b4f41771d96d8221afe318e6f6"
         },
         {
           "source": {
@@ -941,10 +941,9 @@
       "id": "custom.dt",
       "source": {
         "file": "server/app/simulation/environment.py",
-        "scope": "TrafficEnv.step",
-        "kind": "call_keyword",
-        "call": "self.intersection.tick",
-        "target": "dt"
+        "scope": "",
+        "kind": "assignment",
+        "target": "SIMULATION_DT"
       },
       "unit": "s/tick",
       "purpose": "Physical custom-simulator timestep",
@@ -958,7 +957,24 @@
       "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
       "references": [],
       "reviewed_ast_sha256": "a270ddb9e0765184c77aa05a603b2fabfa8bb4420e1be9dfbfd1177918388c36",
-      "consumers": []
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/simulation/environment.py",
+            "scope": "TrafficEnv.step",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "a5693f999e468be26a463f0a35eb6e07f2eb5a5ad468381f415ce0942277464c"
+        },
+        {
+          "source": {
+            "file": "server/app/simulation/environment.py",
+            "scope": "TrafficEnv.step_decision",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "16df3cf7f5549c1502cc01eda971c2f7f7699c15523448be8a332ef89bbf833b"
+        }
+      ]
     },
     {
       "id": "custom.spacing",
@@ -3174,7 +3190,7 @@
       "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
       "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
       "references": [],
-      "reviewed_ast_sha256": "8202b345548733fc56dc7e4540063a04be9803891b4388e750018dcb8d615b18",
+      "reviewed_ast_sha256": "69c2920bd27cd1b251cf2ecd138e06aa14cfb11843ce35af042a44c18030b6ad",
       "consumers": [
         {
           "source": {
@@ -3182,7 +3198,7 @@
             "scope": "TrafficEnv.step",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "e370275bae91ca6e4306add701fc924826fd09785753bbdcd02a42dbf95cd88a"
+          "reviewed_ast_sha256": "a5693f999e468be26a463f0a35eb6e07f2eb5a5ad468381f415ce0942277464c"
         }
       ],
       "limitations": "Local synthetic reward scales, not fitted traffic utility. v4/v5 differ in physical switch-event attribution."
@@ -3342,7 +3358,7 @@
       "references": [
         "dqfd"
       ],
-      "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c",
+      "reviewed_ast_sha256": "8ec4cbb497edb826e495f041b726a9e05c91b1b4f41771d96d8221afe318e6f6",
       "consumers": [
         {
           "source": {
@@ -3350,7 +3366,7 @@
             "scope": "Trainer.train",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "6a575ef681b81250b19eb46d0cb6c4f36b4c58fc910a4752b59168c4aa0f4b0b"
+          "reviewed_ast_sha256": "5dabf6463abc639ca714a7e3d84ebde7a99dd78e684d512bb347473b8e817b27"
         },
         {
           "source": {
@@ -3740,7 +3756,7 @@
             "scope": "load_model",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "34be38ea166674932c42c4f61fba37b6ab7ebf4eac8ebef43c19e1ad4e46ae9e"
+          "reviewed_ast_sha256": "b9edde610e3943e6b1128974cfab987f4e09c615e9e87317f1622d27b3cfa973"
         }
       ],
       "limitations": "Prevents duplicate start/model replacement during covered preparation and task states; not general distributed concurrency, persistence or cancellation safety."
@@ -3761,7 +3777,7 @@
       "justification": "Source-reviewed reproducibility and persistence contract, not a new traffic-control algorithm.",
       "override_notes": "Applies to the website training path; legacy/research artifacts retain their original source and schema.",
       "references": [],
-      "reviewed_ast_sha256": "7d1a61e0280ebcd2280d7ace79bb6b8ac62a881c331ec48f050c0bf10d6fc0d6",
+      "reviewed_ast_sha256": "fccd2be0f1813452a638fc5740d31e9e36fa36bd470fa9585df82db8948d1319",
       "consumers": [
         {
           "source": {
@@ -3813,6 +3829,80 @@
         }
       ],
       "limitations": "Upload acknowledgement is not independently verified cloud persistence. Atomic replacement does not supply distributed writers, immutable history or power-loss guarantees."
+    },
+    {
+      "id": "effective_run_configuration",
+      "source": {
+        "file": "server/app/rl/run_configuration.py",
+        "scope": "",
+        "kind": "symbol"
+      },
+      "purpose": "Selected live optimizer/replay/environment values, declared settings, episode contexts and exact source bytes",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed reproducibility and persistence contract, not a new traffic-control algorithm.",
+      "override_notes": "Applies to the website training path; legacy/research artifacts retain their original source and schema.",
+      "references": [],
+      "reviewed_ast_sha256": "67ae868b4f300a132d69ca85069140ca987015cef0b7510417d2c934ffdcd4cf",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/rl/trainer.py",
+            "scope": "Trainer.get_status",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "a4e46a7f751be2e269a7409f65c82e8642b773ce80cb6b58d70e69b7dd698659"
+        }
+      ],
+      "limitations": "Not every dependency or RNG state is recorded. Website training has no declared global policy seed; source/setting records do not establish deterministic reruns or field calibration."
+    },
+    {
+      "id": "training_configuration_bundle",
+      "source": {
+        "file": "server/app/services/model_service.py",
+        "scope": "save_training_configuration",
+        "kind": "symbol"
+      },
+      "purpose": "Per-run local configuration, source archive, episode hashes and checkpoint linkage",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed reproducibility and persistence contract, not a new traffic-control algorithm.",
+      "override_notes": "Applies to the website training path; legacy/research artifacts retain their original source and schema.",
+      "references": [],
+      "reviewed_ast_sha256": "71bf1a361e9d3da0518abc36f58aaa2ece4e0fe467ed26e7eaa7d072432301e9",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "_training_run_dir",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "97115b5afb07693f58c7bb17a5c417d96a32f55e00dce84dea6202b135a6cadc"
+        },
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "record_training_episode",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "dc35207ba6d10a2aff0a59da0f8ddf2cf46bf04169356505cd8104e177a3994b"
+        },
+        {
+          "source": {
+            "file": "research/audits/verify_training_run.py",
+            "scope": "verify",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "472ec1a73f02558fc35b004b756ccef318da0ce9e157d898390415e3a731e79e"
+        }
+      ],
+      "limitations": "Verifier reconstructs saved hash/configuration linkage without new traffic trajectories. Complete live cloud/browser lifecycle and adversarial signing are outside this evidence."
     }
   ],
   "open_evidence_requirements": [
