@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-10-31, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-11-01, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -78,6 +78,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [45. Methodology contracts, parameter provenance and implementation audit](#45-methodology-contracts-parameter-provenance-and-implementation-audit)
 - [46. Training checkpoint and task lifecycle](#46-training-checkpoint-and-task-lifecycle)
 - [47. Effective training configuration and checkpoint persistence](#47-effective-training-configuration-and-checkpoint-persistence)
+- [48. Clean-pressure margin and sensing robustness diagnostic](#48-clean-pressure-margin-and-sensing-robustness-diagnostic)
 
 ## 1. Project scope and ownership
 
@@ -617,6 +618,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
 | Independent SUMO sensing faults | All 72 episodes / 129,600 panel samples complete after verified reuse of 51 episodes and collection of 21 missing episodes. The original 900-second timeout remains recorded. Combined delay/misses reduce Max-Pressure's aggregate mean stopped waiting by 9.16% on these six seeds, with one unfavorable seed; Fixed stays invariant. This is a bounded classical-controller/sensor interaction, not a learned-policy gain (section 44.9). |
+| SUMO switching/robustness follow-up | Three fixed arms are implemented and frozen: clean pressure, mixed-fault pressure and clean pressure with a one-count switching margin. Native smoke completes 28 runs / 20,000 samples with a deliberate checkpoint restart. The six-fresh-seed, 36-episode longer-horizon panel has not run (section 48). |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -1054,6 +1056,7 @@ The historical 1,000-episode checkpoint is `server/models/76734963-e987-4024-aaa
 | SUMO robustness traffic | 112001/112002, 112101/112102, 112201/112202 | Six further consumed schedules, each with both starts and overlapping 180/360 s endpoints. |
 | SUMO sensing traffic | 1350001/1350002, 1350101/1350102, 1350201/1350202 | Six consumed known-family schedules paired across all three controllers/four faults. Recovery reuses the same cases; they cannot become fresh confirmation after inspecting these results. |
 | SUMO sensing mechanics | 1350901; recovery parity also reuses 1350001 and 1350201 | The smoke seed is separate. Replays of scientific cases are mechanics checks, not additional independent traffic seeds. |
+| SUMO switching follow-up | 1360001/1360002, 1360101/1360102, 1360201/1360202; mechanics 1360901 | Scientific traffic realizations are assigned before collection in the same known families. Both starts share each schedule. Only the separate smoke has run; the six scientific seeds remain uninspected. |
 | SUMO mechanics-only seeds | 108001 and feasibility futures; 109901, 110901, 112901 | Separate mechanics/repeat/prefix checks, not scientific-panel traffic replicates. |
 
 The early 1101-series seed manifest remains application/historical metadata; it does not describe every later research panel. Earlier inspected final panels are also consumed. Fresh confirmation requires freezing development choices first and then using an independent declared test, rather than relabelling a seen template/seed.
@@ -1292,9 +1295,9 @@ Simulator limitations include simplified motion, backlog visibility assumptions,
 
 The completed spatial, temporal, averaged-label, immediate upstream-teacher, October 29 switch-margin and decision-cadence recipes remain closed/failed at their respective prerequisites. The count-restoration model demonstrates a positive supervised reconstruction result, while its frozen-policy control configuration failed the declared screen; that recipe is also closed. The October 30 on-policy PPO/restoration comparison completes all six workers and fails its episode-90 screen. Its actors change decisions, so its negative result cannot be explained by unchanged weights; this does not identify a specific causal optimizer defect. The source-timed arrival-window prototype is implemented and its 180-run full-episode/component screen fails; do not use its gain over one reference to bypass stronger comparators or start training. The subsequent SUMO future, classical, count-ablation and final robustness collections are closed. Do not rerun identical batches, extend to 900/1,000 episodes, cherry-pick seeds/checkpoints, tune on previous final outcomes, loosen screens or silently replace a website default. No completed control-learning study establishes a reproducible input-delivery or reward-direction defect warranting a specific training correction. Later camera-clock and evidence repairs concern the separate CCTV observation path.
 
-A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long command is ready or warranted. The October 31 paper-writing deadline and acceptance of an empirical evaluation make accurate methods, complete results and limitations the available evidence direction. This reference supplies project information for that writing without editing the manuscript.
+A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long neural-training command is ready or warranted. The declared October 31 paper-writing deadline and acceptance of an empirical evaluation motivated prioritizing accurate methods, complete results and limitations. This reference supplies project information for that writing without editing the manuscript.
 
-The sensing comparison is now complete after a disclosed budget extension. Its nonmonotonic sensor/control result and exploratory action/service audit are available in section 44. The six scientific seeds are consumed development evidence; no automatic promotion, new training batch or fresh-confirmation claim follows from them.
+The sensing comparison is now complete after a disclosed budget extension. Its nonmonotonic sensor/control result and exploratory action/service audit are available in section 44. The six scientific seeds are consumed development evidence; no automatic promotion, new training batch or fresh-confirmation claim follows from them. Section 48 freezes a separate bounded diagnostic of one clean-sensing pressure margin, both starts and a longer horizon. That follow-up is classical development work; it does not reopen the failed D3QN margin calibration or establish a new learned controller.
 
 <a id="30-evidence-and-maintenance-index"></a>
 ## 30. Evidence and Maintenance Index
@@ -3183,5 +3186,85 @@ The current static catalogue contains 131 parameters and 28 methods. A separate 
 ### 47.7 Remaining acceptance boundaries
 
 Local configuration/checkpoint persistence and HTTP loading have executable evidence. Complete live Supabase round trips, restart/browser history, authentication/authorization, concurrent-user/process isolation and worker shutdown remain unverified. Camera geometry/movement/signal inputs, measured demand, hardware latency and signal-interface engineering still require independent data and acceptance work. Learned-control superiority and novelty remain open; software-only checks cannot substitute for that evidence.
+
+## 48. Clean-pressure margin and sensing robustness diagnostic
+
+### 48.1 Frozen question, controls and attribution
+
+The earlier sensing result motivates a bounded question: **does the mixed-sensing pressure advantage persist with new traffic realizations, both starting greens and a longer horizon, and can one fixed switching restraint achieve useful control with clean counts?** The experiment does not assume that fewer switches explain all previous gains. Pressure-based switching hysteresis is established control practice; the earlier custom-simulator D3QN margin calibration in section 37 failed and remains closed. This is a separately specified SUMO diagnostic, with no fitting, neural training, checkpoint transfer or new-controller novelty claim. Max-Pressure and switching-loss related work in sections 14 and 37 applies; the adaptation is not a faithful reproduction of a switching-loss-aware paper.
+
+The machine-readable [frozen protocol](research/manifests/sumo_switching.json) records every arm, seed, endpoint, budget, screen and rationale. Experiment-specific values are additional to the selected shared-method catalogue in section 45. All eleven existing sensing/controller/physical source files are SHA-256 pinned; the complete experiment archives sixteen source/configuration files.
+
+| Arm | Delivered sensing | Proposal rule |
+| --- | --- | --- |
+| `pressure_clean` | Existing clean count stream | Original raw-count Max-Pressure, zero margin. |
+| `pressure_mixed` | Existing 2 s additional latency and 30% missed detections | The same original pressure rule, zero margin. |
+| `pressure_margin1` | Existing clean count stream | Retain the current phase when the original pressure rule requests another phase, current observed pressure is positive, and the alternative advantage is at most one pressure-count unit. |
+
+The margin of **1** is the smallest positive integer increment on this raw phase-pressure scale. It is an engineering ablation chosen before the new outcomes, not a fitted value or a calibrated optimum. If current observed pressure is zero, the original proposal is preserved; a single opposing vehicle is not deliberately held by the margin in that case. Zero pressure does not prove an empty approach, and this exception supplies no individual waiting-time guarantee. A zero margin reproduces the original policy exactly, including its ties, minimum-green and clearance behavior.
+
+The proposed margin is in summed raw incoming-minus-destination-outgoing pressure units. It is distinct from the earlier normalized custom-pressure and Q-value margins. Timing remains **0.1 s ticks, 2 s decisions, 8 s minimum green, 3 s yellow and 1 s all-red**. Both the base and margin policy use the same FSM; there is no new starvation shield, uncertainty fallback or change in physical timing. The smoke additionally uses clean/mixed Fixed controls to check sensor independence; those are mechanics controls rather than extra scientific arms.
+
+### 48.2 Observed runtime, canonical phases and verification
+
+[sumo_switching.py](research/policies/sumo_switching.py) owns the pure method/pressure-margin proposal. [The experiment runtime](research/experiments/sumo_switching.py) owns frozen plans, sensor delivery, phase encoding and the observation/accounting bridge. The live flow is requested arrivals → SUMO → previous completed-step snapshot → existing count sensor → proposal and margin telemetry → unchanged physical FSM → executed lamps and trace. Adaptive proposals receive delivered counts, the public phase/stage/age clock and the fixed margin. They do not receive clean replacement counts, future demand, vehicle IDs, external backlog or waiting labels. Fixed receives no packet; sensing remains logged.
+
+Canonical **NS=0 / EW=1** labels stay fixed under both starts. The internal phase offset changes phase, pending target, proposal and lamp-axis interpretation together; positions, counts, IDs and movement labels are not rotated. Executed lamps are audited against canonical axes independently, including agreement between green/yellow permissions and the recorded canonical phase. Native source physics is reused rather than copied.
+
+Replay first reconstructs every actual delivered sensor record and proposal, including the margin-held flag and the original zero-margin proposal at that same visited state. Its private offline view normalizes phase labels and supplies the representation expected by the frozen clean-packet accounting checker. That checker's callback ignores the clean argument and consumes the validated delivered sequence. This view is never a live policy input. Inventory, FIFO, waiting, executed signals and both endpoints must reconstruct. `margin_held_gates` counts suppressed baseline proposals on the margin policy's own trajectory; it is not a count of avoided switches or a counterfactual waiting benefit.
+
+### 48.3 Cases, endpoints and analysis
+
+The scientific grid is **six fresh traffic seeds × two starting greens × three arms = 36 whole episodes**, each **3,600 ticks / 360 s**. Balanced seeds are **1360001/1360002**, NS-dominant **1360101/1360102**, and EW-dominant **1360201/1360202**. Rates remain the earlier known 0.2/0.2, 0.3/0.1 and 0.1/0.3 vehicles/s per approach. These are new realizations in known families, not new traffic families, measured city demand or an independent-family final test. Existing manifest/plan identifiers were checked for collisions before allocation.
+
+The **360 s endpoint is primary**. The **180 s prefix is secondary** and overlaps its parent trajectory. The primary collection has **129,600 physical signal samples**; its 64,800 prefix samples must not be added as independent coverage. Both starts use the same requested schedule within seed and are averaged **within traffic seed** before equal-seed means and the existing exact 64-draw family-stratified bootstrap. The effective stochastic replication is six traffic seeds, not 36 episodes or twelve starts. Percentile intervals are descriptive with two seeds per known family and are not multiplicity-adjusted population guarantees.
+
+Three contrasts are frozen at both endpoints: mixed minus clean, margin minus clean, and margin minus mixed. Each reports mean stopped waiting/requested vehicle, average within-run p95 and completed network-exit trips. Negative waiting differences favor the named candidate; positive completed-trip differences favor it. All seed/start contexts, start-group means, family means, seed means, green/clearance exposure and unfavorable cases remain in the report. Comparisons between margin/clean and raw/mixed change both policy and sensing; they do not identify a unique causal mediator. The three-arm design is not a full noise-by-margin factorial experiment.
+
+The fixed margin's primary continuation screen requires **at least 2% aggregate mean-wait gain against both references**, no aggregate p95 or throughput loss against either, no traffic-seed mean over both starts more than **1% worse** than either reference, and no start-group mean-wait loss. All jobs and signal/observation audits must complete. Passing only supports another bounded classical-mechanism development test; it does not trigger training, promote a model or establish novelty. Failure closes this exact margin recipe without a threshold search or use of a favorable secondary endpoint as a substitute.
+
+### 48.4 Atomic episode checkpoints and bounded sessions
+
+[The collector/verifier](research/pilots/run_sumo_switching_panel.py) stages source, configuration, network and frozen schedules before collection. Each native episode starts empty and saves its raw gzip trace. Only after both endpoint checks pass does it publish an immutable JSON result marker atomically. A session directory is itself registered only after its start metadata is atomic. One kernel file lock prevents concurrent collectors or verification during mutation. Existing outputs require explicit `--resume`; a completed batch is read-only in effect and creates no new session or traffic.
+
+Resume validates the original source/runtime/static hashes, all complete episode traces/metrics and the exact frozen completed prefix. It skips those complete jobs and leaves partial traces or unpublished temporary records in their earlier attempt directories. A completed batch's sealed report must reconstruct exactly; resume refuses external changes instead of replacing that report. Source changes, duplicate/substituted checkpoints, invalid counts, altered policy/lamps, reordered checkpoints and integrity failures are rejected. Budget stops and explicit interruptions may resume; other runtime/integrity errors require review. A hard-killed session consumes a session slot, and its unknown elapsed time is reported as unknown rather than zero measured runtime.
+
+The full protocol permits **at most four collection sessions, each with a cooperative 900 s cap**, for a maximum declared collection allowance of **3,600 s**. The CLI automatically continues only its own explicit session-budget stop. Preparations, revalidation of old checkpoints and final offline verification are outside those collection timers, so this is not an operating-system hard wall-time limit. Ctrl+C stops execution and preserves evidence; an explicit later `--resume` continues the frozen pending jobs. No restart can reset the session count or overwrite earlier attempts. Smoke sessions have a **360 s** cap and a deliberate two-episode pause to exercise native checkpoint continuation.
+
+### 48.5 Executed smoke and pending scientific command
+
+Sources/protocol were committed before native collection as `3605ea9` and `f81565c`, with the completed-report rejection guard committed as `903b940`. The current mechanics basis, `results/sumo_switching/smoke_20261101/`, completes **28 native runs / 20,000 signal samples** in **43.8676 recorded collection seconds over two sessions**. The first session deliberately pauses after two committed episodes; the second skips those records and finishes the remaining 26. Both zero-margin NS streams exactly match the frozen sensing engine's recorded trajectories, repeats match, all six short prefix replays match their longer-run prefixes, and Fixed is physically invariant across clean/mixed sensing in both starts. The margin-held branch executes **three gates** across the two nonduplicate margin trajectories. This is mechanics coverage, not a performance gain or extra independent traffic replication.
+
+The earlier `results/sumo_switching/smoke_20261031/` is preserved. It was collected before the sealed-report guard; verification of that historical source snapshot requires its archived `f81565c` implementation. All **28 semantic trajectory hashes** match the current smoke exactly. Repeating this dedicated mechanics seed after metadata hardening adds no independent scientific traffic replication and changes no policy, margin, endpoint or continuation threshold. Local validation records are under `results/sumo_switching_design/20261101/`.
+
+The smoke uses dedicated seed **1360901**, five methods in both starts twice, six separate 400-tick prefix replays and two 800-tick historical anchors. Saved-data verification reconstructs packets, policy telemetry, canonical lamps, inventory/waiting and checkpoint/session provenance without independent kinematic reruns. The full preflight passes with matching native runtime, all sources and topology; it creates no scientific output or traffic. The full batch remains uncollected; no scientific comparison or candidate-screen outcome is available yet. Existing sensing results and their budget-deviation record remain unchanged.
+
+The final targeted implementation/regression pass records **85 passing tests**, including **42 new policy/collector tests**. This is targeted backend/research coverage, not a new entire application/frontend pass. Tests cover pressure parity, idle/clock rules, both phases, delivered-input corruption, seed clustering, a bad-seed screen failure, atomic publication/registration, interrupted collection, duplicate/tampered records, concurrency refusal and non-writing completed-batch resume. The sealed-report regression first reproduced the unwanted replacement and then passed with the rejection guard. Existing dependency warnings remain.
+
+Verify the saved smoke without collecting it again:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.pilots.run_sumo_switching_panel --verify results/sumo_switching/smoke_20261101
+```
+
+Run the read-only full preflight, then the user-run scientific panel:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_switching_panel \
+  --preflight results/sumo_switching/full_20261101 \
+  --mechanics results/sumo_switching/smoke_20261101
+
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_switching_panel \
+  --output results/sumo_switching/full_20261101 \
+  --mechanics results/sumo_switching/smoke_20261101
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.pilots.run_sumo_switching_panel --verify results/sumo_switching/full_20261101
+```
+
+After an explicit interruption, use the collection command with `--resume` added and the same output/mechanics paths. Do not choose another threshold from the six new cases after seeing their outcomes. Record completion, the fixed primary screen, phase/horizon sensitivity and every adverse case before deciding any subsequent work.
 
 [Back to Top](#top)
