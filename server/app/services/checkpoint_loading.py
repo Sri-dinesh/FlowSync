@@ -8,7 +8,8 @@ def parse_model_request(identifier: str, episode: int | None):
     if not isinstance(identifier, str) or not identifier.strip():
         raise ValueError("A model identifier is required")
     parts = identifier.strip().split(":")
-    if len(parts) > 2 or parts[0] in (".","..") or any(c in parts[0] for c in ("/","\\")):
+    if (len(parts) > 2 or parts[0] in ("",".","..") or any(c in parts[0] for c in ("/","\\"))
+            or any(ord(c) < 32 or ord(c) == 127 for c in parts[0])):
         raise ValueError("Invalid model identifier")
     if episode is not None and (type(episode) is not int or episode < 0):
         raise ValueError("Checkpoint slot must be a nonnegative integer")

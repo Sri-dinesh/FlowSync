@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import io
 from pathlib import Path
 import re
@@ -8,6 +9,8 @@ import time
 
 import torch
 
+from .artifact_files import write_bytes_atomic
+from .checkpoint_loading import parse_model_request
 from .supabase_service import supabase_client, retry_on_transient_error
 
 BUCKET_NAME = "model-checkpoints"
@@ -36,32 +39,35 @@ def _invalidate_model_list_cache() -> None:
 
 
 def _checkpoint_path(model_id: str, episode: int) -> str:
-    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
+    clean_id,_ = parse_model_request(model_id,episode)
     return f"models/{clean_id}/checkpoint_{episode}.pt"
 
 
 def _local_checkpoint_path(model_id: str, episode: int) -> Path:
-    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
-    return LOCAL_MODELS_DIR / clean_id / f"checkpoint_{episode}.pt"
+    clean_id,_ = parse_model_request(model_id,episode)
+    root = LOCAL_MODELS_DIR.resolve()
+    path = (root / clean_id / f"checkpoint_{episode}.pt").resolve()
+    if not path.is_relative_to(root):
+        raise ValueError("Checkpoint path leaves local model storage")
+    return path
 
 
-def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> None:
+def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> dict:
     local_path = _local_checkpoint_path(model_id, episode)
-    local_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(state_dict, local_path)
-    _invalidate_model_list_cache()
-
     path = _checkpoint_path(model_id, episode)
     buffer = io.BytesIO()
     torch.save(state_dict, buffer)
-    # supabase-py v2 upload() requires bytes, not a file-like object
     raw_bytes = buffer.getvalue()
+    write_bytes_atomic(local_path,raw_bytes)
+    _invalidate_model_list_cache()
+    uploaded = False
     try:
         supabase_client.storage.from_(BUCKET_NAME).upload(
             path=path,
             file=raw_bytes,
             file_options={"content-type": "application/octet-stream", "upsert": "true"},
         )
+        uploaded = True
         import logging
         logging.getLogger(__name__).info(
             "Successfully uploaded checkpoint %s (%d bytes) to Supabase Storage bucket '%s'",
@@ -72,29 +78,36 @@ def save_checkpoint(model_id: str, episode: int, state_dict: Dict[str, Any]) -> 
         logging.getLogger(__name__).warning(
             "Supabase storage upload failed for %s episode %d: %s", model_id, episode, exc
         )
+    receipt = {"schema_version":"checkpoint_receipt_v1","model_id":parse_model_request(model_id,episode)[0],
+        "checkpoint_slot":episode,"sha256":hashlib.sha256(raw_bytes).hexdigest(),"size_bytes":len(raw_bytes),
+        "local_saved":True,"cloud_uploaded":uploaded}
+    return receipt
 
 
-def load_checkpoint(model_id: str, episode: int) -> Dict[str, Any]:
+def load_checkpoint(model_id: str, episode: int, *, expected_sha256: str | None = None) -> Dict[str, Any]:
     path = _checkpoint_path(model_id, episode)
-    try:
-        data = supabase_client.storage.from_(BUCKET_NAME).download(path)
-        buffer = io.BytesIO(data)
-        checkpoint = torch.load(buffer, map_location="cpu")
-    except Exception:
-        local_path = _local_checkpoint_path(model_id, episode)
-        checkpoint = torch.load(local_path, map_location="cpu")
-
-    # Handle old format (raw state dict) vs new format (dict with keys)
-    if isinstance(checkpoint, dict) and 'online_net' in checkpoint:
-        return checkpoint  # new format
+    local_path = _local_checkpoint_path(model_id,episode)
+    if expected_sha256 is not None and (not isinstance(expected_sha256,str) or not re.fullmatch(r"[0-9a-f]{64}",expected_sha256)):
+        raise ValueError("Expected checkpoint SHA-256 must be 64 lowercase hexadecimal characters")
+    if local_path.is_file():
+        data,origin = local_path.read_bytes(),"local"
     else:
-        # Old format — wrap it
-        return {'online_net': checkpoint, 'target_net': checkpoint}
+        data,origin = supabase_client.storage.from_(BUCKET_NAME).download(path),"supabase"
+    digest = hashlib.sha256(data).hexdigest()
+    if expected_sha256 is not None and digest != expected_sha256:
+        raise ValueError("Checkpoint bytes differ from the expected SHA-256")
+    checkpoint = torch.load(io.BytesIO(data),map_location="cpu",weights_only=True)
+    if not isinstance(checkpoint,dict):
+        raise ValueError("Checkpoint must contain a state dictionary")
+    checkpoint["storage_provenance"] = {"source":origin,"sha256":digest,"size_bytes":len(data),
+        "model_id":parse_model_request(model_id,episode)[0],"checkpoint_slot":episode}
+    return checkpoint
 
 
 def list_checkpoints(model_id: str) -> List[str]:
-    clean_id = model_id.split(":")[0] if ":" in model_id else model_id
+    clean_id,_ = parse_model_request(model_id,None)
     folder = f"models/{clean_id}"
+    names = set()
     try:
         items = supabase_client.storage.from_(BUCKET_NAME).list(
             folder,
@@ -104,17 +117,13 @@ def list_checkpoints(model_id: str) -> List[str]:
                 "sortBy": {"column": "name", "order": "asc"},
             },
         )
-        if items:
-            return [f"{folder}/{item['name']}" for item in items if item.get("name")]
+        names.update(item["name"] for item in items if re.fullmatch(r"checkpoint_\d+\.pt",str(item.get("name",""))))
     except Exception:
         pass
 
-    local_dir = LOCAL_MODELS_DIR / clean_id
-    if not local_dir.exists():
-        return []
-
-    checkpoints = sorted(local_dir.glob("checkpoint_*.pt"))
-    return [f"{folder}/{path.name}" for path in checkpoints]
+    local_dir = _local_checkpoint_path(clean_id,0).parent
+    names.update(path.name for path in local_dir.glob("checkpoint_*.pt") if re.fullmatch(r"checkpoint_\d+\.pt",path.name))
+    return [f"{folder}/{name}" for name in sorted(names)]
 
 
 @retry_on_transient_error(max_retries=3)

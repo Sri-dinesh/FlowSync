@@ -3744,6 +3744,75 @@
         }
       ],
       "limitations": "Prevents duplicate start/model replacement during covered preparation and task states; not general distributed concurrency, persistence or cancellation safety."
+    },
+    {
+      "id": "checkpoint_storage",
+      "source": {
+        "file": "server/app/services/model_service.py",
+        "scope": "save_checkpoint",
+        "kind": "symbol"
+      },
+      "purpose": "Single serialization, atomic local replacement, explicit upload receipt and byte-level checkpoint identity",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed reproducibility and persistence contract, not a new traffic-control algorithm.",
+      "override_notes": "Applies to the website training path; legacy/research artifacts retain their original source and schema.",
+      "references": [],
+      "reviewed_ast_sha256": "7d1a61e0280ebcd2280d7ace79bb6b8ac62a881c331ec48f050c0bf10d6fc0d6",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "_checkpoint_path",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "bee961cabfdbd1e7a0bd6fcfce40abb915aa518e29a9ac6c1691b96f8a74295d"
+        },
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "_local_checkpoint_path",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "602fd431699893965348d603364ff17fc674e1368401054127d2732e1b06a47b"
+        },
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "load_checkpoint",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d5dc938ff89bcc74ed720ae389df00af952051172d4376aaed73fa3ed7f85089"
+        },
+        {
+          "source": {
+            "file": "server/app/services/model_service.py",
+            "scope": "list_checkpoints",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "db39c8f5a63c9a02e532320a381d4ca8639ae14c41c03693cac0f464f0ee9322"
+        },
+        {
+          "source": {
+            "file": "server/app/services/artifact_files.py",
+            "scope": "write_bytes_atomic",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "6e3f7ef01b3c0836afe97114bb4d4deaf8bf87518b5c96953184085b2905f067"
+        },
+        {
+          "source": {
+            "file": "server/app/services/checkpoint_loading.py",
+            "scope": "parse_model_request",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "c5986c3fe3d9bc638d8faa6518975013fca7aa9f70229e9a05e60eb78d334b3d"
+        }
+      ],
+      "limitations": "Upload acknowledgement is not independently verified cloud persistence. Atomic replacement does not supply distributed writers, immutable history or power-loss guarantees."
     }
   ],
   "open_evidence_requirements": [

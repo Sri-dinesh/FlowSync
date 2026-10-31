@@ -491,6 +491,8 @@ HTTP and simulation-WebSocket loading now require an exact requested checkpoint 
 
 Database migrations/reset utilities affect user data and are not part of routine verification. A fresh checkout lacks the local historical checkpoints/results. It must not silently substitute random weights for missing trained evidence.
 
+Checkpoint storage serializes once and replaces the local file atomically before uploading those same bytes. Its receipt reports the SHA-256, byte count and separate local-save/cloud-upload outcomes. Loading prefers an existing local copy, otherwise downloads from storage; callers can pin an expected hash. Checkpoint discovery merges local and remote slots. Actual read origin and byte identity are returned with loaded state, separately from listing labels.
+
 ## 12. Recording, replay, telemetry and exports
 
 Interactive run bundles use metadata/metrics JSON and trajectory JSONL. Replay reads recorded frames and supports pacing, pause and seek without recreating physics. A replay confirms access to stored telemetry, not an independent rerun. Its original runtime/model identity may be missing or historical and must remain unverified where absent.
@@ -2491,7 +2493,7 @@ The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete e
 
 This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
 
-The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 25 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 26 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
 Three authorities must remain distinct:
 
