@@ -125,6 +125,16 @@ def test_existing_directory_and_concurrent_collector_are_refused(resumed_smoke):
         with pytest.raises(ValueError, match="holds"): tool.run(resumed_smoke, smoke=True, resume=True)
 
 
+def test_completed_batch_cannot_be_resealed_after_external_change(resumed_smoke, tmp_path):
+    target = tmp_path/"completed"
+    shutil.copytree(resumed_smoke, target)
+    original = (target/"report.json").read_bytes()
+    (target/"unexpected.txt").write_text("external change")
+    with pytest.raises(ValueError, match="sealed|changed"):
+        tool.run(target, smoke=True, resume=True)
+    assert (target/"report.json").read_bytes() == original
+
+
 def test_completed_marker_is_atomic_and_never_replaced(tmp_path):
     target = tmp_path/"record.json"
     tool.atomic_json(target, dict(value=1))

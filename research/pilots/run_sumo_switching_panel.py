@@ -316,6 +316,12 @@ def run(output, smoke=False, mechanics=None, resume=False):
             raise ValueError("A previous integrity/runtime failure requires review before any continuation")
         if len(rows) == len(manifest["planned_jobs"]):
             result = report_for(output, manifest, rows)
+            if (output/"report.json").exists():
+                saved = json.loads((output/"report.json").read_text())
+                if saved.get("complete") is True:
+                    if saved != result:
+                        raise ValueError("Sealed completed collection changed; resume cannot reseal it")
+                    return brief(saved)
             atomic_json(output/"report.json", result, replace=True)
             return brief(result)
         if len(history) >= cfg["max_sessions"]:
