@@ -3695,7 +3695,7 @@
       "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
       "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
       "references": [],
-      "reviewed_ast_sha256": "39faa4185571ddd99ffce5c809ddfd42d3d14b443d58d9566385443a4d1fb574",
+      "reviewed_ast_sha256": "3577db02f4f69bd722aa7ffb8ad86ce13eceec725d782c0f0c7776fee1a8dc7d",
       "consumers": [
         {
           "source": {
@@ -3703,7 +3703,7 @@
             "scope": "training_socket",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "7275cc7bb56df337d2603c7d31574a523036be1fa8a8da2b102e840cddb58abb"
+          "reviewed_ast_sha256": "6821993131fb77e259d182ee345ef557483781121eee242c0f1907529cf411b2"
         },
         {
           "source": {
@@ -3711,10 +3711,39 @@
             "scope": "start_training",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "65373d931bed7107bde0e3c7e1a7a28aaa023d1660992dfb870447e848522e8c"
+          "reviewed_ast_sha256": "1e6cfa12fbaafea6891f5dbd8e38b6d60ba6eda0bbc2079dc05051b33c1b9d03"
         }
       ],
       "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "training_task_lifecycle",
+      "source": {
+        "file": "server/app/services/training_tasks.py",
+        "scope": "",
+        "kind": "symbol"
+      },
+      "purpose": "Single-process reservation of training start/load preparation and shared background failure delivery",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed ownership boundary for preparing, queued and running training tasks. No new control algorithm.",
+      "override_notes": "Applies to the process-local application event loop; external worker/thread coordination and user isolation require separate engineering.",
+      "references": [],
+      "reviewed_ast_sha256": "1c55bb61f887cff18806d0a947b57100bc191d7a1ce401f711198277f47489ad",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/routers/training.py",
+            "scope": "load_model",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "34be38ea166674932c42c4f61fba37b6ab7ebf4eac8ebef43c19e1ad4e46ae9e"
+        }
+      ],
+      "limitations": "Prevents duplicate start/model replacement during covered preparation and task states; not general distributed concurrency, persistence or cancellation safety."
     }
   ],
   "open_evidence_requirements": [

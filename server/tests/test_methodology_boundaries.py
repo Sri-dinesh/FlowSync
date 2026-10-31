@@ -12,7 +12,8 @@ from app.services.checkpoint_loading import load_website_agent,parse_model_reque
 
 
 @pytest.mark.parametrize("fields", [dict(num_episodes=0),dict(num_episodes=True),dict(mode="unknown"),
-    dict(finetune_lr=0.),dict(finetune_lr=float("nan")),dict(finetune_epsilon=-.1),dict(finetune_epsilon=float("inf"))])
+    dict(finetune_lr=0.),dict(finetune_lr=float("nan")),dict(finetune_epsilon=-.1),dict(finetune_epsilon=float("inf")),
+    dict(mode="finetune"),dict(mode="resume"),dict(resume_episode=0)])
 def test_training_numerical_boundary_rejects_invalid_values(fields):
     with pytest.raises(ValidationError):
         StartTrainingRequest(**fields)
@@ -25,12 +26,14 @@ def test_finetune_zero_reaches_fake_trainer_without_starting_training(monkeypatc
     captured = []
     def create_task(coroutine):
         captured.append(coroutine)
-        coroutine.close()
         return SimpleNamespace()
     monkeypatch.setattr(training.asyncio,"create_task",create_task)
-    asyncio.run(training.start_training(StartTrainingRequest(mode="finetune",finetune_epsilon=0.),SimpleNamespace(app=app)))
+    async def launch():
+        await training.start_training(StartTrainingRequest(mode="finetune",resume_model_id="parent:0",finetune_epsilon=0.),SimpleNamespace(app=app))
+        await captured[0]
+    asyncio.run(launch())
     assert trainer.train.call_args.kwargs["finetune_epsilon"] == 0.
-    assert len(captured) == 1 and trainer.train.await_count == 0
+    assert len(captured) == 1 and trainer.train.await_count == 1
 
 
 def test_checkpoint_selection_is_exact_and_retains_zero_slot():
@@ -89,7 +92,7 @@ def test_websocket_uses_training_schema_before_launch(monkeypatch,epsilon):
     state = SimpleNamespace(trainer=trainer)
     socket = SimpleNamespace(app=SimpleNamespace(state=state),accept=AsyncMock(),send_json=AsyncMock(),
         receive_json=AsyncMock(side_effect=[dict(command="start_training",simulation_id="fixture",
-            num_episodes=1,mode="finetune",finetune_epsilon=epsilon),WebSocketDisconnect()]))
+            num_episodes=1,mode="finetune",resume_model_id="parent:0",finetune_epsilon=epsilon),WebSocketDisconnect()]))
     launch = AsyncMock()
     monkeypatch.setattr(training_ws,"training_manager",training_ws.TrainingConnectionManager())
     monkeypatch.setattr(training_ws,"_run_training_task",launch)

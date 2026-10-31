@@ -1,6 +1,6 @@
 from typing import Any, Dict, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class TrainingMetric(BaseModel):
@@ -25,3 +25,11 @@ class StartTrainingRequest(BaseModel):
     custom_profile: Optional[Dict[str, Any]] = None
 
     model_config = {"protected_namespaces": ()}
+
+    @model_validator(mode="after")
+    def require_parent_model(self):
+        if self.resume_model_id is not None and not self.resume_model_id.strip():
+            raise ValueError("Parent model identifier must be nonempty")
+        if (self.mode in ("resume","finetune") or self.resume_episode is not None) and not self.resume_model_id:
+            raise ValueError("Resume, fine-tuning and explicit checkpoint slots require a parent model")
+        return self

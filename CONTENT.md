@@ -24,7 +24,6 @@ This reference describes the actual application first. Separate experiment resul
 - [12. Recording, replay, telemetry and exports](#12-recording-replay-telemetry-and-exports)
 - [13. Offline experiment and evidence workflow](#13-offline-experiment-and-evidence-workflow)
 - [14. Technique attribution and primary references](#14-technique-attribution-and-primary-references)
-- [45. Methodology contracts, parameter provenance and implementation audit](#45-methodology-contracts-parameter-provenance-and-implementation-audit)
 - [15. Novelty assessment independent of measured performance](#15-novelty-assessment-independent-of-measured-performance)
 - [16. Maintained documentation and verification boundary](#16-maintained-documentation-and-verification-boundary)
 - [17. Current Status and Evidence Authority](#17-current-status-and-evidence-authority)
@@ -55,6 +54,8 @@ This reference describes the actual application first. Separate experiment resul
 - [42. Arrival reference-gap and service audit](#42-arrival-reference-gap-and-service-audit)
 - [43. Receding arrival decisions: frozen cadence experiment](#43-receding-arrival-decisions-frozen-cadence-experiment)
 - [44. Independent SUMO sensing-fault study](#44-independent-sumo-sensing-fault-study)
+- [45. Methodology contracts, parameter provenance and implementation audit](#45-methodology-contracts-parameter-provenance-and-implementation-audit)
+- [46. Training checkpoint and task lifecycle](#46-training-checkpoint-and-task-lifecycle)
 
 ## 1. Project scope and ownership
 
@@ -2490,7 +2491,7 @@ The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete e
 
 This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
 
-The new [methodology catalogue](research/manifests/methodology.json) describes **131 selected parameters and 24 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 25 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
 Three authorities must remain distinct:
 
@@ -2584,7 +2585,7 @@ The optional additional shield, supervisor and executed physical FSM have differ
 
 The actual centroid tracker uses an **80-pixel match radius**, **3000 ms expiry** and **ten-sample history**. `TRACK_THRESH`, `TRACK_BUFFER` and `MATCH_THRESH` declarations do not configure that implementation. `FRAME_BUFFER_SIZE` does not replace its latest-frame slot with a queue, and the catalogue marks the unused congestion-threshold declaration separately from active display logic. Consumer-function fingerprints make these activity assessments reviewable when code changes. Leaving the declarations visible as unused is more accurate than claiming a wired ByteTrack configuration.
 
-Default values are not necessarily the best-known experimental settings. For example, HyperParams learning rate `3e-4` differs from the research CLI default `1e-4`, and each frozen launcher may override both. `EPSILON_DECAY` is active through the `HyperParams.epsilon_decay` property in the application trainer's ordinary episode updates and resumed-episode initialization. Fine-tuning uses its own multiplier. `DEFAULT_EPISODES` remains an unused declaration relative to the current request-controlled episode count. The catalogue records these distinctions instead of recommending another large run.
+Default values are not necessarily the best-known experimental settings. For example, HyperParams learning rate `3e-4` differs from the research CLI default `1e-4`, and each frozen launcher may override both. `EPSILON_DECAY` is active through the `HyperParams.epsilon_decay` property in the application trainer's ordinary episode updates and resumed-episode initialization. Fine-tuning uses its own multiplier. The earlier catalogue classification of this field as unused was incorrect; section 46 includes a behavioral check. `DEFAULT_EPISODES` remains an unused declaration relative to the current request-controlled episode count. The catalogue records these distinctions instead of recommending another large run.
 
 ### 45.6 Event-based demand estimation and detector identity
 
@@ -2788,7 +2789,7 @@ The exporter refuses existing output directories and nested writes inside a seal
 
 ### 45.9 Verification and historical compatibility
 
-The combined targeted backend command completed **165 tests** covering signal requests, emergency clearance, ordinary simulation/SMDP mechanics, zero-demand CRN, stale scenario hashes, strict/atomic learning state, uncertainty/supervision, spatial compatibility, research collection, resume/fine-tuning, exact website checkpoint selection and rollback, read-only discovery, detector label swapping and supplied-event calibration. A checkpoint test also verifies an identical subsequent optimizer update after loading and rejection of malformed optimizer moments without replacing the current weights. These totals overlap earlier test runs and do not represent the whole repository suite. Existing dependency deprecation warnings remain.
+The earlier methodology pass completed **165 targeted backend tests** covering signal requests, emergency clearance, ordinary simulation/SMDP mechanics, zero-demand CRN, stale scenario hashes, strict/atomic learning state, uncertainty/supervision, spatial compatibility, research collection, resume/fine-tuning, exact website checkpoint selection and rollback, read-only discovery, detector label swapping and supplied-event calibration. A checkpoint test also verifies an identical subsequent optimizer update after loading and rejection of malformed optimizer moments without replacing the current weights. These totals overlap earlier test runs and do not represent the whole repository suite. Section 46 records the expanded current check. Existing dependency deprecation warnings remain.
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
@@ -2815,5 +2816,98 @@ The paper can accurately describe the implemented components, causal observation
 Related platforms [RESCO](https://datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/2021/hash/f0935e4cd5920aa6c7c996a5ee53a70f-Abstract-round1.html) and [LibSignal](https://arxiv.org/abs/2211.10649) must inform an evaluation/infrastructure novelty assessment. [UCATSC](https://arxiv.org/abs/2602.07784) is a relevant 2026 uncertainty/vision-control preprint; acceptance status is not asserted. Advanced-MP, arrival-aware control and uncertainty-related precedents are already distinguished in sections 38–43. A targeted comparison does not justify a universal first-of-its-kind claim. Unavailable full-text leads remain unresolved rather than a basis for invented method details.
 
 This pass improves the project's basis for writing methods, implementation and limitations. **It does not establish a new controller, useful uncertainty-specific control benefit, numerical optimality, publication readiness or production certification.** Remaining acceptance work includes independent camera/demand/simulator calibration, matched stronger baselines and fresh confirmation after a genuine development gain; complete website checkpoint/metadata/storage lifecycle checks; authentication/authorization and concurrent-session isolation; and measured hardware/operator/signal-interface engineering before any real actuation. Those requirements cannot be closed by documentation or chosen constants alone.
+
+## 46. Training checkpoint and task lifecycle
+
+### 46.1 Integration defects and scope
+
+This follow-up closes application training paths that bypassed the strict checkpoint loader in section 45. It changes model-state handling and request ownership. It does not change reward coefficients, traffic dynamics, observation schemas, historical artifacts or a frozen research recipe. No new training batch, performance panel, research-checkpoint promotion or real-camera actuation was run.
+
+| Defect reproduced before correction | Current behavior |
+| --- | --- |
+| A valid online state could replace weights before an invalid target state failed | Resume constructs and validates independent candidate agents before publishing either one. |
+| Bad optimizer configuration or absent trained-episode metadata could pass through resume | The versioned loader validates optimizer state and requires the checkpoint's actual episode. |
+| A checkpoint suffix and explicit slot could disagree | Shared parsing rejects conflicting selections; an unavailable exact slot fails. |
+| Resume reused replay already present in the application agent | A newly constructed training agent starts with empty replay and restores the checkpoint's valid weights, optimizer and counters. |
+| Training overwrote a captured inference agent's tensors before checkpoint persistence returned | Successful checkpoint writes precede publication of a separate inference snapshot and matching identity. |
+| HTTP background failures were not delivered through training progress | HTTP and WebSocket launchers share the error-reporting task runner. |
+| Another start or model replacement could enter while preparation awaited storage | A process-local reservation covers preparation, and pending/running tasks remain busy. |
+| Fine-tuning or an explicit checkpoint slot could be requested without a parent | Shared request validation rejects missing parents before launch. Direct fine-tuning also requires a parent. |
+| Custom fine-tuning could announce one run ID and save under a shorter one | The trainer retains the same normalized custom scenario suffix used by the launchers. |
+
+The changes are in [trainer.py](server/app/rl/trainer.py), [training_tasks.py](server/app/services/training_tasks.py), [training.py](server/app/routers/training.py), [training_ws.py](server/app/websockets/training_ws.py) and [training_schema.py](server/app/schemas/training_schema.py). The separate audited research trainer remains a different collection path.
+
+### 46.2 Resume and fine-tuning data flow
+
+The application trainer resolves the requested model ID and slot through the same [checkpoint helpers](server/app/services/checkpoint_loading.py) as website loading. Without an explicit slot it now prefers `checkpoint_0.pt`, then the highest numbered slot. This aligns inference and resume selection; the previous resume path preferred the highest numbered file. To resume a particular numbered file, supply that exact slot. Slot zero remains a selected-file alias, not an episode count or proof of independent validation.
+
+The loaded artifact must declare website v6 observations, v4 reward, compatible tensors and its actual nonnegative episode. The trainer stages separate training and inference agents and validates them before replacing application references. The training online network uses training mode, and the inference network uses evaluation mode. Failed loading preserves the previous agents, their tensors and active model identity. Training configuration must agree with the loaded observation version.
+
+Ordinary resume restores valid optimizer state and optimizer-update counters, starts numbering from the recorded episode and allocates empty replay. Optional teacher re-warm and the existing exploration reopening still apply. Replay, RNG state, environment state and asynchronous work are not restored. This is parameter/optimizer continuation, not exact reproduction of the interrupted learning trajectory.
+
+Fine-tuning records the parent model, actual parent episode and selected `parent_checkpoint_slot`. It preserves parent tensors, resets optimizer moments/replay/update counters, applies the requested learning rate and starts child episode numbering from zero. The selected slot is retained in progress/checkpoint metadata independently of the actual parent episode. For example, selecting slot zero whose recorded episode is 87 produces parent episode 87 and child episode one after the first child episode.
+
+### 46.3 Saved snapshots and inference identity
+
+At a save milestone the trainer forms checkpoint state with its actual episode, writes the numbered checkpoint and, when selected, the slot-zero alias. After those writer calls return successfully, it constructs an independent inference agent from that state and publishes its model ID, actual episode and numbered file slot together. A failed checkpoint write leaves the prior inference snapshot active. The model metadata write and progress notification remain later persistence operations.
+
+Replacing the inference reference preserves any previous agent already captured by a benchmark. Its tensors do not change when later training checkpoints are published. This is the same snapshot principle already used by timed/scenario benchmarks; it does not prove identity capture across every interactive frame and history path.
+
+The real storage service can save locally while a remote upload fails and falls back. A successful return here is therefore not proof that Supabase contains the same artifact. These regressions use controlled storage callbacks and do not validate a live database/bucket, crash-safe file replacement, complete browser history or production storage recovery.
+
+### 46.4 Preparation and task ownership
+
+[training_tasks.py](server/app/services/training_tasks.py) defines a shared busy check, reservation and task runner. The synchronous reservation is acquired before start/load preparation first awaits. Its `finally` block releases preparation ownership after success, error or cancellation. HTTP start, WebSocket start and HTTP training-model replacement use this reservation.
+
+| State | Ownership evidence | Start/load behavior |
+| --- | --- | --- |
+| Idle | No reservation, no pending task, trainer inactive | One operation can reserve preparation. |
+| Preparing | `training_state_reserved` is true | Another start is rejected; model replacement returns HTTP 409. |
+| Queued | Stored training task exists and is not done | Ownership remains active before the trainer sets `is_training`. |
+| Running | Trainer is active or its task is pending | Another start/model replacement remains blocked. |
+| Finished or failed | Trainer lifecycle exits and task completes | Reservation/task checks permit a later request. |
+
+The trainer's public lifecycle clears `is_training` in `finally`. The common runner broadcasts ordinary failures through the trainer's configured progress callback, while cancellation remains a cancellation. Error reporting does not forcibly clear another run's active flag. The initial HTTP response acknowledges scheduling; completion or a later `training_error` determines the outcome.
+
+This ownership rule applies to one application's event loop. It does not supply authentication, per-user sessions, interprocess locking or independent worker coordination. Cancellation tests verify coroutine/status cleanup, not termination of a worker thread already executing `asyncio.to_thread`. Stop-during-preparation behavior and complete worker shutdown remain separate acceptance work. The existing HTTP local-fallback versus WebSocket storage-error behavior is unchanged.
+
+### 46.5 Exploration constant correction
+
+The previous catalogue incorrectly marked `EPSILON_DECAY=0.997` unused. The active application trainer reads it through `HyperParams.epsilon_decay` for ordinary episode updates and resumed-episode initialization. Fine-tuning substitutes its calculated multiplier. The episode-end floor remains `EPSILON_END`, and ordinary resume reopens exploration to at least `0.20` because replay is not serialized. A requested fine-tuning epsilon of zero is a valid initial value; the subsequent schedule still applies its configured floor.
+
+A behavioral regression changes the declared multiplier to `0.5` in a controlled one-episode fixture and observes epsilon `0.5` in trainer state and delivered metrics. This proves the field is consumed; it does not identify an optimal exploration schedule. No default was retuned. Catalogue checks now fingerprint the property and actual training body. The `app_training` method contract covers `Trainer._train_run` plus the lifecycle and publication methods, so moving the body out of `train` cannot remove it from review.
+
+### 46.6 Verification and source preservation
+
+The new checkpoint tests first reproduced **seven failing cases**: partial target-state loading, invalid optimizer state, missing episode metadata, conflicting slots, inconsistent default selection, mutable inference publication and publication before a failed save. Three task tests separately reproduced duplicate preparation, pending-task duplication and missing HTTP failure delivery. Three request-schema cases reproduced missing-parent acceptance. The fixes pass those cases and additional fine-tuning lineage, cancellation and active-epsilon checks.
+
+The combined targeted suite completes **181 tests**. This includes the earlier method/control/sensing/learning checks and the new training lifecycle tests; totals overlap earlier runs. The new lifecycle fixtures use in-memory checkpoint state, controlled callbacks and a stub evaluator. They do not write production storage or establish control-performance gains. Existing dependency deprecation warnings remain. No frontend source changed, and this pass claims no new browser/cloud lifecycle run.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+server/venv/bin/python -m pytest \
+  server/tests/test_training_checkpoint_lifecycle.py server/tests/test_training_task_lifecycle.py \
+  server/tests/test_methodology_boundaries.py server/tests/test_methodology_catalogue.py \
+  server/tests/simulation/test_signal_requests.py server/tests/simulation/test_traffic_signal.py \
+  server/tests/simulation/test_environment_smdp.py server/tests/simulation/test_spawner_crn.py \
+  server/tests/test_controllers.py server/tests/test_flowsync_uq.py \
+  server/tests/test_research_training.py server/tests/test_spatial_policy.py \
+  server/tests/test_uncertainty_calibration.py server/tests/realworld/test_flow_calibrator.py \
+  server/tests/realworld/test_detector_contract.py server/tests/test_resume_training.py \
+  server/tests/test_finetune_training.py server/tests/rl \
+  --no-cov -p no:cacheprovider -q --disable-warnings
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology --check
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
+```
+
+The current catalogue contains 131 parameters and 25 methods. Its generated table now marks epsilon decay conditional, with the numerical default unchanged. The earlier `results/methodology/current_20261031/` snapshot is preserved with its original 24-method catalogue. A new snapshot uses a separate directory:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology \
+  --output results/methodology/training_lifecycle_20261031
+```
+
+These changes strengthen implementation and reproducibility sections of a paper. Reliable learned-control superiority, independent camera/demand/simulator validation and algorithmic novelty remain open. The next acceptance work includes real storage/browser lifecycle verification and a declared effective run-configuration record; the static defaults catalogue alone does not record every override that executed.
 
 [Back to Top](#top)

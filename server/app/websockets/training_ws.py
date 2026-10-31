@@ -9,6 +9,7 @@ except ImportError:  # pragma: no cover - fallback for missing optional dep
     import json
 
 from ..services import supabase_service
+from ..services.training_tasks import reserve_training_state, run_training as _run_training_task
 
 
 logger = logging.getLogger(__name__)
@@ -42,22 +43,6 @@ async def broadcast_training_metric(data: dict) -> None:
     await training_manager.broadcast(data)
 
 
-async def _run_training_task(trainer, *args, **kwargs) -> None:
-    """Run training without losing background-task exceptions."""
-    try:
-        await trainer.train(*args, **kwargs)
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:
-        trainer.is_training = False
-        logger.exception("Training task failed")
-        await broadcast_training_metric({
-            "type": "training_error",
-            "is_training": False,
-            "message": str(exc) or exc.__class__.__name__,
-        })
-
-
 async def training_socket(websocket: WebSocket) -> None:
     await training_manager.connect(websocket)
     app = websocket.app
@@ -83,88 +68,93 @@ async def training_socket(websocket: WebSocket) -> None:
                 except ValueError as exc:
                     await websocket.send_json({"type":"training_error","is_training":False,"message":str(exc)})
                     continue
-                await websocket.send_json({
-                    "type": "training_request_received",
-                    "is_training": True,
-                    "message": "Training request received; preparing the run...",
-                })
-                num_episodes = payload.num_episodes
-                simulation_id = payload.simulation_id
-                resume_model_id = payload.resume_model_id
-                resume_episode = payload.resume_episode
-                is_finetune = payload.mode == "finetune"
-                finetune_scenario = payload.finetune_scenario or "rush_hour"
-                finetune_lr = 1e-4 if payload.finetune_lr is None else payload.finetune_lr
-                finetune_epsilon = .25 if payload.finetune_epsilon is None else payload.finetune_epsilon
-                custom_profile = payload.custom_profile
+                with reserve_training_state(app.state) as claimed:
+                    if not claimed:
+                        await websocket.send_json({"type":"training_error","is_training":True,
+                            "message":"A training run or model preparation is already active."})
+                        continue
+                    await websocket.send_json({
+                        "type": "training_request_received",
+                        "is_training": True,
+                        "message": "Training request received; preparing the run...",
+                    })
+                    num_episodes = payload.num_episodes
+                    simulation_id = payload.simulation_id
+                    resume_model_id = payload.resume_model_id
+                    resume_episode = payload.resume_episode
+                    is_finetune = payload.mode == "finetune"
+                    finetune_scenario = payload.finetune_scenario or "rush_hour"
+                    finetune_lr = 1e-4 if payload.finetune_lr is None else payload.finetune_lr
+                    finetune_epsilon = .25 if payload.finetune_epsilon is None else payload.finetune_epsilon
+                    custom_profile = payload.custom_profile
 
-                if is_finetune:
-                    base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
-                    if finetune_scenario == "custom" and custom_profile and custom_profile.get("name"):
-                        custom_slug = custom_profile["name"].lower().strip().replace(" ", "_")[:20]
-                        scenario_slug = f"custom_{custom_slug}"
-                    else:
-                        scenario_slug = finetune_scenario.lower().replace(" ", "_")
-                    simulation_id = f"{base_id}-ft-{scenario_slug}"
-                    app.state.current_simulation_id = simulation_id
-                elif resume_model_id and not simulation_id:
-                    base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
-                    simulation_id = base_id
-                    app.state.current_simulation_id = simulation_id
-                elif not simulation_id:
-                    try:
-                        simulation_id = await asyncio.wait_for(
-                            asyncio.to_thread(
-                                supabase_service.create_simulation, "ai"
-                            ),
-                            timeout=20.0,
-                        )
-                        if simulation_id:
-                            app.state.current_simulation_id = simulation_id
+                    if is_finetune:
+                        base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")
+                        if finetune_scenario == "custom" and custom_profile and custom_profile.get("name"):
+                            custom_slug = custom_profile["name"].lower().strip().replace(" ", "_")[:20]
+                            scenario_slug = f"custom_{custom_slug}"
                         else:
-                            raise RuntimeError(
-                                "Supabase create_simulation returned an empty id"
+                            scenario_slug = finetune_scenario.lower().replace(" ", "_")
+                        simulation_id = f"{base_id}-ft-{scenario_slug}"
+                        app.state.current_simulation_id = simulation_id
+                    elif resume_model_id and not simulation_id:
+                        base_id = resume_model_id.split(":")[0] if ":" in resume_model_id else resume_model_id
+                        simulation_id = base_id
+                        app.state.current_simulation_id = simulation_id
+                    elif not simulation_id:
+                        try:
+                            simulation_id = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    supabase_service.create_simulation, "ai"
+                                ),
+                                timeout=20.0,
                             )
-                    except Exception:
-                        logger.exception("Failed to create training simulation record")
+                            if simulation_id:
+                                app.state.current_simulation_id = simulation_id
+                            else:
+                                raise RuntimeError(
+                                    "Supabase create_simulation returned an empty id"
+                                )
+                        except Exception:
+                            logger.exception("Failed to create training simulation record")
+                            await websocket.send_json({
+                                "type": "training_error",
+                                "is_training": False,
+                                "message": (
+                                    "Could not create the Supabase training run. "
+                                    "Check backend credentials/network and try again."
+                                ),
+                            })
+                            continue
+
+                    if not trainer.is_training:
+                        task = asyncio.create_task(
+                            _run_training_task(
+                                trainer,
+                                simulation_id or "",
+                                num_episodes,
+                                resume_model_id=resume_model_id,
+                                resume_episode=resume_episode,
+                                is_finetune=is_finetune,
+                                finetune_scenario=finetune_scenario,
+                                finetune_lr=finetune_lr,
+                                finetune_epsilon=finetune_epsilon,
+                                custom_profile=custom_profile,
+                            )
+                        )
+                        app.state.training_task = task
+                        await websocket.send_json({
+                            "type": "training_started",
+                            "is_training": True,
+                            "simulation_id": simulation_id,
+                            "message": "Training started; collecting demonstration transitions...",
+                        })
+                    else:
                         await websocket.send_json({
                             "type": "training_error",
-                            "is_training": False,
-                            "message": (
-                                "Could not create the Supabase training run. "
-                                "Check backend credentials/network and try again."
-                            ),
+                            "is_training": True,
+                            "message": "A training run is already active.",
                         })
-                        continue
-
-                if not trainer.is_training:
-                    task = asyncio.create_task(
-                        _run_training_task(
-                            trainer,
-                            simulation_id or "",
-                            num_episodes,
-                            resume_model_id=resume_model_id,
-                            resume_episode=resume_episode,
-                            is_finetune=is_finetune,
-                            finetune_scenario=finetune_scenario,
-                            finetune_lr=finetune_lr,
-                            finetune_epsilon=finetune_epsilon,
-                            custom_profile=custom_profile,
-                        )
-                    )
-                    app.state.training_task = task
-                    await websocket.send_json({
-                        "type": "training_started",
-                        "is_training": True,
-                        "simulation_id": simulation_id,
-                        "message": "Training started; collecting demonstration transitions...",
-                    })
-                else:
-                    await websocket.send_json({
-                        "type": "training_error",
-                        "is_training": True,
-                        "message": "A training run is already active.",
-                    })
             elif command == "stop_training":
                 app.state.trainer.stop()
     except WebSocketDisconnect:

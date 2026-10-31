@@ -124,6 +124,8 @@ async def test_start_training_endpoint_with_finetuning():
         expected_sim_id = f"{base_model}-ft-rush_hour"
         assert data["simulation_id"] == expected_sim_id
 
+        await app.state.training_task
+
         mock_trainer.train.assert_called_once_with(
             num_episodes=100,
             simulation_id=expected_sim_id,
@@ -178,6 +180,8 @@ async def test_start_training_endpoint_with_custom_finetuning():
         assert data["scenario"] == "Stadium Rush"
         expected_sim_id = f"{base_model}-ft-custom_stadium_rush"
         assert data["simulation_id"] == expected_sim_id
+
+        await app.state.training_task
 
         mock_trainer.train.assert_called_once_with(
             num_episodes=75,
