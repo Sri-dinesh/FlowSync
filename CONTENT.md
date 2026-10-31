@@ -19,7 +19,7 @@ Use this document as an evidence-bounded drafting reference. It describes implem
 | Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. |
 | Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit) and [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence). The current catalogue contains 131 selected parameters and 28 methods; it is not every literal in the repository. Report executed overrides and units, not just source defaults. |
 | Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
-| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–43. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 has a mechanics smoke; its full sensing-fault study is pending. Include failed screens and unfavorable replicates. |
+| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–43. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 has a verified smoke and a timed-out full attempt with 51 complete runs; full-panel conclusions await recovery. Include failed screens and unfavorable replicates. |
 | Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established) and [arrival-control precedents](#412-novelty-assessment-and-closest-precedents). Separate implemented techniques from related work. |
 | Limitations and external validity | [Open requirements](#293-outstanding-scientific-and-application-requirements), [empirical limits](#365-limitations-and-current-research-decision) and [application acceptance boundaries](#477-remaining-acceptance-boundaries). No field, camera-accuracy or physical-actuation validation follows from simulation. |
 | Software verification and artifact access | [Quality gates](#28-verification-and-quality-gates), [maintenance index](#30-evidence-and-maintenance-index) and sections 46–47. Local ignored results/checkpoints are not automatically publicly available. Software regression tests are distinct from scientific traffic samples. |
@@ -615,7 +615,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
-| Independent SUMO sensing faults | The new fixed-delay/missed-detection interface passes a 24-run mechanics smoke plus a historical-loop anchor: 20,000 signal samples, exact repeats/Fixed invariance and successful saved-data replay (section 44). The frozen 72-episode full study remains pending; no full-study outcome is available. |
+| Independent SUMO sensing faults | The 24-run mechanics smoke plus historical-loop anchor verifies 20,000 samples (section 44). The 72-episode full attempt times out after 900.018 s with 51 complete runs and one partial trace. The complete prefix reconstructs; 21 cells remain for a separately recorded recovery. No complete-panel outcome is available. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -1188,7 +1188,7 @@ The root [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUC
 
 The latest implementation verification before this documentation cleanup is the October 31 configuration/storage pass: **198 targeted backend tests**, **nine frontend behavior tests**, TypeScript checking, lint and the production build passed. Section 47.6 records the exact command, local fixture and verification limits. This was a targeted pass, not a current full-repository suite or live Supabase/browser acceptance test. The cleanup changes the reference and repository link checker; it does not rerun controller training or the application build.
 
-Subsequent SUMO readiness work passes **39 targeted sensing/preflight tests** and the real saved-smoke/runtime preflight (section 44.7). It starts no new traffic collection. The test counts below belong to their respective snapshots/subsets and are not additive unique coverage.
+The subsequent SUMO readiness pass recorded **39 targeted sensing/preflight tests** and a saved-smoke/runtime preflight without starting traffic collection (section 44.7). The user then ran the full attempt, which timed out; section 44.8 records the partial evidence and recovery work. The test counts below belong to their respective snapshots/subsets and are not additive unique coverage.
 
 Historical verification counts describe their original snapshots. The October 25 architecture/frontend pass recorded **669 backend/research tests** in Python 3.11 and five frontend behavior tests plus lint/type/build on Node 26.8.1. The subsequent display correction reran twelve relevant backend tests and five frontend tests; the 669-test suite/build preceded that correction. Earlier organization work recorded 504 backend tests in Python 3.11.15, and later SUMO/evidence additions recorded 155 targeted tests. These overlapping counts must not be added or presented as current full-suite coverage. Node 24 remains the declared CI baseline; remote CI completion was not checked.
 
@@ -1682,7 +1682,7 @@ Do not pool custom/SUMO delay means, attach the custom confidence interval to SU
 | `results/sumo_wait_accounting/analysis_20261027/` | Retrospective axis-weighting and disjoint-window accounting from the same robustness traces. Two 24-row CSVs, a PNG/PDF/SVG figure, exact input/output hashes and analysis source archive. No new traffic samples. See section 36.6. |
 | `results/camera_boundary/final_20261027/` | Synthetic geometry contract audit and 4,104 frozen-policy evaluations of 1,368 hypothetical states. Preserved counter predecessor, full inputs/Q values/masks/proposals, ambiguity witnesses, specification and hashes. Recomputed by the audit's `--verify` mode. See section 36.7. |
 | Later count-restoration, PPO, arrival-window and cadence evidence | Sections 39–43 give each artifact identity, protocol, frozen endpoint and failed control screen. Positive reconstruction accuracy is a different outcome from control benefit. These panels are not included automatically in the earlier manuscript's nine-panel numerical ledger. |
-| SUMO sensing mechanics / pending full study | Section 44 records the completed smoke, its signal/packet coverage and verifier. No completed 72-episode scientific result is available. |
+| SUMO sensing mechanics / interrupted full study | Section 44 records the completed smoke, the timed-out attempt, verified prefix and separate recovery lineage. No completed 72-episode scientific result is available yet. |
 | `results/methodology/` and `results/methodology_audit/20261031/` | Source-default catalogues, archived implementation evidence and local training/storage mechanics. Sections 45–47 distinguish source defaults from executed overrides and software verification from traffic experiments. |
 
 Most result directories are ignored local artifacts and are absent from a fresh clone. The [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) describes this boundary. Source code and Markdown summaries alone do not provide downloadable raw evidence. Artifact packaging/accessibility and final paper tables must be handled explicitly before a reproducibility claim about public availability.
@@ -1718,7 +1718,7 @@ All four full verifiers passed again during this October 25 reference update. Ea
 
 The combined record supports an empirical account of evaluation defects, negative learning results, future-dependent hindsight labels and observed classical waiting/throughput trade-offs. It preserves local favorable outcomes and case-level exceptions. It does not supply the originally desired superior learned controller, validated useful uncertainty supervisor, accepted novelty claim or justified publication-readiness percentage.
 
-The completed October 23 scientific SUMO collections use one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. Section 44 adds a separately verified mechanics path for synthetic count misses and delay; its full scientific study has not run yet. Neither path validates turns, pedestrians, network spillback, actual camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
+The completed October 23 scientific SUMO collections use one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. Section 44 adds verified mechanics for synthetic count misses/delay; its full attempt is interrupted and lacks complete paired scientific coverage. Neither path validates turns, pedestrians, network spillback, actual camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
 
 Executed conflict/clearance samples establish finite simulated lamp behavior under the declared audit. They do not prove collision freedom across all conditions, formal real-world safety, acceptable individual waiting or deployable cabinet control. Hardware latency, camera accuracy and end-to-end website equivalence remain separate open requirements.
 
@@ -2524,28 +2524,29 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/smoke_20261030
 ```
 
-The [read-only preflight](research/audits/preflight_sumo_sensing.py) checks the proposed output location, clean executable sources, complete saved smoke and exact Python/package/native-binary runtime. It prints the planned coverage, cooperative cap and shell-quoted collection/verification commands without creating the collection directory or stepping traffic. Run it using the preserved SUMO interpreter; the historical `/tmp/flowsync-sumo-20261023` environment is no longer present:
+The [read-only preflight](research/audits/preflight_sumo_sensing.py) checked the proposed output location, clean executable sources, complete saved smoke and exact Python/package/native-binary runtime before the original full attempt. It establishes compatibility, not that a chosen wall-time budget will complete the panel. The historical `/tmp/flowsync-sumo-20261023` environment is absent; use the preserved interpreter under `results/runtime/sumo_1_24_0/`.
+
+The original full directory now exists with an audited timeout prefix. Preserve it. Inspect its completed coverage without treating the panel as complete:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.audits.preflight_sumo_sensing \
-  --mechanics results/sumo_sensing/smoke_20261030 \
-  --output results/sumo_sensing/full_20261031
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.pilots.recover_sumo_sensing \
+  --audit-prefix results/sumo_sensing/full_20261031
 ```
 
-The smoke and current preflight have passed. Full collection **has not run**. The proposed October 31 output is a new directory for the same frozen 72-episode protocol; changing the date does not create another experiment or additional samples. Collection repeats its own gates, so an earlier readiness report does not authorize bypassing source/runtime checks. It is a bounded empirical comparison, not model training or promotion:
+The [recovery adapter](research/pilots/recover_sumo_sensing.py) reuses the validated completed episodes in a new output, repeats one complete episode as a parity anchor and collects the 21 missing episodes from fresh empty starts. The interrupted episode is rerun from tick zero and must reproduce its original recorded prefix. The additional cooperative collection cap is **600 seconds**, after validation/source preparation. This is an explicit execution-budget amendment, not a claim that the original 900-second attempt completed. Schedules, sensing, policies, horizons and all 20 contrast definitions remain frozen:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.pilots.run_sumo_sensing_panel \
-  --mechanics results/sumo_sensing/smoke_20261030 \
-  --output results/sumo_sensing/full_20261031
+  -m research.pilots.recover_sumo_sensing \
+  --prefix results/sumo_sensing/full_20261031 \
+  --output results/sumo_sensing_recovery/full_20261031
 
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
-  -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/full_20261031
+  -m research.pilots.recover_sumo_sensing --verify results/sumo_sensing_recovery/full_20261031
 ```
 
-### 44.6 Completed mechanics smoke; scientific collection pending
+### 44.6 Completed mechanics smoke
 
 Artifact: `results/sumo_sensing/smoke_20261030/`. The smoke completes in **114.984 seconds**, below its 240-second cap, with no budget stop. The 24 fault/controller/repeat episodes contribute **19,200 signal samples**; the separate historical-loop anchor contributes **800**, for **20,000** executed samples with zero measured signal violations. Every repeated semantic trajectory matches, the new clean Max-Pressure path exactly matches its old-loop anchor, and Fixed's traffic/FSM/lamp trajectories match across all four sensing conditions. This checks implementation and observation independence, not scientific robustness or controller superiority.
 
@@ -2555,19 +2556,35 @@ Full saved-data verification passes for every sensor record, packet, proposal, p
 
 The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete executable study/protocol as `6accf66`, both before collection. The smoke manifest records `6accf66`; later results documentation changes do not alter its executable sources. Flags remain `smoke: true`, `complete: true`, `scientific_panel_complete: false`, `policy_promoted: false`, `publication_ready: false`. The full-study source/runtime gate also matches the smoke in `results/sumo_sensing_design/20261030/full_preflight.json`. No full-study delay/ranking conclusion, learned-model gain or real-camera readiness follows yet.
 
-### 44.7 October 31 readiness verification
+### 44.7 October 31 readiness verification before the interrupted attempt
 
 The preflight was executed against the actual preserved environment and completed smoke after the methodology/storage changes and documentation cleanup. All **11 frozen executable/configuration files** match the smoke, no study source is dirty, and Python **3.11.15**, all three **1.24.0** packages, native binary hashes and version strings match exactly. Saved smoke reconstruction again covers **19,200 panel samples plus 800 anchor samples**; it runs no new traffic trajectories. The readiness record is `results/sumo_sensing_design/20261031/preflight.json`.
 
-The proposed `results/sumo_sensing/full_20261031/` directory remains absent. Its planned coverage is **six traffic seeds, 72 episodes and 129,600 panel signal samples**, each episode lasting 180 simulated seconds. Those are planned quantities, not collected results. The **900-second cooperative collection cap** is unchanged; preflight/source archiving precede it, and it is not an operating-system hard timeout.
+At preflight, `results/sumo_sensing/full_20261031/` was absent. The plan specifies **six traffic seeds, 72 episodes and 129,600 panel signal samples**, each episode lasting 180 simulated seconds. That planned coverage is distinct from the later partial collection below. The original **900-second cooperative collection cap** excludes preflight/source archiving and is not an operating-system hard timeout.
 
 **39 targeted tests pass** across the new preflight and existing sensing/panel suites. Nine new cases cover quoted commands and non-writing behavior, preservation of existing files/directories/dangling symlinks, refusal to nest outputs inside smoke evidence, dirty study sources, runtime mismatch, full-study substitution for smoke and propagation of saved-evidence verification errors. Existing packet/proposal/accounting/statistical checks remain covered. Synthetic test fixtures are not extra SUMO rollouts. The preflight wrapper leaves all frozen study sources, schedules, controls, outcomes and analysis definitions unchanged; no replacement smoke was collected.
+
+### 44.8 Interrupted full attempt and recovery contract
+
+`results/sumo_sensing/full_20261031/report.json` records `complete:false`, `scientific_panel_complete:false`, **51 complete episodes**, an active halted/mixed-fault episode at seed **1350201**, and `TimeoutError: Frozen sensing collection cap exceeded` after **900.018 seconds**. Four complete seed cases contribute 48 episodes; three further completed cells belong to the next seed. The partial gzip trace is preserved and excluded from complete-episode counts. The original complete-panel verifier correctly rejects this incomplete attempt.
+
+The dedicated prefix auditor verifies the exact frozen run order, every original output hash, source archive and configuration, the mechanics basis, requested schedules, all 51 complete trajectories/metrics, and Fixed invariance. The complete prefix contains **91,800 signal samples**. This saved-data audit reruns no SUMO kinematics. Its 21 missing cells are a coverage deficit, not a failed controller-performance screen. No aggregate full-panel ranking or stratified interval is inferred from the imbalanced prefix.
+
+Recovery preserves the original directory and copies its completed traces byte-for-byte into a new `collection/` subdirectory. It archives its own adapter separately, records original input hashes/revision/runtime and explicitly sets `original_cap_met:false` and `execution_budget_amended:true`. It first requires exact whole-episode parity with the earliest completed cell. The first missing episode must also exactly reproduce the saved partial trajectory before adding its remaining ticks. Fixed invariance is checked as new episodes finish. Outcomes, repetitions and checkpoints are not selected using the prefix's performance.
+
+If all missing cells complete, the canonical collection retains the original source/configuration and all 72 episode records, while its elapsed time includes the original and recovery attempts. The parent recovery report records reused/new runs, the parity anchor and per-episode collection/validation timings. Its verifier checks the complete canonical panel **and** recovery lineage, raw copied bytes, source/runtime identities, partial/whole-episode parity, timing/budget disclosures, all CSVs and summaries. Use the recovery verifier above for this output. Completion cannot be relabelled as meeting the original execution cap or establishing controller superiority.
+
+Recovery refuses existing/nested output directories and dirty adapter/study sources. A stopped recovery retains incomplete reports and traces in its new directory; it is not silently overwritten or certified. This adapter accepts the original closed timeout as its source. A hard-killed or subsequently interrupted recovery needs its own integrity review before any further continuation. Long collection remains user-run.
+
+The recovery's additional execution budget is a **protocol deviation that must be disclosed**, even though its traffic inputs and analysis definitions stay unchanged. Original timeout status is retained; completed recovery would establish case coverage after that deviation. It must not be described as successful execution within the original preregistered cap or as a fresh confirmatory panel.
+
+Validation includes **57 targeted sensing/preflight/recovery tests**, covering full synthetic orchestration, source/inventory/metric tampering, parity, byte-preserving reuse, budget disclosures, existing output refusal and an interrupted recovery remaining incomplete. Synthetic test rows are not native traffic. A separate bounded native-loop rehearsal in `results/sumo_sensing_recovery/rehearsal_20261031/` completes two 1,800-tick episodes in **33.020 seconds**, within its 90-second cap. The first matches the earliest completed trace exactly; the second reproduces all **209 saved ticks** of the interrupted cell before completing its full horizon. Its **3,600 samples** are mechanics coverage, not independent seed replicates or a completed 72-episode result. The original directory is hash-identical afterward. The script/source snapshots and raw traces preserve this check; the controller/simulator sources are unchanged. These are correctness checks, not a measured speedup or a runtime guarantee for all missing cells.
 
 ## 45. Methodology contracts, parameter provenance and implementation audit
 
 ### 45.1 Scope and executable authority
 
-This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
+This October 31 methodology pass addressed implementation correctness, attribution and reproducible method description without tuning constants, training a new controller, rerunning performance panels or promoting checkpoints. The separate SUMO sensing attempt in section 44 later times out and awaits audited recovery. Earlier performance screens and negative results retain their original meaning.
 
 The [methodology catalogue](research/manifests/methodology.json), extended by sections 46 and 47, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
