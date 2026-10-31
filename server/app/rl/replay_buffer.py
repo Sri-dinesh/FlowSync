@@ -74,7 +74,7 @@ class SumTree:
 class PrioritizedReplayBuffer:
     """
     Prioritized Experience Replay buffer.
-    Based on: Schaul et al. 2016 (PER), applied in FPA-DQN, 3DQN-PER.
+    Proportional priority sampling follows Schaul et al. (2016).
 
     Transitions with high TD-error are sampled more frequently.
     Importance sampling weights correct for the resulting bias.

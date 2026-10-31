@@ -1,6 +1,6 @@
 """
 ModelExporter — Export trained YOLOv8 .pt to ONNX for production inference.
-ONNX Runtime is 2-3x faster than PyTorch on CPU for inference.
+ONNX export supports an alternative inference format; speed requires measurement.
 """
 from __future__ import annotations
 

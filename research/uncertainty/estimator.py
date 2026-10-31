@@ -14,8 +14,8 @@ Feature Vector phi_t:
 7. Track fragmentation proxy: Sudden ID turnover rate
 
 Aggregation:
-  U_raw = w^T phi_t + b
-  U_t = sigmoid(U_raw / temperature) in [0.0, 1.0]
+  U_t = sigmoid(5 * (w^T phi_t - 0.35) / temperature)
+  A supplied fitted logistic calibration replaces this heuristic aggregation.
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class UncertaintyFeatures:
 @dataclass
 class UncertaintyScore:
     """Aggregated uncertainty score and detailed diagnostic breakdown."""
-    score: float  # Scalar uncertainty in [0.0, 1.0] (0 = fully confident, 1 = completely untrusted)
+    score: float  # Heuristic score or fitted synthetic-error probability; not control risk.
     is_unreliable: bool  # True if score >= threshold
     threshold: float
     features: UncertaintyFeatures
@@ -164,10 +164,10 @@ class PerceptionUncertaintyEstimator:
             det_u = 0.0
             tail_u = 0.0
 
-        # 2. Step-to-step count volatility: physically impossible jumps indicate miss or ghost
+        # Step-to-step count volatility is a perception heuristic.
         if self._prev_queues is not None:
-            # Physical max service per approach in 0.1s is ~0.2 vehicles.
-            # Large jumps (|dq| > 0.3) indicate perception flicker
+            # The scale depends on the caller's queue units and update cadence;
+            # a large change alone does not establish a sensing failure.
             dq = np.abs(q_curr - self._prev_queues)
             volatility = float(np.clip(np.mean(dq) * 3.0, 0.0, 1.0))
         else:
