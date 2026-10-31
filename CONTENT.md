@@ -1188,13 +1188,15 @@ The root [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUC
 
 The latest implementation verification before this documentation cleanup is the October 31 configuration/storage pass: **198 targeted backend tests**, **nine frontend behavior tests**, TypeScript checking, lint and the production build passed. Section 47.6 records the exact command, local fixture and verification limits. This was a targeted pass, not a current full-repository suite or live Supabase/browser acceptance test. The cleanup changes the reference and repository link checker; it does not rerun controller training or the application build.
 
+Subsequent SUMO readiness work passes **39 targeted sensing/preflight tests** and the real saved-smoke/runtime preflight (section 44.7). It starts no new traffic collection. The test counts below belong to their respective snapshots/subsets and are not additive unique coverage.
+
 Historical verification counts describe their original snapshots. The October 25 architecture/frontend pass recorded **669 backend/research tests** in Python 3.11 and five frontend behavior tests plus lint/type/build on Node 26.8.1. The subsequent display correction reran twelve relevant backend tests and five frontend tests; the 669-test suite/build preceded that correction. Earlier organization work recorded 504 backend tests in Python 3.11.15, and later SUMO/evidence additions recorded 155 targeted tests. These overlapping counts must not be added or presented as current full-suite coverage. Node 24 remains the declared CI baseline; remote CI completion was not checked.
 
 | Check | Recorded result / practical limit |
 | --- | --- |
 | October 31 configuration/storage suite | 198 targeted backend tests passed, including actual local checkpoint serialization/loading with stubbed validation and offline cloud transport. See section 47.6. |
 | October 31 frontend pass | Nine behavior tests, type checking, lint and production build passed. Receipt tests cover identity matching, local fallback, alias failure and malformed/legacy messages. |
-| Documentation cleanup | 35 targeted documentation, methodology, reproducibility and paper-evidence tests pass, including five new link-checker cases. The repository checker passes across 390 Python files and 452 maintained local path/section links. These are source/documentation checks, not new traffic samples or a full application rerun. |
+| Documentation cleanup snapshot | 35 targeted documentation, methodology, reproducibility and paper-evidence tests passed, including five new link-checker cases. At that snapshot, the repository checker covered 390 Python files and 452 maintained local path/section links. These were source/documentation checks, not new traffic samples or a full application rerun. |
 | Historical research discovery | Forty maintained tool help checks and source-only core train/evaluate/compare help passed at the recorded organization snapshot. They establish discovery/imports, not expensive execution or current full coverage. |
 | Historical preservation checks | Nineteen scenario/manifest files remained byte-identical across organization; selected parent hashes were preserved. Spatial comparison reconstruction matched the saved failed screen without new independent evaluations. |
 | Shell/container metadata | Shell syntax, YAML parsing and Compose configuration previously passed. Docker image execution/build was not established; shell syntax is also part of the current repository checker. |
@@ -2522,16 +2524,25 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/smoke_20261030
 ```
 
-The smoke has passed. Full collection is prepared but **has not run**. It is a bounded empirical comparison, not model training or promotion:
+The [read-only preflight](research/audits/preflight_sumo_sensing.py) checks the proposed output location, clean executable sources, complete saved smoke and exact Python/package/native-binary runtime. It prints the planned coverage, cooperative cap and shell-quoted collection/verification commands without creating the collection directory or stepping traffic. Run it using the preserved SUMO interpreter; the historical `/tmp/flowsync-sumo-20261023` environment is no longer present:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.audits.preflight_sumo_sensing \
+  --mechanics results/sumo_sensing/smoke_20261030 \
+  --output results/sumo_sensing/full_20261031
+```
+
+The smoke and current preflight have passed. Full collection **has not run**. The proposed October 31 output is a new directory for the same frozen 72-episode protocol; changing the date does not create another experiment or additional samples. Collection repeats its own gates, so an earlier readiness report does not authorize bypassing source/runtime checks. It is a bounded empirical comparison, not model training or promotion:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
   -m research.pilots.run_sumo_sensing_panel \
   --mechanics results/sumo_sensing/smoke_20261030 \
-  --output results/sumo_sensing/full_20261030
+  --output results/sumo_sensing/full_20261031
 
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
-  -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/full_20261030
+  -m research.pilots.run_sumo_sensing_panel --verify results/sumo_sensing/full_20261031
 ```
 
 ### 44.6 Completed mechanics smoke; scientific collection pending
@@ -2543,6 +2554,14 @@ Fixed's unchanged trajectory also exposes actual sensing effects without confoun
 Full saved-data verification passes for every sensor record, packet, proposal, physical lamp state, wait/inventory metric, contrast, CSV, coverage/hash and mechanics flag. The anchor is checked by exact semantic equality to the verified new clean trajectory. The verifier performs **zero new traffic-kinematics reruns**. Its record is `results/sumo_sensing_design/20261030/smoke_verification.json`. Scientific intervals are absent for this one-seed mechanics panel.
 
 The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete executable study/protocol as `6accf66`, both before collection. The smoke manifest records `6accf66`; later results documentation changes do not alter its executable sources. Flags remain `smoke: true`, `complete: true`, `scientific_panel_complete: false`, `policy_promoted: false`, `publication_ready: false`. The full-study source/runtime gate also matches the smoke in `results/sumo_sensing_design/20261030/full_preflight.json`. No full-study delay/ranking conclusion, learned-model gain or real-camera readiness follows yet.
+
+### 44.7 October 31 readiness verification
+
+The preflight was executed against the actual preserved environment and completed smoke after the methodology/storage changes and documentation cleanup. All **11 frozen executable/configuration files** match the smoke, no study source is dirty, and Python **3.11.15**, all three **1.24.0** packages, native binary hashes and version strings match exactly. Saved smoke reconstruction again covers **19,200 panel samples plus 800 anchor samples**; it runs no new traffic trajectories. The readiness record is `results/sumo_sensing_design/20261031/preflight.json`.
+
+The proposed `results/sumo_sensing/full_20261031/` directory remains absent. Its planned coverage is **six traffic seeds, 72 episodes and 129,600 panel signal samples**, each episode lasting 180 simulated seconds. Those are planned quantities, not collected results. The **900-second cooperative collection cap** is unchanged; preflight/source archiving precede it, and it is not an operating-system hard timeout.
+
+**39 targeted tests pass** across the new preflight and existing sensing/panel suites. Nine new cases cover quoted commands and non-writing behavior, preservation of existing files/directories/dangling symlinks, refusal to nest outputs inside smoke evidence, dirty study sources, runtime mismatch, full-study substitution for smoke and propagation of saved-evidence verification errors. Existing packet/proposal/accounting/statistical checks remain covered. Synthetic test fixtures are not extra SUMO rollouts. The preflight wrapper leaves all frozen study sources, schedules, controls, outcomes and analysis definitions unchanged; no replacement smoke was collected.
 
 ## 45. Methodology contracts, parameter provenance and implementation audit
 
