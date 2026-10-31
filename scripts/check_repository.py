@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import html
 import json
 from pathlib import Path
 import re
@@ -36,8 +37,42 @@ def check_frontend(root):
     return issues
 
 
+def markdown_lines(text):
+    """Yield prose lines outside fenced examples, preserving source line numbers."""
+    fence = None
+    for number,line in enumerate(text.splitlines(),1):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$",line)
+        if marker:
+            if fence is None:
+                fence = marker.group(1)
+                continue
+            if marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence) and not marker.group(2).strip():
+                fence = None
+                continue
+        if fence is None:
+            yield number,line
+
+
+def markdown_anchors(text):
+    """Anchors for this repository's Markdown headings and explicit HTML IDs."""
+    anchors,duplicates = set(),{}
+    for _,line in markdown_lines(text):
+        anchors.update(re.findall(r'\bid=["\']([^"\']+)["\']',line))
+        heading = re.match(r"^ {0,3}#{1,6}\s+(.+?)\s*$",line)
+        if heading:
+            label = re.sub(r"\s+#+\s*$","",heading.group(1))
+            label = re.sub(r"\[([^\]]+)\]\([^)]*\)",r"\1",label)
+            label = html.unescape(re.sub(r"<[^>]+>","",label)).lower()
+            slug = re.sub(r"[^\w -]","",label).replace(" ","-")
+            count = duplicates.get(slug,0)
+            duplicates[slug] = count+1
+            anchors.add(f"{slug}-{count}" if count else slug)
+    return anchors
+
+
 def check_links(root, files):
     issues, checked, optional = [], 0, 0
+    anchors = {}
     for path in files:
         if path.suffix != ".md":
             continue
@@ -46,18 +81,16 @@ def check_links(root, files):
             continue  # Frozen records retain original paths/bytes; CONTENT.md is maintained.
         if name.startswith(("docs/archive/", "research/docs/archive/")) and path.name != "README.md":
             continue  # Historical line/path references are evidence, not maintained guides.
-        for line_number, line in enumerate(path.read_text().splitlines(), 1):
+        for line_number, line in markdown_lines(path.read_text()):
             for match in LINK.finditer(line):
                 target = match.group(1).strip("<>")
                 parsed = urlsplit(target)
                 if parsed.scheme == "file":
                     issues.append(f"{name}:{line_number}: machine-specific file:// link")
                     continue
-                if parsed.scheme or target.startswith(("#", "//")):
+                if parsed.scheme or target.startswith("//"):
                     continue
-                if not parsed.path:
-                    continue
-                resolved = (path.parent / unquote(parsed.path)).resolve()
+                resolved = (path.parent / unquote(parsed.path)).resolve() if parsed.path else path.resolve()
                 try:
                     relative = resolved.relative_to(root).as_posix()
                 except ValueError:
@@ -69,6 +102,11 @@ def check_links(root, files):
                 checked += 1
                 if not resolved.exists():
                     issues.append(f"{name}:{line_number}: missing local link: {target}")
+                elif parsed.fragment and resolved.suffix == ".md":
+                    if resolved not in anchors:
+                        anchors[resolved] = markdown_anchors(resolved.read_text())
+                    if unquote(parsed.fragment) not in anchors[resolved]:
+                        issues.append(f"{name}:{line_number}: missing local anchor: {target}")
     return issues, checked, optional
 
 
