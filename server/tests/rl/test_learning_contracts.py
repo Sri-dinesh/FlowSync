@@ -36,3 +36,27 @@ def test_same_shape_different_schema_and_bad_target_reject_atomically():
     state.update(step_count=4,total_train_steps=11)
     agent.load_checkpoint_state(state)
     assert (agent.step_count,agent.total_train_steps) == (4,11)
+
+
+def test_loaded_optimizer_continues_the_same_update_and_bad_moments_leave_state_intact():
+    source = DQNAgent()
+    def update(agent):
+        agent.optimizer.zero_grad()
+        agent.online_net(torch.zeros((1,agent.state_dim))).sum().backward()
+        agent.optimizer.step()
+    update(source)
+    checkpoint = deepcopy(source.get_checkpoint_state())
+    restored = DQNAgent()
+    restored.load_checkpoint_state(checkpoint)
+    update(source)
+    update(restored)
+    for key,value in source.online_net.state_dict().items():
+        torch.testing.assert_close(restored.online_net.state_dict()[key],value,rtol=0,atol=0)
+    before = deepcopy(restored.get_checkpoint_state())
+    invalid = deepcopy(checkpoint)
+    next(iter(invalid["optimizer"]["state"].values()))["exp_avg"] = torch.zeros(1)
+    with pytest.raises(ValueError,match="optimizer tensor shape"):
+        restored.load_checkpoint_state(invalid)
+    for key,value in before["online_net"].items():
+        torch.testing.assert_close(restored.online_net.state_dict()[key],value,rtol=0,atol=0)
+    assert restored.optimizer.state_dict()["state"].keys() == before["optimizer"]["state"].keys()
