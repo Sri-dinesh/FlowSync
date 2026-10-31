@@ -1,4 +1,4 @@
-"""NEMA actuated / Variable-Access-Timer (VAT) signal controller baseline."""
+"""Simple gap-out actuated baseline, not a complete NEMA implementation."""
 from __future__ import annotations
 
 from typing import Dict, List, Optional
@@ -21,7 +21,7 @@ PHASE_MOVEMENTS: Dict[int, List[str]] = {
 
 class ActuatedController(BaseController):
     """
-    NEMA Actuated / Variable-Access-Timer (VAT) controller baseline.
+    Actuated controller with minimum/maximum green and gap-out rules.
 
     Args:
         gap_threshold: Seconds without arrival before gap-out (default 3.5s).
@@ -59,7 +59,7 @@ class ActuatedController(BaseController):
             supports_training=False,
             uses_camera_observable_state_only=True,
             is_learning_based=False,
-            description="NEMA Actuated / Variable-Access-Timer controller with gap-out logic",
+            description="Actuated controller with gap-out logic",
         )
 
     def update_arrivals(self, arrivals_this_tick: int, dt: float = 0.1) -> None:

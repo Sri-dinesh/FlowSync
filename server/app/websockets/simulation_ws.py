@@ -2306,8 +2306,8 @@ async def simulation_socket(websocket: WebSocket) -> None:
 
             elif command == "manual_override":
                 phase = message.get("phase")
-                if isinstance(phase, int) and 0 <= phase <= 3:
-                    app.state.sim_intersection.signal.set_phase(phase)
+                if type(phase) is int and 0 <= phase <= 3:
+                    app.state.sim_intersection.signal.request_phase(phase)
 
             elif command == "set_spawn_rate":
                 value = message.get("value")

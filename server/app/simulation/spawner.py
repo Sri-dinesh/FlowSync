@@ -131,7 +131,7 @@ class PoissonSpawner:
         else:
             self.profile = None
 
-        if self.profile and self.profile.base_lambda:
+        if self.profile is not None and self.profile.base_lambda is not None:
             self.set_rate(self.profile.base_lambda)
 
     def set_enabled(self, enabled: bool) -> None:

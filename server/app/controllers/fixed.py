@@ -1,4 +1,4 @@
-"""Pre-timed fixed-cycle traffic signal controller baseline (Webster 1958)."""
+"""Preset fixed-cycle baseline; no Webster cycle optimization is calculated."""
 from __future__ import annotations
 
 from typing import List, Optional
@@ -9,11 +9,11 @@ from .base import BaseController, ControllerCapabilities, ControllerContext
 
 class FixedController(BaseController):
     """
-    Fixed-Time cycle controller based on Webster's pre-timed formulation.
+    Fixed-time controller with configured green durations.
 
     Args:
         phase_durations: List of durations (seconds) for phases 0, 1, 2, 3.
-                         Default is 8.0s per phase (32s full cycle).
+                         Default is 8.0s per phase (32s green, excluding clearance).
     """
 
     def __init__(self, phase_durations: Optional[List[float]] = None) -> None:
@@ -36,7 +36,7 @@ class FixedController(BaseController):
             supports_training=False,
             uses_camera_observable_state_only=True,
             is_learning_based=False,
-            description="Classical pre-timed fixed-cycle controller (Webster 1958)",
+            description="Preset fixed-cycle controller with explicit green durations",
         )
 
     def act(self, observation: np.ndarray, context: ControllerContext) -> int:

@@ -5,8 +5,8 @@ Task 1.4 (BUG-04): Provides the canonical DEST_MAP (movement → outgoing direct
 and shared pressure calculation functions used by BOTH simulation (environment.py)
 and real-world vision pipeline (state_builder.py).
 
-Centralizing these ensures the Sim-to-Real observation is numerically identical.
-Any future changes to the pressure formula must only happen here.
+Shared formulas do not establish identical sensing, normalization or dynamics
+between simulated and camera observations.
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def compute_movement_pressures(
         max_cap: Lane capacity for normalization.
 
     Returns:
-        Dict mapping movement → pressure ∈ [0, 1].
+        Dict mapping movement to nonnegative pressure, with no upper clipping.
     """
     pressures: Dict[str, float] = {}
     for movement, dest in DEST_MAP.items():

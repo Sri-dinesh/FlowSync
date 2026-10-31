@@ -40,6 +40,9 @@ PHASE_DEMAND_MOVEMENTS: Dict[int, List[str]] = {
 
 class TrafficSignal:
     def __init__(self, red_duration: float = 3.0) -> None:
+        import math
+        if isinstance(red_duration, bool) or not math.isfinite(red_duration) or red_duration < 0:
+            raise ValueError("All-red duration must be finite and nonnegative")
         self.current_phase: int = SignalPhase.NS_GREEN.value
         self.color: SignalColor = SignalColor.GREEN
         self.time_in_phase: float = 0.0
@@ -48,6 +51,8 @@ class TrafficSignal:
         self.yellow_duration: float = 2.0
         self.red_duration: float = red_duration
         self.pending_phase: Optional[int] = None
+        self._operator_request: Optional[int] = None
+        self._priority_request: Optional[int] = None
 
         self.starvation_timer: Dict[str, float] = {
             "north": 0.0,
@@ -57,7 +62,6 @@ class TrafficSignal:
         }
         self.STARVATION_THRESHOLD: float = 45.0  # seconds before starvation penalty
         self.MAX_GREEN_TIME: float = 40.0         # hard cap per phase
-        self.MIN_GREEN_TIME: float = 8.0          # minimum before switching allowed
         self.phase_starvation_timer: Dict[int, float] = {
             phase: 0.0 for phase in range(4)
         }
@@ -88,7 +92,37 @@ class TrafficSignal:
         """Agent is only allowed to switch phase if minimum green time has passed."""
         return self.time_in_phase >= self.MIN_GREEN_TIME or self.color != SignalColor.GREEN
 
-    def set_phase(self, phase: int) -> None:
+    @property
+    def MIN_GREEN_TIME(self) -> float:
+        """Legacy attribute shares the actual minimum-green value."""
+        return self.min_green_duration
+
+    @MIN_GREEN_TIME.setter
+    def MIN_GREEN_TIME(self, value: float) -> None:
+        self.min_green_duration = value
+
+    @staticmethod
+    def _validate_phase(phase: int) -> int:
+        from numbers import Integral
+        if isinstance(phase, bool) or not isinstance(phase, Integral) or not 0 <= phase <= 3:
+            raise ValueError("Signal phase must be an integer in [0,3]")
+        return int(phase)
+
+    def request_phase(self, phase: int, *, priority: bool = False) -> None:
+        """Queue a request; tick alone changes the executed lamps.
+
+        Priority requests precede operator requests. Neither replaces the
+        pending target or shortens an active clearance interval.
+        """
+        phase = self._validate_phase(phase)
+        if type(priority) is not bool:
+            raise ValueError("Signal request priority must be boolean")
+        if priority:
+            self._priority_request = phase
+        else:
+            self._operator_request = phase
+
+    def _begin_transition(self, phase: int) -> None:
         if phase == self.current_phase and self.color == SignalColor.GREEN:
             return
         self.pending_phase = phase
@@ -102,6 +136,8 @@ class TrafficSignal:
         requested_phase: Optional[int] = None,
         is_manual: bool = False,
     ) -> None:
+        if requested_phase is not None:
+            requested_phase = self._validate_phase(requested_phase)
         # lanes: mapping lane name -> list of vehicles (for dynamic phase decisions)
         self.time_in_phase += dt
 
@@ -152,17 +188,28 @@ class TrafficSignal:
                 self.time_in_phase = 0.0
             return
 
-        # In AI mode, phase requests still respect minimum green + yellow clearance.
+        queued = self._priority_request if self._priority_request is not None else self._operator_request
+        if queued is not None:
+            if queued == self.current_phase or self.time_in_phase >= self.min_green_duration:
+                if queued != self.current_phase:
+                    self._begin_transition(queued)
+                if self._priority_request is not None:
+                    self._priority_request = None
+                else:
+                    self._operator_request = None
+            return
+
+        # Policy requests remain per-tick proposals, without persistent queuing.
         if requested_phase is not None:
             if (
                 requested_phase != self.current_phase
                 and self.time_in_phase >= self.min_green_duration
             ):
-                self.set_phase(requested_phase)
+                self._begin_transition(requested_phase)
             return
 
         # Manual mode holds the current green phase indefinitely 
-        # (until manual_override explicitly sets a new phase)
+        # (until an operator request becomes physically admissible)
         if is_manual:
             return
 
@@ -173,7 +220,7 @@ class TrafficSignal:
         # prioritize lanes with more vehicles. It is purely pre-timed.
         if self.time_in_phase >= self.fixed_duration:
             next_phase = (self.current_phase + 1) % len(SignalPhase)
-            self.set_phase(next_phase)
+            self._begin_transition(next_phase)
 
     def is_green_for(self, lane: str, turn: Optional[str] = None) -> bool:
         """Note: right turns are handled at the intersection level, not signal level."""

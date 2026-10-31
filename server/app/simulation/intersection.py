@@ -102,12 +102,7 @@ class Intersection:
             )
             if has_active_emergency:
                 priority_phase = 0 if self.emergency_override_lane in ("north", "south") else 1
-                from .traffic_signal import SignalColor
-                self.signal.current_phase = priority_phase
-                self.signal.color = SignalColor.GREEN
-                self.signal.time_in_phase = 0.0
-                self.signal._pending_phase = None
-                action = None
+                self.signal.request_phase(priority_phase, priority=True)
             else:
                 self.emergency_override_lane = None
 

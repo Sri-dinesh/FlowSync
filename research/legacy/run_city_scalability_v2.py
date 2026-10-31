@@ -101,7 +101,7 @@ def run_city_network_single_run(
                 total_decisions += 1
 
                 if signal.can_switch_phase and action != signal.current_phase and mask[action]:
-                    signal.set_phase(action)
+                    signal.request_phase(action)
 
         # 3. Step network simulation physics
         network.tick(dt, mode="manual")

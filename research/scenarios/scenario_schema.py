@@ -37,8 +37,8 @@ class DemandProfile:
 @dataclass
 class ScenarioConfig:
     """
-    Frozen scenario specification with immutable content hash.
-    Guarantees reproducible traffic demand conditions.
+    Validated scenario with a 16-hex-character SHA-256 content fingerprint.
+    Matching fingerprints alone do not prove matching execution.
     """
     scenario_id: str
     split: str  # "train", "validation", "test"
@@ -74,11 +74,13 @@ class ScenarioConfig:
         for event in dp.incident_events:
             if event["direction"] not in directions or not 0 <= event["capacity_factor"] <= 1:
                 raise ValueError("Invalid incident configuration")
-        if not self.scenario_hash:
-            self.scenario_hash = self.compute_hash()
+        actual_hash = self.compute_hash()
+        if self.scenario_hash and self.scenario_hash != actual_hash:
+            raise ValueError("Scenario content differs from supplied scenario_hash; clear it when changing a scenario")
+        self.scenario_hash = actual_hash
 
     def compute_hash(self) -> str:
-        """Deterministic SHA-256 fingerprint over scenario parameters."""
+        """First 16 hexadecimal SHA-256 characters of canonical scenario JSON."""
         data = {
             "scenario_id": self.scenario_id,
             "split": self.split,
@@ -91,6 +93,8 @@ class ScenarioConfig:
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()[:16]
 
     def to_dict(self) -> Dict[str, Any]:
+        if self.scenario_hash != self.compute_hash():
+            raise ValueError("Scenario was mutated without updating its content fingerprint")
         return asdict(self)
 
     def to_yaml(self) -> str:
