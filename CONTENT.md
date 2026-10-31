@@ -19,7 +19,7 @@ Use this document as an evidence-bounded drafting reference. It describes implem
 | Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. |
 | Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit) and [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence). The current catalogue contains 131 selected parameters and 28 methods; it is not every literal in the repository. Report executed overrides and units, not just source defaults. |
 | Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
-| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–43. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 has a verified smoke and a timed-out full attempt with 51 complete runs; full-panel conclusions await recovery. Include failed screens and unfavorable replicates. |
+| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–44. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 includes a complete 72-episode sensing panel after a disclosed execution-budget extension. Include failed screens and unfavorable replicates. |
 | Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established) and [arrival-control precedents](#412-novelty-assessment-and-closest-precedents). Separate implemented techniques from related work. |
 | Limitations and external validity | [Open requirements](#293-outstanding-scientific-and-application-requirements), [empirical limits](#365-limitations-and-current-research-decision) and [application acceptance boundaries](#477-remaining-acceptance-boundaries). No field, camera-accuracy or physical-actuation validation follows from simulation. |
 | Software verification and artifact access | [Quality gates](#28-verification-and-quality-gates), [maintenance index](#30-evidence-and-maintenance-index) and sections 46–47. Local ignored results/checkpoints are not automatically publicly available. Software regression tests are distinct from scientific traffic samples. |
@@ -535,7 +535,7 @@ Independent SUMO uses an isolated pinned environment, generated network and TraC
 
 ## 14. Technique attribution and primary references
 
-The initial primary-source review was recorded on 2026-10-25; selected records and the added learning-method references were checked on 2026-10-31. This is implementation attribution and targeted related-work checking, not an exhaustive systematic novelty review or a claim that every full text was rechecked. A conceptual method citation does not prove code was copied from that source; no complete line-by-line external code-origin audit has been established.
+The initial primary-source review was recorded on 2026-10-25; selected records and the added learning/resampling references were checked on 2026-10-31. This is implementation attribution and targeted related-work checking, not an exhaustive systematic novelty review or a claim that every full text was rechecked. A conceptual method citation does not prove code was copied from that source; no complete line-by-line external code-origin audit has been established.
 
 | Technique / implementation | Source to acknowledge | What FlowSync actually uses or adapts |
 | --- | --- | --- |
@@ -558,6 +558,7 @@ The initial primary-source review was recorded on 2026-10-25; selected records a
 | Multi-object tracking comparison | Zhang et al., [ByteTrack, ECCV 2022](https://arxiv.org/abs/2110.06864). | Related method only. Current tracker uses centroid distance and cannot be described as ByteTrack. |
 | Movement-specific camera counting | [AI City Challenge 2020 Track 1](https://www.aicitychallenge.org/2020-challenge-tracks/) and [Chang et al., CVPR Workshops 2020](https://openaccess.thecvf.com/content_CVPRW_2020/html/w35/Chang_AI_City_Challenge_2020_-_Computer_Vision_for_Smart_Transportation_CVPRW_2020_paper.html). | Established task and related movement-zone/tracklet approach. FlowSync implements a simpler retrospective crossing/exit rule; no reproduced challenge method or inherited accuracy. |
 | External microscopic simulation | Lopez et al., [Microscopic Traffic Simulation using SUMO, ITSC 2018, official citation](https://sumo.dlr.de/docs/Publications.html). | SUMO/TraCI/sumolib 1.24.0 in independent studies. Krauss driving belongs to SUMO, not FlowSync's custom simulator. |
+| Bootstrap resampling for empirical uncertainty | Efron, [Bootstrap Methods: Another Look at the Jackknife, The Annals of Statistics 7(1), 1–26, 1979; archived original paper](https://blogs.helsinki.fi/bk-club/files/2012/05/Efron_Bootstrap_AS1979.pdf), DOI `10.1214/aos/1176344552`. | Established resampling framework. FlowSync's paired/crossed or stratified seed resampling and fixed-family assumptions are declared locally. Enumerating all 64 sensing-panel draws does not establish calibrated population coverage or a new statistical method. |
 
 The software stack also needs acknowledgement where relevant: [Next.js](https://nextjs.org/docs), [React](https://react.dev/), [FastAPI](https://fastapi.tiangolo.com/), [PyTorch](https://pytorch.org/docs/stable/index.html), [React Three Fiber](https://r3f.docs.pmnd.rs/), [Zustand](https://zustand.docs.pmnd.rs/), [Prisma](https://www.prisma.io/docs) and [Supabase](https://supabase.com/docs) are existing frameworks/services. REST, WebSockets, finite-state machines, smoothing, hysteresis, seeded paired comparison and file hashes are established engineering techniques. Their use is legitimate with accurate attribution and applicable licenses, but is not a new algorithm claim.
 
@@ -615,7 +616,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
-| Independent SUMO sensing faults | The 24-run mechanics smoke plus historical-loop anchor verifies 20,000 samples (section 44). The 72-episode full attempt times out after 900.018 s with 51 complete runs and one partial trace. The complete prefix reconstructs; 21 cells remain for a separately recorded recovery. No complete-panel outcome is available. |
+| Independent SUMO sensing faults | All 72 episodes / 129,600 panel samples complete after verified reuse of 51 episodes and collection of 21 missing episodes. The original 900-second timeout remains recorded. Combined delay/misses reduce Max-Pressure's aggregate mean stopped waiting by 9.16% on these six seeds, with one unfavorable seed; Fixed stays invariant. This is a bounded classical-controller/sensor interaction, not a learned-policy gain (section 44.9). |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -1051,6 +1052,8 @@ The historical 1,000-episode checkpoint is `server/models/76734963-e987-4024-aaa
 | SUMO future source states | 109001/109002, 109101/109102, 109201/109202 | Six consumed source states in three demand families; futures are paired within source and split by selection/check role. |
 | SUMO classical/count cases | 110001–110005, 110101–110105, 110201–110205 | Fifteen consumed schedules; count ablation reuses the classical schedules and references. |
 | SUMO robustness traffic | 112001/112002, 112101/112102, 112201/112202 | Six further consumed schedules, each with both starts and overlapping 180/360 s endpoints. |
+| SUMO sensing traffic | 1350001/1350002, 1350101/1350102, 1350201/1350202 | Six consumed known-family schedules paired across all three controllers/four faults. Recovery reuses the same cases; they cannot become fresh confirmation after inspecting these results. |
+| SUMO sensing mechanics | 1350901; recovery parity also reuses 1350001 and 1350201 | The smoke seed is separate. Replays of scientific cases are mechanics checks, not additional independent traffic seeds. |
 | SUMO mechanics-only seeds | 108001 and feasibility futures; 109901, 110901, 112901 | Separate mechanics/repeat/prefix checks, not scientific-panel traffic replicates. |
 
 The early 1101-series seed manifest remains application/historical metadata; it does not describe every later research panel. Earlier inspected final panels are also consumed. Fresh confirmation requires freezing development choices first and then using an independent declared test, rather than relabelling a seen template/seed.
@@ -1188,7 +1191,7 @@ The root [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUC
 
 The latest implementation verification before this documentation cleanup is the October 31 configuration/storage pass: **198 targeted backend tests**, **nine frontend behavior tests**, TypeScript checking, lint and the production build passed. Section 47.6 records the exact command, local fixture and verification limits. This was a targeted pass, not a current full-repository suite or live Supabase/browser acceptance test. The cleanup changes the reference and repository link checker; it does not rerun controller training or the application build.
 
-The subsequent SUMO readiness pass recorded **39 targeted sensing/preflight tests** and a saved-smoke/runtime preflight without starting traffic collection (section 44.7). The user then ran the full attempt, which timed out; section 44.8 records the partial evidence and recovery work. The test counts below belong to their respective snapshots/subsets and are not additive unique coverage.
+The SUMO readiness pass recorded **39 targeted sensing/preflight tests** and a saved-smoke/runtime preflight without starting traffic collection (section 44.7). Recovery later passed **57 targeted tests** plus native parity checks (section 44.8); the user completed the remaining episodes and full verification (section 44.9). Evidence-export arithmetic and guard checks pass **16 additional tests**. These counts belong to their respective snapshots/subsets and are not additive unique coverage.
 
 Historical verification counts describe their original snapshots. The October 25 architecture/frontend pass recorded **669 backend/research tests** in Python 3.11 and five frontend behavior tests plus lint/type/build on Node 26.8.1. The subsequent display correction reran twelve relevant backend tests and five frontend tests; the 669-test suite/build preceded that correction. Earlier organization work recorded 504 backend tests in Python 3.11.15, and later SUMO/evidence additions recorded 155 targeted tests. These overlapping counts must not be added or presented as current full-suite coverage. Node 24 remains the declared CI baseline; remote CI completion was not checked.
 
@@ -1276,7 +1279,7 @@ The accepted paper direction is a simulation-only empirical evaluation: evaluati
 | Attribution | Evidence linking a specific new mechanism to useful decisions rather than imitation, warm start, baseline mismatch or selected favorable cases. |
 | Useful uncertainty | Validated selective fallback/correction benefit; detecting count error or always abstaining does not establish it. |
 | Strong baselines | Equally informed/supervised classical methods and faithful relevant research baselines, rather than renaming the historical Max-Pressure. |
-| Independent simulator/demand validity | Bounded SUMO 1.24.0 branch and classical/component studies are complete. FlowSync policy transfer, multi-topology/network replication, distinct demand processes and validation against measured counts/timings remain open. The same three demand families and clean deterministic-driving setup limit generalization. |
+| Independent simulator/demand validity | Bounded SUMO 1.24.0 branch, classical/component and sensing-fault studies are complete. FlowSync policy transfer, multi-topology/network replication, distinct demand processes and validation against measured counts/timings remain open. Three known families, one straight-only topology, deterministic driving and unvalidated synthetic faults limit generalization. |
 | Confirmatory testing | Freeze choices and analysis after genuine development progress, then evaluate an independent uninspected panel. Consumed final/probe data cannot be reused as fresh. |
 | Statistical scope | Account for policy-training and traffic randomness, correlation among branches/futures, multiple choices and finite safety coverage. |
 | Website integration | Verify observation/reward/checkpoint compatibility, training/inference behavior, model identity, persistence/history and headless/UI parity end to end. |
@@ -1291,6 +1294,8 @@ The completed spatial, temporal, averaged-label, immediate upstream-teacher, Oct
 
 A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long command is ready or warranted. The October 31 paper-writing deadline and acceptance of an empirical evaluation make accurate methods, complete results and limitations the available evidence direction. This reference supplies project information for that writing without editing the manuscript.
 
+The sensing comparison is now complete after a disclosed budget extension. Its nonmonotonic sensor/control result and exploratory action/service audit are available in section 44. The six scientific seeds are consumed development evidence; no automatic promotion, new training batch or fresh-confirmation claim follows from them.
+
 <a id="30-evidence-and-maintenance-index"></a>
 ## 30. Evidence and Maintenance Index
 
@@ -1298,7 +1303,7 @@ A future learned-controller experiment needs a new evidence-based mechanism, mat
 
 | Question | Read / inspect |
 | --- | --- |
-| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [PPO outcome](#405-completed-episode-90-result-failed), [arrival-window outcome](#417-completed-full-run-headroom-result-failed), [receding-decision outcome](#43-receding-arrival-decisions-frozen-cadence-experiment), [pending sensing study](#44-independent-sumo-sensing-fault-study). [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
+| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [PPO outcome](#405-completed-episode-90-result-failed), [arrival-window outcome](#417-completed-full-run-headroom-result-failed), [receding-decision outcome](#43-receding-arrival-decisions-frozen-cadence-experiment), [completed sensing panel](#449-completed-recovered-sensing-panel). [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
 | Why the old evaluation is invalid | [EVALUATION_AUDIT.md](research/EVALUATION_AUDIT.md) |
 | Current research commands/packages | [Research package guide](#18-current-repository-and-research-organization), [command dispatcher](research/__main__.py) |
 | Protocol/result/archive organization | [Ownership and organization](#18-current-repository-and-research-organization), frozen [protocols](research/docs/protocols/), [results notes](research/docs/results/), [audits](research/docs/audits/) and [related-work/evidence fixtures](research/docs/papers/) |
@@ -1651,6 +1656,7 @@ The following map supports a simulation-only empirical evaluation. It is a proje
 | Is halted-only control a sufficient strong reference? | Forty-five whole-run SUMO classical episodes and saved-state diagnosis; section 33. | Pressure lowers aggregate mean waiting versus halted/untuned Fixed here, with tail/throughput exceptions. This is classical evidence only. |
 | What changes when outgoing subtraction is removed? | Fifteen-run executed ablation and all thirty stored total/pressure trajectories; section 34. | Mean/p95 waiting worsen while completions rise; every asymmetric case's lower-rate axis bears extra waiting. No learned mechanism is isolated. |
 | Does that trade-off persist under tested starts/horizons? | Six-seed robustness, both starts and fixed endpoints; section 35. | Aggregate direction and asymmetric-axis pattern persist, with balanced/seed exceptions. Scope is small, deterministic, clean-sensing and one topology. |
+| Does higher sensor fidelity necessarily improve control? | The 72-episode, six-seed sensing panel; sections 44.9–44.10. | Combined delay/misses lower aggregate mean waiting for both adaptive classical controllers, with unfavorable seeds. Fixed is invariant. The result is bounded to these synthetic conditions and does not establish a new controller, beneficial real-camera degradation or a FlowSync learned-policy gain. |
 
 The novelty records in section 29 identify related primary work and unresolved comparisons. Max-Pressure is an established baseline; engineering audits, a pressure gain over weak control or a negative ablation do not by themselves establish a new research method. Venue suitability remains a separate assessment.
 
@@ -1664,6 +1670,7 @@ The novelty records in section 29 identify related primary work and unresolved c
 | SUMO classical panel | Fifteen traffic schedules, three policies, initial NS, 180 s. | Mean stopped wait/requested vehicle; equal-case averages; no training randomness. |
 | SUMO count ablation | Fifteen new total-count runs on the same fifteen classical schedules. | Consumed paired development cases; reference reuse is not new replication. |
 | SUMO robustness | Six further schedules; two starts/two policies; 180 s prefix and 360 s primary. | Starts averaged within seed; six traffic replicates, overlapping endpoints. |
+| SUMO sensing | Six new known-family traffic seeds; three controllers × four faults; 72 episodes at initial NS and 180 s. | Paired stopped waiting/requested vehicle, average within-run p95 and network exits; 20 frozen contrasts, 64 stratified bootstrap draws. Completion follows a disclosed execution-budget extension. No training randomness or new traffic family. |
 
 Do not pool custom/SUMO delay means, attach the custom confidence interval to SUMO percentages, count reused references twice or treat frames/futures/vehicles as independent traffic samples. Per-axis averages and overall requested-vehicle means have different denominators. New seeds in an existing demand family establish new realizations, not measured-traffic validity or a new family.
 
@@ -1682,7 +1689,7 @@ Do not pool custom/SUMO delay means, attach the custom confidence interval to SU
 | `results/sumo_wait_accounting/analysis_20261027/` | Retrospective axis-weighting and disjoint-window accounting from the same robustness traces. Two 24-row CSVs, a PNG/PDF/SVG figure, exact input/output hashes and analysis source archive. No new traffic samples. See section 36.6. |
 | `results/camera_boundary/final_20261027/` | Synthetic geometry contract audit and 4,104 frozen-policy evaluations of 1,368 hypothetical states. Preserved counter predecessor, full inputs/Q values/masks/proposals, ambiguity witnesses, specification and hashes. Recomputed by the audit's `--verify` mode. See section 36.7. |
 | Later count-restoration, PPO, arrival-window and cadence evidence | Sections 39–43 give each artifact identity, protocol, frozen endpoint and failed control screen. Positive reconstruction accuracy is a different outcome from control benefit. These panels are not included automatically in the earlier manuscript's nine-panel numerical ledger. |
-| SUMO sensing mechanics / interrupted full study | Section 44 records the completed smoke, the timed-out attempt, verified prefix and separate recovery lineage. No completed 72-episode scientific result is available yet. |
+| SUMO sensing mechanics / recovered full study | Section 44 records the smoke, original timeout, recovery lineage and completed 72-episode panel. `results/paper_evidence/sumo_sensing_20261031/` contains tables, figures, independent numeric reconstruction and provenance. Its raw inputs remain local artifacts. |
 | `results/methodology/` and `results/methodology_audit/20261031/` | Source-default catalogues, archived implementation evidence and local training/storage mechanics. Sections 45–47 distinguish source defaults from executed overrides and software verification from traffic experiments. |
 
 Most result directories are ignored local artifacts and are absent from a fresh clone. The [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) describes this boundary. Source code and Markdown summaries alone do not provide downloadable raw evidence. Artifact packaging/accessibility and final paper tables must be handled explicitly before a reproducibility claim about public availability.
@@ -1718,7 +1725,7 @@ All four full verifiers passed again during this October 25 reference update. Ea
 
 The combined record supports an empirical account of evaluation defects, negative learning results, future-dependent hindsight labels and observed classical waiting/throughput trade-offs. It preserves local favorable outcomes and case-level exceptions. It does not supply the originally desired superior learned controller, validated useful uncertainty supervisor, accepted novelty claim or justified publication-readiness percentage.
 
-The completed October 23 scientific SUMO collections use one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. Section 44 adds verified mechanics for synthetic count misses/delay; its full attempt is interrupted and lacks complete paired scientific coverage. Neither path validates turns, pedestrians, network spillback, actual camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
+The completed October 23 scientific SUMO collections use one generated straight-only topology, short finite horizons, empty starts, deterministic driving, synthetic Bernoulli demand and clean sensing. Section 44 adds a complete six-seed sensing-fault panel after audited recovery and a disclosed execution-budget deviation. Neither path validates turns, pedestrians, network spillback, actual camera errors, empirical demand calibration or FlowSync checkpoint transfer. The custom simulator's separate motion, backlog, incident-headway and permissive-turn limitations remain. Neither simulator has been validated here against supplied real intersection measurements.
 
 Executed conflict/clearance samples establish finite simulated lamp behavior under the declared audit. They do not prove collision freedom across all conditions, formal real-world safety, acceptable individual waiting or deployable cabinet control. Hardware latency, camera accuracy and end-to-end website equivalence remain separate open requirements.
 
@@ -2534,14 +2541,9 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   --audit-prefix results/sumo_sensing/full_20261031
 ```
 
-The [recovery adapter](research/pilots/recover_sumo_sensing.py) reuses the validated completed episodes in a new output, repeats one complete episode as a parity anchor and collects the 21 missing episodes from fresh empty starts. The interrupted episode is rerun from tick zero and must reproduce its original recorded prefix. The additional cooperative collection cap is **600 seconds**, after validation/source preparation. This is an explicit execution-budget amendment, not a claim that the original 900-second attempt completed. Schedules, sensing, policies, horizons and all 20 contrast definitions remain frozen:
+The [recovery adapter](research/pilots/recover_sumo_sensing.py) reused the validated completed episodes in a new output, repeated one complete episode as a parity anchor and collected the 21 missing episodes from fresh empty starts. The interrupted episode restarted at tick zero and reproduced its recorded prefix. Recovery completed within an additional **600-second cooperative collection cap**, after validation/source preparation. This is an explicit execution-budget amendment, not a claim that the original 900-second attempt completed. Schedules, sensing, policies, horizons and all 20 contrast definitions remain frozen. The collection is complete; use read-only verification rather than launching either recipe again:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.pilots.recover_sumo_sensing \
-  --prefix results/sumo_sensing/full_20261031 \
-  --output results/sumo_sensing_recovery/full_20261031
-
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.pilots.recover_sumo_sensing --verify results/sumo_sensing_recovery/full_20261031
 ```
@@ -2580,11 +2582,72 @@ The recovery's additional execution budget is a **protocol deviation that must b
 
 Validation includes **57 targeted sensing/preflight/recovery tests**, covering full synthetic orchestration, source/inventory/metric tampering, parity, byte-preserving reuse, budget disclosures, existing output refusal and an interrupted recovery remaining incomplete. Synthetic test rows are not native traffic. A separate bounded native-loop rehearsal in `results/sumo_sensing_recovery/rehearsal_20261031/` completes two 1,800-tick episodes in **33.020 seconds**, within its 90-second cap. The first matches the earliest completed trace exactly; the second reproduces all **209 saved ticks** of the interrupted cell before completing its full horizon. Its **3,600 samples** are mechanics coverage, not independent seed replicates or a completed 72-episode result. The original directory is hash-identical afterward. The script/source snapshots and raw traces preserve this check; the controller/simulator sources are unchanged. These are correctness checks, not a measured speedup or a runtime guarantee for all missing cells.
 
+### 44.9 Completed recovered sensing panel
+
+Artifact: `results/sumo_sensing_recovery/full_20261031/`. The user completed the **21 missing episodes plus one parity replay**; the recovery verifier passes. All **72 planned episodes across six traffic seeds** are present, with **51 original episodes / 91,800 samples** reused byte-for-byte and **21 completed episodes / 37,800 samples** newly recorded. The canonical panel contains **129,600 signal samples**. The additional 1,800-tick parity replay is a mechanics check, not another traffic seed or a second observation in the aggregate. All recorded panel lamps/transitions pass the finite signal audit.
+
+Recovery collection took **385.541 seconds**, below its 600-second allowance. Original plus recovery collection time is **1,285.559 seconds**; preparation and subsequent offline verification are outside those collection timers. The original 900.018-second timeout remains preserved. Flags are `complete:true`, `scientific_panel_complete:true`, `parity_anchor_verified:true`, `partial_prefix_verified:true`, `original_attempt_budget_met:false`, `execution_budget_amended:true`, `policy_promoted:false` and `publication_ready:false`. Source/runtime, all reused bytes and the 209-tick interrupted prefix reconstruct. Saved-data verification reruns no traffic kinematics.
+
+All figures below are equal-case means over the same six seeds. Stopped waiting includes unfinished/entry-backlogged requested vehicles. P95 is the average of six within-run accumulated-wait percentiles, not a pooled percentile or trip travel time. Completed trips count network exits.
+
+| Controller | Sensing | Mean stopped wait / requested vehicle (s) | Average within-run p95 (s) | Mean completed trips |
+| --- | --- | ---: | ---: | ---: |
+| Max-Pressure | Clean | 6.303826 | 17.030000 | 103.666667 |
+| Max-Pressure | 2 s delay | 5.921178 | 16.701667 | 104.333333 |
+| Max-Pressure | 30% misses | 6.283168 | 16.875000 | 104.000000 |
+| Max-Pressure | Delay + misses | 5.726667 | 16.438333 | 105.500000 |
+| Halted-count | Clean | 6.893668 | 19.028333 | 97.333333 |
+| Halted-count | 2 s delay | 6.775874 | 18.611667 | 98.333333 |
+| Halted-count | 30% misses | 6.709525 | 19.085000 | 99.166667 |
+| Halted-count | Delay + misses | 6.418756 | 18.316667 | 100.333333 |
+| Fixed | Clean | 10.646812 | 31.831667 | 98.833333 |
+| Fixed | 2 s delay | 10.646812 | 31.831667 | 98.833333 |
+| Fixed | 30% misses | 10.646812 | 31.831667 | 98.833333 |
+| Fixed | Delay + misses | 10.646812 | 31.831667 | 98.833333 |
+
+The predefined combined-fault contrasts below use **fault minus own clean**. Negative waiting means lower waiting under the fault; positive trips means higher throughput. Brackets are the frozen 64-draw stratified seed-bootstrap 95% percentile intervals, interpreted only as descriptive sensitivity in this small known-family panel.
+
+| Controller | Mean stopped-wait change (s) | P95 change (s) | Completed-trip change |
+| --- | --- | --- | --- |
+| Max-Pressure | −0.577158 [−0.685322, −0.468994] | −0.591667 [−1.033333, −0.150000] | +1.833333 [−1.333333, 5.000000] |
+| Halted-count | −0.474912 [−0.723914, −0.225910] | −0.711667 [−1.446667, 0.023333] | +3.000000 [1.500000, 4.500000] |
+| Fixed | 0 [0, 0] | 0 [0, 0] | 0 [0, 0] |
+
+Combined faults lower aggregate mean waiting by **9.1557% for Max-Pressure** and **6.8891% for halted-count** relative to each controller's clean value. Each still has **one of six seeds with worse mean waiting**. Max-Pressure has worse p95 in two seeds and fewer completed trips in two; its aggregate throughput interval spans zero. Halted-count's aggregate p95 interval spans zero, and two seeds lose trips. Fixed's executed physical trajectories and outcomes are invariant across faults, as the negative control requires.
+
+Max-Pressure has the lowest aggregate mean/p95 waiting and highest aggregate completed trips in all four conditions. This is not a per-seed universal ranking: its mean-wait advantage over halted-count is favorable in five of six clean, delay-only and mixed cases, and four of six misses-only cases. The misses-only mean advantage interval over halted-count spans zero. Its own misses-only mean-wait change is only **−0.020658 s**, interval **[−0.087618, 0.046303]**, with three better and three worse seeds. Combined-fault interaction intervals for mean waiting span zero for both adaptive controllers; these data do not establish a general superadditive benefit.
+
+The observed result is **nonmonotonic sensor fidelity versus closed-loop control quality in this synthetic setup**. It supports evaluating control outcomes directly when fitting a perception/error model. It does not show that real cameras should be degraded, that delay/noise is generally beneficial, that the same behavior transfers to FlowSync D3QN, or that a new learned controller has beaten pressure control. Only two seeds per fixed family, one straight-only topology, finite empty-start horizons, independent per-frame misses and a fixed latency limit interpretation. Earlier clean count-ablation phase/horizon robustness does not validate this separate fault effect under other starts or horizons. No multiplicity-adjusted or population-level superiority claim is made across the 20 contrasts. The execution-budget deviation remains part of the evidence.
+
+### 44.10 Sensing evidence export and exploratory diagnostics
+
+The [evidence exporter](research/evidence/export_sumo_sensing.py) first runs the full recovery/trajectory verifier. It retains all 72 cases and 20 predefined contrasts, producing **seven CSV tables**: cases (72 rows), aggregate cells (12), contrast/metric rows (60), paired seed contrasts (120), independent arithmetic checks (612), exploratory service exposure (72), and exploratory first-proposal splits (54). Two figures show every sensing/controller cell and every frozen contrast, each in PNG/PDF/SVG. Source/provenance copies preserve both the original study and recovery adapter. Output and all local input files receive SHA-256 inventories.
+
+The arithmetic audit independently reconstructs **612 aggregate, paired-difference and interval quantities from verified per-episode metrics**, using 50-digit decimal arithmetic. Its bootstrap uses the 27 combinations of binomial seed counts and their multiplicities to reconstruct all 64 ordered draws, independently of the collector's ordered-tuple implementation. Absolute agreement tolerance is **1e-10**, below the recorded per-run reporting resolution; this is an arithmetic tolerance, not a performance threshold. Binary-roundoff/exact-decimal direction differences are disclosed without rewriting frozen sign counts. None occurs in this panel.
+
+Service exposure and first-action differences are **post-hoc exploratory diagnostics**, separate from the 20 frozen contrasts. They record executed NS/EW green, yellow/all-red exposure, switch onsets, proposal differences and the physical history before the first proposal split. Proposal differences after traffic trajectories diverge are not same-state input sensitivity or independent counterfactual benefits. Fewer switches or clearance seconds can suggest a mechanism; they do not by themselves causally explain the waiting changes.
+
+All **18 pressure fault/clean pairs** and **17 of 18 halted-count pairs** change at least one proposal. Each first changed proposal occurs after an identical physical history and matching pre-decision FSM. The remaining halted-count pair has no changed proposal or physical trajectory. All 18 Fixed pairs retain identical proposals and trajectories. Thus faults are active and adaptive decisions change; these are not copies of an unchanged clean rollout. Under combined faults, pressure's mean switch onsets fall from **12.5 to 11.5**, and executed clearance falls from **49.6667 to 46.0000 seconds**, leaving **3.6667 seconds more green per episode** on average. Halted-count clearance falls from **53.0000 to 51.3333 seconds**. These associations support examining switching costs and phase allocation, without attributing all waiting changes to clearance alone.
+
+Fixed's unchanged traffic supplies a controlled check on realized sensing. Delay-only/mixed runs each have one initially missing decision and **2.0 s** mean age on delivered decision frames. Misses-only removes **29.33–31.45%** of source-visible vehicle observations at those frames across the six runs; mixed removes **29.25–31.45%**. Clean count-feature error is zero, while the faulted count-feature errors are nonzero. These correlated frame/vehicle observations verify active synthetic corruption, not calibrated real-camera accuracy or independent detection trials.
+
+The artifact directory is `results/paper_evidence/sumo_sensing_20261031/`. This is a tables/figures/provenance bundle with references to local raw traces, not a standalone publicly accessible raw-data release. The numerical auditor for the older October 23 manuscript does not automatically cover this new panel. Manuscript writing remains separate from these project changes.
+
+The [outcomes figure](results/paper_evidence/sumo_sensing_20261031/sensing_outcomes.pdf) shows all six per-cell seed values and equal-case means. The [contrast figure](results/paper_evidence/sumo_sensing_20261031/sensing_contrasts.pdf) retains every predefined comparison and interval, including zero/ambiguous effects. Both rendered figures were inspected locally. The sealed export and its independent CSV reconstruction verify successfully; export generation performs no new traffic rollout.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.evidence.export_sumo_sensing \
+  --verify results/paper_evidence/sumo_sensing_20261031
+```
+
+To reproduce the export, use `--source results/sumo_sensing_recovery/full_20261031 --output results/paper_evidence/new_sumo_sensing_export` with the same module. Existing outputs and paths nested inside any frozen input are refused. Full raw replay occurs during export; export verification checks saved/input hashes and reconstructs every CSV without new traffic or another raw signal/sensor replay. Sixteen exporter tests cover the independent arithmetic, all 64 resampling draws, changed quantities, roundoff disclosure, preserved outputs, protected input directories, failed source verification and CSV tampering after hash repair. This is software/export verification, not another scientific traffic sample.
+
 ## 45. Methodology contracts, parameter provenance and implementation audit
 
 ### 45.1 Scope and executable authority
 
-This October 31 methodology pass addressed implementation correctness, attribution and reproducible method description without tuning constants, training a new controller, rerunning performance panels or promoting checkpoints. The separate SUMO sensing attempt in section 44 later times out and awaits audited recovery. Earlier performance screens and negative results retain their original meaning.
+This October 31 methodology pass addressed implementation correctness, attribution and reproducible method description without tuning constants, training a new controller, rerunning performance panels or promoting checkpoints. The separate SUMO sensing panel in section 44 later completed after an audited timeout recovery and disclosed execution-budget extension. Earlier learned-control performance screens and negative results retain their original meaning.
 
 The [methodology catalogue](research/manifests/methodology.json), extended by sections 46 and 47, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
