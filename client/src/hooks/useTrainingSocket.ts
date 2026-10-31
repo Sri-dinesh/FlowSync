@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useSimulationStore } from "@/store/simulationStore";
 import type { TrainingMetric } from "@/types/simulation";
 import { getFastApiUrls } from "@/lib/utils";
+import { checkpointSaveStatus } from "@/lib/training-storage";
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 500;
@@ -66,7 +67,7 @@ export function useTrainingSocket() {
           } else if (payload.type === "warmup_complete") {
             setTrainingStatus(message ?? "Warm-up complete; starting episode 1...");
           } else if (payload.type === "checkpoint_saved") {
-            setTrainingStatus(`Checkpoint saved at episode ${payload.episode ?? "?"}`);
+            setTrainingStatus(checkpointSaveStatus(payload));
           }
           return;
         }

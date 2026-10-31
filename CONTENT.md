@@ -495,6 +495,8 @@ Database migrations/reset utilities affect user data and are not part of routine
 
 Checkpoint storage serializes once and replaces the local file atomically before uploading those same bytes. Its receipt reports the SHA-256, byte count and separate local-save/cloud-upload outcomes. Loading prefers an existing local copy, otherwise downloads from storage; callers can pin an expected hash. Checkpoint discovery merges local and remote slots. Actual read origin and byte identity are returned with loaded state, separately from listing labels.
 
+Training status distinguishes local-only saves, cloud-acknowledged writes and a selected alias that remains local. Receipt schema, model ID, slot and hash must match before the frontend reports cloud success. Legacy messages leave storage status unreported.
+
 ## 12. Recording, replay, telemetry and exports
 
 Interactive run bundles use metadata/metrics JSON and trajectory JSONL. Replay reads recorded frames and supports pacing, pause and seek without recreating physics. A replay confirms access to stored telemetry, not an independent rerun. Its original runtime/model identity may be missing or historical and must remain unverified where absent.
