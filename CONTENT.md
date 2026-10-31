@@ -56,6 +56,7 @@ This reference describes the actual application first. Separate experiment resul
 - [44. Independent SUMO sensing-fault study](#44-independent-sumo-sensing-fault-study)
 - [45. Methodology contracts, parameter provenance and implementation audit](#45-methodology-contracts-parameter-provenance-and-implementation-audit)
 - [46. Training checkpoint and task lifecycle](#46-training-checkpoint-and-task-lifecycle)
+- [47. Effective training configuration and checkpoint persistence](#47-effective-training-configuration-and-checkpoint-persistence)
 
 ## 1. Project scope and ownership
 
@@ -2497,7 +2498,7 @@ The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete e
 
 This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
 
-The [methodology catalogue](research/manifests/methodology.json), extended by section 46, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+The [methodology catalogue](research/manifests/methodology.json), extended by sections 46 and 47, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
 Three authorities must remain distinct:
 
@@ -2907,13 +2908,129 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology --check
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
 ```
 
-The current catalogue contains 131 parameters and 25 methods. Its generated table now marks epsilon decay conditional, with the numerical default unchanged. The earlier `results/methodology/current_20261031/` snapshot is preserved with its original 24-method catalogue. A new snapshot uses a separate directory:
+The section 46 snapshot contains 131 parameters and 25 methods. Its generated table marks epsilon decay conditional, with the numerical default unchanged. The earlier `results/methodology/current_20261031/` snapshot is preserved with its original 24-method catalogue. The section 46 snapshot uses a separate directory:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology \
   --output results/methodology/training_lifecycle_20261031
 ```
 
-These changes strengthen implementation and reproducibility sections of a paper. Reliable learned-control superiority, independent camera/demand/simulator validation and algorithmic novelty remain open. The next acceptance work includes real storage/browser lifecycle verification and a declared effective run-configuration record; the static defaults catalogue alone does not record every override that executed.
+These changes strengthen implementation and reproducibility sections of a paper. Reliable learned-control superiority, independent camera/demand/simulator validation and algorithmic novelty remain open. Section 47 implements the effective run-configuration record and exercises real local checkpoint persistence. Complete live cloud/browser lifecycle verification remains separate.
+
+## 47. Effective training configuration and checkpoint persistence
+
+### 47.1 Effective values and capture points
+
+The [run-configuration recorder](server/app/rl/run_configuration.py) captures website settings after fresh/resume/fine-tuning setup and before warmup. It records both declared HyperParams and values read from the actual agent, optimizer, replay buffer and environment. The legacy integration does not route every injected HyperParams field into every component; these authorities must remain separate.
+
+Tests exercise a declared learning rate `0.123` with effective optimizer rate `0.0007`, and declared gamma `0.5` with the environment's actual `0.99` reference discount. These are test overrides, not recommended training values. The recorder preserves the difference without silently retuning or migrating the legacy algorithm.
+
+Schema `website_training_configuration_v1` records:
+
+- Runtime profile `interactive_legacy`, run mode, requested/start/target episodes, selected parent model/slot/actual episode and available parent file provenance.
+- Declared HyperParams, observation/reward versions, network class and parameter shapes, actual optimizer groups, demonstration-loss weight and initial optimizer/target counters.
+- Actual replay capacity, alpha, beta, priority offset, readiness threshold and initial size. Replay restoration remains explicitly false.
+- Collector batch/update/target-sync cadence, epsilon at setup, exploration floor/multiplier, environment horizon/watchdogs, signal timings and demand profile.
+- Planned warmup, teacher seed, validation ticks/seeds/rate/clearance, checkpoint cadence and applicable curriculum stages. Planned stages are not proof that every stage executed.
+- Python/Torch/NumPy versions, device, selected source hashes, Git revision and dirty-worktree status where Git is available.
+
+Before each online episode, after environment reset and replay-beta annealing, another record captures the actual optimizer groups, epsilon, beta, environment/demand/signal settings and applied curriculum context. It carries the run ID and configuration hash. These records are not per-tick trajectories, sampled replay batches or every optimizer tensor.
+
+The timestep now has one source constant, `SIMULATION_DT=0.1`, used for physical stepping, reward/forecast timing and elapsed-duration discounting. This replaces repeated copies of the same value without changing the nominal timestep or reward coefficients. The catalogue selects that constant and fingerprints both consuming step methods.
+
+### 47.2 Missing information, randomness and source scope
+
+Unknown instrumentation stays `null` and appears in `unavailable_fields`. Nonfinite supplied configuration values fail serialization. `Trainer.get_status()` returns a copy, so callers cannot mutate the preserved configuration through the status response. Episode metrics and checkpoints retain matching configuration identity.
+
+Website training declares no global policy-training seed: `policy_training_seed` is `null` and `global_rng_state_recorded` is false. The teacher seed is separate. Settings and source snapshots improve auditability but do not establish deterministic reruns. RNG/replay/environment restoration, dependency locks and external overrides remain distinct requirements.
+
+The recorder copies an explicit allowlist of 23 application source files. It does not read `.env`, dump process environment variables or copy recordings/model weights into the source archive. A regression checks that a supplied private environment value is absent. This is selected source provenance, not an exhaustive code-origin or dependency-license audit.
+
+### 47.3 Local bundle and checkpoint linkage
+
+Each website training invocation receives a UUID-hex run ID:
+
+```text
+server/models/<model-id>/
+  checkpoint_<episode>.pt
+  checkpoint_0.pt
+  runs/<run-id>/
+    configuration.json
+    source_snapshot.zip
+    manifest.json
+    episodes/episode_<actual-episode>.json
+```
+
+Configuration uses canonical finite JSON and a full SHA-256. Source bytes are checked against their inventory/hashes before writing; existing run directories are refused. The initial manifest follows the configuration/source archive. Episode records are hashed and registered as written. Identical record retries are allowed; different contents under the same run/episode are rejected.
+
+Checkpoints embed `training_run` with the run ID, configuration hash/body and episode settings. The writer checks configuration identity against the run manifest before saving and registers its resulting receipt afterwards. Model bytes, episode context and configuration identity can then be compared directly.
+
+Run bundles remain local; configuration metadata also travels inside an explicitly uploaded checkpoint. The run directory is not automatically published as a cloud dataset. Altered files or orphan episode records fail verification. No recovery process invents missing records or rewrites historical manifests.
+
+### 47.4 Atomic files, read precedence and cloud receipts
+
+[model_service.py](server/app/services/model_service.py) serializes once. [artifact_files.py](server/app/services/artifact_files.py) writes to a temporary file beside the destination, flushes/fsyncs the file and replaces the destination. The same bytes go to the upload call, giving local/upload payloads the receipt's full SHA-256 and byte count. The former file-versus-buffer double serialization could produce different hashes.
+
+Serialization or replacement failure preserves the previous complete file and prevents upload. Upload failure leaves the completed local checkpoint. `checkpoint_receipt_v1` separates `local_saved` from `cloud_uploaded`; the latter means the SDK upload call returned successfully, not an independently verified cloud read-back. Numbered and selected-alias writes have separate receipts.
+
+Storage IDs/slots are validated at the filesystem/network boundary, including empty IDs, separators, control characters and traversal. Resolved local paths must stay under model storage. Atomic replacement does not provide distributed writer ownership, immutable history, universal power-loss durability or adversarial authenticity. Explicit saves retain replacement semantics, including mutable slot zero.
+
+Loading prefers a local file when present, otherwise downloads the remote object. This prevents a stale remote copy from silently replacing a newer local-only checkpoint after upload failure. If local and remote intentionally differ, local precedence still applies. `expected_sha256` pins requested bytes, rejecting mismatch before tensor loading. Deserialization explicitly uses `weights_only=True`, followed by observation/reward/tensor checks.
+
+`storage_provenance` reports observed origin, full hash, byte count, model ID and slot. HTTP `/training/load` returns it. Discovery merges valid local/remote slots; a remote listing cannot hide a local-only milestone. Listing never uploads files. A listing label describes available copies, not proof of which bytes were loaded.
+
+The WebSocket now includes receipts in `checkpoint_saved`. The frontend [receipt formatter](client/src/lib/training-storage.ts) validates schema, model, slot, hash and booleans before reporting cloud success. It distinguishes local save/upload failure, numbered upload success and a selected alias that remains local. Legacy/malformed messages show storage status as unreported. This updates the existing training status text without enabling a control/deployment flow.
+
+### 47.5 Independent saved-data verification
+
+[verify_training_run.py](research/audits/verify_training_run.py) checks canonical configuration identity, source archive/inventory, registered episode hashes and optional checkpoint linkage. It neither imports the application nor executes saved sources. Torch is required only for checkpoint checking. Altered records, unexpected inventory, mismatched hashes and unregistered checkpoints fail verification.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.verify_training_run \
+  server/models/<model-id>/runs/<run-id> \
+  --checkpoint server/models/<model-id>/checkpoint_<episode>.pt
+```
+
+Verification establishes agreement of saved structures/hashes. It does not establish completion of every requested episode, traffic-performance benefit, simulator validity, cloud availability or camera accuracy. The report explicitly records zero independently rerun traffic trajectories.
+
+Run verification after writes have stopped. Checking during an episode/manifest update can observe an incomplete inventory; the verifier does not lock an active training process.
+
+### 47.6 Executed verification and preserved evidence
+
+Eight initial storage cases reproduced unsafe ID handling, destructive interrupted serialization and differing local/upload bytes. Final checks also cover replacement cleanup, upload fallback, remote-only loading, hash pinning, merged inventories, effective/declared settings, setup versus later episode settings, source tampering and refusal to overwrite run evidence.
+
+The combined targeted suite passes **198 backend tests**. A real local integration fixture runs one 90-tick episode with zero optimizer updates, stubbed validation and offline cloud transport. It writes actual Torch/bundle files, reloads through the HTTP API and checks matching hash/episode identity. The standalone verifier checks its 23 sources, one episode record and one checkpoint, with no unavailable captured fields. This is mechanics evidence, not a new policy-performance experiment.
+
+Fixture: `results/methodology_audit/20261031/storage_run_fixture/`. Its `scope.json` records the stubs and zero updates. Captured Git status is dirty because the fixture ran before commit. Historical research checkpoints/results and previous methodology snapshots were not rewritten.
+
+Frontend verification passes nine behavior tests, TypeScript checking, lint and the production build. Four new receipt cases cover identity matching, local fallback, selected-alias failure and legacy/malformed messages. Existing module/deprecation and chart-sizing warnings remain. This pass does not claim a new browser session or live Supabase end-to-end test.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+server/venv/bin/python -m pytest \
+  server/tests/test_checkpoint_storage.py server/tests/test_training_run_configuration.py \
+  server/tests/test_training_checkpoint_lifecycle.py server/tests/test_training_task_lifecycle.py \
+  server/tests/test_methodology_boundaries.py server/tests/test_methodology_catalogue.py \
+  server/tests/simulation/test_signal_requests.py server/tests/simulation/test_traffic_signal.py \
+  server/tests/simulation/test_environment_smdp.py server/tests/simulation/test_spawner_crn.py \
+  server/tests/test_controllers.py server/tests/test_flowsync_uq.py \
+  server/tests/test_research_training.py server/tests/test_spatial_policy.py \
+  server/tests/test_uncertainty_calibration.py server/tests/realworld/test_flow_calibrator.py \
+  server/tests/realworld/test_detector_contract.py server/tests/test_resume_training.py \
+  server/tests/test_finetune_training.py server/tests/rl \
+  --no-cov -p no:cacheprovider -q --disable-warnings
+
+npm --prefix client test
+npm --prefix client run typecheck
+npm --prefix client run lint
+npm --prefix client run build
+```
+
+The current static catalogue contains 131 parameters and 28 methods. A separate clean-source export uses `results/methodology/run_configuration_20261031/`, preserving earlier snapshots. Configuration capture, hashes, atomic files and receipts are established engineering techniques. They support a more defensible methodology/reproducibility description without establishing a superior controller, novelty or publication/field readiness.
+
+### 47.7 Remaining acceptance boundaries
+
+Local configuration/checkpoint persistence and HTTP loading have executable evidence. Complete live Supabase round trips, restart/browser history, authentication/authorization, concurrent-user/process isolation and worker shutdown remain unverified. Camera geometry/movement/signal inputs, measured demand, hardware latency and signal-interface engineering still require independent data and acceptance work. Learned-control superiority and novelty remain open; software-only checks cannot substitute for that evidence.
 
 [Back to Top](#top)
