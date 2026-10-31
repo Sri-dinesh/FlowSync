@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -155,7 +156,14 @@ def main():
     files = repository_files(ROOT)
     links, checked_links, optional_links = check_links(ROOT, files)
     source, checked_python = check_source(ROOT, files)
-    issues = check_frontend(ROOT) + check_hygiene(ROOT) + links + source
+    sys.path.insert(0,str(ROOT))
+    from research.evidence.export_methodology import inspect, check_content
+    try:
+        report = inspect(ROOT)
+        methodology = report["issues"] + check_content(report, ROOT / "CONTENT.md")
+    except (ValueError, KeyError, OSError) as exc:
+        methodology = [f"Methodology catalogue: {exc}"]
+    issues = check_frontend(ROOT) + check_hygiene(ROOT) + links + source + methodology
     for issue in issues:
         print(issue)
     print(f"Checked {checked_python} Python files and {checked_links} local documentation links; "

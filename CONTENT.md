@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-10-30, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-10-31, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -24,6 +24,7 @@ This reference describes the actual application first. Separate experiment resul
 - [12. Recording, replay, telemetry and exports](#12-recording-replay-telemetry-and-exports)
 - [13. Offline experiment and evidence workflow](#13-offline-experiment-and-evidence-workflow)
 - [14. Technique attribution and primary references](#14-technique-attribution-and-primary-references)
+- [45. Methodology contracts, parameter provenance and implementation audit](#45-methodology-contracts-parameter-provenance-and-implementation-audit)
 - [15. Novelty assessment independent of measured performance](#15-novelty-assessment-independent-of-measured-performance)
 - [16. Maintained documentation and verification boundary](#16-maintained-documentation-and-verification-boundary)
 - [17. Current Status and Evidence Authority](#17-current-status-and-evidence-authority)
@@ -133,13 +134,15 @@ The actual custom simulator uses normalized lane positions, simplified spacing/s
 
 Four phases map to `0=NS straight/right`, `1=EW straight/right`, `2=NS left`, `3=EW left` in [traffic_signal.py](server/app/simulation/traffic_signal.py). Right-turn and left-yield rules are simplified. App emergency/scenario hooks do not provide validated emergency or pedestrian safety. The independent SUMO network instead has two straight-only phases and cannot share these four-action labels without an explicit adapter.
 
+Operator and emergency requests now enter the same executed signal FSM through `request_phase`. They wait for minimum green and preserve an already committed yellow/all-red target. Priority requests precede operator requests; ordinary policy proposals remain per-tick requests. Emergency handling no longer resets the physical phase/color/timer directly. This repairs simulated transition authority; field emergency preemption remains unvalidated. Exact timing defaults and their separate runtime meanings are recorded in section 45.
+
 The spawner creates requested traffic under declared profiles and retains entry backlog when insertion is blocked. Backlog visibility differs by experiment and sensor configuration. Historical movement counts can include vehicles already past the stop line; the explicitly upstream getter has different semantics. Source/runtime configuration must identify which is used. Incident capacity is represented by a discharge-headway surrogate, not a calibrated incident traffic model.
 
 ## 6. Policy architecture and inference
 
 The shared dueling network has two 256-unit feature layers, LayerNorm and ReLU, then 128-unit value/advantage heads producing one value and four advantages. The masked combination is described in section 20. It is a project adaptation of established dueling architecture, not a newly invented DQN family.
 
-Inference encodes the checkpoint's observation version, supplies a valid-action mask, evaluates Q values without training gradients and selects an allowed action. D3QN uses a two-second policy hold cadence within 0.1-second simulation ticks. Checkpoint loading records metadata and SHA-256 and sets evaluation mode. The research runner requires a trained checkpoint unless an explicit mechanics-only untrained override is given.
+Inference encodes the checkpoint's observation version, supplies a valid-action mask, evaluates Q values without training gradients and selects an allowed action. D3QN uses a two-second policy hold cadence within 0.1-second simulation ticks. The audited research path records checkpoint metadata/SHA-256 and sets evaluation mode. The website requires a successfully loaded compatible checkpoint before AI operation; it does not inherit the research path's full provenance contract. The research runner requires a trained checkpoint unless an explicit mechanics-only untrained override is given.
 
 Inputs are numeric traffic features rather than raw CCTV pixels. Observation widths 28/36/48/64 are versioned sensor encodings, detailed in section 20. A 14-dimensional camera-state builder is a separate application utility and is not the later research policy's automatic input contract.
 
@@ -174,6 +177,8 @@ Rule checks, test coverage and finite lamp audits do not amount to formal synthe
 The actual orchestrator is [cctv_pipeline.py](server/app/realworld/pipeline/cctv_pipeline.py). It extracts a frame, runs Ultralytics YOLO detection in a worker thread, updates tracks, assigns exclusive image-direction proxies, smooths counts, annotates and broadcasts/logs the result. Configured pipeline rate is separate from measured end-to-end latency. Stream resolution and latest-frame buffering do not guarantee zero capture/network/decoding delay.
 
 The default detector family is YOLOv8n, with local production/pretrained paths and optional upstream weight fallback. This is third-party software/model use, not a FlowSync detector architecture. Record actual weight identity, dataset/model provenance and upstream licensing separately from this repository's source license.
+
+Detector class mapping now comes from the loaded model's declared label names, including explicitly selected or swapped models. Model/device/path/taxonomy publish together only after successful loading; inference uses that captured model/taxonomy pair. `USE_ONNX` prefers an existing configured ONNX artifact when no explicit path is supplied, then the usual production/pretrained fallback applies. Neither format preference nor structural label compatibility establishes accuracy or a CPU speedup. Section 45 records active tracker defaults separately from unused tracking declarations.
 
 [VehicleTracker.update](server/app/realworld/pipeline/vehicle_tracker.py) greedily associates nearest previous centroids within an 80-pixel distance and prunes tracks after more than three seconds in its supplied observation clock. Recorded files use decoder video-position time; live sources use monotonic receipt time, not a measured camera capture clock. Missing/nonadvancing file times invalidate association rather than borrowing processing time. Track IDs are local to each tracker/session. Section 10.6 documents this clock repair and its reproducible diagnostic. The tracker does **not** execute ByteTrack's two-stage association, despite legacy comments. ByteTrack is related work only until its implementation is actually wired. Likewise, detector IDs or time since first sighting do not automatically provide calibrated individual stopped waiting.
 
@@ -479,6 +484,8 @@ FastAPI model/history services use Supabase API/Storage and local `server/models
 
 Training emits episode progress and checkpoints; saving metadata or uploading a file is distinct from successfully loading it into inference. Model ID, checkpoint episode, observation/reward version and file hash identify what ran. Original selected parents and their lineage remain fixed for controlled research. Website episode labels, latest timestamps and a best-model label cannot replace that identity.
 
+HTTP and simulation-WebSocket loading now require an exact requested checkpoint slot. A missing requested slot fails instead of loading a nearby episode. With no explicit slot, selection prefers slot zero, then the highest numbered slot. The loaded file must record its actual trained episode and compatible website v6/v4 schemas. Both simulation/training agents are staged before HTTP publication; malformed or incompatible state leaves the old model intact. Slot zero is displayed as **Selected checkpoint**, not proof of held-out validation; its legacy `is_best` field remains a slot designation. Discovery/listing no longer uploads local checkpoints implicitly. These changes do not certify complete concurrent-user, browser or cloud-storage behavior.
+
 Database migrations/reset utilities affect user data and are not part of routine verification. A fresh checkout lacks the local historical checkpoints/results. It must not silently substitute random weights for missing trained evidence.
 
 ## 12. Recording, replay, telemetry and exports
@@ -517,7 +524,7 @@ Primary sources below were checked on 2026-10-25. This is implementation attribu
 
 The software stack also needs acknowledgement where relevant: [Next.js](https://nextjs.org/docs), [React](https://react.dev/), [FastAPI](https://fastapi.tiangolo.com/), [PyTorch](https://pytorch.org/docs/stable/index.html), [React Three Fiber](https://r3f.docs.pmnd.rs/), [Zustand](https://zustand.docs.pmnd.rs/), [Prisma](https://www.prisma.io/docs) and [Supabase](https://supabase.com/docs) are existing frameworks/services. REST, WebSockets, finite-state machines, smoothing, hysteresis, seeded paired comparison and file hashes are established engineering techniques. Their use is legitimate with accurate attribution and applicable licenses, but is not a new algorithm claim.
 
-Legacy comments mention FPA-DQN, “3DQN 2025”, “3DQN-PER”, Webster and NEMA without enough verified derivation to claim faithful implementations. The present code supports a fixed schedule, a gap-out controller and the RL mechanisms above. Those ambiguous references remain unverified historical leads. Do not cite invented bibliographic details or present those names as certification. Dataset/weight/dependency licenses remain separate from academic method citations and the repository's MIT source license.
+The October 31 source audit removed unsupported FPA-DQN/“3DQN 2025”/“3DQN-PER” attribution from the active shared learning descriptions and corrected Fixed/Actuated descriptions. The implementation provides a preset fixed schedule, simple gap-out control and the established RL mechanisms above. Historical source snapshots can retain the old wording; it is not bibliographic evidence. The PER priority offset is a local choice, and ONNX export has no established universal speedup. Dataset/weight/dependency licenses remain separate from academic method citations and the repository's MIT source license. Section 45 records the source-grounded equations, constants and review mechanism.
 
 ## 15. Novelty assessment independent of measured performance
 
@@ -2474,5 +2481,337 @@ Fixed's unchanged trajectory also exposes actual sensing effects without confoun
 Full saved-data verification passes for every sensor record, packet, proposal, physical lamp state, wait/inventory metric, contrast, CSV, coverage/hash and mechanics flag. The anchor is checked by exact semantic equality to the verified new clean trajectory. The verifier performs **zero new traffic-kinematics reruns**. Its record is `results/sumo_sensing_design/20261030/smoke_verification.json`. Scientific intervals are absent for this one-seed mechanics panel.
 
 The sensor/runtime feature was committed/pushed as `5111d1f`, and the complete executable study/protocol as `6accf66`, both before collection. The smoke manifest records `6accf66`; later results documentation changes do not alter its executable sources. Flags remain `smoke: true`, `complete: true`, `scientific_panel_complete: false`, `policy_promoted: false`, `publication_ready: false`. The full-study source/runtime gate also matches the smoke in `results/sumo_sensing_design/20261030/full_preflight.json`. No full-study delay/ranking conclusion, learned-model gain or real-camera readiness follows yet.
+
+## 45. Methodology contracts, parameter provenance and implementation audit
+
+### 45.1 Scope and executable authority
+
+This October 31 pass addresses implementation correctness, attribution and reproducible method description. It does not tune constants, train a new controller, rerun performance panels, promote checkpoints or establish a breakthrough. The full SUMO sensing panel in section 44 remains pending. Earlier performance screens and negative results retain their original meaning.
+
+The new [methodology catalogue](research/manifests/methodology.json) describes **131 selected parameters and 24 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+
+Three authorities must remain distinct:
+
+| Question | Authority | Limit |
+| --- | --- | --- |
+| What does current code define by default? | Current source, reviewed catalogue and generated parameter table below | A declared default may be overridden or unused. |
+| What executed in a particular experiment? | Its frozen configuration, manifest, checkpoint metadata/hash and archived source/runtime | Current defaults cannot retroactively describe an old run. |
+| Does this represent an actual intersection or detector? | Independent footage, counts, timing plans, geometry, annotations and validation | Syntax checks, hashes and synthetic fixtures do not establish measurement accuracy. |
+
+The inspector reads Python ASTs without importing application modules, opening models, reading private environment files, contacting Supabase or executing source expressions. It supports explicit assignments, argument defaults, call keywords, guarded comparisons and whole-symbol contracts. A selector must resolve exactly once. Dynamic expressions remain unresolved references; an actual `None` default remains a literal. Network layer specifications preserve symbolic input/output dimensions. Source files are hashed independently of expression fingerprints.
+
+### 45.2 Runtime profiles and complete control flow
+
+| Profile | Observation/control boundary | Timing/action meaning | Current limitation |
+| --- | --- | --- | --- |
+| `interactive_legacy` | Website custom simulation and legacy trainer; v6/28 inputs, v4 reward, executed-action replay | Four action phases; custom 0.1 s stepping; nominal two-second learned decisions | Separate from the audited research collector; no general website/headless parity claim. |
+| `audited_custom_research` | Scenario → truth simulator → delivered synthetic packet → observed features/mask/context → proposal → optional fallback → optional additional shield → physical FSM → executed lamps | Four phases; observation version and cadence frozen per run; v5 completed proposed-action replay in the corrected trainer | Synthetic sensors and normalized motion; no independent field validation. |
+| `independent_sumo` | Generated network/routes → SUMO/TraCI → delivered declared counts → classical proposal → two-phase physical signal → executed lamps → audit | Straight-only NS/EW actions; 0.1 s ticks, 8/3/1 s minimum-green/yellow/all-red in the current study | No automatic custom-checkpoint transfer or four-action equivalence. |
+| `cctv_experimental` | Frame/source clock → external detector → centroid association → supplied geometry or image proxy → counts/crossings/retrospective turns → telemetry and saved session | Configured two-frame/s target is separate from achieved latency and the research 10 Hz sensor boundary | Missing prospective movement, downstream and complete signal-history inputs prevent a validated autonomous control adapter. |
+
+The legacy live research service also has a separate gating FSM whose configured timing differs from the audited executed-lamp path. It remains a visualization/service path, not evidence that all runtimes share one physical implementation. This audit records the difference rather than replacing old protocols with a universal timing constant.
+
+Simulator truth may supply reward, hidden evaluation metrics and synthetic training labels where explicitly declared. It must not become a clean substitute for corrupted policy inputs. Camera truth annotations belong to evaluation, with producer identity and availability times kept separate. A retrospective turn known after an exit cannot be inserted into an earlier queued-movement observation.
+
+### 45.3 Learning equations and local adaptations
+
+For valid actions `M(s)`, the dueling network computes:
+
+```text
+Q(s,a) = V(s) + A(s,a) - mean[A(s,b) for b in M(s)]
+a*     = argmax[b in M(s')] Q_online(s',b)
+y      = R_macro + (1-done) * gamma^(elapsed_s / decision_dt) * Q_target(s',a*)
+```
+
+The two shared 256-unit LayerNorm/ReLU layers feed 128-unit value/advantage heads and four outputs. An absent network mask uses an all-action advantage mean. Valid-action centering is the project's adaptation of [Wang et al.'s dueling architecture](https://proceedings.mlr.press/v48/wangf16.html); the published all-action mean is not inherently an algorithmic error. Online selection with target evaluation follows [Double DQN](https://arxiv.org/abs/1509.06461). These ingredients do not define a newly invented DQN family.
+
+`R_macro` is the stored decision-interval reward; the research collector discounts constituent tick rewards relative to the reference decision interval. Its final incomplete interval is counted and dropped. True terminal transitions suppress bootstrap. The application collector retains its legacy integration differences. A finite experiment endpoint, an environment terminal and a dropped partial interval must not be described as interchangeable.
+
+The shared update uses:
+
+```text
+L_TD   = batch_mean[w_i * SmoothL1(Q(s_i,a_i), y_i)]
+L_demo = mean[relu(0.5 + max_other_valid Q(s_i,b) - Q(s_i,a_i))]
+L      = L_TD + demonstration_loss_weight * L_demo
+```
+
+The demonstration mean includes only flagged demonstration transitions with another valid action; an empty eligible set contributes zero. `0.5` is a local Q-margin, not seconds. The default demonstration multiplier is `0.1`, with experimental overrides. Adam uses the configured learning rate and `eps=1e-8`; gradients are clipped at L2 norm `10`. These are implementation choices, not traffic-calibrated optima. Demonstration-assisted TD/margin learning is related to [DQfD](https://research.google/pubs/deep-q-learning-from-demonstrations/), without reproducing its complete loss/data protocol.
+
+Proportional replay stores `p_i=(abs(TD_i)+epsilon_PER)^alpha`, samples relative to the sum of stored priorities and normalizes importance weights within the sampled batch. The sum tree applies the priority exponent once. The defaults `alpha=0.6` and initial `beta=0.4` match a published proportional-replay setting in [Schaul et al.](https://arxiv.org/html/1511.05952v4); they are not universally optimal. The positive priority offset `0.01` is a **local choice**. No evidence here establishes that every smaller offset causes priority collapse. Falling importance-weighted loss and negative Q values alone do not diagnose control improvement or instability.
+
+The exact custom tick reward is defined in [TrafficEnv.compute_reward](server/app/simulation/environment.py):
+
+```text
+r_tick = -delay_vehicle_seconds / 10
+         -0.05 * total_current_pressure * dt
+         +0.10 * vehicles_passed_this_tick
+         +switch_term
+         -0.10 * number_of_starved_phases * dt
+         -0.10 * max_green_exceeded_indicator * dt
+switch_term = -0.10 if a charged switch leaves phase pressure > 0.5
+              -0.03 for another charged switch, otherwise 0
+balance_term = 0
+```
+
+The environment supplies the actual delay incurred during that tick, including its modeled backlog; a departing vehicle's historical waiting is not refunded. For external callers lacking that increment, a documented nonnegative wait-difference fallback remains. The coefficients convert unlike physical/count/pressure quantities into a scalar local reward and have no measured economic interpretation. v5 charges at the actual GREEN→YELLOW onset once; legacy v4 retains repeated switch charging for historical compatibility. This pass changes neither version's coefficients nor old checkpoint metadata.
+
+Research-only PPO/GAE, count restoration and arrival-window experiments retain their distinct models and protocols in sections 39–43. PPO's clipped ratio and GAE are established methods: [Schulman et al., PPO](https://arxiv.org/abs/1707.06347), [Schulman et al., GAE](https://arxiv.org/abs/1506.02438). They have not replaced website D3QN or turned failed development recipes into successful controllers.
+
+### 45.4 Uncertainty, supervision and timing units
+
+The seven-feature uncertainty vector contains inverted mean and tenth-percentile detector confidence, count volatility, queue-history deviation, frame age, missing-frame flag and optional tracking loss. With the caller's queue vector `q`, the residual is `clip(2 * mean(abs(q - queue_EWMA)), 0, 1)`. The EWMA update uses `alpha=1-exp(-0.1/5)` and the current observation. It is a **mean absolute historical queue residual**, not an L2 forecast error or a prediction of fallback benefit. The retained `forecast_features` argument is unused. The current FlowSync-UQ call does not supply `track_loss_count`, so that input stays zero on this path.
+
+The default weights are `[0.20, 0.15, 0.25, 0.20, 0.10, 0.05, 0.05]`, and aggregation is `sigmoid(5 * (weighted_sum - 0.35) / temperature)`. Even zero feature input gives about `0.148` at temperature one. Confidence absence supplies zero detector features; it does not prove perfect sensing. Volatility/residual scales and the embedded 0.1 s EWMA step are local assumptions. Calling this at another rate does not preserve its effective five-second history automatically.
+
+A compatible fitted calibration replaces the heuristic with a standardized logistic model predicting the declared **synthetic count-error event**. Its fitting/calibration provenance is separate from test data. It does not predict accident probability, a formal error bound or which backup action improves control. Hysteresis defaults enter fallback at `0.45` and permit recovery below `0.25`, with `40` dwell calls and `10` consecutive low-score calls. Those counts equal four/one seconds only at 10 Hz. The supervisor now rejects unordered/nonfinite thresholds, invalid call counts and nonfinite/out-of-range scores before mutating authority or counters.
+
+The optional additional shield, supervisor and executed physical FSM have different responsibilities. An unshielded research D3QN still receives physical minimum-green and clearance. The basic custom FSM's current defaults are 8 s minimum green, 2 s yellow and 3 s all-red; maximum-green/starvation interventions depend on the surrounding controller/watchdog configuration. SUMO's current 8/3/1 s rule is a different synthetic protocol. None is a measured legal plan for a real site.
+
+### 45.5 Numerical rationale and calibration requirements
+
+| Parameter family | What the numbers currently mean | Evidence needed for a stronger interpretation |
+| --- | --- | --- |
+| Custom positions/speed/spacing | Stop line `0.42`, free speed `0.12` normalized path units/s and spacing `0.08` define simplified synthetic motion | Road-plane calibration, measured flow/headway/speed and independent simulator validation; normalized coordinates are not metres. |
+| Queue representations | Visible storage `15`, pressure divisor `10` and policy `tanh(count/15)` have different roles | A declared sensor/storage model and sensitivity checks; these values must not be collapsed into one universal capacity. Pressure is nonnegative without an upper clip. |
+| Signal and service timers | Local physical timing, feature scales, controller limits and call-count dwell | Site movement/conflict/pedestrian plans and engineering review; service timers are not individual vehicle waiting. |
+| EWMA features | Nominal 5/10/20 s history summaries with a local arrival-rate scale | Independent predictive validation; smoothing is not proof of short-term forecasting superiority. |
+| Learning/reward coefficients | Defaults, optimizer stabilizers and frozen study choices | Explicit executed values and controlled sensitivity studies; a literature citation does not calibrate a local scalar. |
+| Camera confidence/geometry | Detection threshold `0.35`, NMS IoU `0.45`, image size `640`, 2 Hz target, smoothing `0.3` and geometry tolerances | Independent labeled footage with coverage/clock/error checks and measured hardware latency. |
+| Vehicle queue weights | Bicycle/motorcycle/car/auto-rickshaw/van/bus/truck weights `0.3/0.5/1/1.3/1.5/3/2.5` | Local traffic measurements; these are relative engineering weights, not validated passenger-car equivalents. |
+| Arrival windows | Position-error envelope `0.002`, one-second history and 0.4 s minimum span under synthetic dedicated movement lanes | Metric geometry, association errors, prospective movement availability and calibrated uncertainty; no inherited crossing-time guarantee. |
+
+The actual centroid tracker uses an **80-pixel match radius**, **3000 ms expiry** and **ten-sample history**. `TRACK_THRESH`, `TRACK_BUFFER` and `MATCH_THRESH` declarations do not configure that implementation. `FRAME_BUFFER_SIZE` does not replace its latest-frame slot with a queue, and the catalogue marks the unused congestion-threshold declaration separately from active display logic. Consumer-function fingerprints make these activity assessments reviewable when code changes. Leaving the declarations visible as unused is more accurate than claiming a wired ByteTrack configuration.
+
+Default values are not necessarily the best-known experimental settings. For example, HyperParams learning rate `3e-4` differs from the research CLI default `1e-4`, and each frozen launcher may override both. The declared multiplicative `EPSILON_DECAY` and `DEFAULT_EPISODES` fields are not the current trainer/request schedule authority. The catalogue records these distinctions instead of recommending another large run.
+
+### 45.6 Event-based demand estimation and detector identity
+
+[FlowCalibrator](server/app/realworld/digital_twin/flow_calibrator.py) now estimates rates from **unique provided upstream arrival events over an explicit source-clock interval**. Summing frame occupancy repeatedly counts vehicles that remain visible and makes the inferred demand depend on frame rate. Occupancy-only sessions, first track sightings, stop-line discharges and retrospective turns are therefore rejected as upstream demand calibration inputs.
+
+Accepted input declares a nonempty session ID, an `observation_window` with `start_s`, `end_s` and `timebase`, and an `arrivals` list. Every event explicitly declares `event_semantics:"upstream_demand_arrival"`, a unique nonempty vehicle ID, approach, supported turn and finite timestamp inside the half-open window `[start_s,end_s)`. Supported clocks are `video_position_seconds`, `controller_log_seconds` and explicitly synthetic `synthetic_seconds`. Empty event sessions currently fail; this implementation does not certify an independently observed zero-flow interval.
+
+For movement `m`, the estimator computes `rate_m_vehicles_per_minute = provided_event_count_m / ((end_s-start_s)/60)`. Turn ratios are reported only for approaches with supplied events. Missing movement counts mean zero **provided events**, not independently verified zero demand or exhaustive camera coverage. Vehicle-type proportions are produced only when all events supply recognized types; otherwise they remain empty. No peak-hour schedule or invented vehicle-type prior is inferred from one short session.
+
+`FlowCalibrationProvenance` stores event semantics, timebase, interval and exact input-file SHA-256, with `coverage:"provided_events_only"` and `measurement_validation:"not_independently_validated"`. JSON export requires this provenance. Directory aggregation fails because filenames do not establish nonoverlapping vehicles, shared clocks or complete exposure. The CLI refuses to overwrite an existing output. Existing example flow JSON files remain historical supplied profiles, not new measurements; current camera recordings do not automatically satisfy this upstream event contract.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/calibrate_flow.py \
+  --session /path/to/explicit_upstream_event_session.json \
+  --output /path/to/new_flow_profile.json
+```
+
+Detector loading separately validates the actual model-declared class taxonomy rather than guessing it from a production/pretrained path. Failed staging retains the prior model/path/taxonomy; inference calls are serialized and filter results with the same captured taxonomy. The legacy `is_custom_model` flag describes label mapping, not proof of custom training. ONNX selection is an active conditional preference, while a measured speed/accuracy claim still requires actual weights, data and hardware. Finite positive pipeline FPS is validated before opening a video source.
+
+### 45.7 Correctness repairs and model-state lifecycle
+
+| Boundary | Before this audit | Current behavior |
+| --- | --- | --- |
+| Signal requests | Manual/emergency paths could bypass or reset physical transitions; two minimum-green fields could diverge | Queued requests share executed FSM authority; active clearance keeps its target/timer; minimum-green alias reads the same value. |
+| Zero demand | Truthiness skipped a profile's explicit `base_lambda=0` | Zero replaces positive demand. |
+| Scenario provenance | A supplied stale hash could survive modified scenario contents | Construction/serialization checks the 16-hex SHA-256 content fingerprint; mutations require an explicitly updated hash. It remains a mutable dataclass. |
+| Fine-tuning parameters | `epsilon=0` could fall back to `0.25`; WebSocket parsing differed from HTTP | Shared finite/ranged schema, strict positive episode counts and explicit `None` fallback preserve zero. Invalid requests fail before launch. |
+| Agent state loading | Tensor loading/counters could partially replace state or accept schema ambiguity | Compatible observation/reward versions, strict shapes, finite tensors/optimizer state and valid counters are staged before publication. |
+| Checkpoint identity | Missing slots could resolve to nearby files; failures could retain old weights under invented episode labels | Exact selection or explicit failure, actual trained episode separate from file slot, no fabricated 1000/300-episode fallback. |
+| Model discovery | Listing could upload local checkpoint files to cloud storage | Listing is read-only; explicit saving/uploading remains a separate action. |
+| Demand estimation | Repeated visible occupancy could be presented as arrival demand | Explicit upstream-event exposure/rates and provenance; unsupported session semantics fail. |
+| Detection labels | Explicit/swapped model paths could inherit the wrong class mapping | Loaded names determine the mapping, published together with the model. |
+
+Structured agent checkpoints must match both observation **meaning** and width plus reward version. Same-shaped spatial and zero-spatial schemas are not interchangeable. Missing target tensors synchronize from online tensors; missing saved counters reset to zero, and absent optimizer state clears old moments. Saved valid counters restore target/update scheduling state. Raw legacy weights require explicit opt-in and cannot recover their missing observation/training provenance.
+
+HTTP model loading stages independent simulation and training agents, then replaces their references and the trainer's agent together after validation. It rejects replacement while training reports active. Simulation inference uses evaluation mode; the training agent's online network uses training mode. Current operations still use process-global application state and do not prove race-free multi-user sessions. Checkpoint loading does not restore replay, Python/NumPy/Torch RNG state, environment state or pending asynchronous work, so it is not exact trajectory resumption. Website loading remains v6/v4; this audit does not silently migrate it to research v5 or v9.
+
+### 45.8 Source-default table and review commands
+
+The following table is generated from reviewed source selectors. `conditional` means runtime selection/overrides matter; `declared_unused` means the audited consumer does not read that declaration. `active` and `historical_example` are supported catalogue statuses when appropriate. A `dynamic reference` is deliberately not executed by the inspector. Longer structured schemas are available in full in the referenced source and exported JSON/CSV.
+
+<!-- methodology-parameters:start -->
+| Parameter | Source default | Unit | Activity | Source |
+| --- | --- | --- | --- | --- |
+| `learning.state_dim` | `28` | features | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.action_dim` | `4` | phases | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.learning_rate` | `0.0003` | optimizer step size | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.gamma` | `0.99` | discount per reference decision | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.batch_size` | `128` | transitions/update | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.train_every_n_steps` | `1` | decisions/update | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.max_steps_per_episode` | `3000` | simulation ticks | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.default_episodes` | `500` | episodes | declared_unused | [source](server/app/rl/hyperparams.py) |
+| `learning.target_update_freq` | `500` | optimizer updates | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.checkpoint_every_n_episodes` | `50` | episodes | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.replay_buffer_size` | `100000` | transitions | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.min_replay_size` | `1000` | transitions | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.epsilon_start` | `1.0` | probability | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.epsilon_end` | `0.05` | probability | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.epsilon_decay` | `0.997` | episode multiplier | declared_unused | [source](server/app/rl/hyperparams.py) |
+| `learning.per_alpha` | `0.6` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.per_beta_start` | `0.4` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.per_beta_end` | `1.0` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.per_epsilon` | `0.01` | priority offset | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.min_green_time` | `8.0` | s | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.max_green_time` | `40.0` | s | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.starvation_threshold` | `45.0` | s | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.decision_dt` | `2.0` | s | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.training_lambda` | `0.8` | vehicles/s, whole junction | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.eval_lambda` | `0.5` | vehicles/s, whole junction | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.forecast_dims` | `8` | features | conditional | [source](server/app/rl/hyperparams.py) |
+| `learning.obs_version` | `"v6_28dim_smdp"` | schema identifier | conditional | [source](server/app/rl/hyperparams.py) |
+| `custom.signal.min_green_duration` | `8.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.signal.fixed_duration` | `8.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.signal.yellow_duration` | `2.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.signal.starvation_threshold` | `45.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.signal.max_green_time` | `40.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.signal.all_red` | `3.0` | s | conditional | [source](server/app/simulation/traffic_signal.py) |
+| `custom.stop_line` | `0.42` | normalized path position | conditional | [source](server/app/simulation/intersection.py) |
+| `custom.default_speed` | `0.12` | normalized path units/s | conditional | [source](server/app/simulation/vehicle.py) |
+| `custom.max_queue` | `15` | vehicles/movement lane | conditional | [source](server/app/simulation/spawner.py) |
+| `custom.max_cap` | `10.0` | vehicles | conditional | [source](server/app/simulation/traffic_math.py) |
+| `custom.dt` | `0.1` | s/tick | conditional | [source](server/app/simulation/environment.py) |
+| `custom.spacing` | `0.08` | normalized path units | conditional | [source](server/app/simulation/intersection.py) |
+| `shield.min_green_time` | `8.0` | s | conditional | [source](server/app/controllers/safety_shield.py) |
+| `shield.max_green_time` | `40.0` | s | conditional | [source](server/app/controllers/safety_shield.py) |
+| `shield.yellow_duration` | `2.0` | s | conditional | [source](server/app/controllers/safety_shield.py) |
+| `shield.red_duration` | `3.0` | s | conditional | [source](server/app/controllers/safety_shield.py) |
+| `shield.starvation_threshold` | `45.0` | s | conditional | [source](server/app/controllers/safety_shield.py) |
+| `supervisor.threshold_high` | `0.45` | dimensionless score | conditional | [source](server/app/controllers/supervisor.py) |
+| `supervisor.threshold_low` | `0.25` | dimensionless score | conditional | [source](server/app/controllers/supervisor.py) |
+| `supervisor.min_dwell_steps` | `40` | update calls | conditional | [source](server/app/controllers/supervisor.py) |
+| `supervisor.recovery_window_steps` | `10` | update calls | conditional | [source](server/app/controllers/supervisor.py) |
+| `forecast.tau_5s` | `5.0` | s | conditional | [source](server/app/simulation/demand_forecast.py) |
+| `forecast.tau_10s` | `10.0` | s | conditional | [source](server/app/simulation/demand_forecast.py) |
+| `forecast.tau_20s` | `20.0` | s | conditional | [source](server/app/simulation/demand_forecast.py) |
+| `forecast.max_arrival_rate` | `2.0` | vehicles/s | conditional | [source](server/app/simulation/demand_forecast.py) |
+| `forecast.growth_window_seconds` | `10.0` | s | conditional | [source](server/app/simulation/demand_forecast.py) |
+| `actuated.gap_threshold` | `3.5` | s | conditional | [source](server/app/controllers/actuated.py) |
+| `actuated.min_green_time` | `8.0` | s | conditional | [source](server/app/controllers/actuated.py) |
+| `actuated.max_green_time` | `40.0` | s | conditional | [source](server/app/controllers/actuated.py) |
+| `uncertainty.temperature` | `1.0` | dimensionless | conditional | [source](research/uncertainty/estimator.py) |
+| `uncertainty.threshold_high` | `0.45` | dimensionless | conditional | [source](research/uncertainty/estimator.py) |
+| `uncertainty.threshold_low` | `0.25` | dimensionless | conditional | [source](research/uncertainty/estimator.py) |
+| `uncertainty.heuristic_weights` | `Structured schema; full value in source and exported JSON/CSV` | dimensionless weights | conditional | [source](research/uncertainty/estimator.py) |
+| `learning.demonstration_loss_weight` | `0.1` | loss multiplier | conditional | [source](server/app/rl/dqn_agent.py) |
+| `learning.adam_epsilon` | `1e-08` | optimizer numerical stabilizer | conditional | [source](server/app/rl/dqn_agent.py) |
+| `learning.gradient_clip` | `10.0` | gradient L2 norm | conditional | [source](server/app/rl/dqn_agent.py) |
+| `network.feature_layer` | `Linear(state_dim, 256); LayerNorm(256); ReLU(); Linear(256, 256); LayerNorm(256); ReLU()` | network layers | conditional | [source](server/app/rl/dqn_network.py) |
+| `network.value_stream` | `Linear(256, 128); ReLU(); Linear(128, 1)` | network layers | conditional | [source](server/app/rl/dqn_network.py) |
+| `network.advantage_stream` | `Linear(256, 128); ReLU(); Linear(128, action_dim)` | network layers | conditional | [source](server/app/rl/dqn_network.py) |
+| `research_cli.episodes` | `120` | episodes | conditional | [source](research/training/train_policy.py) |
+| `research_cli.seed` | `101` | seed identifier | conditional | [source](research/training/train_policy.py) |
+| `research_cli.validate-every` | `30` | episodes | conditional | [source](research/training/train_policy.py) |
+| `research_cli.demo-episodes` | `24` | episodes | conditional | [source](research/training/train_policy.py) |
+| `research_cli.pretrain-updates` | `300` | optimizer updates | conditional | [source](research/training/train_policy.py) |
+| `research_cli.learning-rate` | `0.0001` | optimizer step size | conditional | [source](research/training/train_policy.py) |
+| `research_cli.imitation-updates` | `0` | optimizer updates | conditional | [source](research/training/train_policy.py) |
+| `research_cli.target-update` | `HP.TARGET_UPDATE_FREQ (dynamic reference)` | optimizer updates | conditional | [source](research/training/train_policy.py) |
+| `research_cli.episode-steps` | `0` | simulation ticks | conditional | [source](research/training/train_policy.py) |
+| `research_cli.demo-loss-weight` | `0.1` | loss multiplier | conditional | [source](research/training/train_policy.py) |
+| `research_cli.demo-loss-decay-episodes` | `0` | episodes | conditional | [source](research/training/train_policy.py) |
+| `research_cli.max-wall-seconds` | `0` | s | conditional | [source](research/training/train_policy.py) |
+| `ppo.gamma` | `0.99` | discount per macro reference | conditional | [source](research/training/ppo.py) |
+| `ppo.lambda` | `0.95` | GAE decay | conditional | [source](research/training/ppo.py) |
+| `ppo.clip` | `0.2` | probability-ratio offset | conditional | [source](research/training/ppo.py) |
+| `observation.temporal_schema` | `Structured schema; full value in source and exported JSON/CSV` | feature schema | conditional | [source](server/app/rl/observations.py) |
+| `observation.spatial_schema` | `Structured schema; full value in source and exported JSON/CSV` | feature schema | conditional | [source](server/app/rl/observations.py) |
+| `restoration.feature_dim` | `17` | features | conditional | [source](research/observation/count_restoration.py) |
+| `restoration.ema_alphas` | `[0.2, 0.5, 0.8, 1.0]` | smoothing-factor grid | conditional | [source](research/observation/count_restoration.py) |
+| `arrival.extension_seconds` | `2.0` | s | conditional | [source](research/policies/arrival_extension.py) |
+| `arrival.max_packet_age` | `0.5` | s | conditional | [source](research/policies/arrival_extension.py) |
+| `arrival.proxy_margin_vehicle_seconds` | `1.0` | vehicle-s | conditional | [source](research/policies/arrival_extension.py) |
+| `arrival_calibration.stop_line` | `0.42` | normalized path position | conditional | [source](research/observation/arrival_tracks.py) |
+| `arrival_calibration.max_speed` | `0.12` | normalized path units/s | conditional | [source](research/observation/arrival_tracks.py) |
+| `arrival_calibration.spacing` | `0.08` | normalized path units | conditional | [source](research/observation/arrival_tracks.py) |
+| `arrival_calibration.position_error` | `0.002` | normalized path units | conditional | [source](research/observation/arrival_tracks.py) |
+| `arrival_calibration.history_seconds` | `1.0` | s | conditional | [source](research/observation/arrival_tracks.py) |
+| `arrival_calibration.minimum_span` | `0.4` | s | conditional | [source](research/observation/arrival_tracks.py) |
+| `camera.yolo_conf_threshold` | `0.35` | confidence score | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.yolo_nms_iou` | `0.45` | IoU | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.yolo_imgsz` | `640` | pixels | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.use_onnx` | `true` | format preference flag | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.vehicle_queue_weights` | `{"bicycle": 0.3, "motorcycle": 0.5, "car": 1.0, "auto_rickshaw": 1.3, "van": 1.5, "bus": 3.0, "truck": 2.5}` | relative vehicle weights | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.pipeline_fps` | `2.0` | frames/s target | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.frame_buffer_size` | `30` | declared frame capacity | declared_unused | [source](server/app/realworld/models/config.py) |
+| `camera.temporal_smoothing_alpha` | `0.3` | smoothing factor | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.max_queue_cap` | `10.0` | vehicles, pressure divisor | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.max_green_time` | `40.0` | s, feature scale | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.starvation_threshold` | `45.0` | s, feature scale | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.obs_dim` | `28` | features | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.max_upload_size_mb` | `500` | MiB (binary upload limit) | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.track_thresh` | `0.4` | unused confidence threshold | declared_unused | [source](server/app/realworld/models/config.py) |
+| `camera.track_buffer` | `30` | unused track-buffer declaration | declared_unused | [source](server/app/realworld/models/config.py) |
+| `camera.match_thresh` | `0.8` | unused association threshold | declared_unused | [source](server/app/realworld/models/config.py) |
+| `camera.movement_threshold_px` | `5.0` | pixels | conditional | [source](server/app/realworld/models/config.py) |
+| `camera.congestion_thresholds` | `{"LOW": 0.3, "MODERATE": 0.55, "HIGH": 0.75}` | display ratios | declared_unused | [source](server/app/realworld/models/config.py) |
+| `camera.actual_match_radius` | `80.0` | pixels | conditional | [source](server/app/realworld/pipeline/vehicle_tracker.py) |
+| `camera.actual_track_expiry` | `3000.0` | ms | conditional | [source](server/app/realworld/pipeline/vehicle_tracker.py) |
+| `camera.actual_history_depth` | `10` | samples | conditional | [source](server/app/realworld/pipeline/vehicle_tracker.py) |
+| `camera.crossingobservation.max_gap_s` | `1.0` | s | conditional | [source](server/app/realworld/models/crossings.py) |
+| `camera.crossingobservation.deadband_px` | `2.0` | pixels | conditional | [source](server/app/realworld/models/crossings.py) |
+| `camera.crossingobservation.max_displacement_px` | `80.0` | pixels | conditional | [source](server/app/realworld/models/crossings.py) |
+| `camera.trajectoryobservation.max_gap_s` | `1.0` | s | conditional | [source](server/app/realworld/models/trajectory_turns.py) |
+| `camera.trajectoryobservation.max_displacement_px` | `80.0` | pixels | conditional | [source](server/app/realworld/models/trajectory_turns.py) |
+| `camera.trajectoryobservation.max_duration_s` | `15.0` | s | conditional | [source](server/app/realworld/models/trajectory_turns.py) |
+| `camera.trajectoryobservation.exit_confirmation_frames` | `2` | frames | conditional | [source](server/app/realworld/models/trajectory_turns.py) |
+| `website_request.num_episodes` | `500` | episodes | conditional | [source](server/app/schemas/training_schema.py) |
+| `website_request.finetune_lr` | `0.0001` | optimizer step size | conditional | [source](server/app/schemas/training_schema.py) |
+| `website_request.finetune_epsilon` | `0.25` | probability | conditional | [source](server/app/schemas/training_schema.py) |
+| `website_setting.all_red` | `3.0` | s | conditional | [source](server/app/config.py) |
+| `sumo.dt` | `0.1` | s/tick | conditional | [source](research/audits/sumo_branch_feasibility.py) |
+| `sumo.min_green` | `80` | ticks | conditional | [source](research/audits/sumo_branch_feasibility.py) |
+| `sumo.yellow_ticks` | `30` | ticks | conditional | [source](research/audits/sumo_branch_feasibility.py) |
+| `sumo.red_ticks` | `10` | ticks | conditional | [source](research/audits/sumo_branch_feasibility.py) |
+| `sumo.fixed_green` | `300` | ticks | conditional | [source](research/policies/sumo_classical.py) |
+<!-- methodology-parameters:end -->
+
+Review metadata stores source AST fingerprints rather than a second editable copy of each numeric default. A changed expression, selected method or relevant consumer fails review. Comments/docstrings and line movement alone do not change those AST fingerprints; full source hashes still record byte-level differences. After reviewing an intentional change, update its explicit catalogue metadata/fingerprint and regenerate the marked table. The inspector provides no command to automatically approve drift.
+
+```bash
+# Static validation; performs no training, simulation or storage operation.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology --check
+
+# Print the source-derived table used above after reviewing any drift.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology --table
+
+# New output directory: JSON, CSV, table, source archive and hashed manifest.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology \
+  --output results/methodology/current_20261031
+
+# Compare source identities without rerunning or rewriting a historical study.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology \
+  --compare-manifest results/receding_arrival/pilot_20261030/manifest.json
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
+```
+
+The exporter refuses existing output directories and nested writes inside a sealed evidence collection. Its manifest records Git revision, dirty-worktree status, Python version and output hashes; the source archive includes selected implementation files and the catalogue. This is a static implementation/defaults snapshot, not a traffic dataset, all-dependency lock, experiment rerun or formal correctness proof. Generated `parameter_table.md` is an artifact, not another maintained project guide.
+
+`scripts/check_repository.py` now checks catalogue integrity and exact agreement of this marked table with reviewed source. Tests demonstrate failure after a changed constant, a changed consumer of an unused declaration, an ambiguous selector, missing units/basis, invalid profile/path or a manually altered table. Source matching does not prove numerical optimality, exhaustive catalogue coverage, data validity or scientific novelty.
+
+### 45.9 Verification and historical compatibility
+
+The combined targeted backend command completed **165 tests** covering signal requests, emergency clearance, ordinary simulation/SMDP mechanics, zero-demand CRN, stale scenario hashes, strict/atomic learning state, uncertainty/supervision, spatial compatibility, research collection, resume/fine-tuning, exact website checkpoint selection and rollback, read-only discovery, detector label swapping and supplied-event calibration. A checkpoint test also verifies an identical subsequent optimizer update after loading and rejection of malformed optimizer moments without replacing the current weights. These totals overlap earlier test runs and do not represent the whole repository suite. Existing dependency deprecation warnings remain.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+server/venv/bin/python -m pytest \
+  server/tests/test_methodology_boundaries.py server/tests/test_methodology_catalogue.py \
+  server/tests/simulation/test_signal_requests.py server/tests/simulation/test_traffic_signal.py \
+  server/tests/simulation/test_environment_smdp.py server/tests/simulation/test_spawner_crn.py \
+  server/tests/test_controllers.py server/tests/test_flowsync_uq.py \
+  server/tests/test_research_training.py server/tests/test_spatial_policy.py \
+  server/tests/test_uncertainty_calibration.py server/tests/realworld/test_flow_calibrator.py \
+  server/tests/realworld/test_detector_contract.py server/tests/test_resume_training.py \
+  server/tests/test_finetune_training.py server/tests/rl \
+  --no-cov -p no:cacheprovider -q --disable-warnings
+```
+
+A real CLI invocation on an explicitly synthetic two-event/60-second fixture produced two supplied arrivals/minute, preserved the input SHA-256 and left missing vehicle-type priors empty. This verifies the command/output contract, not CCTV counting accuracy. Frontend TypeScript checking, lint and five existing behavior tests also passed; this pass changes no frontend source and claims no new production build or browser/cloud end-to-end run.
+
+Read-only historical comparison finds changed source files in the consumed custom receding-arrival panel. Old strict-verification runs must use their archived code and matching runtime; historical manifests, checkpoints and metrics were not rewritten. The independent SUMO sensing smoke's recorded source map still matches after these changes. Its full panel remains uncollected. Hash inspection independently reruns zero traffic trajectories.
+
+### 45.10 Attribution, novelty and remaining acceptance work
+
+The paper can accurately describe the implemented components, causal observation contracts, source/version separation, error checks and repeatable evidence tooling. DQN, Double DQN, dueling, PER, demonstration learning, PPO/GAE, pressure control, smoothing, hysteresis, centroid association and finite-state signal clearance remain established ingredients. Fixed is a preset schedule without calculated Webster optimization; Actuated is a simple gap-out controller rather than a complete NEMA implementation. Shared formulas do not establish sim-to-real observation equivalence.
+
+Related platforms [RESCO](https://datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/2021/hash/f0935e4cd5920aa6c7c996a5ee53a70f-Abstract-round1.html) and [LibSignal](https://arxiv.org/abs/2211.10649) must inform an evaluation/infrastructure novelty assessment. [UCATSC](https://arxiv.org/abs/2602.07784) is a relevant 2026 uncertainty/vision-control preprint; acceptance status is not asserted. Advanced-MP, arrival-aware control and uncertainty-related precedents are already distinguished in sections 38–43. A targeted comparison does not justify a universal first-of-its-kind claim. Unavailable full-text leads remain unresolved rather than a basis for invented method details.
+
+This pass improves the project's basis for writing methods, implementation and limitations. **It does not establish a new controller, useful uncertainty-specific control benefit, numerical optimality, publication readiness or production certification.** Remaining acceptance work includes independent camera/demand/simulator calibration, matched stronger baselines and fresh confirmation after a genuine development gain; complete website checkpoint/metadata/storage lifecycle checks; authentication/authorization and concurrent-session isolation; and measured hardware/operator/signal-interface engineering before any real actuation. Those requirements cannot be closed by documentation or chosen constants alone.
 
 [Back to Top](#top)

@@ -4,6 +4,7 @@ import runpy
 import sys
 
 COMMANDS = {
+    "methodology": "evidence.export_methodology",
     "train": "training.train_policy",
     "evaluate": "evaluation.evaluate_replicates",
     "validate": "evaluation.evaluate_validation",

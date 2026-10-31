@@ -1,0 +1,3708 @@
+{
+  "schema_version": "methodology_v1",
+  "review_date": "2026-10-31",
+  "profiles": {
+    "interactive_legacy": "Website custom simulation/training. v6/v4 legacy behavior; no audited headless parity.",
+    "audited_custom_research": "Explicit versioned checkpoints and delivered inputs in audited custom simulation. Actual values belong to each frozen run.",
+    "independent_sumo": "Independent straight-only two-phase SUMO experiments; separate sensing/demand/timing units. No checkpoint transfer.",
+    "cctv_experimental": "Experimental detector/tracker/geometry/event tooling; no validated autonomous signal-control input or field operation."
+  },
+  "references": {
+    "dqn": {
+      "title": "Playing Atari with Deep Reinforcement Learning",
+      "url": "https://arxiv.org/abs/1312.5602",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "double_dqn": {
+      "title": "Deep Reinforcement Learning with Double Q-learning",
+      "url": "https://arxiv.org/abs/1509.06461",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "dueling": {
+      "title": "Dueling Network Architectures for Deep Reinforcement Learning",
+      "url": "https://proceedings.mlr.press/v48/wangf16.html",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "per": {
+      "title": "Prioritized Experience Replay",
+      "url": "https://arxiv.org/html/1511.05952v4",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "dqfd": {
+      "title": "Deep Q-learning from Demonstrations",
+      "url": "https://research.google/pubs/deep-q-learning-from-demonstrations/",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "pressure": {
+      "title": "Varaiya publication record: Max pressure control of a network of signalized intersections",
+      "url": "https://people.eecs.berkeley.edu/~varaiya/publications.html",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "advanced_mp": {
+      "title": "Expression might be enough",
+      "url": "https://proceedings.mlr.press/v162/zhang22ah.html",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "shielding": {
+      "title": "Safe Reinforcement Learning via Shielding",
+      "url": "https://ojs.aaai.org/index.php/AAAI/article/view/11797",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "ppo": {
+      "title": "Proximal Policy Optimization Algorithms",
+      "url": "https://arxiv.org/abs/1707.06347",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "gae": {
+      "title": "High-Dimensional Continuous Control Using Generalized Advantage Estimation",
+      "url": "https://arxiv.org/abs/1506.02438",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "sumo": {
+      "title": "SUMO official publication/citation record",
+      "url": "https://sumo.dlr.de/docs/Publications.html",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "yolo": {
+      "title": "Ultralytics YOLOv8 documentation",
+      "url": "https://docs.ultralytics.com/models/yolov8/",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "bytetrack": {
+      "title": "ByteTrack: Multi-Object Tracking by Associating Every Detection Box",
+      "url": "https://arxiv.org/abs/2110.06864",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "resco": {
+      "title": "Reinforcement Learning Benchmarks for Traffic Signal Control",
+      "url": "https://datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/2021/hash/f0935e4cd5920aa6c7c996a5ee53a70f-Abstract-round1.html",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "libsignal": {
+      "title": "LibSignal: An Open Library for Traffic Signal Control",
+      "url": "https://arxiv.org/abs/2211.10649",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "ucatsc": {
+      "title": "UCATSC: Uncertainty-Aware Constrained Traffic Signal Control Under Vision-Based Partial Observability",
+      "url": "https://arxiv.org/abs/2602.07784",
+      "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    }
+  },
+  "parameters": [
+    {
+      "id": "learning.state_dim",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "STATE_DIM"
+      },
+      "unit": "features",
+      "purpose": "state dim",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ebad280ecd700cdcfecaef7c98bcb597dcc107cd12666b3082dbea5b3313bda2",
+      "consumers": []
+    },
+    {
+      "id": "learning.action_dim",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "ACTION_DIM"
+      },
+      "unit": "phases",
+      "purpose": "action dim",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "7fa6730d4945a002ebf7a3d96cb8c4b63b4695bf939159aead9a8eb0ce69acff",
+      "consumers": []
+    },
+    {
+      "id": "learning.learning_rate",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "LEARNING_RATE"
+      },
+      "unit": "optimizer step size",
+      "purpose": "learning rate",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "9ca1fb23145a7516702867d671dfbcfdfabb2e10486f5642e37347c901ac15ec",
+      "consumers": []
+    },
+    {
+      "id": "learning.gamma",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "GAMMA"
+      },
+      "unit": "discount per reference decision",
+      "purpose": "gamma",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0a18dd89518a08a4ef7b5caabbec3c613a51f8ffc3a3536185e3787e46cc0c8c",
+      "consumers": []
+    },
+    {
+      "id": "learning.batch_size",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "BATCH_SIZE"
+      },
+      "unit": "transitions/update",
+      "purpose": "batch size",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "04ecd57753f043d10871bc896311c08a07b06f7b83a52a9c2b32200f31e43a5f",
+      "consumers": []
+    },
+    {
+      "id": "learning.train_every_n_steps",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "TRAIN_EVERY_N_STEPS"
+      },
+      "unit": "decisions/update",
+      "purpose": "train every n steps",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "dcce64221460ae02ade35eabf689c8afe44d59a36c7cf9a2a9db244a4284ded2",
+      "consumers": []
+    },
+    {
+      "id": "learning.max_steps_per_episode",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "MAX_STEPS_PER_EPISODE"
+      },
+      "unit": "simulation ticks",
+      "purpose": "max steps per episode",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "d2fe3f2c571d689e6072517e89458015c6c786293e4186a33769c8bd47ff3952",
+      "consumers": []
+    },
+    {
+      "id": "learning.default_episodes",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "DEFAULT_EPISODES"
+      },
+      "unit": "episodes",
+      "purpose": "default episodes",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Historical HyperParams declaration; current application schedule/request defaults do not read this field.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0d61f23d852acf5d9f628f8ecbed9250e66fc688618e0bc3e9c83da564d73bf6",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/rl/trainer.py",
+            "scope": "Trainer.train",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134"
+        }
+      ]
+    },
+    {
+      "id": "learning.target_update_freq",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "TARGET_UPDATE_FREQ"
+      },
+      "unit": "optimizer updates",
+      "purpose": "target update freq",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0d61f23d852acf5d9f628f8ecbed9250e66fc688618e0bc3e9c83da564d73bf6",
+      "consumers": []
+    },
+    {
+      "id": "learning.checkpoint_every_n_episodes",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "CHECKPOINT_EVERY_N_EPISODES"
+      },
+      "unit": "episodes",
+      "purpose": "checkpoint every n episodes",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a1209c690dac8a9d115f5f4afcee097bc40562bf47741b8e5d2197beb956f7d6",
+      "consumers": []
+    },
+    {
+      "id": "learning.replay_buffer_size",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "REPLAY_BUFFER_SIZE"
+      },
+      "unit": "transitions",
+      "purpose": "replay buffer size",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "340d6397f727e7b42037eee59cd349e11f1dc4fc18b92436f491d89a5d4e19f6",
+      "consumers": []
+    },
+    {
+      "id": "learning.min_replay_size",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "MIN_REPLAY_SIZE"
+      },
+      "unit": "transitions",
+      "purpose": "min replay size",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e1909f46277c4c04ed7c35ba13d5196f45243f4becc39fae2c1fa3c4ebb2d1dd",
+      "consumers": []
+    },
+    {
+      "id": "learning.epsilon_start",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "EPSILON_START"
+      },
+      "unit": "probability",
+      "purpose": "epsilon start",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": []
+    },
+    {
+      "id": "learning.epsilon_end",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "EPSILON_END"
+      },
+      "unit": "probability",
+      "purpose": "epsilon end",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e0ac13a13b32646f13407c13895922285064a254ec1b55656311d5f844e2bbf5",
+      "consumers": []
+    },
+    {
+      "id": "learning.epsilon_decay",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "EPSILON_DECAY"
+      },
+      "unit": "episode multiplier",
+      "purpose": "epsilon decay",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Historical HyperParams declaration; current application schedule/request defaults do not read this field.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "8aac06d593780880dfb71e910c6b20a360f8cebcde893c2180d2b70d54de5e43",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/rl/trainer.py",
+            "scope": "Trainer.train",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134"
+        }
+      ]
+    },
+    {
+      "id": "learning.per_alpha",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "PER_ALPHA"
+      },
+      "unit": "dimensionless exponent",
+      "purpose": "per alpha",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "per"
+      ],
+      "reviewed_ast_sha256": "1bc11c3448c2b44215986da59f22a6690f5dbfedc266401f6632c14401ab45cf",
+      "consumers": []
+    },
+    {
+      "id": "learning.per_beta_start",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "PER_BETA_START"
+      },
+      "unit": "dimensionless exponent",
+      "purpose": "per beta start",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "per"
+      ],
+      "reviewed_ast_sha256": "e466b4f0babd9fa7ff269f3be39e8acc51d1a65f2da1499fe1db94430ffe8116",
+      "consumers": []
+    },
+    {
+      "id": "learning.per_beta_end",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "PER_BETA_END"
+      },
+      "unit": "dimensionless exponent",
+      "purpose": "per beta end",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "per"
+      ],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": []
+    },
+    {
+      "id": "learning.per_epsilon",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "PER_EPSILON"
+      },
+      "unit": "priority offset",
+      "purpose": "per epsilon",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "per"
+      ],
+      "reviewed_ast_sha256": "8530690a006323b2d55a0633fe64f6581a15bcdf80eee5733c6547397e763ef2",
+      "consumers": []
+    },
+    {
+      "id": "learning.min_green_time",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "MIN_GREEN_TIME"
+      },
+      "unit": "s",
+      "purpose": "min green time",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ce9ef4a87ada7497fec24546b0e1a28901904ee90e5e4ff7b6ea3813d5eea2ae",
+      "consumers": []
+    },
+    {
+      "id": "learning.max_green_time",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "MAX_GREEN_TIME"
+      },
+      "unit": "s",
+      "purpose": "max green time",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "d8a1159f9a3856a1ba7949b126249ff1b4b6f4ede1d75afa46c172e34f20bdd9",
+      "consumers": []
+    },
+    {
+      "id": "learning.starvation_threshold",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "STARVATION_THRESHOLD"
+      },
+      "unit": "s",
+      "purpose": "starvation threshold",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e318b988b7d7c792deb0ff5820a1e654bb48c831ca748cc5df4cd7d3871bf06d",
+      "consumers": []
+    },
+    {
+      "id": "learning.decision_dt",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "DECISION_DT"
+      },
+      "unit": "s",
+      "purpose": "decision dt",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "learning.training_lambda",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "TRAINING_LAMBDA"
+      },
+      "unit": "vehicles/s, whole junction",
+      "purpose": "training lambda",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "9a91a2df174d8ffdc850d55b5dfc469abc27454dd79d39f75be4ea9296141495",
+      "consumers": []
+    },
+    {
+      "id": "learning.eval_lambda",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "EVAL_LAMBDA"
+      },
+      "unit": "vehicles/s, whole junction",
+      "purpose": "eval lambda",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "58547221ee78862df0bb04b94411232b1c0ac1918af7004d5c66795b18b1b8b8",
+      "consumers": []
+    },
+    {
+      "id": "learning.forecast_dims",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "FORECAST_DIMS"
+      },
+      "unit": "features",
+      "purpose": "forecast dims",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "1f3154c8c25a6c46296246c0fa4e72be3ed39096902413adf1185cf2ff1fddd3",
+      "consumers": []
+    },
+    {
+      "id": "learning.obs_version",
+      "source": {
+        "file": "server/app/rl/hyperparams.py",
+        "scope": "HyperParams",
+        "kind": "assignment",
+        "target": "OBS_VERSION"
+      },
+      "unit": "schema identifier",
+      "purpose": "obs version",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local/adopted learning default, not a traffic-specific optimum. PER alpha/beta match a published proportional-replay setting; the priority offset remains a local choice.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e658828e5a293802de3aec9e69f9cf3c7b10593fffcd109b57bf934d69733a5a",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.min_green_duration",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "assignment",
+        "target": "self.min_green_duration"
+      },
+      "unit": "s",
+      "purpose": "min green duration",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Synthetic timing convention; field deployment needs site-specific signal engineering. Maximum/starvation authority is outside the basic per-tick FSM.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ce9ef4a87ada7497fec24546b0e1a28901904ee90e5e4ff7b6ea3813d5eea2ae",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.fixed_duration",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "assignment",
+        "target": "self.fixed_duration"
+      },
+      "unit": "s",
+      "purpose": "fixed duration",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Synthetic timing convention; field deployment needs site-specific signal engineering. Maximum/starvation authority is outside the basic per-tick FSM.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ce9ef4a87ada7497fec24546b0e1a28901904ee90e5e4ff7b6ea3813d5eea2ae",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.yellow_duration",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "assignment",
+        "target": "self.yellow_duration"
+      },
+      "unit": "s",
+      "purpose": "yellow duration",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Synthetic timing convention; field deployment needs site-specific signal engineering. Maximum/starvation authority is outside the basic per-tick FSM.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.starvation_threshold",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "assignment",
+        "target": "self.STARVATION_THRESHOLD"
+      },
+      "unit": "s",
+      "purpose": "starvation threshold",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Synthetic timing convention; field deployment needs site-specific signal engineering. Maximum/starvation authority is outside the basic per-tick FSM.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e318b988b7d7c792deb0ff5820a1e654bb48c831ca748cc5df4cd7d3871bf06d",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.max_green_time",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "assignment",
+        "target": "self.MAX_GREEN_TIME"
+      },
+      "unit": "s",
+      "purpose": "max green time",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Synthetic timing convention; field deployment needs site-specific signal engineering. Maximum/starvation authority is outside the basic per-tick FSM.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "d8a1159f9a3856a1ba7949b126249ff1b4b6f4ede1d75afa46c172e34f20bdd9",
+      "consumers": []
+    },
+    {
+      "id": "custom.signal.all_red",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal.__init__",
+        "kind": "default",
+        "target": "red_duration"
+      },
+      "unit": "s",
+      "purpose": "Default all-red clearance",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Application settings or ScenarioConfig.red_duration override this constructor default.",
+      "references": [],
+      "reviewed_ast_sha256": "022c56809209a4ff9fbb0c9f001593ceb31714dc930e8eb022fb186f5b2eb797",
+      "consumers": []
+    },
+    {
+      "id": "custom.stop_line",
+      "source": {
+        "file": "server/app/simulation/intersection.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "STOP_LINE"
+      },
+      "unit": "normalized path position",
+      "purpose": "Synthetic stop-line coordinate, not metres",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "77a136cd9fae500c1608bcf6e5814b9f71081449b6e61409beb49621a79be813",
+      "consumers": []
+    },
+    {
+      "id": "custom.default_speed",
+      "source": {
+        "file": "server/app/simulation/vehicle.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "DEFAULT_SPEED"
+      },
+      "unit": "normalized path units/s",
+      "purpose": "Synthetic moving speed, not a measured free-flow speed",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "6cb74bfe6bd7b3abe0dc9b81b9b7bbaa59c6ce19fcff2d6db297c7434afd1d23",
+      "consumers": []
+    },
+    {
+      "id": "custom.max_queue",
+      "source": {
+        "file": "server/app/simulation/spawner.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_QUEUE"
+      },
+      "unit": "vehicles/movement lane",
+      "purpose": "Visible storage; excess demand remains upstream",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ded20a45cbe87e90818dd257729f7fe651150d0a734a4441bf348f54541f2442",
+      "consumers": []
+    },
+    {
+      "id": "custom.max_cap",
+      "source": {
+        "file": "server/app/simulation/traffic_math.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_CAP"
+      },
+      "unit": "vehicles",
+      "purpose": "Pressure divisor, not lane storage or tanh observation scale",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "28d2586e9ed257f47938bbf8b3246eafe1ec91507efaaa7e8103443a3d2ce60c",
+      "consumers": []
+    },
+    {
+      "id": "custom.dt",
+      "source": {
+        "file": "server/app/simulation/environment.py",
+        "scope": "TrafficEnv.step",
+        "kind": "call_keyword",
+        "call": "self.intersection.tick",
+        "target": "dt"
+      },
+      "unit": "s/tick",
+      "purpose": "Physical custom-simulator timestep",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a270ddb9e0765184c77aa05a603b2fabfa8bb4420e1be9dfbfd1177918388c36",
+      "consumers": []
+    },
+    {
+      "id": "custom.spacing",
+      "source": {
+        "file": "server/app/simulation/intersection.py",
+        "scope": "Intersection.tick",
+        "kind": "assignment",
+        "target": "MIN_DIST"
+      },
+      "unit": "normalized path units",
+      "purpose": "Synthetic minimum spacing and incident-headway surrogate basis",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0099b46e604150e02efbf0ddf39f467d9c753cc0b24f427010a4328a87d4dbf7",
+      "consumers": []
+    },
+    {
+      "id": "shield.min_green_time",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.__init__",
+        "kind": "default",
+        "target": "min_green_time"
+      },
+      "unit": "s",
+      "purpose": "Additional rule shield: min_green_time",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Configured rule guard, related to shielding; not synthesized temporal-logic guarantees or measured legal timings.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "ce9ef4a87ada7497fec24546b0e1a28901904ee90e5e4ff7b6ea3813d5eea2ae",
+      "consumers": []
+    },
+    {
+      "id": "shield.max_green_time",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.__init__",
+        "kind": "default",
+        "target": "max_green_time"
+      },
+      "unit": "s",
+      "purpose": "Additional rule shield: max_green_time",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Configured rule guard, related to shielding; not synthesized temporal-logic guarantees or measured legal timings.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "d8a1159f9a3856a1ba7949b126249ff1b4b6f4ede1d75afa46c172e34f20bdd9",
+      "consumers": []
+    },
+    {
+      "id": "shield.yellow_duration",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.__init__",
+        "kind": "default",
+        "target": "yellow_duration"
+      },
+      "unit": "s",
+      "purpose": "Additional rule shield: yellow_duration",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Configured rule guard, related to shielding; not synthesized temporal-logic guarantees or measured legal timings.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "shield.red_duration",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.__init__",
+        "kind": "default",
+        "target": "red_duration"
+      },
+      "unit": "s",
+      "purpose": "Additional rule shield: red_duration",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Configured rule guard, related to shielding; not synthesized temporal-logic guarantees or measured legal timings.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "022c56809209a4ff9fbb0c9f001593ceb31714dc930e8eb022fb186f5b2eb797",
+      "consumers": []
+    },
+    {
+      "id": "shield.starvation_threshold",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.__init__",
+        "kind": "default",
+        "target": "starvation_threshold"
+      },
+      "unit": "s",
+      "purpose": "Additional rule shield: starvation_threshold",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Configured rule guard, related to shielding; not synthesized temporal-logic guarantees or measured legal timings.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "e318b988b7d7c792deb0ff5820a1e654bb48c831ca748cc5df4cd7d3871bf06d",
+      "consumers": []
+    },
+    {
+      "id": "supervisor.threshold_high",
+      "source": {
+        "file": "server/app/controllers/supervisor.py",
+        "scope": "ControllerSupervisor.__init__",
+        "kind": "default",
+        "target": "threshold_high"
+      },
+      "unit": "dimensionless score",
+      "purpose": "Authority switching threshold_high",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Fitted synthetic-error calibration and explicit controller settings may override. Calls convert to seconds only at the declared update cadence.",
+      "references": [],
+      "reviewed_ast_sha256": "49e841022818c127f893764cab9de11939eeedf2a3ec77e1cfb5732525991625",
+      "consumers": []
+    },
+    {
+      "id": "supervisor.threshold_low",
+      "source": {
+        "file": "server/app/controllers/supervisor.py",
+        "scope": "ControllerSupervisor.__init__",
+        "kind": "default",
+        "target": "threshold_low"
+      },
+      "unit": "dimensionless score",
+      "purpose": "Authority switching threshold_low",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Fitted synthetic-error calibration and explicit controller settings may override. Calls convert to seconds only at the declared update cadence.",
+      "references": [],
+      "reviewed_ast_sha256": "60f402c9c5241ce9e251543988a07bec2c6c220275c89680b909b0ad7fa309cf",
+      "consumers": []
+    },
+    {
+      "id": "supervisor.min_dwell_steps",
+      "source": {
+        "file": "server/app/controllers/supervisor.py",
+        "scope": "ControllerSupervisor.__init__",
+        "kind": "default",
+        "target": "min_dwell_steps"
+      },
+      "unit": "update calls",
+      "purpose": "Authority switching min_dwell_steps",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Fitted synthetic-error calibration and explicit controller settings may override. Calls convert to seconds only at the declared update cadence.",
+      "references": [],
+      "reviewed_ast_sha256": "f66592253d43635d20ec829ef15515121b4630f2ea817a865c639a04a356374b",
+      "consumers": []
+    },
+    {
+      "id": "supervisor.recovery_window_steps",
+      "source": {
+        "file": "server/app/controllers/supervisor.py",
+        "scope": "ControllerSupervisor.__init__",
+        "kind": "default",
+        "target": "recovery_window_steps"
+      },
+      "unit": "update calls",
+      "purpose": "Authority switching recovery_window_steps",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Fitted synthetic-error calibration and explicit controller settings may override. Calls convert to seconds only at the declared update cadence.",
+      "references": [],
+      "reviewed_ast_sha256": "a2838193f927321540fb9a36355934a87e15ba202009114f32bc7e4a1f2ec794",
+      "consumers": []
+    },
+    {
+      "id": "forecast.tau_5s",
+      "source": {
+        "file": "server/app/simulation/demand_forecast.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_TAU_5S"
+      },
+      "unit": "s",
+      "purpose": "EWMA feature convention _TAU_5S",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0e52caa456688a049c95f6faec77c2bb008ee93e69d7648aa4201442eea9f491",
+      "consumers": []
+    },
+    {
+      "id": "forecast.tau_10s",
+      "source": {
+        "file": "server/app/simulation/demand_forecast.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_TAU_10S"
+      },
+      "unit": "s",
+      "purpose": "EWMA feature convention _TAU_10S",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "28d2586e9ed257f47938bbf8b3246eafe1ec91507efaaa7e8103443a3d2ce60c",
+      "consumers": []
+    },
+    {
+      "id": "forecast.tau_20s",
+      "source": {
+        "file": "server/app/simulation/demand_forecast.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_TAU_20S"
+      },
+      "unit": "s",
+      "purpose": "EWMA feature convention _TAU_20S",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "2ef989de201702ad572d82320805a8e76b791067a678d21177312280a196893e",
+      "consumers": []
+    },
+    {
+      "id": "forecast.max_arrival_rate",
+      "source": {
+        "file": "server/app/simulation/demand_forecast.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_MAX_ARRIVAL_RATE"
+      },
+      "unit": "vehicles/s",
+      "purpose": "EWMA feature convention _MAX_ARRIVAL_RATE",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "forecast.growth_window_seconds",
+      "source": {
+        "file": "server/app/simulation/demand_forecast.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_GROWTH_WINDOW_SECONDS"
+      },
+      "unit": "s",
+      "purpose": "EWMA feature convention _GROWTH_WINDOW_SECONDS",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "28d2586e9ed257f47938bbf8b3246eafe1ec91507efaaa7e8103443a3d2ce60c",
+      "consumers": []
+    },
+    {
+      "id": "actuated.gap_threshold",
+      "source": {
+        "file": "server/app/controllers/actuated.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_GAP_THRESHOLD"
+      },
+      "unit": "s",
+      "purpose": "Gap-out controller default",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "b39fba0349e7f2584424c8ec85528c0a85a2379bb4359c5e85bdfaf38a4ab38b",
+      "consumers": []
+    },
+    {
+      "id": "actuated.min_green_time",
+      "source": {
+        "file": "server/app/controllers/actuated.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_MIN_GREEN_TIME"
+      },
+      "unit": "s",
+      "purpose": "Gap-out controller default",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ce9ef4a87ada7497fec24546b0e1a28901904ee90e5e4ff7b6ea3813d5eea2ae",
+      "consumers": []
+    },
+    {
+      "id": "actuated.max_green_time",
+      "source": {
+        "file": "server/app/controllers/actuated.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "_MAX_GREEN_TIME"
+      },
+      "unit": "s",
+      "purpose": "Gap-out controller default",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "d8a1159f9a3856a1ba7949b126249ff1b4b6f4ede1d75afa46c172e34f20bdd9",
+      "consumers": []
+    },
+    {
+      "id": "uncertainty.temperature",
+      "source": {
+        "file": "research/uncertainty/estimator.py",
+        "scope": "PerceptionUncertaintyEstimator.__init__",
+        "kind": "default",
+        "target": "temperature"
+      },
+      "unit": "dimensionless",
+      "purpose": "Synthetic-error score temperature",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": []
+    },
+    {
+      "id": "uncertainty.threshold_high",
+      "source": {
+        "file": "research/uncertainty/estimator.py",
+        "scope": "PerceptionUncertaintyEstimator.__init__",
+        "kind": "default",
+        "target": "threshold_high"
+      },
+      "unit": "dimensionless",
+      "purpose": "Synthetic-error score threshold_high",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "49e841022818c127f893764cab9de11939eeedf2a3ec77e1cfb5732525991625",
+      "consumers": []
+    },
+    {
+      "id": "uncertainty.threshold_low",
+      "source": {
+        "file": "research/uncertainty/estimator.py",
+        "scope": "PerceptionUncertaintyEstimator.__init__",
+        "kind": "default",
+        "target": "threshold_low"
+      },
+      "unit": "dimensionless",
+      "purpose": "Synthetic-error score threshold_low",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "60f402c9c5241ce9e251543988a07bec2c6c220275c89680b909b0ad7fa309cf",
+      "consumers": []
+    },
+    {
+      "id": "uncertainty.heuristic_weights",
+      "source": {
+        "file": "research/uncertainty/estimator.py",
+        "scope": "PerceptionUncertaintyEstimator.__init__",
+        "kind": "assignment",
+        "target": "self.weights"
+      },
+      "unit": "dimensionless weights",
+      "purpose": "Seven heuristic feature weights",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Heuristic fallback weights are not fitted probabilities; a supplied compatible calibration changes the scoring method.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "fe615252314c36499476b73a17d422cbed0ba271e6c295dc062405ba302e4880",
+      "consumers": []
+    },
+    {
+      "id": "learning.demonstration_loss_weight",
+      "source": {
+        "file": "server/app/rl/dqn_agent.py",
+        "scope": "DQNAgent.__init__",
+        "kind": "assignment",
+        "target": "self.demonstration_loss_weight"
+      },
+      "unit": "loss multiplier",
+      "purpose": "Demonstration margin weight",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "dqfd"
+      ],
+      "reviewed_ast_sha256": "a270ddb9e0765184c77aa05a603b2fabfa8bb4420e1be9dfbfd1177918388c36",
+      "consumers": []
+    },
+    {
+      "id": "learning.adam_epsilon",
+      "source": {
+        "file": "server/app/rl/dqn_agent.py",
+        "scope": "DQNAgent.__init__",
+        "kind": "call_keyword",
+        "call": "optim.Adam",
+        "target": "eps"
+      },
+      "unit": "optimizer numerical stabilizer",
+      "purpose": "Adam epsilon",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e0abf1ebe800fbd81c6fd19cb4fc6c5db31318456a3d3e6648ca0a11d26f6def",
+      "consumers": []
+    },
+    {
+      "id": "learning.gradient_clip",
+      "source": {
+        "file": "server/app/rl/dqn_agent.py",
+        "scope": "DQNAgent.train_step",
+        "kind": "call_keyword",
+        "call": "torch.nn.utils.clip_grad_norm_",
+        "target": "max_norm"
+      },
+      "unit": "gradient L2 norm",
+      "purpose": "Gradient norm clipping",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "28d2586e9ed257f47938bbf8b3246eafe1ec91507efaaa7e8103443a3d2ce60c",
+      "consumers": []
+    },
+    {
+      "id": "network.feature_layer",
+      "source": {
+        "file": "server/app/rl/dqn_network.py",
+        "scope": "DuelingDQNNetwork.__init__",
+        "kind": "assignment",
+        "target": "self.feature_layer"
+      },
+      "unit": "network layers",
+      "purpose": "Dueling network feature_layer",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "dueling"
+      ],
+      "reviewed_ast_sha256": "418ff9e40ceee0c7f3b0d120f0b5e1ea5c135acd72ef0e6c27da234a00be387c",
+      "consumers": []
+    },
+    {
+      "id": "network.value_stream",
+      "source": {
+        "file": "server/app/rl/dqn_network.py",
+        "scope": "DuelingDQNNetwork.__init__",
+        "kind": "assignment",
+        "target": "self.value_stream"
+      },
+      "unit": "network layers",
+      "purpose": "Dueling network value_stream",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "dueling"
+      ],
+      "reviewed_ast_sha256": "a8f8afe53699057841b0e16070aa626ac17d17ddd87197b5392a3833e3a38a4c",
+      "consumers": []
+    },
+    {
+      "id": "network.advantage_stream",
+      "source": {
+        "file": "server/app/rl/dqn_network.py",
+        "scope": "DuelingDQNNetwork.__init__",
+        "kind": "assignment",
+        "target": "self.advantage_stream"
+      },
+      "unit": "network layers",
+      "purpose": "Dueling network advantage_stream",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "dueling"
+      ],
+      "reviewed_ast_sha256": "fd7a4c1018da846180a30890bfdd7dcd18040b0288b73323383ca8b0326bc254",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.episodes",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--episodes",
+        "target": "default"
+      },
+      "unit": "episodes",
+      "purpose": "Research CLI default --episodes",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "4fd6eda196c971ee9362d118ab849ffd6e2bfd3489bbf823abba5bb76962c7f5",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.seed",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--seed",
+        "target": "default"
+      },
+      "unit": "seed identifier",
+      "purpose": "Research CLI default --seed",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "0fc5426556308ef85bc9efb705c657767fcdeddb9aaa0d492f436eea59c57d83",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.validate-every",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--validate-every",
+        "target": "default"
+      },
+      "unit": "episodes",
+      "purpose": "Research CLI default --validate-every",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "14e182932528b6c448913ce34d285784536ff26e86b383ecd370e4ef72396206",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.demo-episodes",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--demo-episodes",
+        "target": "default"
+      },
+      "unit": "episodes",
+      "purpose": "Research CLI default --demo-episodes",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "2e53e925e0b8e70bb040aab31a07463c3ace2097b2eb593e8b1872c5d40bfe44",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.pretrain-updates",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--pretrain-updates",
+        "target": "default"
+      },
+      "unit": "optimizer updates",
+      "purpose": "Research CLI default --pretrain-updates",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "4f7b6a7359c51bddc1cec35eee6483511d58c59cabd521fdcaa19f1411bab7ea",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.learning-rate",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--learning-rate",
+        "target": "default"
+      },
+      "unit": "optimizer step size",
+      "purpose": "Research CLI default --learning-rate",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "011c38b747ffd79200f8a7ba6be9226c4631421a435fef920012c34bdf669504",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.imitation-updates",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--imitation-updates",
+        "target": "default"
+      },
+      "unit": "optimizer updates",
+      "purpose": "Research CLI default --imitation-updates",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "3665a31e7cefc7e4d62b864a2de16f8ac2d46f669e7695b79bdeb398cebfcfae",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.target-update",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--target-update",
+        "target": "default"
+      },
+      "unit": "optimizer updates",
+      "purpose": "Research CLI default --target-update",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "4b267d5604773aa993a0f24455425dce81243bd4d332a7d88ab821296e7188b6",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.episode-steps",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--episode-steps",
+        "target": "default"
+      },
+      "unit": "simulation ticks",
+      "purpose": "Research CLI default --episode-steps",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "3665a31e7cefc7e4d62b864a2de16f8ac2d46f669e7695b79bdeb398cebfcfae",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.demo-loss-weight",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--demo-loss-weight",
+        "target": "default"
+      },
+      "unit": "loss multiplier",
+      "purpose": "Research CLI default --demo-loss-weight",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "a270ddb9e0765184c77aa05a603b2fabfa8bb4420e1be9dfbfd1177918388c36",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.demo-loss-decay-episodes",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--demo-loss-decay-episodes",
+        "target": "default"
+      },
+      "unit": "episodes",
+      "purpose": "Research CLI default --demo-loss-decay-episodes",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "3665a31e7cefc7e4d62b864a2de16f8ac2d46f669e7695b79bdeb398cebfcfae",
+      "consumers": []
+    },
+    {
+      "id": "research_cli.max-wall-seconds",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "main",
+        "kind": "call_keyword",
+        "call": "parser.add_argument",
+        "tag": "--max-wall-seconds",
+        "target": "default"
+      },
+      "unit": "s",
+      "purpose": "Research CLI default --max-wall-seconds",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "CLI and frozen protocol arguments are authoritative for a run. Zero budget/step defaults are sentinels, not executed physical zero.",
+      "references": [],
+      "reviewed_ast_sha256": "3665a31e7cefc7e4d62b864a2de16f8ac2d46f669e7695b79bdeb398cebfcfae",
+      "consumers": []
+    },
+    {
+      "id": "ppo.gamma",
+      "source": {
+        "file": "research/training/ppo.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "GAMMA"
+      },
+      "unit": "discount per macro reference",
+      "purpose": "Research-only PPO/GAE default",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "ppo",
+        "gae"
+      ],
+      "reviewed_ast_sha256": "0a18dd89518a08a4ef7b5caabbec3c613a51f8ffc3a3536185e3787e46cc0c8c",
+      "consumers": []
+    },
+    {
+      "id": "ppo.lambda",
+      "source": {
+        "file": "research/training/ppo.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "LAMBDA"
+      },
+      "unit": "GAE decay",
+      "purpose": "Research-only PPO/GAE default",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "ppo",
+        "gae"
+      ],
+      "reviewed_ast_sha256": "16484fd3f9b7f09a2cc570066ae7d5f086d99c156b4fead0b71d1a95b10746c5",
+      "consumers": []
+    },
+    {
+      "id": "ppo.clip",
+      "source": {
+        "file": "research/training/ppo.py",
+        "scope": "clipped_loss",
+        "kind": "default",
+        "target": "clip"
+      },
+      "unit": "probability-ratio offset",
+      "purpose": "PPO clipped-surrogate width",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "ppo"
+      ],
+      "reviewed_ast_sha256": "40d164f7a7beb3eadb4facc5848dc23b2dabacd6b38bf79ebc3e3d18e0d954f3",
+      "consumers": []
+    },
+    {
+      "id": "observation.temporal_schema",
+      "source": {
+        "file": "server/app/rl/observations.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "TEMPORAL_SCHEMA"
+      },
+      "unit": "feature schema",
+      "purpose": "Versioned delivered-input layout and units",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "derived",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "f470f9e6d43485991ae82aa23bb696c8f59ed9961578c4ac12364b2b7cf796fd",
+      "consumers": []
+    },
+    {
+      "id": "observation.spatial_schema",
+      "source": {
+        "file": "server/app/rl/observations.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "SPATIAL_SCHEMA"
+      },
+      "unit": "feature schema",
+      "purpose": "Versioned delivered-input layout and units",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "derived",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "2b3a76bb2e001c274d829a8f204be9906278ed6bb071368e156ce0c02ff58e78",
+      "consumers": []
+    },
+    {
+      "id": "restoration.feature_dim",
+      "source": {
+        "file": "research/observation/count_restoration.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "FEATURE_DIM"
+      },
+      "unit": "features",
+      "purpose": "Research-only restoration convention",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "2ac4b733933d293bd4e54244fb69da0dba330c8ffc89c86e06cc09c2e2bfc332",
+      "consumers": []
+    },
+    {
+      "id": "restoration.ema_alphas",
+      "source": {
+        "file": "research/observation/count_restoration.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "EMA_ALPHAS"
+      },
+      "unit": "smoothing-factor grid",
+      "purpose": "Research-only restoration convention",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "c2913bb00827a07e613ab9eccb2fdacec7091fbf0f289a6065d1a84915eb2aa3",
+      "consumers": []
+    },
+    {
+      "id": "arrival.extension_seconds",
+      "source": {
+        "file": "research/policies/arrival_extension.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "EXTENSION_SECONDS"
+      },
+      "unit": "s",
+      "purpose": "Arrival-window experiment convention",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Frozen local proxy choice; does not certify full-run benefit or calibrated stop-line crossing bounds.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "advanced_mp"
+      ],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "arrival.max_packet_age",
+      "source": {
+        "file": "research/policies/arrival_extension.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_PACKET_AGE"
+      },
+      "unit": "s",
+      "purpose": "Arrival-window experiment convention",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Frozen local proxy choice; does not certify full-run benefit or calibrated stop-line crossing bounds.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "advanced_mp"
+      ],
+      "reviewed_ast_sha256": "58547221ee78862df0bb04b94411232b1c0ac1918af7004d5c66795b18b1b8b8",
+      "consumers": []
+    },
+    {
+      "id": "arrival.proxy_margin_vehicle_seconds",
+      "source": {
+        "file": "research/policies/arrival_extension.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "PROXY_MARGIN_VEHICLE_SECONDS"
+      },
+      "unit": "vehicle-s",
+      "purpose": "Arrival-window experiment convention",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Frozen local proxy choice; does not certify full-run benefit or calibrated stop-line crossing bounds.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "advanced_mp"
+      ],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.stop_line",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "stop_line"
+      },
+      "unit": "normalized path position",
+      "purpose": "Declared synthetic track calibration stop_line",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "77a136cd9fae500c1608bcf6e5814b9f71081449b6e61409beb49621a79be813",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.max_speed",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "max_speed"
+      },
+      "unit": "normalized path units/s",
+      "purpose": "Declared synthetic track calibration max_speed",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "6cb74bfe6bd7b3abe0dc9b81b9b7bbaa59c6ce19fcff2d6db297c7434afd1d23",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.spacing",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "spacing"
+      },
+      "unit": "normalized path units",
+      "purpose": "Declared synthetic track calibration spacing",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0099b46e604150e02efbf0ddf39f467d9c753cc0b24f427010a4328a87d4dbf7",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.position_error",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "position_error"
+      },
+      "unit": "normalized path units",
+      "purpose": "Declared synthetic track calibration position_error",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "4e28b35087bc11351d80c74d74f3be4473b87b5ef72ccf96275c25bcc230d8be",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.history_seconds",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "history_seconds"
+      },
+      "unit": "s",
+      "purpose": "Declared synthetic track calibration history_seconds",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": []
+    },
+    {
+      "id": "arrival_calibration.minimum_span",
+      "source": {
+        "file": "research/observation/arrival_tracks.py",
+        "scope": "Calibration",
+        "kind": "assignment",
+        "target": "minimum_span"
+      },
+      "unit": "s",
+      "purpose": "Declared synthetic track calibration minimum_span",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Synthetic dedicated movement-lane assumption; no measured camera road-plane calibration supplied.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e466b4f0babd9fa7ff269f3be39e8acc51d1a65f2da1499fe1db94430ffe8116",
+      "consumers": []
+    },
+    {
+      "id": "camera.yolo_conf_threshold",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "YOLO_CONF_THRESHOLD"
+      },
+      "unit": "confidence score",
+      "purpose": "Camera declaration YOLO_CONF_THRESHOLD",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "yolo"
+      ],
+      "reviewed_ast_sha256": "3c8f2c4ad5ad41f6e8999bbb28d7bc8a7c36e615a6d10940c376ac9d6219d778",
+      "consumers": []
+    },
+    {
+      "id": "camera.yolo_nms_iou",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "YOLO_NMS_IOU"
+      },
+      "unit": "IoU",
+      "purpose": "Camera declaration YOLO_NMS_IOU",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "yolo"
+      ],
+      "reviewed_ast_sha256": "49e841022818c127f893764cab9de11939eeedf2a3ec77e1cfb5732525991625",
+      "consumers": []
+    },
+    {
+      "id": "camera.yolo_imgsz",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "YOLO_IMGSZ"
+      },
+      "unit": "pixels",
+      "purpose": "Camera declaration YOLO_IMGSZ",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [
+        "yolo"
+      ],
+      "reviewed_ast_sha256": "7faf97ce4b842cb1b40fd74432f654156e0e7bc71e53cf3715f582345d29db8f",
+      "consumers": []
+    },
+    {
+      "id": "camera.use_onnx",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "USE_ONNX"
+      },
+      "unit": "format preference flag",
+      "purpose": "Camera declaration USE_ONNX",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "fc49e3ff31db631b11fdae65c1243eea50afe64ff7f1cddca82c434c55e40498",
+      "consumers": []
+    },
+    {
+      "id": "camera.vehicle_queue_weights",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "VEHICLE_QUEUE_WEIGHTS"
+      },
+      "unit": "relative vehicle weights",
+      "purpose": "Camera declaration VEHICLE_QUEUE_WEIGHTS",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "270aeb621847098bf6e524594162baed815be9375dbac12c6297aa53c6dcfeee",
+      "consumers": []
+    },
+    {
+      "id": "camera.pipeline_fps",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "PIPELINE_FPS"
+      },
+      "unit": "frames/s target",
+      "purpose": "Camera declaration PIPELINE_FPS",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": []
+    },
+    {
+      "id": "camera.frame_buffer_size",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "FRAME_BUFFER_SIZE"
+      },
+      "unit": "declared frame capacity",
+      "purpose": "Camera declaration FRAME_BUFFER_SIZE",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "14e182932528b6c448913ce34d285784536ff26e86b383ecd370e4ef72396206",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/video_processor.py",
+            "scope": "RealtimeFrameGrabber",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "ceed044b2ab9770c1c6f0559d8da42d7c1527e7a85fe78d4667d19babcf15238"
+        }
+      ]
+    },
+    {
+      "id": "camera.temporal_smoothing_alpha",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "TEMPORAL_SMOOTHING_ALPHA"
+      },
+      "unit": "smoothing factor",
+      "purpose": "Camera declaration TEMPORAL_SMOOTHING_ALPHA",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "b2c45f7fe015c16e902eaa49d31812d3cfe6d1f34a388beac50ffb8ec2518385",
+      "consumers": []
+    },
+    {
+      "id": "camera.max_queue_cap",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_QUEUE_CAP"
+      },
+      "unit": "vehicles, pressure divisor",
+      "purpose": "Camera declaration MAX_QUEUE_CAP",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "28d2586e9ed257f47938bbf8b3246eafe1ec91507efaaa7e8103443a3d2ce60c",
+      "consumers": []
+    },
+    {
+      "id": "camera.max_green_time",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_GREEN_TIME"
+      },
+      "unit": "s, feature scale",
+      "purpose": "Camera declaration MAX_GREEN_TIME",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "d8a1159f9a3856a1ba7949b126249ff1b4b6f4ede1d75afa46c172e34f20bdd9",
+      "consumers": []
+    },
+    {
+      "id": "camera.starvation_threshold",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "STARVATION_THRESHOLD"
+      },
+      "unit": "s, feature scale",
+      "purpose": "Camera declaration STARVATION_THRESHOLD",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e318b988b7d7c792deb0ff5820a1e654bb48c831ca748cc5df4cd7d3871bf06d",
+      "consumers": []
+    },
+    {
+      "id": "camera.obs_dim",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "OBS_DIM"
+      },
+      "unit": "features",
+      "purpose": "Camera declaration OBS_DIM",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "ebad280ecd700cdcfecaef7c98bcb597dcc107cd12666b3082dbea5b3313bda2",
+      "consumers": []
+    },
+    {
+      "id": "camera.max_upload_size_mb",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_UPLOAD_SIZE_MB"
+      },
+      "unit": "MiB (binary upload limit)",
+      "purpose": "Camera declaration MAX_UPLOAD_SIZE_MB",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0d61f23d852acf5d9f628f8ecbed9250e66fc688618e0bc3e9c83da564d73bf6",
+      "consumers": []
+    },
+    {
+      "id": "camera.track_thresh",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "TRACK_THRESH"
+      },
+      "unit": "unused confidence threshold",
+      "purpose": "Camera declaration TRACK_THRESH",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "e466b4f0babd9fa7ff269f3be39e8acc51d1a65f2da1499fe1db94430ffe8116",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+            "scope": "VehicleTracker",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "67b51a9be037519d1f50fd73bae6b290aa086c20ee904706e74683ee5ee03672"
+        },
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/cctv_pipeline.py",
+            "scope": "CCTVPipeline.__init__",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d777894bd5b4703f49c9d7c0eb28f93c72fd732f2a9910ddd37343bdc10dcce2"
+        }
+      ]
+    },
+    {
+      "id": "camera.track_buffer",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "TRACK_BUFFER"
+      },
+      "unit": "unused track-buffer declaration",
+      "purpose": "Camera declaration TRACK_BUFFER",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "14e182932528b6c448913ce34d285784536ff26e86b383ecd370e4ef72396206",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+            "scope": "VehicleTracker",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "67b51a9be037519d1f50fd73bae6b290aa086c20ee904706e74683ee5ee03672"
+        },
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/cctv_pipeline.py",
+            "scope": "CCTVPipeline.__init__",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d777894bd5b4703f49c9d7c0eb28f93c72fd732f2a9910ddd37343bdc10dcce2"
+        }
+      ]
+    },
+    {
+      "id": "camera.match_thresh",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MATCH_THRESH"
+      },
+      "unit": "unused association threshold",
+      "purpose": "Camera declaration MATCH_THRESH",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "9a91a2df174d8ffdc850d55b5dfc469abc27454dd79d39f75be4ea9296141495",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+            "scope": "VehicleTracker",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "67b51a9be037519d1f50fd73bae6b290aa086c20ee904706e74683ee5ee03672"
+        },
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/cctv_pipeline.py",
+            "scope": "CCTVPipeline.__init__",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d777894bd5b4703f49c9d7c0eb28f93c72fd732f2a9910ddd37343bdc10dcce2"
+        }
+      ]
+    },
+    {
+      "id": "camera.movement_threshold_px",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MOVEMENT_THRESHOLD_PX"
+      },
+      "unit": "pixels",
+      "purpose": "Camera declaration MOVEMENT_THRESHOLD_PX",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "0e52caa456688a049c95f6faec77c2bb008ee93e69d7648aa4201442eea9f491",
+      "consumers": []
+    },
+    {
+      "id": "camera.congestion_thresholds",
+      "source": {
+        "file": "server/app/realworld/models/config.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "CONGESTION_THRESHOLDS"
+      },
+      "unit": "display ratios",
+      "purpose": "Camera declaration CONGESTION_THRESHOLDS",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "declared_unused",
+      "justification": "Declared value is not independent field calibration. Inactive knobs are not reported as effective tracker/transport settings; actual pixel rules are in the reviewed consumer.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "7be9ee84fbfd09cbc27608e6f5a51ccd680318fb90304562a5a1c7410f7ab8ac",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/cctv_pipeline.py",
+            "scope": "CCTVPipeline",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "7e80091b4357b052fc42677370978dd70622be08b3a0278d768865b925b1fe16"
+        }
+      ]
+    },
+    {
+      "id": "camera.actual_match_radius",
+      "source": {
+        "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+        "scope": "VehicleTracker.update",
+        "kind": "assignment",
+        "target": "MAX_MATCH_DIST"
+      },
+      "unit": "pixels",
+      "purpose": "Actual nearest-centroid match gate",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "b6fa5555afcdc910147d30f437f2d346293abafa4b8e0773dd899d66021aabdb",
+      "consumers": []
+    },
+    {
+      "id": "camera.actual_track_expiry",
+      "source": {
+        "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+        "scope": "VehicleTracker.update",
+        "kind": "compare_rhs",
+        "operator": "LtE",
+        "target": "now_ms - track.last_seen_ms"
+      },
+      "unit": "ms",
+      "purpose": "Actual source-clock track expiry",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "62dfbf88ad54ffb87e0dbbc6d147a411a71c46907bde4534829b24e5c1a85327",
+      "consumers": []
+    },
+    {
+      "id": "camera.actual_history_depth",
+      "source": {
+        "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+        "scope": "VehicleTracker.update",
+        "kind": "compare_rhs",
+        "operator": "Gt",
+        "target": "len(track.centroid_history)"
+      },
+      "unit": "samples",
+      "purpose": "Actual centroid history retention threshold",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a2838193f927321540fb9a36355934a87e15ba202009114f32bc7e4a1f2ec794",
+      "consumers": []
+    },
+    {
+      "id": "camera.crossingobservation.max_gap_s",
+      "source": {
+        "file": "server/app/realworld/models/crossings.py",
+        "scope": "CrossingObservation",
+        "kind": "assignment",
+        "target": "max_gap_s"
+      },
+      "unit": "s",
+      "purpose": "Source-time event gate max_gap_s",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/stop_line_crossings.py",
+            "scope": "StopLineCrossings",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "874d7a509a16e73ed6d25bb4732f6ca45e059de1effe64734a90e59c1579c27b"
+        }
+      ]
+    },
+    {
+      "id": "camera.crossingobservation.deadband_px",
+      "source": {
+        "file": "server/app/realworld/models/crossings.py",
+        "scope": "CrossingObservation",
+        "kind": "assignment",
+        "target": "deadband_px"
+      },
+      "unit": "pixels",
+      "purpose": "Source-time event gate deadband_px",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "447490a807e628a6162661e4da0ccdff0096c92a89ac43ab9a50e7bc7f47f311",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/stop_line_crossings.py",
+            "scope": "StopLineCrossings",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "874d7a509a16e73ed6d25bb4732f6ca45e059de1effe64734a90e59c1579c27b"
+        }
+      ]
+    },
+    {
+      "id": "camera.crossingobservation.max_displacement_px",
+      "source": {
+        "file": "server/app/realworld/models/crossings.py",
+        "scope": "CrossingObservation",
+        "kind": "assignment",
+        "target": "max_displacement_px"
+      },
+      "unit": "pixels",
+      "purpose": "Source-time event gate max_displacement_px",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "b6fa5555afcdc910147d30f437f2d346293abafa4b8e0773dd899d66021aabdb",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/stop_line_crossings.py",
+            "scope": "StopLineCrossings",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "874d7a509a16e73ed6d25bb4732f6ca45e059de1effe64734a90e59c1579c27b"
+        }
+      ]
+    },
+    {
+      "id": "camera.trajectoryobservation.max_gap_s",
+      "source": {
+        "file": "server/app/realworld/models/trajectory_turns.py",
+        "scope": "TrajectoryObservation",
+        "kind": "assignment",
+        "target": "max_gap_s"
+      },
+      "unit": "s",
+      "purpose": "Source-time event gate max_gap_s",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a77ce679a39d58612d22d1de65d61b51b39b980ebe20eded1309aa6215eb9387",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/trajectory_turns.py",
+            "scope": "TrajectoryTurns",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d059610bef1faca876941357dc9ab3a7b535d390867e2d7b2c77dec3123ef435"
+        }
+      ]
+    },
+    {
+      "id": "camera.trajectoryobservation.max_displacement_px",
+      "source": {
+        "file": "server/app/realworld/models/trajectory_turns.py",
+        "scope": "TrajectoryObservation",
+        "kind": "assignment",
+        "target": "max_displacement_px"
+      },
+      "unit": "pixels",
+      "purpose": "Source-time event gate max_displacement_px",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "b6fa5555afcdc910147d30f437f2d346293abafa4b8e0773dd899d66021aabdb",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/trajectory_turns.py",
+            "scope": "TrajectoryTurns",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d059610bef1faca876941357dc9ab3a7b535d390867e2d7b2c77dec3123ef435"
+        }
+      ]
+    },
+    {
+      "id": "camera.trajectoryobservation.max_duration_s",
+      "source": {
+        "file": "server/app/realworld/models/trajectory_turns.py",
+        "scope": "TrajectoryObservation",
+        "kind": "assignment",
+        "target": "max_duration_s"
+      },
+      "unit": "s",
+      "purpose": "Source-time event gate max_duration_s",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "6f3fab6123c5b963e2d75c0499584c2d3a8231521f6bf891b1521260d659379d",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/trajectory_turns.py",
+            "scope": "TrajectoryTurns",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d059610bef1faca876941357dc9ab3a7b535d390867e2d7b2c77dec3123ef435"
+        }
+      ]
+    },
+    {
+      "id": "camera.trajectoryobservation.exit_confirmation_frames",
+      "source": {
+        "file": "server/app/realworld/models/trajectory_turns.py",
+        "scope": "TrajectoryObservation",
+        "kind": "assignment",
+        "target": "exit_confirmation_frames"
+      },
+      "unit": "frames",
+      "purpose": "Source-time event gate exit_confirmation_frames",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "calibration_required",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "72263497eca1fae09934eb2a5fd87010ab1c1319f8a419e68001ccc729cc14da",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/realworld/pipeline/trajectory_turns.py",
+            "scope": "TrajectoryTurns",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d059610bef1faca876941357dc9ab3a7b535d390867e2d7b2c77dec3123ef435"
+        }
+      ]
+    },
+    {
+      "id": "website_request.num_episodes",
+      "source": {
+        "file": "server/app/schemas/training_schema.py",
+        "scope": "StartTrainingRequest",
+        "kind": "assignment",
+        "target": "num_episodes"
+      },
+      "unit": "episodes",
+      "purpose": "Validated website request default",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "63249cf5fdfad8c97bfb99f0e0ec4b75f1c6db6fe3ba62540208eae5246954df",
+      "consumers": []
+    },
+    {
+      "id": "website_request.finetune_lr",
+      "source": {
+        "file": "server/app/schemas/training_schema.py",
+        "scope": "StartTrainingRequest",
+        "kind": "assignment",
+        "target": "finetune_lr"
+      },
+      "unit": "optimizer step size",
+      "purpose": "Validated website request default",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "8f4bb74239a125d5ffb887f8628dadd13d549e5825ff9d42e1b336071786e20c",
+      "consumers": []
+    },
+    {
+      "id": "website_request.finetune_epsilon",
+      "source": {
+        "file": "server/app/schemas/training_schema.py",
+        "scope": "StartTrainingRequest",
+        "kind": "assignment",
+        "target": "finetune_epsilon"
+      },
+      "unit": "probability",
+      "purpose": "Validated website request default",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "169ff7960e1194fab4824f18cb127ac764e0a78099a7e1980ced7f732d08aee3",
+      "consumers": []
+    },
+    {
+      "id": "website_setting.all_red",
+      "source": {
+        "file": "server/app/config.py",
+        "scope": "Settings",
+        "kind": "assignment",
+        "target": "signal_red_duration"
+      },
+      "unit": "s",
+      "purpose": "Application environment setting",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "SIGNAL_RED_DURATION environment configuration; exported source default does not read .env.",
+      "references": [],
+      "reviewed_ast_sha256": "9ab695e9b510322d80e4b3a16d229c520043a32bc7ac7fb86cebb3a0af7275e2",
+      "consumers": []
+    },
+    {
+      "id": "sumo.dt",
+      "source": {
+        "file": "research/audits/sumo_branch_feasibility.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "DT"
+      },
+      "unit": "s/tick",
+      "purpose": "Independent SUMO tick duration",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a270ddb9e0765184c77aa05a603b2fabfa8bb4420e1be9dfbfd1177918388c36",
+      "consumers": []
+    },
+    {
+      "id": "sumo.min_green",
+      "source": {
+        "file": "research/audits/sumo_branch_feasibility.py",
+        "scope": "Signal.request",
+        "kind": "compare_rhs",
+        "operator": "GtE",
+        "target": "self.age"
+      },
+      "unit": "ticks",
+      "purpose": "SUMO minimum green",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "136a684d5960a3ed32fb09c893b9cc731b457ada5c8fadec0cd412b5e79bc99b",
+      "consumers": []
+    },
+    {
+      "id": "sumo.yellow_ticks",
+      "source": {
+        "file": "research/audits/sumo_branch_feasibility.py",
+        "scope": "Signal.advance",
+        "kind": "compare_rhs",
+        "operator": "Eq",
+        "guard": {
+          "left": "self.stage",
+          "value": "yellow"
+        },
+        "target": "self.age"
+      },
+      "unit": "ticks",
+      "purpose": "SUMO stage duration",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "14e182932528b6c448913ce34d285784536ff26e86b383ecd370e4ef72396206",
+      "consumers": []
+    },
+    {
+      "id": "sumo.red_ticks",
+      "source": {
+        "file": "research/audits/sumo_branch_feasibility.py",
+        "scope": "Signal.advance",
+        "kind": "compare_rhs",
+        "operator": "Eq",
+        "guard": {
+          "left": "self.stage",
+          "value": "red"
+        },
+        "target": "self.age"
+      },
+      "unit": "ticks",
+      "purpose": "SUMO stage duration",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "a2838193f927321540fb9a36355934a87e15ba202009114f32bc7e4a1f2ec794",
+      "consumers": []
+    },
+    {
+      "id": "sumo.fixed_green",
+      "source": {
+        "file": "research/policies/sumo_classical.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "FIXED_GREEN_TICKS"
+      },
+      "unit": "ticks",
+      "purpose": "SUMO Fixed actual green",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Local source default retained for reproducibility; no claim of universal optimality or external calibration.",
+      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "references": [],
+      "reviewed_ast_sha256": "4f7b6a7359c51bddc1cec35eee6483511d58c59cabd521fdcaa19f1411bab7ea",
+      "consumers": []
+    }
+  ],
+  "methods": [
+    {
+      "id": "custom_dynamics",
+      "source": {
+        "file": "server/app/simulation/intersection.py",
+        "scope": "Intersection.tick",
+        "kind": "symbol"
+      },
+      "purpose": "Normalized-position traffic stepping and stopped waiting",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "5f153bb4459e04e9ebb6ae33f01755f24fc2cb7d3823a79f96bbf8c180540f89",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "reward_definition",
+      "source": {
+        "file": "server/app/simulation/environment.py",
+        "scope": "TrafficEnv.compute_reward",
+        "kind": "symbol"
+      },
+      "purpose": "Tick-delay, pressure, throughput and explicit timing penalty coefficients",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "8202b345548733fc56dc7e4540063a04be9803891b4388e750018dcb8d615b18",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/simulation/environment.py",
+            "scope": "TrafficEnv.step",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "e370275bae91ca6e4306add701fc924826fd09785753bbdcd02a42dbf95cd88a"
+        }
+      ],
+      "limitations": "Local synthetic reward scales, not fitted traffic utility. v4/v5 differ in physical switch-event attribution."
+    },
+    {
+      "id": "physical_signal",
+      "source": {
+        "file": "server/app/simulation/traffic_signal.py",
+        "scope": "TrafficSignal",
+        "kind": "symbol"
+      },
+      "purpose": "Single executed-lamp authority for queued operator/priority and per-tick policy requests",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "e5bd6ff1740ae2f00585b33697e0acc2abcb508153de8989481e0ed9e3084836",
+      "consumers": [],
+      "limitations": "Synthetic min-green/clearance rules only; no real cabinet, pedestrian or formal collision-safety proof."
+    },
+    {
+      "id": "pressure_control",
+      "source": {
+        "file": "server/app/controllers/max_pressure.py",
+        "scope": "MaxPressureController.act",
+        "kind": "symbol"
+      },
+      "purpose": "Clipped queue-differential pressure with declared destinations",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "pressure"
+      ],
+      "reviewed_ast_sha256": "bd7f79a338c671555f73454279dfde342f119c5b033357526439f354531aa8d2",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "extra_shield",
+      "source": {
+        "file": "server/app/controllers/safety_shield.py",
+        "scope": "SafetyShield.filter_action",
+        "kind": "symbol"
+      },
+      "purpose": "Additional modeled guard/intervention rules",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "shielding"
+      ],
+      "reviewed_ast_sha256": "3e95ebba853d6da7a013324755188f93702f24d06b5ceab1b3040a25c323c82d",
+      "consumers": [],
+      "limitations": "Related shielding concept, not the cited temporal-logic synthesis or inherited guarantee."
+    },
+    {
+      "id": "network",
+      "source": {
+        "file": "server/app/rl/dqn_network.py",
+        "scope": "DuelingDQNNetwork",
+        "kind": "symbol"
+      },
+      "purpose": "Shared numeric features, value/advantage heads and local masked centering",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "dueling"
+      ],
+      "reviewed_ast_sha256": "b490cb28bae350fde88392d1518a2392134d942771a53d08220a345f293da539",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "double_dqn_update",
+      "source": {
+        "file": "server/app/rl/dqn_agent.py",
+        "scope": "DQNAgent.train_step",
+        "kind": "symbol"
+      },
+      "purpose": "Masked Double-DQN, weighted Huber TD, demo margin and gradient clipping",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "dqn",
+        "double_dqn",
+        "per",
+        "dqfd"
+      ],
+      "reviewed_ast_sha256": "510f3dc3b05cf2df8c4284788f083168daea30b17b8dc0adc0fe1fff0cb910d9",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "prioritized_replay",
+      "source": {
+        "file": "server/app/rl/replay_buffer.py",
+        "scope": "",
+        "kind": "symbol"
+      },
+      "purpose": "SumTree replay, per-transition discounts, importance weights and demo flags",
+      "profiles": [
+        "interactive_legacy",
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "per"
+      ],
+      "reviewed_ast_sha256": "2d4e8dfebf57e5d64873d3471e8c619ff08805211e919085abf4ae439ddd3d2b",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "app_training",
+      "source": {
+        "file": "server/app/rl/trainer.py",
+        "scope": "Trainer.train",
+        "kind": "symbol"
+      },
+      "purpose": "Legacy v4 application training and executed-action replay",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "dqfd"
+      ],
+      "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134",
+      "consumers": [],
+      "limitations": "Separate from audited v5 proposed-action collection; UI/headless training parity is not established."
+    },
+    {
+      "id": "research_training",
+      "source": {
+        "file": "research/training/train_policy.py",
+        "scope": "collect_episode",
+        "kind": "symbol"
+      },
+      "purpose": "Completed decision-to-decision proposed-action replay with incomplete endpoint dropping",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "dqn",
+        "double_dqn",
+        "dqfd"
+      ],
+      "reviewed_ast_sha256": "ea5e91525098a5a3ec4f0e803c62c1bdd6ec39620d19898c0a32e5b59461dc3b",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "observation_versions",
+      "source": {
+        "file": "server/app/rl/observations.py",
+        "scope": "encode_policy_observation",
+        "kind": "symbol"
+      },
+      "purpose": "Version-specific delivered-input encodings, including matched zero-input controls",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "8451caafa08cd613307f84c2bc81769a8d00b794b0486df568bd5d3829087383",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "queue_uncertainty",
+      "source": {
+        "file": "research/uncertainty/estimator.py",
+        "scope": "PerceptionUncertaintyEstimator.compute",
+        "kind": "symbol"
+      },
+      "purpose": "Heuristic or fitted synthetic count-error score; queue-EWMA mean absolute deviation",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "5382830d44bff5cfd2f492a76d97cf6619c48e99c70c1080144c793ae86f83a6",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/controllers/flowsync_uq.py",
+            "scope": "FlowSyncUQController.act",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "e1605bdb33e25072269c271a136d726e383e4b202bc6aa5ddff2783977528fc0"
+        }
+      ],
+      "limitations": "Not accident risk or fallback benefit. Current FlowSyncUQ call leaves tracking-loss input zero; forecast_features argument is unused."
+    },
+    {
+      "id": "authority_supervisor",
+      "source": {
+        "file": "server/app/controllers/supervisor.py",
+        "scope": "ControllerSupervisor.update",
+        "kind": "symbol"
+      },
+      "purpose": "Hysteretic fallback authority with call-count dwell/recovery",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "2e6a7904d380f6b109bbd0ffa1ae446b11d6d12998ca2b35f640b8596d41f2e8",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "ppo",
+      "source": {
+        "file": "research/training/ppo.py",
+        "scope": "update",
+        "kind": "symbol"
+      },
+      "purpose": "Research-only clipped policy update, value regression and variable-duration collection",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "ppo",
+        "gae"
+      ],
+      "reviewed_ast_sha256": "a7013e33da4d89e3f58973541082fa925c2edf9ff974b98ea1e0659f5de9e239",
+      "consumers": [
+        {
+          "source": {
+            "file": "research/training/ppo.py",
+            "scope": "advantages",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "65678300bcee21ce004dd309dad1193dd68d574de855f3e5137275d163b3832d"
+        }
+      ],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "count_restoration",
+      "source": {
+        "file": "research/observation/count_restoration.py",
+        "scope": "PacketHistory.update",
+        "kind": "symbol"
+      },
+      "purpose": "Causal delivered-count features for fitted restoration experiments",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "0738cbdb04a56a3ee3e319e110048edb93576f8b40cbb002f72f611a86e58b6f",
+      "consumers": [],
+      "limitations": "Reconstruction accuracy is separate from useful control; no real detector restoration validation."
+    },
+    {
+      "id": "arrival_window",
+      "source": {
+        "file": "research/policies/arrival_extension.py",
+        "scope": "choose_extension",
+        "kind": "symbol"
+      },
+      "purpose": "Observed-cohort hold/switch proxy with declared timing envelopes",
+      "profiles": [
+        "audited_custom_research"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "advanced_mp"
+      ],
+      "reviewed_ast_sha256": "1a8d39989c0035252cc5191e262fbd050f1be6d5b73cf856cf75a359a8038a2b",
+      "consumers": [],
+      "limitations": "Arrival-aware pressure/green extension are prior concepts; local service proxy is not a full-run benefit bound or new-theory claim."
+    },
+    {
+      "id": "sumo_classical",
+      "source": {
+        "file": "research/policies/sumo_classical.py",
+        "scope": "choose_action",
+        "kind": "symbol"
+      },
+      "purpose": "Two-phase matched-count Fixed/halted/pressure comparisons",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "sumo",
+        "pressure"
+      ],
+      "reviewed_ast_sha256": "45d90a0d49579b9530876496bc878f955808c9234f3d8683a2d8a5a90ca9b7ba",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "sumo_sensing",
+      "source": {
+        "file": "research/observation/sumo_sensing.py",
+        "scope": "CountSensor.step",
+        "kind": "symbol"
+      },
+      "purpose": "Coherent per-vehicle misses and causal fixed-delay delivery",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "sumo"
+      ],
+      "reviewed_ast_sha256": "48892d54c88ca71c073af04ea92a7153c135d36404730ad8c814e61991acb24e",
+      "consumers": [],
+      "limitations": "Synthetic assumptions, not measured camera calibration; capture clock differs from custom research sensor contracts."
+    },
+    {
+      "id": "centroid_tracker",
+      "source": {
+        "file": "server/app/realworld/pipeline/vehicle_tracker.py",
+        "scope": "VehicleTracker.update",
+        "kind": "symbol"
+      },
+      "purpose": "Nearest-centroid association under explicit source/receipt clocks",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "bytetrack"
+      ],
+      "reviewed_ast_sha256": "d22be2d9d1ccd6d254cb7bf1ca93d43696152c76838aca45f7b2b76ee512670f",
+      "consumers": [],
+      "limitations": "ByteTrack is related work only; this code does not implement ByteTrack or calibrated metric vehicle waiting."
+    },
+    {
+      "id": "camera_detector",
+      "source": {
+        "file": "server/app/realworld/pipeline/yolo_detector.py",
+        "scope": "YOLODetector.load_model",
+        "kind": "symbol"
+      },
+      "purpose": "External YOLO loading with atomic model/taxonomy publication and explicit format preference",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [
+        "yolo"
+      ],
+      "reviewed_ast_sha256": "97795d2db696b60e274ea845a721196a72224d6542975b2e055b42ea4758ddda",
+      "consumers": [],
+      "limitations": "Model-label compatibility is structural; no provided footage establishes accuracy or hardware speed."
+    },
+    {
+      "id": "event_flow_estimation",
+      "source": {
+        "file": "server/app/realworld/digital_twin/flow_calibrator.py",
+        "scope": "FlowCalibrator.calibrate_from_session",
+        "kind": "symbol"
+      },
+      "purpose": "Unique supplied upstream arrivals divided by explicit source-clock exposure",
+      "profiles": [
+        "cctv_experimental"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "7435cd3fcdfb727de71aa21f3577d6f6747e298af6db5a4e3d888da39b13aac9",
+      "consumers": [],
+      "limitations": "Occupancy/discharges cannot calibrate demand. Accepted event syntax and file hashes do not validate measurement accuracy or completeness."
+    },
+    {
+      "id": "checkpoint_identity",
+      "source": {
+        "file": "server/app/services/checkpoint_loading.py",
+        "scope": "load_website_agent",
+        "kind": "symbol"
+      },
+      "purpose": "Stage version-compatible tensors before publishing actual trained episode and file slot",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "6c43abe317c0a1ac22b6fc641272c434cec1468bf36c49014eb7c1de76286a39",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "model_discovery",
+      "source": {
+        "file": "server/app/services/model_service.py",
+        "scope": "_list_all_models_uncached",
+        "kind": "symbol"
+      },
+      "purpose": "Read-only model discovery; listing never uploads local checkpoint data",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "ccf1c69ed114c1059227704da08c3daaca3f1ffb79c0d14a2d817af14b10d112",
+      "consumers": [],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    },
+    {
+      "id": "training_request_boundary",
+      "source": {
+        "file": "server/app/schemas/training_schema.py",
+        "scope": "StartTrainingRequest",
+        "kind": "symbol"
+      },
+      "purpose": "Finite/ranged training request values shared by HTTP and WebSocket adapters",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Source-reviewed implementation contract; established ingredients are explicitly attributed.",
+      "override_notes": "Behavior is versioned by source/checkpoint/run metadata; do not pool incompatible runtimes.",
+      "references": [],
+      "reviewed_ast_sha256": "39faa4185571ddd99ffce5c809ddfd42d3d14b443d58d9566385443a4d1fb574",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/websockets/training_ws.py",
+            "scope": "training_socket",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "7275cc7bb56df337d2603c7d31574a523036be1fa8a8da2b102e840cddb58abb"
+        },
+        {
+          "source": {
+            "file": "server/app/routers/training.py",
+            "scope": "start_training",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "65373d931bed7107bde0e3c7e1a7a28aaa023d1660992dfb870447e848522e8c"
+        }
+      ],
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+    }
+  ],
+  "open_evidence_requirements": [
+    "Algorithmic novelty and a reliable learned-control advantage remain unestablished; this static check does not certify either.",
+    "No supplied real intersection footage/counts/timings establish camera accuracy, normalized-to-metric geometry or field timing calibration.",
+    "Interactive training remains v4/executed-action replay; audited research v5/proposed-action replay is a separate method, not automatic website migration.",
+    "Legacy live research has a separate gating FSM and lacks numerical parity with audited executed lamps; describe it as legacy visualization.",
+    "Authentication/authorization, concurrent-user state isolation, complete browser-storage lifecycle and deployment operations require a separate production acceptance exercise.",
+    "Controller/UQ/shield guarantees are limited to implemented simulated constraints and finite tests, not formal collision safety or real-world readiness.",
+    "Camera target FPS, pixel tracking gates, queue weights and signal timings are engineering assumptions without independent field calibration.",
+    "Historical research/calibration/profiles/calib_profile_v1.json is example data; its is_calibrated flag is not evidence of measured accuracy.",
+    "Source fixes require original source snapshots when replaying historical strict-hash studies. Old checkpoints, reports and archives are preserved.",
+    "This catalogue reviews named method-critical surfaces, not every numerical literal or every possible runtime environment override."
+  ]
+}
