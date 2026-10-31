@@ -154,6 +154,8 @@ Demonstrations are transitions collected from a teacher such as Max-Pressure. Im
 
 Research v5 fixes repeated switch charging and stores completed decision-to-decision macro transitions, dropping the incomplete final transition. The application path retains v4 reward/replay differences. Variable-duration discounting uses the elapsed decision interval. Input/reward compatibility must be checked together; matching network dimensions alone is insufficient. No automatic website migration or research-checkpoint promotion occurred.
 
+Application resume and fine-tuning use staged, version-compatible checkpoint loading with exact slot selection and actual trained-episode metadata. Resume starts with fresh replay; fine-tuning also resets optimizer state and child counters. Saved milestones publish a separate inference snapshot and matching model identity after checkpoint writes return. Captured inference agents retain their prior tensors.
+
 ## 8. Research observation and data boundary
 
 The headless custom path executes scenario/demand → simulator → delivered synthetic sensor packet → observed context/features → controller proposal → optional fallback → optional shield → physical transition → executed lamps. Truth is permitted for rewards and evaluation metrics. It must not replace noisy delivered controller inputs.
@@ -2582,7 +2584,7 @@ The optional additional shield, supervisor and executed physical FSM have differ
 
 The actual centroid tracker uses an **80-pixel match radius**, **3000 ms expiry** and **ten-sample history**. `TRACK_THRESH`, `TRACK_BUFFER` and `MATCH_THRESH` declarations do not configure that implementation. `FRAME_BUFFER_SIZE` does not replace its latest-frame slot with a queue, and the catalogue marks the unused congestion-threshold declaration separately from active display logic. Consumer-function fingerprints make these activity assessments reviewable when code changes. Leaving the declarations visible as unused is more accurate than claiming a wired ByteTrack configuration.
 
-Default values are not necessarily the best-known experimental settings. For example, HyperParams learning rate `3e-4` differs from the research CLI default `1e-4`, and each frozen launcher may override both. The declared multiplicative `EPSILON_DECAY` and `DEFAULT_EPISODES` fields are not the current trainer/request schedule authority. The catalogue records these distinctions instead of recommending another large run.
+Default values are not necessarily the best-known experimental settings. For example, HyperParams learning rate `3e-4` differs from the research CLI default `1e-4`, and each frozen launcher may override both. `EPSILON_DECAY` is active through the `HyperParams.epsilon_decay` property in the application trainer's ordinary episode updates and resumed-episode initialization. Fine-tuning uses its own multiplier. `DEFAULT_EPISODES` remains an unused declaration relative to the current request-controlled episode count. The catalogue records these distinctions instead of recommending another large run.
 
 ### 45.6 Event-based demand estimation and detector identity
 
@@ -2641,7 +2643,7 @@ The following table is generated from reviewed source selectors. `conditional` m
 | `learning.min_replay_size` | `1000` | transitions | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.epsilon_start` | `1.0` | probability | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.epsilon_end` | `0.05` | probability | conditional | [source](server/app/rl/hyperparams.py) |
-| `learning.epsilon_decay` | `0.997` | episode multiplier | declared_unused | [source](server/app/rl/hyperparams.py) |
+| `learning.epsilon_decay` | `0.997` | episode multiplier | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.per_alpha` | `0.6` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.per_beta_start` | `0.4` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.per_beta_end` | `1.0` | dimensionless exponent | conditional | [source](server/app/rl/hyperparams.py) |

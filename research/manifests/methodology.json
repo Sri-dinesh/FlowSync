@@ -268,10 +268,10 @@
         {
           "source": {
             "file": "server/app/rl/trainer.py",
-            "scope": "Trainer.train",
+            "scope": "Trainer._train_run",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134"
+          "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c"
         }
       ]
     },
@@ -418,23 +418,30 @@
       "unit": "episode multiplier",
       "purpose": "epsilon decay",
       "profiles": [
-        "interactive_legacy",
-        "audited_custom_research"
+        "interactive_legacy"
       ],
       "origin": "local_engineering",
-      "status": "declared_unused",
-      "justification": "Historical HyperParams declaration; current application schedule/request defaults do not read this field.",
-      "override_notes": "Callers and run manifests may override this default; inspect the actual runtime/checkpoint configuration.",
+      "status": "conditional",
+      "justification": "Active multiplicative application exploration decay, accessed through HyperParams.epsilon_decay. Used after ordinary episodes and in resumed-episode initialization; not a fitted optimum.",
+      "override_notes": "Fine-tuning replaces the per-episode multiplier with its local schedule. Resume reopens exploration to at least 0.20; the ordinary epsilon floor also applies.",
       "references": [],
       "reviewed_ast_sha256": "8aac06d593780880dfb71e910c6b20a360f8cebcde893c2180d2b70d54de5e43",
       "consumers": [
         {
           "source": {
             "file": "server/app/rl/trainer.py",
-            "scope": "Trainer.train",
+            "scope": "Trainer._train_run",
             "kind": "symbol"
           },
-          "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134"
+          "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c"
+        },
+        {
+          "source": {
+            "file": "server/app/rl/hyperparams.py",
+            "scope": "HyperParams.epsilon_decay",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "f458140bd6d1ee4812e75782bb3b78a9e337e9954c04c3355ce5c7ea3adee575"
         }
       ]
     },
@@ -3321,7 +3328,7 @@
       "id": "app_training",
       "source": {
         "file": "server/app/rl/trainer.py",
-        "scope": "Trainer.train",
+        "scope": "Trainer._train_run",
         "kind": "symbol"
       },
       "purpose": "Legacy v4 application training and executed-action replay",
@@ -3335,8 +3342,25 @@
       "references": [
         "dqfd"
       ],
-      "reviewed_ast_sha256": "aae5cbefb5ee911d13c1d262e5882b952f8930a8f88197bcccc93eadbca27134",
-      "consumers": [],
+      "reviewed_ast_sha256": "48e5607d12d204b2f37d8469b4c23e45180f8a22de1fd2c8f7eb8ac28bf2c05c",
+      "consumers": [
+        {
+          "source": {
+            "file": "server/app/rl/trainer.py",
+            "scope": "Trainer.train",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "6a575ef681b81250b19eb46d0cb6c4f36b4c58fc910a4752b59168c4aa0f4b0b"
+        },
+        {
+          "source": {
+            "file": "server/app/rl/trainer.py",
+            "scope": "Trainer._publish_inference",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "3f9b4c1984e9248f7d677adcbe6551cba6213a8951f61fc4df9c80a2892369cf"
+        }
+      ],
       "limitations": "Separate from audited v5 proposed-action collection; UI/headless training parity is not established."
     },
     {

@@ -114,7 +114,32 @@ class Trainer:
         finetune_epsilon: float = 0.25,
         custom_profile: Optional[Dict[str, Any]] = None,
     ) -> None:
+        if self.is_training:
+            raise RuntimeError("A training run is already active")
+        if is_finetune and (not resume_model_id or not resume_model_id.strip()):
+            raise ValueError("Fine-tuning requires a parent model checkpoint")
         self.is_training = True
+        try:
+            await self._train_run(simulation_id,num_episodes,resume_model_id,resume_episode,
+                is_finetune,finetune_scenario,finetune_lr,finetune_epsilon,custom_profile)
+        finally:
+            self.is_training = False
+
+    def _publish_inference(self, candidate: DQNAgent, model_id: str, episode: int, slot: int) -> None:
+        """Publish a staged snapshot without mutating a captured inference agent."""
+        if self.app_state is not None and hasattr(self.app_state,"sim_agent"):
+            self.app_state.sim_agent = candidate
+            self.app_state.active_model_id = model_id
+            self.app_state.active_model_episode = episode
+            self.app_state.active_model_checkpoint_slot = slot
+
+    async def _train_run(
+        self, simulation_id: str, num_episodes: int, resume_model_id: Optional[str],
+        resume_episode: Optional[int], is_finetune: bool, finetune_scenario: str,
+        finetune_lr: float, finetune_epsilon: float, custom_profile: Optional[Dict[str, Any]],
+    ) -> None:
+        from ..services.checkpoint_loading import load_website_agent, parse_model_request, select_checkpoint
+
         self.is_finetune = is_finetune
         self.finetune_scenario = finetune_scenario
         self.finetune_lr = finetune_lr
@@ -143,65 +168,25 @@ class Trainer:
 
         start_episode = 0
         base_model_id = None
+        self.resume_checkpoint_slot = None
         if resume_model_id:
-            if ":" in resume_model_id:
-                base_model_id, ep_str = resume_model_id.split(":", 1)
-                ep_clean = ep_str.replace("checkpoint_", "").replace(".pt", "")
-                if ep_clean.isdigit() and resume_episode is None:
-                    resume_episode = int(ep_clean)
-            else:
-                base_model_id = resume_model_id
-
-            if resume_episode is None:
-                try:
-                    checkpoints = await asyncio.to_thread(self.model_service.list_checkpoints, base_model_id)
-                    eps_found = []
-                    for cp in checkpoints:
-                        fn = cp.split("/")[-1]
-                        if fn.startswith("checkpoint_") and fn.endswith(".pt"):
-                            t = fn[len("checkpoint_"):-len(".pt")]
-                            if t.isdigit():
-                                eps_found.append(int(t))
-                    if eps_found:
-                        resume_episode = max(eps_found)
-                except Exception as list_err:
-                    logger.warning("Could not list checkpoints for resume model %s: %s", base_model_id, list_err)
-
-            start_episode = resume_episode or 0
-
             try:
-                chk_data = await asyncio.to_thread(self.model_service.load_checkpoint, base_model_id, start_episode)
-                if (
-                    chk_data.get("obs_version") != self.hyperparams.OBS_VERSION
-                    or chk_data.get("reward_version") != "v4_incremental_delay"
-                ):
-                    raise ValueError(
-                        "legacy checkpoint is incompatible with corrected v6 training"
-                    )
-                if isinstance(chk_data, dict) and "online_net" in chk_data:
-                    self.agent.online_net.load_state_dict(chk_data["online_net"])
-                    self.agent.target_net.load_state_dict(chk_data.get("target_net", chk_data["online_net"]))
-                    if not is_finetune and "optimizer" in chk_data and chk_data["optimizer"]:
-                        try:
-                            self.agent.optimizer.load_state_dict(chk_data["optimizer"])
-                        except Exception as opt_err:
-                            logger.warning("Could not restore optimizer state: %s", opt_err)
-                    if not is_finetune and "step_count" in chk_data:
-                        self.agent.step_count = chk_data["step_count"]
-                    if not is_finetune and "total_train_steps" in chk_data:
-                        self.agent.total_train_steps = chk_data["total_train_steps"]
-            # checkpoint_0.pt is an alias; resume numbering from real episode inside checkpoint.
-                    start_episode = int(chk_data.get("episode", start_episode))
-                else:
-                    self.agent.online_net.load_state_dict(chk_data)
-                    self.agent.sync_target_network()
-                self.agent.target_net.eval()
-
-                if self.app_state and hasattr(self.app_state, "sim_agent"):
-                    self.app_state.sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
-                    self.app_state.sim_agent.target_net.load_state_dict(self.agent.target_net.state_dict())
-                    self.app_state.active_model_id = base_model_id
-                    self.app_state.active_model_episode = start_episode
+                base_model_id,requested_slot = parse_model_request(resume_model_id,resume_episode)
+                checkpoints = await asyncio.to_thread(self.model_service.list_checkpoints,base_model_id)
+                slot = select_checkpoint(checkpoints,requested_slot)
+                chk_data = await asyncio.to_thread(self.model_service.load_checkpoint,base_model_id,slot)
+                candidate,start_episode = load_website_agent(chk_data)
+                inference,_ = load_website_agent(chk_data)
+                if candidate.obs_version != self.hyperparams.OBS_VERSION:
+                    raise ValueError("Training observation configuration differs from checkpoint")
+                if is_finetune:
+                    candidate.prepare_for_finetuning(learning_rate=finetune_lr)
+                candidate.online_net.train()
+                self.agent = candidate
+                self.resume_checkpoint_slot = slot
+                if self.app_state is not None:
+                    self.app_state.training_agent = candidate
+                self._publish_inference(inference,base_model_id,start_episode,slot)
 
                 logger.info(
                     "Successfully loaded checkpoint for model %s (episode %d) for %s",
@@ -210,20 +195,18 @@ class Trainer:
                     "fine-tuning" if is_finetune else "resumed training",
                 )
             except Exception as load_err:
-                self.is_training = False
                 raise RuntimeError(
-                    f"Cannot resume model {base_model_id!r} at episode "
-                    f"{start_episode}: checkpoint load failed"
+                    f"Cannot resume {resume_model_id!r}: checkpoint load failed: {load_err}"
                 ) from load_err
 
             if is_finetune:
                 self.parent_model_id = base_model_id
                 self.parent_episode = start_episode
-                self.agent.prepare_for_finetuning(learning_rate=finetune_lr)
 
-                clean_base = base_model_id.split(":")[0] if ":" in base_model_id else base_model_id
                 scenario_slug = finetune_scenario.lower().replace(" ", "_")
-                simulation_id = f"{clean_base}-ft-{scenario_slug}"
+                if finetune_scenario == "custom" and custom_profile and custom_profile.get("name"):
+                    scenario_slug = "custom_" + custom_profile["name"].lower().strip().replace(" ","_")[:20]
+                simulation_id = f"{base_model_id}-ft-{scenario_slug}"
                 if self.app_state:
                     self.app_state.current_simulation_id = simulation_id
 
@@ -298,6 +281,7 @@ class Trainer:
                 "model_id":              simulation_id,
                 "parent_model_id":       self.parent_model_id,
                 "parent_episode":        self.parent_episode,
+                "parent_checkpoint_slot": self.resume_checkpoint_slot,
                 "scenario":              finetune_scenario,
                 "scenario_name":         profile_name,
                 "num_episodes":          num_episodes,
@@ -374,6 +358,7 @@ class Trainer:
                 "type":                  "training_resumed",
                 "model_id":              base_model_id,
                 "start_episode":         start_episode,
+                "checkpoint_slot":       self.resume_checkpoint_slot,
                 "num_episodes":          num_episodes,
                 "total_target_episodes": total_target_episodes,
                 "message":               f"Resumed model training from episode {start_episode} for +{num_episodes} episodes (target: {total_target_episodes}).",
@@ -588,16 +573,6 @@ class Trainer:
                 or is_new_best
             )
 
-            # Sync inference agent immediately when a new milestone or best checkpoint occurs.
-            if (is_new_best or should_save_checkpoint) and self.app_state and hasattr(self.app_state, "sim_agent"):
-                sim_agent = self.app_state.sim_agent
-                sim_agent.online_net.load_state_dict(self.agent.online_net.state_dict())
-                sim_agent.target_net.load_state_dict(self.agent.target_net.state_dict())
-                logger.info(
-                    "Synced sim_agent weights from training_agent at episode %d",
-                    episode_num,
-                )
-
             if should_save_checkpoint:
                 chk_state = self.agent.get_checkpoint_state() if hasattr(self.agent, "get_checkpoint_state") else {
                     "online_net":  self.agent.online_net.state_dict(),
@@ -615,6 +590,7 @@ class Trainer:
                     chk_state["is_finetuned"] = True
                     chk_state["parent_model_id"] = self.parent_model_id
                     chk_state["parent_episode"] = self.parent_episode
+                    chk_state["parent_checkpoint_slot"] = self.resume_checkpoint_slot
                     chk_state["scenario"] = effective_scenario
                     if self.custom_profile:
                         chk_state["custom_profile"] = self.custom_profile
@@ -632,6 +608,9 @@ class Trainer:
                         0,  # 0 indicates best checkpoint
                         chk_state,
                     )
+
+                inference,_ = load_website_agent(chk_state)
+                self._publish_inference(inference,simulation_id,episode_num,episode_num)
 
                 avg_reward = (
                     sum(m["reward"] for m in _recent_rewards) / len(_recent_rewards)
@@ -653,8 +632,6 @@ class Trainer:
                     }
                 )
 
-        self.is_training = False
-
     def stop(self) -> None:
         self.is_training = False
 
@@ -665,6 +642,7 @@ class Trainer:
             "target_episodes":   getattr(self, "target_episodes", 0),
             "is_resumed":        getattr(self, "is_resumed", False),
             "resume_model_id":   getattr(self, "resume_model_id", None),
+            "resume_checkpoint_slot": getattr(self,"resume_checkpoint_slot",None),
             "is_finetuned":      getattr(self, "is_finetune", False),
             "finetune_scenario": getattr(self, "finetune_scenario", None),
             "parent_model_id":   getattr(self, "parent_model_id", None),

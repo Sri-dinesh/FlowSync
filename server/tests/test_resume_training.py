@@ -43,7 +43,9 @@ async def test_trainer_resume_state_initialization():
         "total_train_steps": 5432,
         "obs_version": "v6_28dim_smdp",
         "reward_version": "v4_incremental_delay",
+        "episode": 1000,
     }
+    mock_model_service.list_checkpoints.return_value = ["checkpoint_1000.pt"]
     mock_model_service.load_checkpoint.return_value = checkpoint_state
 
     trainer = Trainer(
@@ -135,6 +137,7 @@ async def test_start_training_endpoint_with_resume():
         assert data["status"] == "started"
         assert data["is_resumed"] is True
         assert data["resume_model_id"] == "089035ea-3b87-4279-8230-00f1c4f10457:1000"
+        await app.state.training_task
         mock_trainer.train.assert_called_once_with(
             num_episodes=300,
             simulation_id="089035ea-3b87-4279-8230-00f1c4f10457",
