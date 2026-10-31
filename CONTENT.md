@@ -8,8 +8,29 @@ FlowSync is a simulation application and experimental traffic-control research p
 
 This reference describes the actual application first. Separate experiment results begin at section 17. Camera accuracy, physical signal operation, hardware latency, public production hardening and complete application/headless parity remain unestablished. Research-only training and diagnostics do not automatically change application defaults or promote models.
 
+## Paper drafting map
+
+Use this document as an evidence-bounded drafting reference. It describes implemented methods, their sources, executed studies and remaining requirements. It does not establish a new superior controller or certify that a manuscript is ready for submission. The accepted direction is a simulation-only empirical evaluation; manuscript writing remains outside the current project task.
+
+| Paper material | Current reference and evidence to inspect |
+| --- | --- |
+| Problem, scope and contribution | [Scope](#1-project-scope-and-ownership), [attribution](#14-technique-attribution-and-primary-references), [novelty assessment](#15-novelty-assessment-independent-of-measured-performance), [evidence status](#17-current-status-and-evidence-authority) and [empirical questions](#361-evidence-backed-empirical-questions). State the exact evaluated question rather than a general smart-city or optimal-control claim. |
+| Architecture and application workflow | [Architecture](#2-current-system-architecture), sections 3–4 and 26, [checkpoint lifecycle](#46-training-checkpoint-and-task-lifecycle) and [effective configuration/persistence](#47-effective-training-configuration-and-checkpoint-persistence). Distinguish the web application, custom research runtime and independent SUMO path. |
+| Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. |
+| Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit) and [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence). The current catalogue contains 131 selected parameters and 28 methods; it is not every literal in the repository. Report executed overrides and units, not just source defaults. |
+| Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
+| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–43. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 has a mechanics smoke; its full sensing-fault study is pending. Include failed screens and unfavorable replicates. |
+| Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established) and [arrival-control precedents](#412-novelty-assessment-and-closest-precedents). Separate implemented techniques from related work. |
+| Limitations and external validity | [Open requirements](#293-outstanding-scientific-and-application-requirements), [empirical limits](#365-limitations-and-current-research-decision) and [application acceptance boundaries](#477-remaining-acceptance-boundaries). No field, camera-accuracy or physical-actuation validation follows from simulation. |
+| Software verification and artifact access | [Quality gates](#28-verification-and-quality-gates), [maintenance index](#30-evidence-and-maintenance-index) and sections 46–47. Local ignored results/checkpoints are not automatically publicly available. Software regression tests are distinct from scientific traffic samples. |
+
+Keep the measurement units and populations attached to every table. Custom-simulator stopped delay is accumulated stopped waiting per arrived vehicle; SUMO waiting uses requested vehicles, including entry waiting. Neither is trip travel time. Branch gains in vehicle-seconds, count prediction error, Q-target error and optimizer loss are different quantities. Reported aggregate p95 values average within-run percentiles rather than pooling all vehicles. Frames, branches and future continuations are correlated samples. Changed Q values, changed proposed actions, executed interventions and full-run control benefit are separate observations. Zero sampled lamp violations establishes finite simulated coverage.
+
+Before submission, the author must still supply authors/affiliations, a venue-specific scope and format, the final selected empirical questions/panels, accessible artifact packaging, and a full-text assessment of close related work. Use the claim limits in this reference while drafting; do not replace these missing decisions with a publication-readiness percentage.
+
 ## Contents
 
+- [Paper drafting map](#paper-drafting-map)
 - [1. Project scope and ownership](#1-project-scope-and-ownership)
 - [2. Current system architecture](#2-current-system-architecture)
 - [3. Frontend pages and state flow](#3-frontend-pages-and-state-flow)
@@ -146,7 +167,7 @@ The shared dueling network has two 256-unit feature layers, LayerNorm and ReLU, 
 
 Inference encodes the checkpoint's observation version, supplies a valid-action mask, evaluates Q values without training gradients and selects an allowed action. D3QN uses a two-second policy hold cadence within 0.1-second simulation ticks. The audited research path records checkpoint metadata/SHA-256 and sets evaluation mode. The website requires a successfully loaded compatible checkpoint before AI operation; it does not inherit the research path's full provenance contract. The research runner requires a trained checkpoint unless an explicit mechanics-only untrained override is given.
 
-Inputs are numeric traffic features rather than raw CCTV pixels. Observation widths 28/36/48/64 are versioned sensor encodings, detailed in section 20. A 14-dimensional camera-state builder is a separate application utility and is not the later research policy's automatic input contract.
+Inputs are numeric traffic features rather than raw CCTV pixels. Observation widths 28/36/48/64 are versioned sensor encodings, detailed in section 20. The separate application [camera-state builder](server/app/realworld/pipeline/state_builder.py) constructs 28 features: twelve movement counts, four phase indicators, timing/transition/pressure/starvation features and eight EWMA forecast features. That utility is not an automatic adapter for later 36/48/64-dimensional research checkpoints or proof of equivalent camera/simulator inputs.
 
 ## 7. Training, demonstrations and version compatibility
 
@@ -514,7 +535,7 @@ Independent SUMO uses an isolated pinned environment, generated network and TraC
 
 ## 14. Technique attribution and primary references
 
-Primary sources below were checked on 2026-10-25. This is implementation attribution and targeted related-work checking, not an exhaustive systematic novelty review. A conceptual method citation does not prove code was copied from that source; no complete line-by-line external code-origin audit has been established.
+The initial primary-source review was recorded on 2026-10-25; selected records and the added learning-method references were checked on 2026-10-31. This is implementation attribution and targeted related-work checking, not an exhaustive systematic novelty review or a claim that every full text was rechecked. A conceptual method citation does not prove code was copied from that source; no complete line-by-line external code-origin audit has been established.
 
 | Technique / implementation | Source to acknowledge | What FlowSync actually uses or adapts |
 | --- | --- | --- |
@@ -523,6 +544,12 @@ Primary sources below were checked on 2026-10-25. This is implementation attribu
 | Dueling value/advantage architecture; `dqn_network.py` | Wang et al., [Dueling Network Architectures for Deep Reinforcement Learning, ICML 2016](https://proceedings.mlr.press/v48/wangf16.html). | Value/advantage heads; local implementation adds valid-action centering and traffic encodings. The combination does not establish new dueling theory. |
 | Priority replay and importance weighting; `replay_buffer.py` | Schaul et al., [Prioritized Experience Replay, ICLR 2016](https://arxiv.org/abs/1511.05952). | Sum-tree proportional replay, priorities and bias-correction weights. Project defaults are not universal values prescribed by the paper. |
 | Demonstration replay, imitation/margin warm start | Hester et al., [Deep Q-learning from Demonstrations, AAAI 2018](https://research.google/pubs/deep-q-learning-from-demonstrations/). | Related demonstration-assisted TD and margin learning. Teacher-generated data and this loss schedule are local adaptations, not full DQfD replication. |
+| Adam optimization; shared DQN and research PPO training | Kingma and Ba, [Adam: A Method for Stochastic Optimization, ICLR 2015](https://arxiv.org/abs/1412.6980). | Existing adaptive optimizer. Learning rates, update counts and weight decay are executed configuration choices; citing Adam does not calibrate them for traffic. |
+| Layer normalization; dueling network | Ba, Kiros and Hinton, [Layer Normalization, 2016 preprint](https://arxiv.org/abs/1607.06450). | Existing feature-normalization mechanism in the network. It does not establish invariance to sensing errors. |
+| Smooth-L1 TD loss | [PyTorch SmoothL1Loss reference](https://docs.pytorch.org/docs/stable/generated/torch.nn.SmoothL1Loss.html). | Uses the library loss with its declared/default beta and local weighting. Smooth-L1 is an established loss, not a new FlowSync objective. Report the reward and replay repairs separately. |
+| Variable-duration decision transitions and discounting | Sutton, Precup and Singh, [Between MDPs and semi-MDPs: A framework for temporal abstraction in reinforcement learning, 1999, author PDF](https://incompleteideas.net/609%20dropbox/other%20readings%20and%20resources/Options.pdf). | SMDP-related duration-aware transitions/discounting. FlowSync does not reproduce the complete options-learning framework merely by using duration-dependent discounts. |
+| Research-only clipped PPO | Schulman et al., [Proximal Policy Optimization Algorithms, 2017](https://arxiv.org/abs/1707.06347). | Separate research actor/critic and clipped updates in section 40. It is not the website's D3QN trainer or a new PPO algorithm. |
+| Generalized advantage estimation; PPO pilot | Schulman et al., [High-Dimensional Continuous Control Using Generalized Advantage Estimation, ICLR 2016](https://arxiv.org/abs/1506.02438). | Existing advantage estimator adapted to the research transition contract. Its use does not establish effective traffic learning. |
 | Queue-differential pressure; `max_pressure.py`, SUMO policies | Varaiya, [Max pressure control of a network of signalized intersections, 2013, author publication record](https://people.eecs.berkeley.edu/~varaiya/publications.html). | A declared movement/destination pressure variant with finite timing and sensor constraints. No automatic inheritance of a network stability theorem. |
 | Spatial running/queued demand and pressure representations | Zhang et al., [Expression might be enough, ICML 2022](https://proceedings.mlr.press/v162/zhang22ah.html). | Close prior work defining Advanced-MP/Advanced-XLight. FlowSync's upstream counts/zero-input controls are not faithful implementations of those methods. |
 | Safety shielding as a research concept | Alshiekh et al., [Safe Reinforcement Learning via Shielding, AAAI 2018](https://ojs.aaai.org/index.php/AAAI/article/view/11797). | Related intervention concept. FlowSync's programmed rules/FSM are not the paper's synthesized temporal-logic shield or its guarantee. |
@@ -555,6 +582,16 @@ The architecture is a legitimate implementation of identifiable components, with
 
 Redundant setup, architecture, package README and index guides are consolidated here. Setup/configuration/operations are in section 27; repository ownership/command discovery in section 18; scientific status and evidence limits in sections 17–36. Optional detector utilities are `scripts/download_datasets.py`, `merge_datasets.py`, `train_yolo.py`, `validate_model.py`, `export_model.py` and `calibrate_flow.py`. The Colab notebook is optional detector training, not traffic-policy training. Weights, datasets, secrets and notebook outputs require separate provenance/access.
 
+The October 31 cleanup retires three superseded narratives after checking executable references and the available saved manifests. Their current facts are consolidated below; the originals remain recoverable at Git commit `888bc8dc57e7a9f05050144c0485218f79d518f5` and in the local hash-checked archive `results/cleanup_audit/documentation_20261031/retired_narratives.zip` with its manifest. Historical links inside frozen records refer to those original versions.
+
+| Retired working copy | Current coverage / recoverable original |
+| --- | --- |
+| `research/docs/guides/SHIELD_AWARE_TRAINING.md` | Sections 7, 19 and 21.1 retain the training/selection interpretation. [Original guide](https://github.com/Sri-dinesh/FlowSync/blob/888bc8dc57e7a9f05050144c0485218f79d518f5/research/docs/guides/SHIELD_AWARE_TRAINING.md). |
+| `research/docs/papers/PAPER_DRAFT_AUDITED_20261016.md` | Sections 21.2, 29, 36 and 45 retain the methods/evidence boundaries; the numerical export remains intact. [Original scaffold](https://github.com/Sri-dinesh/FlowSync/blob/888bc8dc57e7a9f05050144c0485218f79d518f5/research/docs/papers/PAPER_DRAFT_AUDITED_20261016.md). |
+| `research/docs/papers/PAPER_ADDENDUM_OBSERVATION_AND_TEACHERS_20261022.md` | Sections 23–24 retain the observation/teacher/horizon findings. [Original addendum](https://github.com/Sri-dinesh/FlowSync/blob/888bc8dc57e7a9f05050144c0485218f79d518f5/research/docs/papers/PAPER_ADDENDUM_OBSERVATION_AND_TEACHERS_20261022.md). |
+
+Frozen protocols, source snapshots, results and the October 23 empirical draft remain preserved. The numerical manuscript auditor takes that draft as an input and records its hash; it is an evidence fixture, not a second maintained guide. Legacy hard-coded figure/reproduction entry points remain explicit refusal scripts because tests and historical manifests depend on that behavior. Package markers remain necessary Python files. Cleanup removes regenerable caches without changing datasets, checkpoints or experiment outputs.
+
 The frontend now has behavior tests for real snapshot identity, missing data, genuine SHA-256 versus legacy labels, safe CSV/LaTeX and backend controller availability. Backend tests cover live learned-control rejection, strict scenarios, runtime metadata, retired summaries and a successful two-tick classical stream. These are engineering checks, not new control experiments. Remaining integration work includes migrating learned live research control to a checkpoint-aware observed runtime, complete socket/persistence/model lifecycle browser tests and independent camera/simulator validation. No complete production or end-to-end parity claim follows from this update. The final verification scope is recorded in section 28.
 
 ---
@@ -578,7 +615,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Source-timed arrival extension | Implemented and audited over 180 full runs. Mean delay improves 4.73% over its age-gated Advanced-MP reference but is 1.31% worse than the strongest native pressure comparator; component/tail/case-loss requirements fail (section 41). No novelty/superiority claim or learning promotion. |
 | Extra temporal/spatial inputs | Implemented with matched controls; both completed pilots fail their continuation screens. |
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
-| Independent SUMO sensing faults | The new fixed-delay/missed-detection interface passes a 24-run mechanics smoke plus a historical-loop anchor: 20,000 signal samples, exact repeats/Fixed invariance and successful saved-data replay (section 44). The frozen 72-episode full study is ready for the user to run; it has not run yet. |
+| Independent SUMO sensing faults | The new fixed-delay/missed-detection interface passes a 24-run mechanics smoke plus a historical-loop anchor: 20,000 signal samples, exact repeats/Fixed invariance and successful saved-data replay (section 44). The frozen 72-episode full study remains pending; no full-study outcome is available. |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -591,7 +628,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 
 ### 17.2 Evidence hierarchy and historical material
 
-Read the [current research status](research/RESEARCH_STATUS.md) and [evaluation audit](research/EVALUATION_AUDIT.md) before using an older table or launch instruction. For a particular experiment, read its frozen protocol, recorded manifest/configuration/checkpoint/source hashes, raw measurements and matching results note together. A summary is useful for navigation; its filename does not certify its claims.
+Use the [current status table](#171-what-the-project-currently-establishes) for the latest conclusions and the preserved [research chronology](research/RESEARCH_STATUS.md) and [evaluation audit](research/EVALUATION_AUDIT.md) for history. For a particular experiment, read its frozen protocol, recorded manifest/configuration/checkpoint/source hashes, raw measurements and matching results note together. Older “ready to run” text does not override a completed outcome here. A summary is useful for navigation; its filename does not certify its claims.
 
 `results/final/`, `results/tables/`, the original manuscript assets and the superseded design narrative contain historical material that predates the audited fixes. Preserve them for traceability, but do not cite their numbers as validated research. The corrected experiments below are distinct panels; their means must not be pooled merely because each reports seconds.
 
@@ -637,7 +674,7 @@ The formerly flat research scripts have been grouped by responsibility. Maintain
 | [evidence](research/evidence/) | Provenance-checked tables/figures, teacher/SUMO exports, manuscript numerical auditing and closed-study CSV export. |
 | [profiling](research/profiling/) and [cv](research/cv/) | Profiling, camera input audits and labeled crossing evaluation; optional dependencies may be required. The legacy random CV report generator is disabled. |
 | [legacy](research/legacy/) | Earlier exploratory runners/configuration and deliberately retired figure entry points. |
-| [docs](#30-evidence-and-maintenance-index) | Protocols, results, audits, workflow guides and paper drafts in separate indexed collections. |
+| [docs](#30-evidence-and-maintenance-index) | Frozen protocols, results notes, audits and related-work/manuscript evidence, grouped by purpose. Current guidance is consolidated in this reference. |
 
 Dated documents retain their original filenames under `research/docs/{protocols,results,audits,guides,papers}/`. The cleanup relocated 64 research files into packages and grouped the research records; it also consolidated duplicated/outdated project guides and removed unused starter assets and duplicate package-manager configuration. Recorded results, checkpoints, data and source archives were preserved.
 
@@ -696,15 +733,15 @@ $$P_m=\max\left(0,\frac{q_{\mathrm{in},m}}{C_{\mathrm{in}}}-\frac{q_{\mathrm{out
 
 It chooses a phase with highest summed pressure, preserving the current phase on a positive tie or when every pressure is zero. If switching is unavailable, it holds. The common physical/shield rules still apply. In the audited path its incoming/outgoing context comes from delivered sensing. See [max_pressure.py](server/app/controllers/max_pressure.py).
 
-The phase indices are **0 = north/south straight, 1 = east/west straight, 2 = north/south left, 3 = east/west left**. The original section 4 action table has a different historical ordering and must not be used to decode current checkpoints or traces. Right turns and permissive movement handling follow simulator rules; four actions do not imply twelve separately protected movements.
+The phase indices are **0 = north/south straight, 1 = east/west straight, 2 = north/south left, 3 = east/west left**. A superseded design narrative used a different action ordering; decode checkpoints/traces with the actual observation/signal schema recorded for their runtime. Right turns and permissive movement handling follow simulator rules; four actions do not imply twelve separately protected movements.
 
-Greedy responds to observed demand; Actuated uses its configured demand/timing logic; Fixed follows its configured schedule. The repository's names/metadata do not certify compliance with Webster/NEMA engineering designs. The implemented Max-Pressure is not Advanced-MP, Advanced-XLight or switching-curve MP. The additional upstream-only variant changes delivered incoming-demand semantics; it is not a faithful reproduction of those research baselines.
+Greedy responds to observed demand; Actuated uses its configured demand/timing logic; Fixed follows its configured schedule. The repository's names/metadata do not certify compliance with Webster/NEMA engineering designs. The historical Max-Pressure and its upstream-only variant are not Advanced-MP, Advanced-XLight or switching-curve MP. Later arrival studies implement separately named Advanced-MP adaptations, with explicit timing/sensing differences and related-work boundaries in sections 41–43; they do not retroactively change the historical baseline.
 
 ### 19.4 Fault and safety interpretation
 
 The fault injector exposes 13 presets and supports missed detections, bursts, false positives/jitter, lane swaps, latency and drops with corresponding delivered outgoing/arrival context. Their names and parameters are read from the actual executed configuration. Synthetic scenarios are not calibrated real-camera error distributions.
 
-Zero measured lamp conflict/clearance violations describe sampled simulated states under the implemented audit. They do not measure collisions, pedestrian safety, cabinet faults or all possible trajectories. Phase-service starvation counters describe time since service of a phase; they do not directly bound every vehicle's accumulated waiting time. A shield can protect service/tails while increasing mean delay through additional switches and clearance losses.
+Zero measured lamp conflict/clearance violations describe sampled simulated states under the implemented audit. They do not measure collisions, pedestrian safety, cabinet faults or all possible trajectories. In the observed research runtime, a phase-service counter accumulates while delivered observations indicate demand and that phase is not green; it resets when the phase is served or delivered demand disappears. It is neither unconditional time since last service nor an individual vehicle's accumulated waiting time. A shield can protect service/tails while increasing mean delay through additional switches and clearance losses.
 
 <a id="20-current-rl-architecture-observation-versions-and-learning-repairs"></a>
 ## 20. Current RL Architecture, Observation Versions and Learning Repairs
@@ -778,9 +815,11 @@ Each row below is a separate experiment. Different demand panels, episode horizo
 | v5 learning pilot `pilot_v5_kbW0lsY3` | Research reward/replay repairs; selected frozen parents used in later controlled pilots. Their identities are fixed in section 25. |
 | Matched-shield frozen evaluation | 2,800 runs; strongest audited frozen reference, detailed below. |
 
+The earlier shield-aware selection audit covered 990 validation cells, with eleven checkpoints per training seed. Under matched shield-only selection, its controls selected seed 101 warmup (10.7702 s), seed 202 episode 400 (10.7728 s) and seed 303 episode 500 (10.8106 s), averaging 10.7845 s. These are the controls for that historical training recipe, distinct from the later v5 parents frozen in section 25. Their selected validation scores are not independent final-test estimates.
+
 ### 21.2 Strongest frozen reference: matched supervision
 
-Artifact: `results/replicate_evaluation/matched_shield_v5_20261015`. The panel includes three selected policy replicates, twenty traffic seeds **81001–81020**, seven clean scenario templates and three additional sensing conditions. See the [matched-shield protocol](research/docs/protocols/MATCHED_SHIELD_PROTOCOL_20261015.md) and [audited manuscript scaffold](research/docs/papers/PAPER_DRAFT_AUDITED_20261016.md).
+Artifact: `results/replicate_evaluation/matched_shield_v5_20261015`. The panel includes three selected policy replicates, twenty traffic seeds **81001–81020**, seven clean scenario templates and three additional sensing conditions. See the [matched-shield protocol](research/docs/protocols/MATCHED_SHIELD_PROTOCOL_20261015.md) and [provenance-checked evidence exporter](research/evidence/build_paper_evidence.py).
 
 | Controller | All-condition mean stopped delay per arrived vehicle (s) |
 | --- | ---: |
@@ -794,6 +833,8 @@ Artifact: `results/replicate_evaluation/matched_shield_v5_20261015`. The panel i
 | Actuated | 16.463 |
 
 The primary matched-shield saved-delay estimate is **−0.050 seconds**, with a descriptive crossed-bootstrap 95% interval **[−0.219, 0.125]**. The UQ increment relative to shielded D3QN saves **−0.015 seconds**, interval **[−0.104, 0.071]**. Positive saved delay would favor the candidate. Neither interval establishes superiority; spanning zero also does not establish equivalence.
+
+The [crossed-bootstrap implementation](research/evaluation/evaluate_replicates.py) resamples training-replicate and traffic-seed indices independently, retaining all fixed scenario/condition cells within each draw. The default is 5,000 draws with RNG seed 717 and empirical 2.5/97.5 percentiles. Conditions are not sampled as independent traffic replicates. Three training replicates and fixed families limit the interval's interpretation; it is descriptive rather than a universal, equivalence or multiplicity-adjusted guarantee.
 
 Fallback was active: **306 activations and 260,298 ticks across 600 UQ runs**. Its lack of added benefit cannot be attributed to a disabled component. Anti-starvation accounts for **892 of 896 D3QN shield interventions**. The uncertainty calibration detects synthetic count error; it does not estimate whether a particular backup action improves traffic.
 
@@ -977,7 +1018,7 @@ These are seven correlated states with unequal coverage across three policy repl
 
 The reproducible finding is that additional geometric observations can move Q magnitudes without changing final actions, and fixed alternative choices at fixed observed states can change apparent benefit with arrival future and horizon. This distinguishes hindsight availability, stable action benefit, observed-input learnability and closed-loop improvement. It is a candidate methods/failure-analysis narrative, not a demonstrated breakthrough or superior learned controller.
 
-Generated CSV/PNG/SVG evidence and hashes are in `results/paper_evidence/teacher_diagnostics_20261022`. The [dated manuscript addendum](research/docs/papers/PAPER_ADDENDUM_OBSERVATION_AND_TEACHERS_20261022.md) keeps this development evidence separate from the earlier frozen manuscript tables. Exporting a figure does not create new evaluation samples.
+Generated CSV/PNG/SVG evidence and hashes are in `results/paper_evidence/teacher_diagnostics_20261022`. These input-use/teacher/horizon findings are development evidence, separate from the earlier frozen evaluation tables. The [teacher evidence exporter](research/evidence/export_teacher_evidence.py) preserves that scope. Exporting a figure does not create new evaluation samples.
 
 <a id="25-reproducibility-parent-checkpoints-and-experimental-separation"></a>
 ## 25. Reproducibility, Parent Checkpoints and Experimental Separation
@@ -1145,30 +1186,36 @@ The root [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUC
 
 ### 28.1 Latest recorded implementation checks
 
-The October 25 architecture/frontend update adds real application-contract checks. Frontend snapshot tests pass for absent data, frame identity, genuine checkpoint hashes, actual violation counters, escaped export formats and controller availability. The old self-comparison test labelled frontend/headless parity was replaced by real interactive-session repeatability checks with an explicit no-parity scope. Frozen research documents and SUMO source pins remain unchanged. The broad backend/research verification passed **669 tests**, with one existing Starlette/httpx deprecation warning, in the fresh Python 3.11 environment. All **five frontend behavior tests**, ESLint, TypeScript checking and the production build pass on Node 26.8.1. Node 24 remains the declared CI baseline; remote CI was not checked.
+The latest implementation verification before this documentation cleanup is the October 31 configuration/storage pass: **198 targeted backend tests**, **nine frontend behavior tests**, TypeScript checking, lint and the production build passed. Section 47.6 records the exact command, local fixture and verification limits. This was a targeted pass, not a current full-repository suite or live Supabase/browser acceptance test. The cleanup changes the reference and repository link checker; it does not rerun controller training or the application build.
 
-An earlier broad backend run during repository reorganization used a fresh Python 3.11.15 environment and completed **504 tests with one existing Starlette/httpx deprecation warning in 106.23 seconds**. Later SUMO/evidence additions passed **155 targeted tests in 37.90 seconds**, checked against the staged source snapshot during the feature-by-feature main-branch commits. The later run covers the added research tools and does not replace the older broad suite or rerun frontend checks. The 504/155 counts describe earlier snapshots/subsets and must not be added to the current 669 as unique coverage.
+Historical verification counts describe their original snapshots. The October 25 architecture/frontend pass recorded **669 backend/research tests** in Python 3.11 and five frontend behavior tests plus lint/type/build on Node 26.8.1. The subsequent display correction reran twelve relevant backend tests and five frontend tests; the 669-test suite/build preceded that correction. Earlier organization work recorded 504 backend tests in Python 3.11.15, and later SUMO/evidence additions recorded 155 targeted tests. These overlapping counts must not be added or presented as current full-suite coverage. Node 24 remains the declared CI baseline; remote CI completion was not checked.
 
 | Check | Recorded result / practical limit |
 | --- | --- |
-| Current full backend/research suite | 669 passed; one dependency deprecation warning. Includes the new application-contract and real-session repeatability checks. |
-| Later SUMO/evidence suite | 155 targeted tests passed; one existing dependency warning. Includes observation/proposal reconstruction, physical timing, evidence tampering, partial-output preservation, phase relabelling, endpoint hierarchy and CSV export. |
-| Research tool discovery | Forty maintained tool `--help` checks passed. Help checks establish imports/argument discovery, not successful expensive execution. |
-| Fresh source-only checkout | Core train/evaluate/compare help works without private API credentials or local checkpoints. Missing experimental artifacts remain missing. |
-| Frontend | ESLint, TypeScript checking and production build passed. Local checks used Node 26.8.1; declared fresh/CI baseline is Node 24. Font download required network. |
-| Scenario/configuration preservation | Nineteen scenario/manifest JSON/YAML files remained byte-identical across organization; frozen parent identities preserved. |
-| Saved spatial comparison | Recomputed result matches the saved failed screen. This is report reproduction, not new independent evaluation. |
-| Shell/container metadata | Shell syntax, YAML parsing and `docker compose config --quiet` passed. Docker image execution/build was not established. |
-| Source/format hygiene | Repository checks and `git diff --check` are the maintained documentation/source-layout checks. No claim that all external links or raw datasets were fetched. |
-| Integration/deployment | Remote CI completion, browser/camera end-to-end flows, real hardware and physical signal operation have not been established by these local checks. |
+| October 31 configuration/storage suite | 198 targeted backend tests passed, including actual local checkpoint serialization/loading with stubbed validation and offline cloud transport. See section 47.6. |
+| October 31 frontend pass | Nine behavior tests, type checking, lint and production build passed. Receipt tests cover identity matching, local fallback, alias failure and malformed/legacy messages. |
+| Documentation cleanup | 35 targeted documentation, methodology, reproducibility and paper-evidence tests pass, including five new link-checker cases. The repository checker passes across 390 Python files and 452 maintained local path/section links. These are source/documentation checks, not new traffic samples or a full application rerun. |
+| Historical research discovery | Forty maintained tool help checks and source-only core train/evaluate/compare help passed at the recorded organization snapshot. They establish discovery/imports, not expensive execution or current full coverage. |
+| Historical preservation checks | Nineteen scenario/manifest files remained byte-identical across organization; selected parent hashes were preserved. Spatial comparison reconstruction matched the saved failed screen without new independent evaluations. |
+| Shell/container metadata | Shell syntax, YAML parsing and Compose configuration previously passed. Docker image execution/build was not established; shell syntax is also part of the current repository checker. |
+| Source/format hygiene | Maintained commands check local documentation paths/section anchors, source layout, catalogue consistency and diff whitespace. External URLs and raw datasets are not fetched by these checks. |
+| Integration/deployment | Remote CI, complete browser/camera/model lifecycle, live cloud acceptance, real hardware and physical signal operation remain outside the demonstrated local scope. |
 
-After the final small correction to classical controller identity and absent Q-value reporting, the twelve relevant backend session/contract tests, all five frontend tests, lint and type checking pass again. The full 669-test run and production build preceded that display correction and were not repeated.
-
-A Chromium check against the actual research router/WebSocket verifies the overview catalog, unavailable learned options, classical single-run start/stop, paired controller defaults and a 375-pixel layout without page overflow. It reports no browser exceptions in that checked flow. Cloud application startup was isolated; database, full training/model lifecycle, camera streams and all-device visual correctness were not tested. Temporary browser-check scripts/screenshots are local verification artifacts, not a new maintained guide or scientific evaluation.
+The recorded October 25 Chromium check against the research router/WebSocket covers the overview catalog, unavailable learned options, classical single-run start/stop, paired controller defaults and a 375-pixel layout without page overflow or browser exceptions. It predates the later training/storage work. Cloud startup was isolated; database, full training/model lifecycle, camera streams and all-device visual correctness were not tested. Temporary browser scripts/screenshots are local verification artifacts, not a new maintained guide or scientific evaluation. The old self-comparison test labelled frontend/headless parity was replaced with real interactive-session repeatability checks carrying an explicit no-parity scope.
 
 Non-blocking warnings remain: the existing Starlette/httpx deprecation, Node module-format/deprecation notices and a chart size warning during static generation. Passing compilation does not certify every external service or page.
 
-The repository checker validates maintained local Markdown paths, dependency/lock metadata, Python syntax, research imports/package ownership, shell syntax, declared protocol paths and ignored private/generated files. Local artifact links are optional in a fresh clone; the checker does not certify their numerical contents. Obsolete design claims have been removed from this maintained reference. Frozen evidence documents retain their recorded bytes and are excluded from maintained-guide link rewriting.
+The repository checker validates maintained local Markdown paths and section anchors, dependency/lock metadata, Python syntax, research imports/package ownership, shell syntax, declared protocol paths and ignored private/generated files. It ignores Markdown examples inside fences and checks the heading/explicit-ID forms used by this repository. Local artifact links are optional in a fresh clone; the checker does not certify their numerical contents. Frozen evidence documents retain their recorded bytes and are excluded from maintained-guide link rewriting. Section 16 identifies the three retired narratives and their recovery locations.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  server/venv/bin/python -m pytest \
+  server/tests/test_repository_documentation.py server/tests/test_methodology_catalogue.py \
+  server/tests/test_reproducibility.py server/tests/test_paper_evidence.py \
+  --no-cov -p no:cacheprovider -q --disable-warnings
+git diff --check
+```
 
 ### 28.2 Maintained local commands and CI
 
@@ -1205,7 +1252,7 @@ The historical all-in-one reproduction command and hard-coded figure generators 
 
 ### 29.1 Existing writing/evidence assets
 
-The [audited manuscript scaffold](research/docs/papers/PAPER_DRAFT_AUDITED_20261016.md) and `results/paper_evidence/audited_v5_20261016/` preserve the corrected evaluation methods/tables/figures. [build_paper_evidence.py](research/evidence/build_paper_evidence.py) verifies compatible provenance before export. The [October 22 addendum](research/docs/papers/PAPER_ADDENDUM_OBSERVATION_AND_TEACHERS_20261022.md), [teacher evidence exporter](research/evidence/export_teacher_evidence.py) and `results/paper_evidence/teacher_diagnostics_20261022/` document later input-use/teacher/horizon development findings.
+The current methods/evidence reference is this document, starting with the [paper drafting map](#paper-drafting-map). `results/paper_evidence/audited_v5_20261016/` preserves corrected evaluation tables/figures; [build_paper_evidence.py](research/evidence/build_paper_evidence.py) checks compatible provenance before export. The [teacher evidence exporter](research/evidence/export_teacher_evidence.py) and `results/paper_evidence/teacher_diagnostics_20261022/` cover later input-use/teacher/horizon development findings. Section 16 records the retired October 16 scaffold and October 22 addendum, their consolidated coverage and immutable recovery locations.
 
 The [October 23 empirical draft](research/docs/papers/PAPER_DRAFT_EMPIRICAL_20261023.md), [related-work record](research/docs/papers/EMPIRICAL_RELATED_WORK_20261023.md) and [BibTeX file](research/docs/papers/empirical_references.bib) are preserved writing assets. The [numerical auditor](research/evidence/audit_empirical_manuscript.py) produced `results/paper_evidence/empirical_audit_20261023_v3/`, recording 148 reconstructed quantities across nine panels and a hash of the draft. This checks the declared numerical ledger, not every prose claim, citation, novelty or venue fit. The draft's audit predates the later whole-run classical, count-ablation and robustness results. Those results have separate reports and closure tables and must be incorporated explicitly when the paper is written. The current project task updates this reference; manuscript writing remains stopped at the user's request.
 
@@ -1249,10 +1296,10 @@ A future learned-controller experiment needs a new evidence-based mechanism, mat
 
 | Question | Read / inspect |
 | --- | --- |
-| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [PPO outcome](#405-completed-episode-90-result-failed), [arrival-window outcome](#417-completed-full-run-headroom-result-failed); [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
+| Current research outcome | [Current evidence status](#17-current-status-and-evidence-authority), [PPO outcome](#405-completed-episode-90-result-failed), [arrival-window outcome](#417-completed-full-run-headroom-result-failed), [receding-decision outcome](#43-receding-arrival-decisions-frozen-cadence-experiment), [pending sensing study](#44-independent-sumo-sensing-fault-study). [RESEARCH_STATUS.md](research/RESEARCH_STATUS.md) is a preserved chronological record. |
 | Why the old evaluation is invalid | [EVALUATION_AUDIT.md](research/EVALUATION_AUDIT.md) |
-| Current research commands/packages | [research README](#18-current-repository-and-research-organization), [command dispatcher](research/__main__.py) |
-| Protocol/result/archive organization | [research documentation index](#30-evidence-and-maintenance-index) and its protocols/results/audits/papers indexes |
+| Current research commands/packages | [Research package guide](#18-current-repository-and-research-organization), [command dispatcher](research/__main__.py) |
+| Protocol/result/archive organization | [Ownership and organization](#18-current-repository-and-research-organization), frozen [protocols](research/docs/protocols/), [results notes](research/docs/results/), [audits](research/docs/audits/) and [related-work/evidence fixtures](research/docs/papers/) |
 | Reward/replay mechanics | [learning audit](research/docs/audits/LEARNING_UPDATE_AUDIT_20261015.md), [research trainer](research/training/train_policy.py) |
 | Observation versions and spatial delivery | [observation schema](server/app/rl/observations.py), [runtime](research/experiments/runtime.py), [spatial count adapter](research/noise/spatial_counts.py) |
 | Spatial outcome and input-use findings | [spatial results](research/docs/results/SPATIAL_INPUT_RESULTS_20261021.md), [input-use audit](research/docs/audits/SPATIAL_INPUT_AUDIT_RESULTS_20261022.md) |
@@ -1262,7 +1309,9 @@ A future learned-controller experiment needs a new evidence-based mechanism, mat
 | Executed classical/component results | [classical results](research/docs/results/SUMO_CLASSICAL_BASELINES_20261023.md), [count ablation](research/docs/results/SUMO_COUNT_ABLATION_20261023.md), [waiting attribution](research/docs/audits/SUMO_COUNT_TRADEOFF_20261023.md) |
 | Final robustness and CSV evidence | [robustness results](research/docs/results/SUMO_ROBUSTNESS_20261023.md), [exporter](research/evidence/export_sumo_robustness.py), [section 35](#35-initial-phase-and-horizon-robustness) |
 | App/headless split | [architecture guide](#2-current-system-architecture) |
-| Installation/deployment | [setup guide](#27-installation-operations-security-and-open-source-conventions), [server README](#4-api-websockets-and-service-lifecycle), [client README](#3-frontend-pages-and-state-flow) |
+| Installation/deployment | [Setup guide](#27-installation-operations-security-and-open-source-conventions), [API lifecycle](#4-api-websockets-and-service-lifecycle), [frontend flow](#3-frontend-pages-and-state-flow) |
+| Equations, constants and parameter provenance | [Methodology contracts/catalogue](#45-methodology-contracts-parameter-provenance-and-implementation-audit), [source exporter/checker](research/evidence/export_methodology.py) |
+| Training run identity and storage behavior | [Checkpoint/task lifecycle](#46-training-checkpoint-and-task-lifecycle), [effective run configuration](#47-effective-training-configuration-and-checkpoint-persistence), [saved-run verifier](research/audits/verify_training_run.py) |
 | Local artifacts and missing fresh-clone weights | [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) |
 | Contribution/security/CI | [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [repository checker](scripts/check_repository.py), [workflow](.github/workflows/ci.yml) |
 | Paper claims and limits | [paper index](#29-paper-scope-novelty-and-remaining-requirements), [novelty triage](research/docs/papers/RESEARCH_NOVELTY_TRIAGE_20261022.md) |
@@ -1273,7 +1322,7 @@ Keep a dated distinction between implemented behavior, measured outcomes, hypoth
 
 Use portable repository-relative links in this document. Some earlier links named files that are absent or were only design references; those paths remain inline and explicitly historical, rather than being redirected to an unrelated file. Current source links above point to maintained implementations. Local ignored artifacts may be unavailable in a fresh clone; provide provenance and an artifact policy rather than pretending the source includes trained weights or footage.
 
-This update covers the completed October 23 SUMO studies and their saved-data verification, documented on October 25, with the superseded design narrative preserved in Git history rather than current instructions. PR #7 merged repository cleanup into `main` at `fa96432`. Thirteen focused follow-up commits through `f7e05e0` added the SUMO studies, evidence tools and closure documentation on `main`; they preserved source bytes used by recorded experiments. The chore branch is historical and receives no further pushes. Earlier branch/commit lists and numeric tables remain historical snapshots. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
+PR #7 merged the earlier repository organization into `main` at `fa96432`; that is a historical milestone, not the current implementation boundary. Later control studies are covered in sections 37–44, and October 31 methodology/training/storage work in sections 45–47. The [paper drafting map](#paper-drafting-map) identifies current coverage. Work and focused commits continue on `main`; the chore branch is historical. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
 
 ---
 
@@ -1630,6 +1679,9 @@ Do not pool custom/SUMO delay means, attach the custom confidence interval to SU
 | `results/sumo_robustness/full_20261023/` and `results/sumo_robustness/closure_20261023/` | All final robustness traces/reports and eight verified CSV tables, retaining every seed/start/endpoint and exceptions. |
 | `results/sumo_wait_accounting/analysis_20261027/` | Retrospective axis-weighting and disjoint-window accounting from the same robustness traces. Two 24-row CSVs, a PNG/PDF/SVG figure, exact input/output hashes and analysis source archive. No new traffic samples. See section 36.6. |
 | `results/camera_boundary/final_20261027/` | Synthetic geometry contract audit and 4,104 frozen-policy evaluations of 1,368 hypothetical states. Preserved counter predecessor, full inputs/Q values/masks/proposals, ambiguity witnesses, specification and hashes. Recomputed by the audit's `--verify` mode. See section 36.7. |
+| Later count-restoration, PPO, arrival-window and cadence evidence | Sections 39–43 give each artifact identity, protocol, frozen endpoint and failed control screen. Positive reconstruction accuracy is a different outcome from control benefit. These panels are not included automatically in the earlier manuscript's nine-panel numerical ledger. |
+| SUMO sensing mechanics / pending full study | Section 44 records the completed smoke, its signal/packet coverage and verifier. No completed 72-episode scientific result is available. |
+| `results/methodology/` and `results/methodology_audit/20261031/` | Source-default catalogues, archived implementation evidence and local training/storage mechanics. Sections 45–47 distinguish source defaults from executed overrides and software verification from traffic experiments. |
 
 Most result directories are ignored local artifacts and are absent from a fresh clone. The [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) describes this boundary. Source code and Markdown summaries alone do not provide downloadable raw evidence. Artifact packaging/accessibility and final paper tables must be handled explicitly before a reproducibility claim about public availability.
 
