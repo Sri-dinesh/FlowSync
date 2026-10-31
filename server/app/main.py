@@ -57,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # reward and demand process, so silently accepting them is unsafe.
     active_model_id = None
     active_model_episode = None
+    active_model_checkpoint_slot = None
     try:
         models = model_service.list_all_models()
         seen_model_ids = set()
@@ -79,14 +80,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     and cp_data.get("reward_version") == "v4_incremental_delay"
                 )
                 if compatible and "online_net" in cp_data:
-                    sim_agent.online_net.load_state_dict(cp_data["online_net"])
-                    sim_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
-                    training_agent.online_net.load_state_dict(cp_data["online_net"])
-                    training_agent.target_net.load_state_dict(cp_data.get("target_net", cp_data["online_net"]))
-                    selected_ep = int(cp_data.get("episode", best_ep))
+                    from .services.checkpoint_loading import load_website_agent
+                    candidate_sim,selected_ep = load_website_agent(cp_data)
+                    candidate_training,_ = load_website_agent(cp_data)
+                    candidate_training.online_net.train()
+                    sim_agent,training_agent = candidate_sim,candidate_training
                     active_model_id = m_id
                     active_model_episode = selected_ep
-                    print(f"[ModelService] Auto-loaded trained model checkpoint: {m_id} (ep {selected_ep}, validated best={best_ep == 0})")
+                    active_model_checkpoint_slot = best_ep
+                    print(f"[ModelService] Auto-loaded trained model checkpoint: {m_id} (episode {selected_ep}, file slot {best_ep})")
                     break
     except Exception as e:
         print(f"[ModelService] Default checkpoint load skipped: {e}")
@@ -117,6 +119,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.training_task = None
     app.state.active_model_id = active_model_id
     app.state.active_model_episode = active_model_episode
+    app.state.active_model_checkpoint_slot = active_model_checkpoint_slot
 
     # --- CCTV / Real-World ---
     try:

@@ -72,26 +72,31 @@ async def training_socket(websocket: WebSocket) -> None:
             command = message.get("command")
 
             if command == "start_training":
+                from ..schemas.training_schema import StartTrainingRequest
+                try:
+                    values = {key:value for key,value in message.items() if key in StartTrainingRequest.model_fields}
+                    if "is_finetune" in message and type(message["is_finetune"]) is not bool:
+                        raise ValueError("is_finetune must be boolean")
+                    if message.get("is_finetune"):
+                        values["mode"] = "finetune"
+                    payload = StartTrainingRequest(**values)
+                except ValueError as exc:
+                    await websocket.send_json({"type":"training_error","is_training":False,"message":str(exc)})
+                    continue
                 await websocket.send_json({
                     "type": "training_request_received",
                     "is_training": True,
                     "message": "Training request received; preparing the run...",
                 })
-                num_episodes = int(message.get("num_episodes", 500))
-                simulation_id = message.get("simulation_id")
-                resume_model_id = message.get("resume_model_id")
-                resume_episode = message.get("resume_episode")
-                is_finetune = message.get("mode") == "finetune" or bool(message.get("is_finetune", False))
-                finetune_scenario = message.get("finetune_scenario", "rush_hour")
-                finetune_lr = float(message.get("finetune_lr", 1e-4))
-                finetune_epsilon = float(message.get("finetune_epsilon", 0.25))
-                custom_profile = message.get("custom_profile")
-
-                if resume_episode is not None:
-                    try:
-                        resume_episode = int(resume_episode)
-                    except Exception:
-                        resume_episode = None
+                num_episodes = payload.num_episodes
+                simulation_id = payload.simulation_id
+                resume_model_id = payload.resume_model_id
+                resume_episode = payload.resume_episode
+                is_finetune = payload.mode == "finetune"
+                finetune_scenario = payload.finetune_scenario or "rush_hour"
+                finetune_lr = 1e-4 if payload.finetune_lr is None else payload.finetune_lr
+                finetune_epsilon = .25 if payload.finetune_epsilon is None else payload.finetune_epsilon
+                custom_profile = payload.custom_profile
 
                 if is_finetune:
                     base_id = resume_model_id.split(":")[0] if resume_model_id and ":" in resume_model_id else (resume_model_id or "base")

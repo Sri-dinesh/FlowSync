@@ -279,12 +279,6 @@ def _select_ai_phase_action(
 
 
 
-def _parse_checkpoint_ep(path: str) -> int | None:
-    import re
-    match = re.search(r"checkpoint_(\d+)\.pt$", path)
-    return int(match.group(1)) if match else None
-
-
 def _detect_finetune_info(model_identifier: str | None) -> tuple[bool, str | None]:
     """Detect whether a model checkpoint is fine-tuned and extract its scenario slug."""
     if not model_identifier:
@@ -300,74 +294,27 @@ def _detect_finetune_info(model_identifier: str | None) -> tuple[bool, str | Non
 
 
 async def _load_agent_checkpoint(app, model_id: str | None, model_episode: int | None = None) -> tuple[str, int]:
-    """Load a specific model checkpoint into app.state.sim_agent and return (model_name, episode)."""
-    active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
-    active_e = getattr(app.state, "active_model_episode", None) or 1000
-    if not model_id:
-        return active_m, active_e
-
-    try:
-        from app.services import model_service
-        raw_id = str(model_id).strip()
-        target_ep = model_episode
-        if ":" in raw_id:
-            base_id, ep_str = raw_id.split(":", 1)
-            ep_clean = ep_str.replace("checkpoint_", "").replace(".pt", "")
-            if ep_clean.isdigit():
-                target_ep = int(ep_clean)
-            model_id_clean = base_id
-        else:
-            model_id_clean = raw_id
-
-        checkpoints = await asyncio.to_thread(model_service.list_checkpoints, model_id_clean)
-        if not checkpoints:
-            return model_id_clean, target_ep or active_e
-
-        episodes = [
-            ep for p in checkpoints
-            if (ep := _parse_checkpoint_ep(p)) is not None
-        ]
-        if not episodes:
-            return model_id_clean, target_ep or active_e
-
-        if target_ep is not None and target_ep in episodes:
-            chosen_ep = target_ep
-        elif target_ep is not None:
-            chosen_ep = min(episodes, key=lambda e: abs(e - target_ep))
-        else:
-            chosen_ep = 0 if 0 in episodes else max(episodes)
-
-        checkpoint_data = await asyncio.to_thread(model_service.load_checkpoint, model_id_clean, chosen_ep)
-        if (
-            checkpoint_data.get("obs_version") != "v6_28dim_smdp"
-            or checkpoint_data.get("reward_version") != "v4_incremental_delay"
-        ):
-            raise ValueError(
-                "legacy checkpoint is incompatible with the corrected v6 observation/reward semantics; "
-                "retrain it with scripts/train_rl_offline.py"
-            )
-        selected_episode = int(checkpoint_data.get("episode", chosen_ep))
-        sim_agent = getattr(app.state, "sim_agent", None)
-        if sim_agent and "online_net" in checkpoint_data:
-            sim_agent.online_net.load_state_dict(checkpoint_data["online_net"])
-            if "target_net" in checkpoint_data:
-                sim_agent.target_net.load_state_dict(checkpoint_data["target_net"])
-            else:
-                sim_agent.sync_target_network()
-            sim_agent.target_net.eval()
-
-        app.state.active_model_id = model_id_clean
-        app.state.active_model_episode = selected_episode
-        logger.info(
-            "Successfully loaded agent checkpoint %s at episode %d%s",
-            model_id_clean,
-            selected_episode,
-            " (held-out best)" if chosen_ep == 0 else "",
-        )
-        return model_id_clean, selected_episode
-    except Exception as e:
-        logger.warning("Could not load agent checkpoint %s: %s", model_id, e)
-        return active_m, active_e
+    """Publish identity only after exact, compatible checkpoint loading succeeds."""
+    from ..services import model_service
+    from ..services.checkpoint_loading import load_website_agent,parse_model_request,select_checkpoint
+    active_id = getattr(app.state,"active_model_id",None)
+    active_episode = getattr(app.state,"active_model_episode",None)
+    if not model_id and model_episode is None:
+        agent = getattr(app.state,"sim_agent",None)
+        if (not active_id or type(active_episode) is not int or active_episode < 0 or agent is None
+                or agent.obs_version != "v6_28dim_smdp" or agent.reward_version != "v4_incremental_delay"):
+            raise ValueError("AI control requires a successfully loaded compatible trained checkpoint")
+        return active_id,active_episode
+    identifier,requested = parse_model_request(model_id or active_id,model_episode)
+    paths = await asyncio.to_thread(model_service.list_checkpoints,identifier)
+    slot = select_checkpoint(paths,requested)
+    checkpoint = await asyncio.to_thread(model_service.load_checkpoint,identifier,slot)
+    candidate,actual_episode = load_website_agent(checkpoint)
+    app.state.sim_agent = candidate
+    app.state.active_model_id = identifier
+    app.state.active_model_episode = actual_episode
+    app.state.active_model_checkpoint_slot = slot
+    return identifier,actual_episode
 
 
 
@@ -400,6 +347,16 @@ async def _run_timed_benchmark(
             await websocket.send_json({"type": "error", "message": error})
             return
 
+    clean_model_id,clean_model_ep,benchmark_agent = "",0,None
+    if "ai" in modes:
+        try:
+            clean_model_id,clean_model_ep = await _load_agent_checkpoint(app,model_id,model_episode)
+            benchmark_agent = app.state.sim_agent
+        except Exception as exc:
+            app.state.benchmark_running = False
+            await websocket.send_json({"type":"error","code":"CHECKPOINT_UNAVAILABLE","message":str(exc)})
+            return
+
     TICK_DT = 0.1          # simulation seconds per tick (matches normal loop)
     TICK_SLEEP = 0.10      # wall-clock seconds between ticks (normal 1.0x real-time speed)
     PHASE_DIRS  = {0: ["north", "south"], 1: ["east", "west"], 2: ["north", "south"], 3: ["east", "west"]}
@@ -420,9 +377,6 @@ async def _run_timed_benchmark(
             pass
     await asyncio.sleep(0.2)
 
-    clean_model_id = str(model_id).strip() if model_id else (getattr(app.state, "active_model_id", None) or "FlowSync DQN")
-    clean_model_ep = int(model_episode) if model_episode else (getattr(app.state, "active_model_episode", None) or 1000)
-
     # Common Random Numbers (CRN) seed for paired comparison.
     import random
     benchmark_seed = random.randint(1, 1_000_000)
@@ -434,10 +388,7 @@ async def _run_timed_benchmark(
         for mode_idx, mode in enumerate(modes):
             intersection = app.state.sim_intersection
 
-            if mode == "ai" and (model_id or model_episode):
-                clean_model_id, clean_model_ep = await _load_agent_checkpoint(app, model_id, model_episode)
-
-            agent = app.state.sim_agent if mode == "ai" else None
+            agent = benchmark_agent if mode == "ai" else None
 
             intersection.reset()
             phase_starvation = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
@@ -1272,6 +1223,19 @@ async def _run_scenario_benchmark(
     PHASE_TURNS = {0: ["straight"], 1: ["straight"], 2: ["left"], 3: ["left"]}
     TICK_DT     = 0.1
 
+    controllers = _normalize_scenario_modes(modes)
+    if not controllers:
+        raise ValueError("At least one valid scenario controller is required")
+    clean_model_id,clean_model_ep,scenario_agent = "",0,None
+    if "ai" in controllers:
+        try:
+            clean_model_id,clean_model_ep = await _load_agent_checkpoint(app,model_id,model_episode)
+            scenario_agent = app.state.sim_agent
+        except Exception as exc:
+            app.state.benchmark_running = False
+            await websocket.send_json({"type":"error","code":"CHECKPOINT_UNAVAILABLE","message":str(exc)})
+            return
+
     prev_mode    = getattr(app.state, "mode", "fixed")
     prev_running = getattr(app.state, "sim_running", False)
 
@@ -1283,20 +1247,6 @@ async def _run_scenario_benchmark(
         except Exception:
             pass
     await asyncio.sleep(0.15)
-
-    controllers = _normalize_scenario_modes(modes)
-    if not controllers:
-        raise ValueError("At least one valid scenario controller is required")
-
-    # Baseline runs are independent of DQN checkpoints.
-    if "ai" in controllers:
-        active_m = getattr(app.state, "active_model_id", None) or "FlowSync DQN"
-        active_e = getattr(app.state, "active_model_episode", None) or 1000
-        clean_model_id = str(model_id).strip() if model_id else active_m
-        clean_model_ep = int(model_episode) if model_episode else active_e
-    else:
-        clean_model_id = ""
-        clean_model_ep = 0
 
     run_group_id = f"rg_{scenario_id[:8]}_{seed}_{int(time.time())}"
 
@@ -1334,9 +1284,7 @@ async def _run_scenario_benchmark(
             intersection.reset()
             intersection.spawner.set_enabled(False)  # Pre-scheduled arrivals drive all spawning
             if controller == "ai":
-                if model_id or model_episode:
-                    clean_model_id, clean_model_ep = await _load_agent_checkpoint(app, model_id, model_episode)
-                agent = app.state.sim_agent
+                agent = scenario_agent
             else:
                 agent = None
             forecaster = ArrivalForecaster()
@@ -1912,8 +1860,8 @@ async def _simulation_loop(app) -> None:
                     passed = intersection.total_passed
                     peak_queue = max(intersection.get_queue_lengths().values(), default=0)
                     active_mode = getattr(app.state, "mode", "fixed")
-                    active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
-                    active_eps = getattr(app.state, "active_model_episode", 300)
+                    active_model = getattr(app.state, "active_model_id", None)
+                    active_eps = getattr(app.state, "active_model_episode", None)
                     sim_id = app.state.current_simulation_id
 
                     try:
@@ -2075,6 +2023,12 @@ async def simulation_socket(websocket: WebSocket) -> None:
             command = message.get("command")
 
             if command == "start":
+                if getattr(app.state,"mode","fixed") == "ai":
+                    try:
+                        await _load_agent_checkpoint(app,message.get("model_id"),message.get("model_episode"))
+                    except (ValueError,FileNotFoundError) as exc:
+                        await websocket.send_json({"type":"error","message":str(exc)})
+                        continue
                 duration_val = message.get("duration_seconds")
                 if duration_val is not None:
                     try:
@@ -2154,8 +2108,8 @@ async def simulation_socket(websocket: WebSocket) -> None:
                 passed = intersection.total_passed
                 peak_queue = max(intersection.get_queue_lengths().values(), default=0)
                 active_mode = getattr(app.state, "mode", "fixed")
-                active_model = getattr(app.state, "active_model_id", "FlowSync DQN")
-                active_eps = getattr(app.state, "active_model_episode", 300)
+                active_model = getattr(app.state, "active_model_id", None)
+                active_eps = getattr(app.state, "active_model_episode", None)
 
                 if simulation_id and not str(simulation_id).startswith("local-"):
                     await _flush_buffer()
@@ -2302,6 +2256,12 @@ async def simulation_socket(websocket: WebSocket) -> None:
             elif command == "set_mode":
                 mode = message.get("mode")
                 if mode in ("fixed", "ai", "manual", "greedy"):
+                    if mode == "ai":
+                        try:
+                            await _load_agent_checkpoint(app,None)
+                        except (ValueError,FileNotFoundError) as exc:
+                            await websocket.send_json({"type":"error","message":str(exc)})
+                            continue
                     app.state.mode = mode
 
             elif command == "manual_override":

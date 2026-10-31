@@ -240,9 +240,8 @@ def _list_all_models_uncached() -> List[Dict[str, Any]]:
         if max_ep <= 0:
             continue
 
-        # checkpoint_0.pt is an alias for the held-out validation winner.  It
-        # must be visible in the website; otherwise the UI can only benchmark
-        # the latest numbered checkpoint, which is not necessarily the best.
+        # Slot zero is a selected-checkpoint alias. Its filename alone does
+        # not establish how it was selected or whether validation was held out.
         if 0 in episodes_found:
             best_is_remote = 0 in remote_eps
             best_is_local = (
@@ -250,7 +249,7 @@ def _list_all_models_uncached() -> List[Dict[str, Any]]:
             ).exists()
             models_dict[f"{model_id}:0"] = {
                 "id": f"{model_id}:0",
-                "name": f"{base_name} — Best validated ({date_part})",
+                "name": f"{base_name} — Selected checkpoint (slot 0; {date_part})",
                 "version": "best",
                 "source": "remote" if best_is_remote else "local",
                 "in_cloud": best_is_remote,
@@ -261,7 +260,7 @@ def _list_all_models_uncached() -> List[Dict[str, Any]]:
                 "checkpoint_episode": 0,
                 "avg_reward": row.get("avgReward"),
                 "is_active": row.get("isActive", False),
-                "is_best": True,
+                "is_best": True,  # Legacy UI flag for slot zero, not validation evidence.
                 "is_finetuned": "-ft-" in model_id,
                 "sort_date": date_part,
             }
@@ -275,23 +274,6 @@ def _list_all_models_uncached() -> List[Dict[str, Any]]:
             key = f"{model_id}:{ep}"
             is_remote = ep in remote_eps
             is_local = (LOCAL_MODELS_DIR / model_id / f"checkpoint_{ep}.pt").exists()
-
-            # If local exists but not in remote storage, auto-sync to Supabase Cloud Storage bucket
-            if is_local and not is_remote:
-                try:
-                    local_pt = LOCAL_MODELS_DIR / model_id / f"checkpoint_{ep}.pt"
-                    with open(local_pt, "rb") as lf:
-                        raw_bytes = lf.read()
-                    supabase_client.storage.from_(BUCKET_NAME).upload(
-                        path=f"models/{model_id}/checkpoint_{ep}.pt",
-                        file=raw_bytes,
-                        file_options={"content-type": "application/octet-stream", "upsert": "true"},
-                    )
-                    is_remote = True
-                    remote_eps.add(ep)
-                    logger.info("Auto-synced local checkpoint %s to Supabase Cloud Storage bucket", local_pt)
-                except Exception as sync_err:
-                    logger.warning("Failed to auto-sync local checkpoint %s to Supabase: %s", key, sync_err)
 
             source = "remote" if is_remote else "local"
 

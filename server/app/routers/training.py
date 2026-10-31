@@ -4,7 +4,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..schemas.training_schema import StartTrainingRequest
 from ..services import model_service, supabase_service
@@ -15,19 +15,9 @@ router = APIRouter(prefix="/training", tags=["training"])
 
 class LoadModelRequest(BaseModel):
     model_id: str
-    episode: Optional[int] = None
+    episode: Optional[int] = Field(default=None, ge=0, strict=True)
 
     model_config = {"protected_namespaces": ()}
-
-
-def _parse_episode(path: str) -> Optional[int]:
-    filename = path.split("/")[-1]
-    if not filename.startswith("checkpoint_") or not filename.endswith(".pt"):
-        return None
-    episode_text = filename[len("checkpoint_") : -len(".pt")]
-    if not episode_text.isdigit():
-        return None
-    return int(episode_text)
 
 
 from ..simulation.spawner import SCENARIO_PROFILES
@@ -106,8 +96,8 @@ async def start_training(payload: StartTrainingRequest, request: Request) -> dic
             resume_episode=resume_episode,
             is_finetune=is_finetune,
             finetune_scenario=finetune_scenario,
-            finetune_lr=payload.finetune_lr or 1e-4,
-            finetune_epsilon=payload.finetune_epsilon or 0.25,
+            finetune_lr=1e-4 if payload.finetune_lr is None else payload.finetune_lr,
+            finetune_epsilon=0.25 if payload.finetune_epsilon is None else payload.finetune_epsilon,
             custom_profile=custom_profile,
         )
     )
@@ -156,81 +146,31 @@ async def list_models() -> dict:
 @router.post("/load")
 async def load_model(payload: LoadModelRequest, request: Request) -> dict:
     app = request.app
-    raw_model_id = payload.model_id
-    target_episode = payload.episode
-
-    if ":" in raw_model_id:
-        base_id, ep_str = raw_model_id.split(":", 1)
-        ep_clean = ep_str.replace("checkpoint_", "").replace(".pt", "")
-        if ep_clean.isdigit():
-            target_episode = int(ep_clean)
-        model_id = base_id
-    else:
-        model_id = raw_model_id
-
-    checkpoints = await asyncio.to_thread(
-        model_service.list_checkpoints, model_id
-    )
-
-    if not checkpoints:
-        raise HTTPException(status_code=404, detail=f"No checkpoints found for {model_id}")
-
-    episodes = [
-        episode
-        for path in checkpoints
-        if (episode := _parse_episode(path)) is not None
-    ]
-    if not episodes:
-        raise HTTPException(status_code=404, detail="No valid checkpoints found")
-
-    if target_episode is not None and target_episode in episodes:
-        chosen_episode = target_episode
-    elif target_episode is not None:
-        chosen_episode = min(episodes, key=lambda e: abs(e - target_episode))
-    else:
-        chosen_episode = max(episodes)
-
-    checkpoint_data = await asyncio.to_thread(
-        model_service.load_checkpoint, model_id, chosen_episode
-    )
-    if (
-        checkpoint_data.get("obs_version") != "v6_28dim_smdp"
-        or checkpoint_data.get("reward_version") != "v4_incremental_delay"
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="Legacy checkpoint is incompatible with corrected v6 training; start fresh.",
-        )
-
-    sim_agent = app.state.sim_agent
-    training_agent = app.state.training_agent
-    
-    sim_agent.online_net.load_state_dict(checkpoint_data['online_net'])
-    training_agent.online_net.load_state_dict(checkpoint_data['online_net'])
-    
-    if 'target_net' in checkpoint_data:
-        sim_agent.target_net.load_state_dict(checkpoint_data['target_net'])
-        training_agent.target_net.load_state_dict(checkpoint_data['target_net'])
-    else:
-        sim_agent.sync_target_network()
-        training_agent.sync_target_network()
-    
-    if 'optimizer' in checkpoint_data:
-        try:
-            sim_agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
-            training_agent.optimizer.load_state_dict(checkpoint_data['optimizer'])
-        except Exception:
-            pass
-    if 'step_count' in checkpoint_data:
-        sim_agent.step_count = checkpoint_data['step_count']
-        training_agent.step_count = checkpoint_data['step_count']
-        
-    sim_agent.target_net.eval()
-    training_agent.target_net.eval()
-
+    from ..services.checkpoint_loading import load_website_agent,parse_model_request,select_checkpoint
+    if app.state.trainer.is_training:
+        raise HTTPException(status_code=409,detail="Stop training before replacing its model")
+    try:
+        model_id,target_episode = parse_model_request(payload.model_id,payload.episode)
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    try:
+        checkpoints = await asyncio.to_thread(model_service.list_checkpoints,model_id)
+        chosen_episode = select_checkpoint(checkpoints,target_episode)
+        checkpoint_data = await asyncio.to_thread(model_service.load_checkpoint,model_id,chosen_episode)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404,detail=str(exc)) from exc
+    try:
+        sim_agent,actual_episode = load_website_agent(checkpoint_data)
+        training_agent,_ = load_website_agent(checkpoint_data)
+        training_agent.online_net.train()
+    except ValueError as exc:
+        raise HTTPException(status_code=409,detail=str(exc)) from exc
+    app.state.sim_agent = sim_agent
+    app.state.training_agent = training_agent
+    app.state.trainer.agent = training_agent
     app.state.active_model_id = model_id
-    actual_episode = int(checkpoint_data.get("episode", chosen_episode))
     app.state.active_model_episode = actual_episode
+    app.state.active_model_checkpoint_slot = chosen_episode
 
     return {
         "status": "loaded",
