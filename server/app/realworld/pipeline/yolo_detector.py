@@ -5,6 +5,8 @@ Handles both fine-tuned custom model and COCO pretrained fallback.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
+import threading
 import time
 from typing import List, Optional
 
@@ -16,11 +18,33 @@ from ..models.config import (
     YOLO_CONF_THRESHOLD,
     YOLO_IMGSZ,
     YOLO_NMS_IOU,
+    YOLO_ONNX_PATH,
     YOLO_PRETRAINED_PATH,
     YOLO_PRODUCTION_PATH,
     USE_ONNX,
 )
 from ..models.schemas import BoundingBox, VehicleDetection
+
+
+def vehicle_taxonomy(names):
+    """Map model-declared labels to the project taxonomy, never infer from path."""
+    if isinstance(names,list):
+        names = dict(enumerate(names))
+    if not isinstance(names,dict) or any(type(k) is not int or k < 0 or not isinstance(v,str) for k,v in names.items()):
+        raise ValueError("Detector model must declare an integer-indexed label taxonomy")
+    accepted = set(VEHICLE_CLASSES.values())
+    mapping = {index:name.strip().lower() for index,name in names.items() if name.strip().lower() in accepted}
+    if not mapping:
+        raise ValueError("Detector model declares no recognized vehicle classes")
+    return mapping
+
+
+@dataclass(frozen=True)
+class _LoadedDetector:
+    model: object
+    device: str
+    path: str
+    classes: dict
 
 
 class YOLODetector:
@@ -30,9 +54,9 @@ class YOLODetector:
     Supports:
     - Custom fine-tuned model (.pt) with 7 unified vehicle classes
     - COCO pretrained model (.pt) as fallback (5 vehicle classes, no auto_rickshaw)
-    - ONNX Runtime model (.onnx) for 2-3x faster CPU inference
+    - ONNX artifacts when requested and available; speed is not established here.
 
-    Thread-safe for asyncio.to_thread() usage.
+    Blocking model calls are serialized; loaded model/taxonomy publish together.
     """
 
     def __init__(
@@ -40,35 +64,33 @@ class YOLODetector:
         model_path: Optional[str] = None,
         use_onnx: bool = USE_ONNX,
     ) -> None:
-        self._model = None
-        self._model_path: Optional[str] = model_path
+        if type(use_onnx) is not bool:
+            raise ValueError("use_onnx must be boolean")
+        self._loaded: Optional[_LoadedDetector] = None
+        self._requested_path = model_path
         self._use_onnx = use_onnx
-        self._is_custom_model = False  # True after fine-tuning
+        self._inference_lock = threading.Lock()
         self._last_inference_ms: float = 0.0
-        self._device: str = "cpu"
 
     async def load_model(self, model_path: Optional[str] = None) -> None:
         """
         Load or hot-swap model. model_path can be .pt or .onnx.
         Falls back to COCO pretrained if production model not found.
         """
-        path = model_path or self._model_path
+        path = model_path or self._requested_path
 
         if path is None:
             # Try production first, then pretrained fallback
             import os
-            if os.path.exists(YOLO_PRODUCTION_PATH):
+            if self._use_onnx and os.path.exists(YOLO_ONNX_PATH):
+                path = YOLO_ONNX_PATH
+            elif os.path.exists(YOLO_PRODUCTION_PATH):
                 path = YOLO_PRODUCTION_PATH
-                self._is_custom_model = True
             elif os.path.exists(YOLO_PRETRAINED_PATH):
                 path = YOLO_PRETRAINED_PATH
-                self._is_custom_model = False
             else:
                 # Download pretrained
                 path = "yolov8n.pt"  # ultralytics auto-downloads
-                self._is_custom_model = False
-
-        self._model_path = path
 
         def _load():
             from ultralytics import YOLO
@@ -79,16 +101,18 @@ class YOLODetector:
                 device = "cuda:0"
             else:
                 device = "cpu"
-            return model, device
+            return _LoadedDetector(model,device,str(path),vehicle_taxonomy(model.names))
 
-        self._model, self._device = await asyncio.to_thread(_load)
+        loaded = await asyncio.to_thread(_load)
+        self._loaded = loaded
+        self._requested_path = str(path)
 
     async def detect(self, frame: np.ndarray) -> VehicleDetection:
         """
         Main inference: frame -> VehicleDetection with all bboxes.
         Returns empty VehicleDetection if model not loaded.
         """
-        if self._model is None:
+        if self._loaded is None:
             return VehicleDetection(
                 frame_id=0,
                 timestamp_ms=time.time() * 1000,
@@ -115,18 +139,14 @@ class YOLODetector:
 
     def _run_inference(self, frame: np.ndarray) -> List[BoundingBox]:
         """Blocking inference — called via asyncio.to_thread()."""
-        results = self._model(
-            frame,
-            conf=YOLO_CONF_THRESHOLD,
-            iou=YOLO_NMS_IOU,
-            imgsz=YOLO_IMGSZ,
-            verbose=False,
-        )
-        return self._filter_vehicle_classes(results)
+        with self._inference_lock:
+            loaded = self._loaded
+            results = loaded.model(frame,conf=YOLO_CONF_THRESHOLD,iou=YOLO_NMS_IOU,imgsz=YOLO_IMGSZ,verbose=False)
+            return self._filter_vehicle_classes(results,loaded.classes)
 
-    def _filter_vehicle_classes(self, results) -> List[BoundingBox]:
+    def _filter_vehicle_classes(self, results, classes) -> List[BoundingBox]:
         """
-        Keep only vehicle class IDs, remap COCO IDs to unified IDs if using pretrained.
+        Use the taxonomy captured with this inference's model instance.
         """
         bboxes = []
         for result in results:
@@ -137,21 +157,10 @@ class YOLODetector:
                 conf = float(box.conf[0].item())
                 x1, y1, x2, y2 = [float(v) for v in box.xyxy[0].tolist()]
 
-                if self._is_custom_model:
-                    # Custom model: class IDs are already 0-6 (unified)
-                    if cls_id not in VEHICLE_CLASSES:
-                        continue
-                    class_name = VEHICLE_CLASSES[cls_id]
-                    unified_id = cls_id
-                else:
-                    # COCO pretrained: remap vehicle COCO IDs to unified
-                    if cls_id not in COCO_TO_UNIFIED:
-                        continue
-                    class_name = COCO_TO_UNIFIED[cls_id]
-                    # Find unified ID from class name
-                    unified_id = next(
-                        (k for k, v in VEHICLE_CLASSES.items() if v == class_name), cls_id
-                    )
+                if cls_id not in classes:
+                    continue
+                class_name = classes[cls_id]
+                unified_id = next(k for k,v in VEHICLE_CLASSES.items() if v == class_name)
 
                 bboxes.append(BoundingBox(
                     x1=x1, y1=y1, x2=x2, y2=y2,
@@ -163,7 +172,7 @@ class YOLODetector:
 
     async def warmup(self) -> float:
         """Run 3 dummy inferences to warm up. Returns avg latency ms."""
-        if self._model is None:
+        if self._loaded is None:
             return 0.0
         dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
         latencies = []
@@ -175,16 +184,17 @@ class YOLODetector:
 
     @property
     def is_loaded(self) -> bool:
-        return self._model is not None
+        return self._loaded is not None
 
     @property
     def model_path(self) -> Optional[str]:
-        return self._model_path
+        return self._loaded.path if self._loaded else self._requested_path
 
     @property
     def device(self) -> str:
-        return self._device
+        return self._loaded.device if self._loaded else "cpu"
 
     @property
     def is_custom_model(self) -> bool:
-        return self._is_custom_model
+        """Legacy flag describes label mapping, not proof of fine-tuning."""
+        return bool(self._loaded and self._loaded.classes != COCO_TO_UNIFIED)

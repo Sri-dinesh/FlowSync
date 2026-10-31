@@ -79,6 +79,8 @@ class VideoProcessor:
         source: Union[str, Path],
         target_fps: float = PIPELINE_FPS,
     ) -> None:
+        if type(target_fps) not in (int,float) or not math.isfinite(target_fps) or target_fps <= 0:
+            raise ValueError("Video processing target FPS must be finite and positive")
         self.source = str(source).strip()
         self.target_fps = target_fps
         self._resolved_url: str = self.source

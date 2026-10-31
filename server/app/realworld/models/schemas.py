@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List, Literal, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .calibration import GeometryObservation
 from .crossings import CrossingObservation
 from .signal_timeline import RecordedSignal
@@ -277,8 +277,26 @@ class TrainingResult(BaseModel):
 # Digital Twin Schemas
 # ══════════════════════════════════════════════════════════════════════════════
 
+class FlowCalibrationProvenance(BaseModel):
+    """Declared event inputs, without claiming independently measured accuracy."""
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    input_semantics: Literal["upstream_demand_arrival"] = "upstream_demand_arrival"
+    timebase: Literal["video_position_seconds", "controller_log_seconds", "synthetic_seconds"]
+    start_s: float = Field(ge=0, allow_inf_nan=False)
+    end_s: float = Field(gt=0, allow_inf_nan=False)
+    source_file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    coverage: Literal["provided_events_only"] = "provided_events_only"
+    measurement_validation: Literal["not_independently_validated"] = "not_independently_validated"
+
+    @model_validator(mode="after")
+    def ordered_window(self):
+        if self.end_s <= self.start_s:
+            raise ValueError("Calibration end_s must exceed start_s")
+        return self
+
+
 class TrafficFlowParams(BaseModel):
-    """Calibrated flow parameters extracted from detection sessions."""
+    """Supplied flow profile; defaults alone are not measured calibration."""
     model_config = ConfigDict(frozen=False)
 
     intersection_id: str = "default"
@@ -293,6 +311,7 @@ class TrafficFlowParams(BaseModel):
     )
     peak_hours: List[int] = Field(default_factory=lambda: [8, 9, 17, 18])
     avg_vehicles_per_minute: float = 0.0
+    calibration_provenance: Optional[FlowCalibrationProvenance] = None
 
 
 class DatasetStats(BaseModel):

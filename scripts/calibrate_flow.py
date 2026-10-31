@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run flow calibration from a detection session JSON.
+Count declared upstream arrival events over an explicit observation interval.
 
 Usage:
     python scripts/calibrate_flow.py --session data/sessions/session_001.json --output data/flow_params.json
@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "server"))
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calibrate traffic flow parameters from a detection session."
+        description="Estimate supplied upstream-event rates; occupancy-only sessions are rejected."
     )
     parser.add_argument("--session", type=str, required=True, help="Path to session JSON file")
     parser.add_argument("--output", type=str, default="data/flow_params.json", help="Output path")
@@ -29,10 +29,16 @@ def main():
 
     calibrator = FlowCalibrator()
     print(f"[Calibrate] Loading session: {args.session}")
-    params = calibrator.calibrate_from_session(args.session)
+    try:
+        params = calibrator.calibrate_from_session(args.session)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+    if Path(args.output).exists():
+        parser.error("Output already exists; use a new path to preserve evidence")
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
 
     with open(args.output, "w") as f:
-        json.dump(params.model_dump(mode="json"), f, indent=2)
+        json.dump(calibrator.export_as_simulation_config(params), f, indent=2, allow_nan=False)
 
     print(f"\n[Calibrate] Flow Parameters:")
     print(f"  Avg vehicles/min:  {params.avg_vehicles_per_minute:.1f}")

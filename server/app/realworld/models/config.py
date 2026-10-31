@@ -1,6 +1,7 @@
 """
 FlowSync Real-World CCTV Integration — Configuration
-Single source of truth for all constants. No hardcoding anywhere else.
+Declared camera defaults. Some legacy knobs are inactive; source consumers
+and the methodology catalogue distinguish declarations from executed behavior.
 """
 from typing import Dict, List
 
@@ -8,7 +9,7 @@ YOLO_MODEL_SIZE: str = "yolov8n"
 YOLO_PRETRAINED_PATH: str = "models/yolo/pretrained/yolov8n.pt"
 YOLO_PRODUCTION_PATH: str = "models/yolo/production/best.pt"
 YOLO_ONNX_PATH: str = "models/yolo/production/best.onnx"
-USE_ONNX: bool = True  # Enabled ONNX production inference
+USE_ONNX: bool = True  # Prefer an available configured ONNX artifact; otherwise use .pt.
 YOLO_CONF_THRESHOLD: float = 0.35
 YOLO_NMS_IOU: float = 0.45
 YOLO_IMGSZ: int = 640
@@ -42,7 +43,7 @@ VEHICLE_QUEUE_WEIGHTS: Dict[str, float] = {
     "truck": 2.5,
 }
 
-PIPELINE_FPS: float = 2.0               # 2 frames/sec — sufficient for signal control
+PIPELINE_FPS: float = 2.0               # Processing target, not validated control sufficiency.
 FRAME_BUFFER_SIZE: int = 30             # Ring buffer depth
 TEMPORAL_SMOOTHING_ALPHA: float = 0.3   # EMA alpha for queue count smoothing
 
@@ -69,7 +70,7 @@ DIRECTION_COLORS_BGR: Dict[str, tuple] = {
     "west": (0, 255, 255),   # yellow
 }
 
-MAX_QUEUE_CAP: float = 10.0             # Same as simulation (normalization denominator)
+MAX_QUEUE_CAP: float = 10.0             # Pressure divisor; queue encoding uses a separate scale15.
 MAX_GREEN_TIME: float = 40.0            # Same as simulation
 STARVATION_THRESHOLD: float = 45.0     # Same as simulation
 OBS_DIM: int = 28                       # Must match the production DQN input
