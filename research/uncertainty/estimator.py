@@ -8,7 +8,7 @@ Feature Vector phi_t:
 1. Mean detector confidence (inverted: 1.0 - conf)
 2. Lower-tail detector confidence (inverted: 1.0 - tail_conf)
 3. Count volatility: Normalized step-to-step queue change |q_t - q_{t-1}|
-4. Forecast innovation residual: L2 norm between instantaneous queue and 5s EWMA
+4. Queue-history residual: clipped mean absolute deviation from a 5s queue EWMA
 5. Observation staleness / age: Time since newest observation frame
 6. Missing-frame / frame-drop penalty
 7. Track fragmentation proxy: Sudden ID turnover rate
@@ -33,7 +33,7 @@ class UncertaintyFeatures:
     detector_uncertainty: float = 0.0       # 1.0 - mean_conf
     tail_detector_uncertainty: float = 0.0  # 1.0 - min/tail_conf
     count_volatility: float = 0.0           # sudden jump in queue
-    forecast_residual: float = 0.0          # disagreement with 5s EWMA forecaster
+    forecast_residual: float = 0.0          # historical field name; 5s queue-EWMA deviation
     observation_age: float = 0.0            # staleness from latency or dropped frames
     missing_frame_penalty: float = 0.0      # 1.0 if frame was dropped, 0.0 otherwise
     track_instability: float = 0.0          # lost or fragmented tracks
@@ -142,11 +142,13 @@ class PerceptionUncertaintyEstimator:
 
         Args:
             observed_queues: 12-element movement queue vector.
-            forecast_features: Optional 8-element EWMA forecaster features (dims 20-27).
+            forecast_features: Retained argument; unused because arrival-rate features have
+                different units from the queue-history residual computed here.
             detection_confidences: List of YOLO detection confidence scores in [0, 1].
             observation_age_ms: Latency or staleness in milliseconds.
             frame_dropped: True if newest video frame was dropped/stale.
-            track_loss_count: Number of lost/fragmented tracks this tick.
+            track_loss_count: Optional lost/fragmented tracks; the current FlowSync-UQ
+                controller omits it, leaving this feature zero on that path.
         """
         self._step += 1
         q_curr = np.asarray(observed_queues, dtype=np.float32)[:12]

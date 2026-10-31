@@ -1,16 +1,15 @@
 """
 dqn_network.py — Dueling DQN Architecture with Masked Advantage Centering
 ==========================================================================
-Improvements in this version:
-  - BUG-05 fix: DuelingDQNNetwork.forward() now accepts an optional valid_action_mask.
-    When provided, advantage centering uses mean only over VALID actions (not all 4).
-    This prevents invalid/empty phases from biasing the Q-value baseline estimate.
+Local action-mask adaptation:
+  An optional valid_action_mask centers advantage only over valid actions.
+  Standard all-action mean centering remains supported when no mask is supplied.
 
-  Corrected formula:
+  Masked formula:
     Q(s,a) = V(s) + A(s,a) - mean_{a' ∈ valid(s)} A(s, a')
 
-  Previously used:
-    Q(s,a) = V(s) + A(s,a) - mean_{all 4 actions} A(s, a')   ← BUG-05
+  All-action formula:
+    Q(s,a) = V(s) + A(s,a) - mean_{all actions} A(s, a')
 """
 from typing import Optional
 
@@ -27,7 +26,8 @@ HP = HyperParams()
 class DuelingDQNNetwork(nn.Module):
     """
     Dueling DQN Architecture with valid-action masked advantage centering.
-    Based on: Wang et al. 2016, FPA-DQN 2025, 3DQN 2025.
+    Dueling value/advantage decomposition follows Wang et al. (2016).
+    Masked centering is this implementation's adaptation, not a new network family.
 
     Splits Q(s,a) into:
       V(s)    — state value stream (how good is this state)
@@ -35,7 +35,7 @@ class DuelingDQNNetwork(nn.Module):
       Q(s,a)  = V(s) + A(s,a) - mean_{a' ∈ valid} A(s,a')   ← BUG-05 corrected
 
     Args:
-        state_dim: Input observation dimension (default 20, will be 28 post-Task 4.2).
+        state_dim: Input observation dimension (default 28; version-specific alternatives exist).
         action_dim: Number of actions (4 signal phases).
     """
 

@@ -4,15 +4,20 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import logging
+import copy
+import math
+from numbers import Integral
 from typing import Dict, Optional, Tuple
 try:
     from .dqn_network import DuelingDQNNetwork
     from .replay_buffer import PrioritizedReplayBuffer
     from .hyperparams import HyperParams
+    from .observations import OBSERVATION_DIMS
 except (ImportError, ValueError):
     from app.rl.dqn_network import DuelingDQNNetwork
     from app.rl.replay_buffer import PrioritizedReplayBuffer
     from app.rl.hyperparams import HyperParams
+    from app.rl.observations import OBSERVATION_DIMS
 
 logger = logging.getLogger(__name__)
 
@@ -278,17 +283,69 @@ class DQNAgent:
     def save(self, path: str):
         torch.save(self.get_checkpoint_state(), path)
 
-    def load(self, path: str):
-        checkpoint = torch.load(path, map_location="cpu")
-        if isinstance(checkpoint, dict) and "online_net" in checkpoint:
-            self.reward_version = checkpoint.get("reward_version", self.reward_version)
-            self.online_net.load_state_dict(checkpoint["online_net"])
-            self.target_net.load_state_dict(checkpoint["target_net"])
-            if "optimizer" in checkpoint:
-                self.optimizer.load_state_dict(checkpoint["optimizer"])
-            if "step_count" in checkpoint:
-                self.step_count = checkpoint["step_count"]
+    def load_checkpoint_state(self, checkpoint: dict, *, allow_legacy_weights: bool = False) -> None:
+        """Load compatible state atomically; tensor shape alone is not a schema.
+
+        Structured artifacts must name this agent's observation and reward
+        versions. Explicit legacy loading accepts weights under the caller's
+        existing schema without claiming recovered training provenance. Missing
+        target weights synchronize from online; absent saved counters reset to
+        zero. Replay is not restored by this operation.
+        """
+        if not isinstance(checkpoint, dict):
+            raise ValueError("Checkpoint must be a state dictionary")
+        if OBSERVATION_DIMS.get(self.obs_version) != self.state_dim:
+            raise ValueError("Agent observation version and input dimension differ")
+        structured = "online_net" in checkpoint
+        if structured:
+            if checkpoint.get("obs_version") != self.obs_version:
+                raise ValueError("Checkpoint observation version is incompatible with this agent")
+            if checkpoint.get("reward_version") != self.reward_version:
+                raise ValueError("Checkpoint reward version is incompatible with this agent")
+            online_state = checkpoint["online_net"]
+            target_state = checkpoint.get("target_net", online_state)
+            counters = [checkpoint.get(name, 0) for name in ("step_count", "total_train_steps")]
+            if any(isinstance(value, bool) or not isinstance(value, Integral) or value < 0 for value in counters):
+                raise ValueError("Checkpoint counters must be nonnegative integers")
         else:
-            self.online_net.load_state_dict(checkpoint)
-            self.sync_target_network()
-        self.target_net.eval()
+            if not allow_legacy_weights:
+                raise ValueError("Unversioned weights require explicit allow_legacy_weights=True")
+            online_state = target_state = checkpoint
+            counters = [0, 0]
+
+        # A joint deepcopy preserves the optimizer's references to the cloned
+        # online parameters. Failed staging cannot partially replace a model.
+        online, target, optimizer = copy.deepcopy((self.online_net, self.target_net, self.optimizer))
+        try:
+            online.load_state_dict(online_state, strict=True)
+            target.load_state_dict(target_state, strict=True)
+            if any(not torch.isfinite(value).all() for net in (online, target) for value in net.state_dict().values()):
+                raise ValueError("Checkpoint network contains nonfinite values")
+            if structured and "optimizer" in checkpoint:
+                optimizer.load_state_dict(checkpoint["optimizer"])
+                for parameter, state in optimizer.state.items():
+                    for name, value in state.items():
+                        if not torch.is_tensor(value):
+                            continue
+                        if not torch.isfinite(value).all():
+                            raise ValueError("Checkpoint optimizer contains nonfinite values")
+                        if name in ("exp_avg", "exp_avg_sq", "max_exp_avg_sq", "momentum_buffer") and value.shape != parameter.shape:
+                            raise ValueError("Checkpoint optimizer tensor shape differs from its parameter")
+                for group in optimizer.param_groups:
+                    for name in ("lr", "eps", "weight_decay"):
+                        if name in group and (not math.isfinite(group[name]) or group[name] < 0):
+                            raise ValueError(f"Invalid checkpoint optimizer {name}")
+                    if "betas" in group and (len(group["betas"]) != 2 or any(not math.isfinite(v) or not 0 <= v < 1 for v in group["betas"])):
+                        raise ValueError("Invalid checkpoint optimizer betas")
+            else:
+                optimizer.state.clear()
+        except (RuntimeError, TypeError, KeyError, IndexError, ValueError) as exc:
+            raise ValueError(f"Incompatible checkpoint state: {exc}") from exc
+        target.eval()
+        self.online_net, self.target_net, self.optimizer = online, target, optimizer
+        self.step_count, self.total_train_steps = map(int, counters)
+        self.latest_q_stats = {}
+
+    def load(self, path: str, *, allow_legacy_weights: bool = False) -> None:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        self.load_checkpoint_state(checkpoint, allow_legacy_weights=allow_legacy_weights)

@@ -29,7 +29,7 @@ class HyperParams:
     PER_ALPHA: float = 0.6
     PER_BETA_START: float = 0.4
     PER_BETA_END: float = 1.0
-    # Schaul et al. (2016) standard; smaller epsilon (1e-6) causes priority collapse.
+    # Local positive priority floor; this number is not prescribed by the PER paper.
     PER_EPSILON: float = 0.01
 
     MIN_GREEN_TIME: float = 8.0

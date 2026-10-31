@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from enum import Enum
+import math
+from numbers import Integral, Real
 from typing import Any, Dict, List
 
 
@@ -31,8 +33,8 @@ class ControllerSupervisor:
     Args:
         threshold_high: Uncertainty threshold triggering switch to fallback (default 0.45).
         threshold_low: Uncertainty threshold permitting return to RL (default 0.25).
-        min_dwell_steps: Minimum steps to remain in fallback before returning to RL (default 40 = 4.0s).
-        recovery_window_steps: Consecutive steps uncertainty must stay below T_low (default 10 = 1.0s).
+        min_dwell_steps: Minimum update calls in fallback (default 40; 4.0s only at 10Hz).
+        recovery_window_steps: Consecutive low-score calls (default 10; 1.0s only at 10Hz).
     """
 
     def __init__(
@@ -42,6 +44,13 @@ class ControllerSupervisor:
         min_dwell_steps: int = 40,
         recovery_window_steps: int = 10,
     ) -> None:
+        thresholds = (threshold_low, threshold_high)
+        if (any(isinstance(value, bool) or not isinstance(value, Real) or not math.isfinite(value) for value in thresholds)
+                or not 0 <= threshold_low < threshold_high <= 1):
+            raise ValueError("Supervisor thresholds require finite 0 <= low < high <= 1")
+        if any(isinstance(value, bool) or not isinstance(value, Integral) or value < 0
+               for value in (min_dwell_steps, recovery_window_steps)):
+            raise ValueError("Supervisor durations must be nonnegative integer update counts")
         self.threshold_high = threshold_high
         self.threshold_low = threshold_low
         self.min_dwell_steps = min_dwell_steps
@@ -73,6 +82,11 @@ class ControllerSupervisor:
         Returns:
             Current active ControlAuthority (RL_ACTIVE or FALLBACK_ACTIVE).
         """
+        if (isinstance(uncertainty_score, bool) or not isinstance(uncertainty_score, Real)
+                or not math.isfinite(uncertainty_score) or not 0 <= uncertainty_score <= 1):
+            raise ValueError("Supervisor score must be finite and within [0,1]")
+        if isinstance(step, bool) or not isinstance(step, Integral) or step < 0:
+            raise ValueError("Supervisor step must be a nonnegative integer")
         self._steps_in_current_authority += 1
 
         if self.authority == ControlAuthority.RL_ACTIVE:

@@ -4,10 +4,10 @@ demand_forecast.py — Real-Time Short-Horizon Traffic Arrival Forecaster
 Task 4.1: Implements an online Exponentially Weighted Moving Average (EWMA)
 arrival rate tracker and short-horizon (5s, 10s, 20s) demand forecaster.
 
-This is the core of FlowSync's predictive USP:
-  Neither Greedy nor VAT can look into the future. By adding short-horizon
-  EWMA arrival forecasting and queue growth rates to the state vector, the
-  RL agent gains a structural predictive advantage over all reactive heuristics.
+These features summarize past observed arrivals at several smoothing scales.
+They contain no future arrivals and do not by themselves establish a control
+advantage over reactive controllers. Time constants and thresholds are local
+engineering choices rather than an independently calibrated traffic forecast.
 
 Usage:
     forecaster = ArrivalForecaster()
