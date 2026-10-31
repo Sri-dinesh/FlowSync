@@ -1,0 +1,57 @@
+{
+  "version": "sumo_switching_v1",
+  "base_source_sha256": {
+    "research/observation/sumo_sensing.py": "63fdb4741bcdd07c26a7d75795c6b790bf416df1ce82df408603bbd411ff7491",
+    "research/experiments/sumo_sensing.py": "094f32a7fa753aee6c73c8ef6fabfc7e5e04435a418510e87a1e6501ca0367db",
+    "research/analysis/sumo_sensing_metrics.py": "7ba69fe0109fc2f3eabcaf675a69334cdbfdf304c76067d56843a4e2b95f58a5",
+    "research/pilots/run_sumo_sensing_panel.py": "e59397d11a17684daf008a6e461137c72f4aa950e1a63d8759299d6a0bf0081a",
+    "research/policies/sumo_classical.py": "15c66f3f47507496204595823d026df6d4bc25bacd8d5456918ce8a1d2c30be1",
+    "research/audits/sumo_branch_feasibility.py": "f150579af1bb14befaf2f9af2a930929b532dcc77639dc7d78bb4672bbed329b",
+    "research/experiments/sumo_observed_episode.py": "2aa8f40f5ddf37679e61cdaf76e1774b61696723e100d7c88717584e985df73e",
+    "research/analysis/sumo_classical_metrics.py": "458229f453b3821a6caaf137e97988f12cfd31e637a6b5abe4e414382253a64f",
+    "research/pilots/run_sumo_future_panel.py": "32f0b58a3f67b7feb1967dfe56cbed8b49d0b4a822da69e575d99e3047d1470f",
+    "research/requirements-sumo.txt": "93657bae83da23c577aa5efabd8634e6a163c43b1451a51a2300de25164f2fce",
+    "research/experiments/sumo_classical_runtime.py": "8f0fb676984d760c8274abd2343e40aeeffcc86f1a3c1281fe8b925c42989140"
+  },
+  "question": "Does the earlier mixed-sensing pressure advantage persist across fresh known-family traffic realizations, initial greens and a longer horizon, and can one fixed clean-sensing pressure margin reproduce useful control outcomes?",
+  "dt_s": 0.1,
+  "decision_ticks": 20,
+  "physical_timings_ticks": {"min_green": 80, "yellow": 30, "all_red": 10},
+  "methods": [
+    {"name": "pressure_clean", "controller": "max_pressure", "fault": "clean", "margin": 0},
+    {"name": "pressure_mixed", "controller": "max_pressure", "fault": "delay2s_miss30", "margin": 0},
+    {"name": "pressure_margin1", "controller": "max_pressure", "fault": "clean", "margin": 1}
+  ],
+  "smoke_extra_methods": [
+    {"name": "fixed_clean", "controller": "fixed", "fault": "clean", "margin": 0},
+    {"name": "fixed_mixed", "controller": "fixed", "fault": "delay2s_miss30", "margin": 0}
+  ],
+  "families": [
+    {"name": "balanced", "ns_rate": 0.2, "ew_rate": 0.2, "seeds": [1360001, 1360002]},
+    {"name": "ns_dominant", "ns_rate": 0.3, "ew_rate": 0.1, "seeds": [1360101, 1360102]},
+    {"name": "ew_dominant", "ns_rate": 0.1, "ew_rate": 0.3, "seeds": [1360201, 1360202]}
+  ],
+  "smoke_family": {"name": "balanced", "ns_rate": 0.2, "ew_rate": 0.2, "seeds": [1360901]},
+  "initial_phases": [0, 1],
+  "full_steps": 3600,
+  "full_endpoint_ticks": [1800, 3600],
+  "smoke_steps": 800,
+  "smoke_endpoint_ticks": [400, 800],
+  "session_cap_seconds": 900,
+  "smoke_session_cap_seconds": 360,
+  "smoke_pause_after_jobs": 2,
+  "max_sessions": 4,
+  "mechanics": "Smoke repeats five methods in both starts twice, separately replays six 400-tick prefixes, and anchors the two NS base-pressure streams to the frozen sensing engine: 28 episodes / 20,000 signal samples. At least one margin-held gate must execute in native smoke. This is branch coverage, not smoke performance selection.",
+  "margin_rationale": "A one-vehicle pressure-advantage margin is the smallest positive integer increment on this raw count scale. When current pressure is positive, switch only if alternative minus current pressure exceeds one. When current pressure is zero, preserve the original proposal so one opposing vehicle is not deliberately held on an idle phase. This is an observed-pressure rule, not a vehicle-wait guarantee. It is a fixed engineering ablation, not a fitted or optimal value. Zero preserves the original pressure proposal exactly.",
+  "contrasts": [
+    {"name": "mixed_minus_clean", "candidate": "pressure_mixed", "reference": "pressure_clean"},
+    {"name": "margin_minus_clean", "candidate": "pressure_margin1", "reference": "pressure_clean"},
+    {"name": "margin_minus_mixed", "candidate": "pressure_margin1", "reference": "pressure_mixed"}
+  ],
+  "analysis": "Primary 360 s; secondary 180 s overlapping prefix. Average both starts within traffic seed before equal-seed means and exact 64-draw stratified bootstrap. Three contrasts and mean stopped waiting/requested vehicle, within-run p95, completed trips. Preserve every seed, start, endpoint, phase-service exposure and unfavorable case. Six traffic seeds, not 36 independent replicates. No multiplicity-adjusted or population coverage claim.",
+  "candidate_screen": {"minimum_delay_gain_fraction_against_both": 0.02, "maximum_seed_mean_delay_loss_fraction": 0.01, "no_primary_aggregate_p95_or_throughput_loss": true, "no_start_group_mean_delay_loss": true},
+  "screen_scope": "A passing screen only supports another bounded classical-mechanism development test. No learned-policy advantage, automatic training, controller promotion, novelty or publication readiness follows. A failed screen closes this exact fixed-margin recipe without threshold search.",
+  "novelty": "Pressure control and switching hysteresis are established ideas. This is an empirical diagnostic with an explicitly declared local margin; it does not reproduce or invent a switching-loss-aware research controller.",
+  "limits": "Known Bernoulli demand families, new stochastic realizations, straight-only topology, deterministic driving, empty starts, synthetic constant latency and independent frame/vehicle misses. No real-camera calibration, measured demand, policy transfer or independent-family final test.",
+  "restart_contract": "One exclusive collector. Completed episode markers are atomic and traces are immutable. Resume re-verifies and skips the exact completed prefix; incomplete traces remain in earlier sessions. At most four full sessions, each with a cooperative 900 s cap; hard-killed sessions consume one full session allowance and do not certify elapsed time. Smoke sessions use 360 s and intentionally pause after two committed episodes to exercise native restart. Only budget, explicit interruption or planned smoke pause may continue; integrity/runtime failures require review. A completed collection is read-only. No resetting budgets or overwriting failed attempts."
+}
