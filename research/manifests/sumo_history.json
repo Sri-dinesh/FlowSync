@@ -1,0 +1,197 @@
+{
+  "version": "sumo_history_v1",
+  "question": "Can a fixed causal interval mean of delivered phase pressures improve full-run control beyond instantaneous pressure, an equal-span pure lag and the existing mixed-sensing pressure reference?",
+  "base_source_sha256": {
+    "research/analysis/sumo_classical_metrics.py": "458229f453b3821a6caaf137e97988f12cfd31e637a6b5abe4e414382253a64f",
+    "research/analysis/sumo_sensing_metrics.py": "7ba69fe0109fc2f3eabcaf675a69334cdbfdf304c76067d56843a4e2b95f58a5",
+    "research/analysis/sumo_switching_metrics.py": "c49152a1507b1b819749aa60e3c33d2a8edf08276ab4c4283d9de1e8079f1136",
+    "research/audits/sumo_branch_feasibility.py": "f150579af1bb14befaf2f9af2a930929b532dcc77639dc7d78bb4672bbed329b",
+    "research/experiments/sumo_classical_runtime.py": "8f0fb676984d760c8274abd2343e40aeeffcc86f1a3c1281fe8b925c42989140",
+    "research/experiments/sumo_observed_episode.py": "2aa8f40f5ddf37679e61cdaf76e1774b61696723e100d7c88717584e985df73e",
+    "research/experiments/sumo_sensing.py": "094f32a7fa753aee6c73c8ef6fabfc7e5e04435a418510e87a1e6501ca0367db",
+    "research/experiments/sumo_switching.py": "3490928b2027dfe4e73bc73954fcfea4598426bc5ce58533b3185d45e5353488",
+    "research/manifests/sumo_switching.json": "4244d62e92cd431a34a7976d40d92bf6b3b320de8b2ea3c508ab7e4d09ee9954",
+    "research/observation/sumo_sensing.py": "63fdb4741bcdd07c26a7d75795c6b790bf416df1ce82df408603bbd411ff7491",
+    "research/pilots/run_sumo_future_panel.py": "32f0b58a3f67b7feb1967dfe56cbed8b49d0b4a822da69e575d99e3047d1470f",
+    "research/pilots/run_sumo_sensing_panel.py": "e59397d11a17684daf008a6e461137c72f4aa950e1a63d8759299d6a0bf0081a",
+    "research/pilots/run_sumo_switching_panel.py": "80e8e8625bee0015a1d5f6cc0e06e1493b85db7dc82342314df70c48e8d6d65e",
+    "research/policies/sumo_classical.py": "15c66f3f47507496204595823d026df6d4bc25bacd8d5456918ce8a1d2c30be1",
+    "research/policies/sumo_switching.py": "89aa4f430be8305930832ae0291404c30acfbb23c9271c6587511fa4eb9c42d5",
+    "research/requirements-sumo.txt": "93657bae83da23c577aa5efabd8634e6a163c43b1451a51a2300de25164f2fce"
+  },
+  "dt_s": 0.1,
+  "decision_ticks": 20,
+  "window_ticks": 20,
+  "physical_timings_ticks": {
+    "min_green": 80,
+    "yellow": 30,
+    "all_red": 10
+  },
+  "methods": [
+    {
+      "name": "instant_clean",
+      "fault": "clean",
+      "estimator": "current"
+    },
+    {
+      "name": "lag_clean",
+      "fault": "clean",
+      "estimator": "lag"
+    },
+    {
+      "name": "mean_clean",
+      "fault": "clean",
+      "estimator": "mean"
+    },
+    {
+      "name": "instant_mixed",
+      "fault": "delay2s_miss30",
+      "estimator": "current"
+    },
+    {
+      "name": "mean_mixed",
+      "fault": "delay2s_miss30",
+      "estimator": "mean"
+    }
+  ],
+  "families": [
+    {
+      "name": "balanced",
+      "ns_rate": 0.2,
+      "ew_rate": 0.2,
+      "seeds": [
+        1370001,
+        1370002
+      ]
+    },
+    {
+      "name": "ns_dominant",
+      "ns_rate": 0.3,
+      "ew_rate": 0.1,
+      "seeds": [
+        1370101,
+        1370102
+      ]
+    },
+    {
+      "name": "ew_dominant",
+      "ns_rate": 0.1,
+      "ew_rate": 0.3,
+      "seeds": [
+        1370201,
+        1370202
+      ]
+    }
+  ],
+  "smoke_family": {
+    "name": "balanced",
+    "ns_rate": 0.2,
+    "ew_rate": 0.2,
+    "seeds": [
+      1370901
+    ]
+  },
+  "initial_phases": [
+    0,
+    1
+  ],
+  "full_steps": 3600,
+  "full_endpoint_ticks": [
+    1800,
+    3600
+  ],
+  "smoke_steps": 800,
+  "smoke_endpoint_ticks": [
+    400,
+    800
+  ],
+  "session_cap_seconds": 900,
+  "smoke_session_cap_seconds": 360,
+  "max_sessions": 4,
+  "smoke_pause_after_jobs": 2,
+  "primary_candidate": "mean_clean",
+  "primary_references": [
+    "instant_clean",
+    "lag_clean",
+    "instant_mixed"
+  ],
+  "candidate_screen": {
+    "minimum_delay_gain_fraction": 0.02,
+    "maximum_seed_mean_delay_loss_fraction": 0.01,
+    "no_aggregate_p95_or_throughput_loss": true,
+    "no_start_group_mean_delay_loss": true,
+    "noise_arm_no_aggregate_mean_p95_or_throughput_loss": true,
+    "noise_arm_maximum_seed_loss_fraction": 0.01
+  },
+  "contrasts": [
+    {
+      "name": "mean_clean_minus_instant_clean",
+      "terms": {
+        "mean_clean": 1,
+        "instant_clean": -1
+      }
+    },
+    {
+      "name": "lag_clean_minus_instant_clean",
+      "terms": {
+        "lag_clean": 1,
+        "instant_clean": -1
+      }
+    },
+    {
+      "name": "mean_clean_minus_lag_clean",
+      "terms": {
+        "mean_clean": 1,
+        "lag_clean": -1
+      }
+    },
+    {
+      "name": "instant_mixed_minus_instant_clean",
+      "terms": {
+        "instant_mixed": 1,
+        "instant_clean": -1
+      }
+    },
+    {
+      "name": "mean_mixed_minus_instant_mixed",
+      "terms": {
+        "mean_mixed": 1,
+        "instant_mixed": -1
+      }
+    },
+    {
+      "name": "mean_clean_minus_instant_mixed",
+      "terms": {
+        "mean_clean": 1,
+        "instant_mixed": -1
+      }
+    },
+    {
+      "name": "history_by_sensing_interaction",
+      "terms": {
+        "mean_mixed": 1,
+        "instant_mixed": -1,
+        "mean_clean": -1,
+        "instant_clean": 1
+      }
+    }
+  ],
+  "rationale": "The two-second span equals the existing decision interval, not a tuned optimum. Mean uses the current delivered pressure and previous 20 ticks: 21 samples spanning 2.0 s. Compute existing clipped movement/phase pressure before averaging. Exact integer sums share a divisor, so argmax uses no floating-point rounding. Lag selects the frame delivered 20 ticks earlier. This lag is a declared strong control motivated by consumed observations, not an independent discovery.",
+  "startup": "Use the available causal buffer for the mean; retain explicit missing-frame counts and the existing zero-count missing delivery. Lag uses zero scores until its 21-frame buffer is full. Initial startup ends before physical switching eligibility; no clean replacement or future frame is used.",
+  "mechanics": "Five methods in both starts repeated twice (20 x 800 ticks), ten independent 400-tick prefix replays, and six 800-tick old-runtime anchors: clean instantaneous, mixed instantaneous and pure-lag vs an added-delay sensor, in both starts. Total 36 native jobs / 24,800 samples. Require >=1 same-state current-versus-mean proposal difference on each mean arm; no smoke performance selection.",
+  "analysis": "Primary 360 s; overlapping secondary 180 s. Average starts within each traffic seed. Equal-seed means and exact 64-draw family-stratified descriptive bootstrap, two seeds per family. Preserve every context, seed, family and start-group result. Seven predeclared contrasts include the full history-by-sensing interaction. No multiplicity-adjusted population inference.",
+  "continuation": "The primary mean_clean must gain >=2% mean waiting against all three fixed references, with no aggregate p95/throughput or start-group mean loss and no seed >1% worse. mean_mixed must have no aggregate mean/p95/throughput or start-group mean loss and no seed >1% worse against instant_mixed. All jobs and signal/observation audits must complete. Failure closes this exact interval-mean recipe without window/endpoint/arm search. Passing permits bounded classical development only; no automatic training, controller promotion, novelty or publication readiness.",
+  "attribution": [
+    {
+      "title": "Smith, The Scientist and Engineer's Guide to Digital Signal Processing, Chapter 15",
+      "url": "https://www.dspguide.com/CH15.PDF"
+    },
+    {
+      "title": "MathWorks, moving-average filter as a sliding-window FIR",
+      "url": "https://www.mathworks.com/help/dsp/ug/how-is-moving-average-filter-different-from-an-fir-filter.html"
+    }
+  ],
+  "novelty": "Moving averages and pressure control are established. This is an explicitly attributed engineering baseline and controlled empirical test, not a newly invented optimal controller. No MATLAB code or traffic-paper implementation is copied.",
+  "limits": "Known Bernoulli demand families, new realizations, straight-only SUMO topology, synthetic delay/misses, deterministic driving and empty starts. No camera calibration, independent-family final test, learned-model improvement or network stability guarantee.",
+  "restart_contract": "At most four sessions with a cooperative 900 s full cap (3,600 s declared collection allowance). Verification/preparation outside session timers. Atomic immutable episode records; resume skips only the validated exact completed prefix. Unknown hard-kill times remain unknown. Only declared budget or planned smoke pause auto-continues; Ctrl+C requires explicit later --resume. Integrity/runtime failures block continuation."
+}
