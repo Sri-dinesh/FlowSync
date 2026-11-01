@@ -1,0 +1,22 @@
+{
+  "version": "sumo_observation_timing_audit_v1",
+  "source": "results/sumo_switching/full_20261101",
+  "source_report_sha256": "99ad29153c321330319607486e34aafa90d764c6ee48ef703f73a9175b6afcf2",
+  "source_manifest_sha256": "25c8a959d914c4ffc3e03bbf7febe595bf3b96389a3f1959916c2db345a7212b",
+  "endpoint_ticks": [1800, 3600],
+  "decision_ticks": 20,
+  "comparisons": [
+    ["delay_vs_clean", "delay2s", "clean"],
+    ["misses_vs_clean", "miss30", "clean"],
+    ["mixed_vs_clean", "delay2s_miss30", "clean"],
+    ["margin_vs_clean", "margin1", "clean"],
+    ["mixed_vs_margin", "delay2s_miss30", "margin1"],
+    ["mixed_vs_delay", "delay2s_miss30", "delay2s"]
+  ],
+  "basis": "All 36 completed trajectories from all three methods, both starting greens and all six consumed traffic seeds. No partial episode or mechanics repeat is included.",
+  "probes": "Replay all four existing CountSensor presets on each visited trajectory, sharing the original seed and capture ticks. Apply the unchanged pressure proposal and the closed one-count margin at the same canonical pre-decision clock. Reconstruct the actually recorded sensor, packet, proposal and policy telemetry before accepting probes.",
+  "denominators": "Retain every scheduled gate and missing packet. Report comparisons separately by visited method, traffic seed, start and overlapping endpoint. Action changes and hold/switch direction are counted among physically eligible gates only: green with age >= 80 ticks. Keep total scheduled and eligible denominators. Frames, proposals, starts and overlapping prefixes are not independent traffic replicates.",
+  "patterns": "Among eligible gates where mixed differs from clean, count whether delay-only, misses-only, both or neither agrees with the mixed proposal. Also count clean-margin agreement at those same gates. These are joint action patterns, not causal shares of traffic benefit.",
+  "scope": "Post-hoc diagnostic selected after the full-run outcomes, with queries frozen before inspecting these proposal counts. Contemporaneous clean counts are offline audit inputs only. No live controller change, threshold search, fitting, new traffic, future branch, causal mediation estimate, full-run counterfactual improvement, model promotion or novelty claim. Different visited-method bases stay separate.",
+  "verification": "Export first runs the official source-study verifier, then replays all source sensor streams and actual proposals. Saved-audit verification checks input/output/source hashes, the exact gate grid, saved-packet policy reconstruction and all summary/CSV rows. It does not replay raw counterfactual sensor streams again or rerun native kinematics."
+}
