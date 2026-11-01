@@ -620,7 +620,7 @@ The scope is simulation only. No measured intersection counts/timings or recorde
 | Arrival service and cadence diagnosis | All 27 credited service events in the original panel occur within the chosen holds. A matched all-visible pressure control exposes a 0.483 s cadence penalty on those consumed cases (section 42). The subsequent 198-run receding-decision experiment completes but fails: faster decisions worsen the window rule's mean delay by 5.51% and do not establish an interval-model benefit (section 43). |
 | Independent SUMO sensing faults | All 72 episodes / 129,600 panel samples complete after verified reuse of 51 episodes and collection of 21 missing episodes. The original 900-second timeout remains recorded. Combined delay/misses reduce Max-Pressure's aggregate mean stopped waiting by 9.16% on these six seeds, with one unfavorable seed; Fixed stays invariant. This is a bounded classical-controller/sensor interaction, not a learned-policy gain (section 44.9). |
 | SUMO switching/robustness follow-up | All 36 episodes / 129,600 samples complete across six new traffic seeds, both starts and a 360 s primary endpoint. The fixed margin improves aggregate mean waiting 2.47% against clean pressure but is 8.05% worse than mixed-sensing pressure and fails its frozen screen. Mixed sensing reduces mean waiting 9.73% against clean pressure, with lower waiting in all twelve seed/start contexts. This is classical-controller development evidence (section 48). |
-| Causal pressure-history baseline | A fixed two-second pressure mean, instantaneous controls and a pure-lag control are implemented. The native smoke completes 36 jobs / 24,800 samples with exact old-controller/lag parity and checkpoint recovery. The frozen five-arm, six-seed, 60-episode scientific comparison has not run; no performance benefit is established (section 49). |
+| Causal pressure-history baseline | All 60 episodes / 216,000 samples complete and verify under recorded Python 3.11. Clean averaging improves mean waiting 3.03% against instantaneous clean pressure but loses to the lag/mixed references and fails the frozen primary screen. The predeclared noisy mean improves matched noisy mean waiting 4.22%, with adverse tail/throughput cases retained; it cannot replace the failed primary. This exact recipe is closed (section 49). |
 | Upstream-only pressure teacher | Implemented, but the targeted teacher prerequisite and horizon diagnostic fail to justify replacement/training. |
 | Independent SUMO action labels | Six-state, 204-branch panel is complete. Four states have both delay-gain signs across future arrivals; single-future and mean-eight selectors choose the same one-state benefit. No added averaging or learned-policy benefit. |
 | Executed SUMO classical control | Forty-five-run comparison establishes a stronger pressure reference in the tested setup. Removing outgoing subtraction worsens mean/tail waiting while raising completed trips. |
@@ -1059,7 +1059,7 @@ The historical 1,000-episode checkpoint is `server/models/76734963-e987-4024-aaa
 | SUMO sensing traffic | 1350001/1350002, 1350101/1350102, 1350201/1350202 | Six consumed known-family schedules paired across all three controllers/four faults. Recovery reuses the same cases; they cannot become fresh confirmation after inspecting these results. |
 | SUMO sensing mechanics | 1350901; recovery parity also reuses 1350001 and 1350201 | The smoke seed is separate. Replays of scientific cases are mechanics checks, not additional independent traffic seeds. |
 | SUMO switching follow-up | 1360001/1360002, 1360101/1360102, 1360201/1360202; mechanics 1360901 | All six scientific realizations are now inspected development cases in known families. Both starts share each schedule and are averaged within seed. Neither the starts, the overlapping 180 s prefixes nor mechanics repeats create additional independent traffic seeds. |
-| SUMO pressure-history experiment | 1370001/1370002, 1370101/1370102, 1370201/1370202; mechanics 1370901 | Six scientific realizations assigned before collection in the same known families; their control outcomes remain uninspected. The separate smoke is completed mechanics development. All five arms and both starts share each scientific requested-arrival schedule. |
+| SUMO pressure-history experiment | 1370001/1370002, 1370101/1370102, 1370201/1370202; mechanics 1370901 | All six scientific realizations are now consumed development evidence. All five arms and both starts share each requested schedule. The separate smoke and recorded-data verification add no independent traffic seeds. |
 | SUMO mechanics-only seeds | 108001 and feasibility futures; 109901, 110901, 112901 | Separate mechanics/repeat/prefix checks, not scientific-panel traffic replicates. |
 
 The early 1101-series seed manifest remains application/historical metadata; it does not describe every later research panel. Earlier inspected final panels are also consumed. Fresh confirmation requires freezing development choices first and then using an independent declared test, rather than relabelling a seen template/seed.
@@ -1300,7 +1300,7 @@ The completed spatial, temporal, averaged-label, immediate upstream-teacher, Oct
 
 A future learned-controller experiment needs a new evidence-based mechanism, matched controls, a declared budget, fixed endpoints and continuation criteria **before** inspection. Only a passing bounded development screen justifies expanded fresh development and a later independent final test. The completed descriptive SUMO studies had no favorable-performance gate and must not be relabelled as failed execution or successful learning. The user prefers to execute long jobs; no new long neural-training command is ready or warranted. The declared October 31 paper-writing deadline and acceptance of an empirical evaluation motivated prioritizing accurate methods, complete results and limitations. This reference supplies project information for that writing without editing the manuscript.
 
-The sensing comparison is now complete after a disclosed budget extension. Its nonmonotonic sensor/control result and exploratory action/service audit are available in section 44. Those six scientific seeds are consumed development evidence; no automatic promotion, new training batch or fresh-confirmation claim follows from them. The separately frozen, six-seed SUMO follow-up in section 48 also completes. Its one-count clean-pressure margin fails the primary screen and is closed without a threshold search. Mixed sensing again lowers mean waiting across both starts and the longer horizon, but the three-arm design does not isolate why. The subsequent same-state observation audit reconstructs all 36 source streams and finds both suppressed and added switch requests, with limited agreement from the fixed margin (section 48.8). It identifies a limitation of that rule's proposal mapping without measuring the causal traffic benefit of any individual change. Section 49 implements and mechanically verifies a separately frozen pressure-history baseline and controls; its scientific outcomes remain pending. No new long neural-training command or replacement margin recipe is justified by these results.
+The sensing comparison is now complete after a disclosed budget extension. Its nonmonotonic sensor/control result and exploratory action/service audit are available in section 44. Those six scientific seeds are consumed development evidence; no automatic promotion, new training batch or fresh-confirmation claim follows from them. The separately frozen, six-seed SUMO follow-up in section 48 also completes. Its one-count clean-pressure margin fails the primary screen and is closed without a threshold search. Mixed sensing again lowers mean waiting across both starts and the longer horizon, but the three-arm design does not isolate why. The subsequent same-state observation audit reconstructs all 36 source streams and finds both suppressed and added switch requests, with limited agreement from the fixed margin (section 48.8). It identifies a limitation of that rule's proposal mapping without measuring the causal traffic benefit of any individual change. Section 49's separately frozen pressure-history comparison is now complete and its primary clean-mean candidate fails; its positive predeclared noisy ablation remains a secondary observation. The runtime-specific verification failure is diagnosed and the strict check passes under the recorded interpreter without changing the evidence. No new long neural-training command, replacement margin or expanded interval-mean recipe is justified by these results.
 
 <a id="30-evidence-and-maintenance-index"></a>
 ## 30. Evidence and Maintenance Index
@@ -3331,7 +3331,7 @@ Two post-hoc illustrations use the first qualifying gate in frozen source-job/ti
 
 The saved-audit verifier passes input/output/source hashes, the exact gate grid, saved-packet policy reconstruction and every CSV/summary row. It does not repeat the raw four-stream sensor replay. A separate local check under `results/sumo_observation_timing_review/20261101/` independently recomputes **32,400 saved-packet choices** using explicit movement-pressure arithmetic and clock/margin rules, all 36 aggregate rows and all 72 pattern rows. It also matches margin-held counts against all twelve original margin-trajectory result markers, reproducing their **57** recorded holds. This adds arithmetic/software verification, not traffic or training replication. Raw sensor replay occurred during export; native kinematics were independently rerun zero times.
 
-The diagnostic supports testing a causal observation-history baseline as a separate hypothesis. Section 49 implements that bounded test without selecting a new margin. Reproducing the noisy proposal mapping is neither necessary nor sufficient for better traffic. The new control rule has its own frozen controls, endpoints and fresh development traffic, with the historical one-count margin remaining closed. No new long neural-training command is ready from this audit.
+The diagnostic motivated testing a causal observation-history baseline as a separate hypothesis. Section 49 records that completed bounded test without selecting a new margin. Reproducing the noisy proposal mapping is neither necessary nor sufficient for better traffic. Its six traffic seeds were fresh at collection and are now consumed; both the historical one-count margin and the failed primary interval-mean recipe remain closed. No new long neural-training command is ready from this audit.
 
 Verify this saved audit without recollecting or reprocessing raw sensor histories:
 
@@ -3388,7 +3388,7 @@ Instantaneous/mean crossed with clean/mixed sensing form a **two-by-two factoria
 
 ### 49.3 Scientific grid, endpoints and continuation screen
 
-The [frozen machine-readable protocol](research/manifests/sumo_history.json) declares **six traffic seeds × two starts × five methods = 60 episodes**, each **3,600 ticks / 360 s**, for **216,000 primary physical signal samples**. Balanced seeds are **1370001/1370002**, NS-dominant **1370101/1370102**, and EW-dominant **1370201/1370202**. Rates remain the known 0.2/0.2, 0.3/0.1 and 0.1/0.3 vehicles/s per approach. A metadata-only scan of 163 existing result manifests/plans finds no collisions with these identifiers or smoke seed **1370901**. The scientific control outcomes remain uninspected; mechanics uses only the separate smoke seed. These are fresh realizations in known families, not independent traffic families or measured city demand.
+The [frozen machine-readable protocol](research/manifests/sumo_history.json) declares **six traffic seeds × two starts × five methods = 60 episodes**, each **3,600 ticks / 360 s**, for **216,000 primary physical signal samples**. Balanced seeds are **1370001/1370002**, NS-dominant **1370101/1370102**, and EW-dominant **1370201/1370202**. Rates remain the known 0.2/0.2, 0.3/0.1 and 0.1/0.3 vehicles/s per approach. Before collection, a metadata-only scan of 163 existing result manifests/plans found no collisions with these identifiers or smoke seed **1370901**. The scientific outcomes were uninspected at freezing and are now consumed development evidence; mechanics used only its separate seed. These are realizations in known families, not independent traffic families or measured city demand.
 
 The **360 s endpoint is primary**, and the **180 s prefix is secondary**. Its 108,000 signal samples overlap the primary trajectories and must not be added as independent coverage. Both starts are averaged within each traffic seed before equal-seed means and the existing exact 64-draw family-stratified descriptive bootstrap. The effective stochastic replication is **six traffic seeds**, with zero policy-training replicates. Frames, starts, methods and prefixes are not independent traffic seeds. Intervals are not calibrated population guarantees or multiplicity-adjusted superiority tests.
 
@@ -3404,35 +3404,94 @@ Completed episodes publish their immutable markers only after raw trace persiste
 
 The full protocol allows **at most four collection sessions with a cooperative 900 s cap each**, a **3,600 s declared collection allowance**. Source preparation, revalidation of completed checkpoints and final offline verification are outside those collection timers, so this is not a one-hour hard wall-time guarantee. Native collection requires the pinned SUMO/TraCI/sumolib **1.24.0** environment and a verified history smoke with exactly matching sources, runtime and topology. Preflight checks these without collecting scientific traffic or creating its proposed full output. No neural checkpoint, website default or Supabase model is changed by this research path.
 
-### 49.5 Completed mechanics and pending scientific result
+### 49.5 Completed mechanics and implementation checks
 
 Policy/runtime sources were committed as `fd7c198`, the shared runner as `0665103`, and the full protocol/analysis/launcher as `e5efdfc`, before native collection. Artifact `results/sumo_history/smoke_20261101/` completes **36 native jobs / 24,800 signal samples** in **132.029370 recorded collection seconds across two sessions**. The first session deliberately pauses after two committed jobs; the second preserves those records and completes the remaining 34. There are no unobserved session times. All measured signal transitions pass the finite audit; no real-world safety claim follows.
 
 The smoke contains five methods in both starts twice (**20 × 800 ticks**), ten separate prefix replays (**10 × 400 ticks**) and six old-runtime anchors (**6 × 800 ticks**). Repeats and independent prefixes match exactly. Clean/mixed instantaneous streams match the old observed runtime. The clean-history pure lag matches both executed physical trajectories and every proposal/pre-decision clock of the old controller receiving an additional two-second sensor delay, in both starts; its contemporary input packet is correctly different from that delayed anchor's packet. This prevents attributing pure buffering to a new smoothing mechanism.
 
-The mean changes **three** same-state instantaneous proposals under clean sensing and **four** under mixed sensing across the two nonduplicate starts. Those counts exercise the active history branch; they are not saved switches, branch benefits or performance gains. Saved-data verification passes all source/packet/history/proposal/metric/coverage checks with zero independent native kinematic reruns. The scientific batch remains uncollected: `scientific_panel_complete:false`, `candidate_screen:null`, `publication_ready:false`. Local verification/scope/preflight records are under `results/sumo_history_design/20261101/`.
+The mean changes **three** same-state instantaneous proposals under clean sensing and **four** under mixed sensing across the two nonduplicate starts. Those counts exercise the active history branch; they are not saved switches, branch benefits or performance gains. Saved-data smoke verification passes all source/packet/history/proposal/metric/coverage checks with zero independent native kinematic reruns. That mechanics artifact retains `scientific_panel_complete:false`, `candidate_screen:null` and `publication_ready:false`. The user subsequently completed the scientific batch below. The earlier preflight/scope records remain under `results/sumo_history_design/20261101/`.
 
 The final targeted pass records **184 passing tests**, including **63 new policy/runtime, factorial/screen and checkpoint-runner tests**. Tests cover the exact 21-frame window and lag offset, clipping before averaging, zero-span pressure parity, both canonical phases, physical priorities/ties, rejection without state mutation, missing-frame telemetry, delivered-only replay, corrupt history/lamps/waiting, native-adapter equivalence, complete paired grids, seed-level intervals and interaction arithmetic, primary/noisy/start-group failures, immutable prefix recovery, explicit interruption, locking, source/session/trace changes and protection against resealing completed evidence. This is targeted backend/research coverage, not an entire application/frontend suite. Existing dependency warnings remain.
 
-### 49.6 User-run scientific command
+### 49.6 Verification runtime defect and correction
 
-The completed smoke is preserved; it does not need recollection. The scientific recipe remains fixed while its results are pending. Run the read-only preflight and then the bounded scientific panel from the repository root:
+The scientific run completes, but the originally supplied verification command used `server/venv/bin/python`, **Python 3.14.8**, while collection used the pinned native environment's **Python 3.11.15**. The exact report comparison then rejects **seventeen** low-order numeric differences, all inside `history_by_sensing_interaction`. The maximum absolute difference is **1.7763568394002505e-15**. The source episode metrics, controller means, six pairwise contrasts, sign counts and primary screen are unchanged. Recomputing the analysis under Python 3.11 produces **zero** differences from the saved report.
+
+The root is the frozen analysis's four-term weighted floating-point `sum()` calls, not its pressure buffer or traffic stepping. Python changed float summation starting in 3.12; this is documented in the [Python built-in `sum()` reference](https://docs.python.org/3.14/library/functions.html#sum). Session-time aggregation already uses `math.fsum` and is not the mismatching field. The report's SHA-256 remains `123f44e192825cb4414ec12bc63b5a471c5d9cd81bf93e3179b0cb47e8f7ed5e`. No report, checkpoint, trace, controller, protocol or continuation criterion is rounded, rewritten or relaxed to make verification pass.
+
+[verify_sumo_panel.py](research/audits/verify_sumo_panel.py), committed as `1868ab4`, corrects the runtime selection. It supports explicitly registered frozen history/switching protocols, reads the recorded Python version, and selects the current interpreter only when its full `sys.version` matches. Otherwise it probes the existing pinned SUMO interpreter, or an explicitly supplied `--interpreter`, and rejects a mismatch before expensive replay. It delegates to the unchanged strict verifier and checks returned coverage, scope and unchanged source headers. An optional new receipt must be outside frozen evidence and cannot replace an existing receipt. The original twenty-two collection source hashes remain unchanged. Historical v1 exact replay requires its recorded interpreter; this launcher does not make its arithmetic inherently portable across Python versions.
+
+The recorded-runtime verifier and the real launcher both pass **all 60 episodes / 216,000 samples**, with zero new native traffic or independent kinematic reruns. The launcher receipt records the requesting Python 3.14 version, actual Python 3.11 verification version/interpreter, source manifest/report hashes and launcher hash under `results/sumo_history_verification/full_20261101/verification.json`. The local `diagnose.py` and both runtime comparison JSONs preserve the **17 versus 0** field-difference evidence without raw replay or data mutation.
+
+The focused selection regression failed before the fix by choosing the server interpreter instead of the producer interpreter. Afterwards **43 targeted tests pass**, including **12 new dispatch/receipt tests**. They reject unavailable/wrong runtimes, changed inputs, failed verifiers, unsupported protocols, malformed receipts, relabelled coverage and overwriting/nested receipt outputs. This count overlaps earlier implementation suites and is not another whole-application test pass.
+
+Use the launcher from the ordinary server environment to verify the completed artifact:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.verify_sumo_panel results/sumo_history/full_20261101
+```
+
+Direct verification with the original producer environment also works:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.pilots.run_sumo_history_panel \
-  --preflight results/sumo_history/full_20261101 \
-  --mechanics results/sumo_history/smoke_20261101
-
-PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
-  -m research.pilots.run_sumo_history_panel \
-  --output results/sumo_history/full_20261101 \
-  --mechanics results/sumo_history/smoke_20261101
-
-PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.pilots.run_sumo_history_panel --verify results/sumo_history/full_20261101
 ```
 
-After an explicit interruption, repeat the collection command with `--resume` added and the same output/mechanics paths. Do not reset the session allowance or reinterpret a failed performance screen as a successful candidate. The implementation and mechanics are complete; the primary traffic-performance result remains pending.
+The original v1 command under a mismatching Python 3.14 interpreter still has the exact-comparison mismatch; use one of the two commands above. No traffic recollection is needed.
+
+### 49.7 Completed scientific result and failed primary
+
+Artifact `results/sumo_history/full_20261101/` was collected from revision `0e6abd3`. All **60 planned episodes / 216,000 primary signal samples** complete, with zero measured signal-transition violations and no unobserved session times. This is finite simulated signal coverage, not a real-world collision/safety guarantee.
+
+Session 0 records **900.009506 s**, commits **55** episodes and preserves an uncommitted **1,173-tick** trace of seed 1370202 / EW start / instantaneous clean pressure. Session 1 records **126.283199 s** and completes the remaining **five** episodes. The **1,026.292705 s** observed total uses two of the four predeclared collection sessions; it is not a budget amendment. The partial remains in its original session and contributes no samples or metrics to the complete panel.
+
+At the fixed **360 s primary endpoint**, equal-seed means after averaging starts are:
+
+| Method | Mean stopped waiting / requested vehicle, s | Average within-run p95, s | Completed trips / episode | Switch onsets / episode | Clearance / episode, s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Instantaneous clean pressure | 8.840863 | 22.073333 | 253.500000 | 24.166667 | 96.333333 |
+| Pure-lag clean pressure | 8.175462 | 21.075000 | 262.666667 | 23.000000 | 91.666667 |
+| **Mean clean pressure, primary** | **8.573289** | **21.432500** | **256.833333** | **23.833333** | **95.333333** |
+| Instantaneous mixed-sensing pressure | 8.196122 | 21.153750 | 261.166667 | 22.833333 | 91.333333 |
+| Mean mixed-sensing pressure, predeclared ablation | 7.849889 | 20.950000 | 262.583333 | 22.250000 | 88.666667 |
+
+The primary clean mean improves aggregate mean waiting **3.0266%** against instantaneous clean pressure, but seed **1370102 worsens 2.8694%**, failing the 1% maximum seed-loss constraint. Its mean waiting is **4.8661% worse than the pure lag** and **4.6018% worse than instantaneous mixed sensing**. Both comparisons also lose aggregate p95, throughput and both start-group means. Three seed means violate the 1% loss constraint against lag and four violate it against instantaneous mixed sensing.
+
+The frozen screen retains **eleven failures**: the seed-loss constraint against instantaneous clean pressure, plus mean-wait gain, p95, throughput, seed-loss and start-group constraints against each of the lag and mixed references. `continue_to_bounded_development:false`, `automatic_promotion:false` and `publication_ready:false` remain unchanged. **Close this exact interval-mean recipe without a window, endpoint or primary-arm search.**
+
+Primary contrast differences are candidate minus reference; brackets are the frozen descriptive 95% seed-stratified bootstrap intervals:
+
+| Primary contrast | Mean-wait difference, s [interval] | p95 difference, s [interval] | Completed-trip difference [interval] |
+| --- | ---: | ---: | ---: |
+| Mean clean minus instantaneous clean | -0.267574 [-0.365868, -0.169280] | -0.640833 [-1.355000, +0.073333] | +3.333333 [+1.333333, +5.333333] |
+| Mean clean minus pure lag | +0.397827 [-0.036017, +0.831672] | +0.357500 [-1.060833, +1.775833] | -5.833333 [-9.000000, -2.666667] |
+| Mean clean minus instantaneous mixed | +0.377167 [+0.020555, +0.733779] | +0.278750 [-0.528750, +1.086250] | -4.333333 [-7.833333, -0.833333] |
+
+An interval spanning zero does not establish equivalence or override the predeclared point/tail/seed screen. At the overlapping **180 s** endpoint, instantaneous clean / lag clean / mean clean / instantaneous mixed / mean mixed mean waits are **6.955543 / 6.764711 / 6.856927 / 6.849192 / 6.646662 s**. The primary still has higher aggregate waiting than the lag and mixed references. The secondary horizon cannot replace the failed primary.
+
+The clean mean changes **66** same-state instantaneous proposals on its own twelve completed trajectories; the mixed mean changes **102** and the pure lag **159**. These are active-history diagnostics, not numbers of saved switches or traffic-benefit labels. No neural model was trained or promoted.
+
+### 49.8 Predeclared noisy ablation and interpretation
+
+The predeclared `mean_mixed` ablation improves matched `instant_mixed` aggregate mean waiting **4.2244%**, a difference of **-0.346234 s**, with descriptive interval **[-0.576883, -0.115584]**. All **six seed means improve** and **eleven of twelve start contexts improve**. The adverse context, **1370002 / NS start**, adds **0.240909 s** of mean waiting and **0.330000 s** of p95 while completing two more trips. Both start-group mean differences favor the ablation, by **0.291783 s** for NS and **0.400684 s** for EW starts.
+
+Its aggregate p95 difference is **-0.203750 s**, interval **[-0.908750, +0.501250]**; p95 worsens in **four** seed means despite the aggregate reduction. Completed trips rise **1.416667**, interval **[-1.083333, +3.916667]**, with **two** seed means losing trips. Thus the matched noisy-arm nondegradation screen passes on its declared aggregate/mean-seed constraints, but the result is not uniform improvement in every metric or context. Its primary mean is the smallest point estimate among the five methods, while completed trips remain **0.083333 below the pure-lag control**. Selecting it after inspection would not make it the study's successful primary controller.
+
+The primary-endpoint history-by-sensing mean-wait interaction is **-0.078660 s**, interval **[-0.219232, +0.061913]**. Its p95 and trip interaction intervals also span zero. This does not establish a statistically separated sensing-specific averaging effect. The five-arm design has no pure-lag control on the mixed stream; filtering also changes effective observation age. The noisy ablation's gain cannot be assigned uniquely to noise suppression rather than temporal weighting/additional lag. The causal self-history window was fixed before these outcomes, but its useful noisy-arm observation is not permission to replace the failed clean primary, reopen the recipe or claim a newly invented controller.
+
+This is a conditional empirical result on six known-family stochastic realizations, with correlated starts/methods/prefixes. It adds no learned-policy superiority, camera calibration, independent-family final confirmation or deployment readiness. The earlier sensing/switching panels and this panel have different traffic/horizon designs and must not be pooled into a favorable aggregate. No new long training job or expansion of this failed recipe is warranted.
+
+### 49.9 Evidence export and preservation
+
+Local artifact `results/paper_evidence/sumo_history_20261101/` contains eight CSVs: **120 endpoint-case rows, ten aggregates, 168 context contrasts, 84 seed contrasts, 42 metric contrasts, 28 start-group contrasts, 42 family contrasts and 1,442 independent arithmetic checks**. The exporter recomputes Decimal means, weighted contrasts and interval endpoints through binomial-weight enumeration of all 64 bootstrap draws. Its separate arithmetic-audit tolerance is **1e-10**; this is not a relaxation of the original strict report verifier, which runs under the producer interpreter with no comparison tolerance. The frozen float sign counts and Boolean continuation screen are preserved rather than independently redefined by the exporter.
+
+Four deliberate perturbations to an aggregate, interval, seed contrast and start-group contrast are rejected. These are local artifact checks, not extra pytest or traffic replicates. A separate verification reconstructs every CSV and all input/output hashes, including the recorded-runtime receipt. The primary comparison figure is saved as PNG, PDF and SVG and its PNG was visually inspected. Source copies, the original manifest/report, frozen schedules, twenty-two-file collection source ZIP, exporter/helper code and verification receipt accompany the export. Original inputs remain unchanged.
+
+Reproduce the export into a new output using `server/venv/bin/python results/sumo_history_analysis/20261101/analyze.py --source results/sumo_history/full_20261101 --verification results/sumo_history_verification/full_20261101/verification.json --output results/paper_evidence/new_history_export`, with bytecode disabled. It collects no traffic and requires a valid strict recorded-runtime receipt. Raw traces remain in the listed local input directories, so this is not a standalone public raw-data release. No manuscript is edited.
+
+Collection, raw saved-data verification, arithmetic review and documentation are complete. The completed original artifacts are preserved and there is no pending scientific collection command for this closed recipe.
 
 [Back to Top](#top)
