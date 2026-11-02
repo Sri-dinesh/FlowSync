@@ -16,7 +16,7 @@ Use this document as an evidence-bounded drafting reference. It describes implem
 | --- | --- |
 | Problem, scope and contribution | [Scope](#1-project-scope-and-ownership), [attribution](#14-technique-attribution-and-primary-references), [novelty assessment](#15-novelty-assessment-independent-of-measured-performance), [evidence status](#17-current-status-and-evidence-authority) and [empirical questions](#361-evidence-backed-empirical-questions). State the exact evaluated question rather than a general smart-city or optimal-control claim. |
 | Architecture and application workflow | [Architecture](#2-current-system-architecture), sections 3–4 and 26, [checkpoint lifecycle](#46-training-checkpoint-and-task-lifecycle) and [effective configuration/persistence](#47-effective-training-configuration-and-checkpoint-persistence). Distinguish the web application, custom research runtime and independent SUMO path. |
-| Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. |
+| Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. The separately proposed [service-ledger hybrid](#52-service-ledger-hybrid-controller-research-candidate) is an independent two-phase research candidate, not a new trained D3QN checkpoint. |
 | Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit), [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence) and the [generated current inventory](#501-source-checked-method-inventory). Report executed overrides and units, not just source defaults. The catalogue selects method-critical values; it is not every literal in the repository. |
 | Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
 | Recorded outcomes and ablations | Sections 21–24, 32–35, 37–44 and 48–49. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Sections 48–49 cover the completed switching/history studies, same-state audit and verification-runtime correction. Include failed screens and unfavorable replicates. |
@@ -82,6 +82,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [49. Causal pressure-history baseline and controlled experiment](#49-causal-pressure-history-baseline-and-controlled-experiment)
 - [50. Methodology review for paper drafting](#50-methodology-review-for-paper-drafting)
 - [51. Algorithmic originality, attribution and defensible contribution](#51-algorithmic-originality-attribution-and-defensible-contribution)
+- [52. Service-ledger hybrid controller: research candidate](#52-service-ledger-hybrid-controller-research-candidate)
 
 ## 1. Project scope and ownership
 
@@ -547,6 +548,7 @@ The initial primary-source review was recorded on 2026-10-25; selected records a
 | Double-DQN targets; `dqn_agent.py` | Van Hasselt, Guez and Silver, [Deep Reinforcement Learning with Double Q-learning, AAAI 2016](https://arxiv.org/abs/1509.06461). | Online masked action selection with target-network evaluation. Established method. |
 | Dueling value/advantage architecture; `dqn_network.py` | Wang et al., [Dueling Network Architectures for Deep Reinforcement Learning, ICML 2016](https://proceedings.mlr.press/v48/wangf16.html). | Value/advantage heads; local implementation adds valid-action centering and traffic encodings. The combination does not establish new dueling theory. |
 | Priority replay and importance weighting; `replay_buffer.py` | Schaul et al., [Prioritized Experience Replay, ICLR 2016](https://arxiv.org/abs/1511.05952). | Sum-tree proportional replay, priorities and bias-correction weights. Project defaults are not universal values prescribed by the paper. |
+| Pressure-share allocation and executed green batches; research candidate in section 52 | Varaiya's pressure control and Varghese/Shreedhar, [Efficient Fair Queueing using Deficit Round Robin, WUCS-94-17](https://repository.library.washu.edu/cse_research/339/). | A local pressure/fair-scheduling hybrid with an executed-service ledger. It is not full DRR, inherited throughput theory or established global novelty. |
 | Demonstration replay, imitation/margin warm start | Hester et al., [Deep Q-learning from Demonstrations, AAAI 2018](https://research.google/pubs/deep-q-learning-from-demonstrations/). | Related demonstration-assisted TD and margin learning. Teacher-generated data and this loss schedule are local adaptations, not full DQfD replication. |
 | Adam optimization; shared DQN and research PPO training | Kingma and Ba, [Adam: A Method for Stochastic Optimization, ICLR 2015](https://arxiv.org/abs/1412.6980). | Existing adaptive optimizer. Learning rates, update counts and weight decay are executed configuration choices; citing Adam does not calibrate them for traffic. |
 | Layer normalization; dueling network | Ba, Kiros and Hinton, [Layer Normalization, 2016 preprint](https://arxiv.org/abs/1607.06450). | Existing feature-normalization mechanism in the network. It does not establish invariance to sensing errors. |
@@ -2931,6 +2933,12 @@ The following table is generated from reviewed source selectors. `conditional` m
 | `sumo.history_decision_interval` | `20` | ticks/decision | conditional | [source](research/pilots/run_sumo_history_panel.py) |
 | `sumo.sensor_delay` | `20` | ticks | conditional | [source](research/observation/sumo_sensing.py) |
 | `sumo.sensor_miss_probability` | `0.3` | probability | conditional | [source](research/observation/sumo_sensing.py) |
+| `ledger.quantum_ticks` | `80` | executed green ticks | conditional | [source](research/policies/sumo_service_ledger.py) |
+| `ledger.decision_ticks` | `20` | ticks/gate | conditional | [source](research/policies/sumo_service_ledger.py) |
+| `ledger.share_scale` | `1048576` | allocation units/green tick | conditional | [source](research/policies/sumo_service_ledger.py) |
+| `ledger.maximum_batch` | `3 * QUANTUM_TICKS (dynamic reference)` | executed green ticks | conditional | [source](research/policies/sumo_service_ledger.py) |
+| `ledger.debt_priority` | `true` | boolean | conditional | [source](research/policies/sumo_service_ledger.py) |
+| `ledger.debt_budget` | `true` | boolean | conditional | [source](research/policies/sumo_service_ledger.py) |
 <!-- methodology-parameters:end -->
 
 Review metadata stores source AST fingerprints rather than a second editable copy of each numeric default. A changed expression, selected method or relevant consumer fails review. Comments/docstrings and line movement alone do not change those AST fingerprints; full source hashes still record byte-level differences. After reviewing an intentional change, update its explicit catalogue metadata/fingerprint and regenerate the marked table. The inspector provides no command to automatically approve drift.
@@ -3511,7 +3519,7 @@ The November 2 pass updates the writing reference and executable review metadata
 The inventory below is generated from [methodology.json](research/manifests/methodology.json). Each contract has a reviewed AST fingerprint. Consumer fingerprints cover linked behavior where declared. The full exported JSON and `methods.csv` also contain justifications, override notes, reference roles and available method-specific limitations. References distinguish conceptual foundations, implemented adaptations, software dependencies and related work, as defined in section 51.2. They do not imply a literal reproduction of a cited paper, its constants, results or theorem. The runtime profile names are defined in section 45.2. A conditional contract applies when that feature/path is selected.
 
 <!-- methodology-methods:start -->
-The reviewed catalogue covers **135 selected parameters and 35 method contracts**.
+The reviewed catalogue covers **141 selected parameters and 38 method contracts**.
 
 | Contract and implementation | Runtime profiles | Origin and activity | Purpose | References and roles |
 | --- | --- | --- | --- | --- |
@@ -3550,6 +3558,9 @@ The reviewed catalogue covers **135 selected parameters and 35 method contracts*
 | [`recorded_runtime_verification`](research/audits/verify_sumo_panel.py) | independent_sumo | local_engineering; conditional | Dispatch exact saved-panel verification under its recorded Python version | [python_sum](https://docs.python.org/3.14/library/functions.html#sum) (dependency) |
 | [`same_state_sensing_audit`](research/audits/audit_sumo_observation_timing.py) | independent_sumo | local_engineering; conditional | Compare clean, delayed, missed and mixed proposals on the same recorded states | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) (foundation) |
 | [`legacy_demonstration_teacher`](server/app/simulation/greedy_teacher.py) | interactive_legacy | literature_adaptation; conditional | Legacy simulator-pressure teacher and masked demonstration replay collection | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) (adaptation), [dqfd](https://research.google/pubs/deep-q-learning-from-demonstrations/) (foundation) |
+| [`service_ledger_policy`](research/policies/sumo_service_ledger.py) | independent_sumo | literature_adaptation; conditional | Pressure-share debt, nonpreemptive green allocation and receipt-validated executed feedback | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) (adaptation), [deficit_scheduling](https://repository.library.washu.edu/cse_research/339/) (foundation), [cycle_mp](https://www.aimspress.com/article/id/9228e06c-d535-4104-8012-ccc999771a1d) (related_only) |
+| [`service_ledger_runtime`](research/experiments/sumo_service_ledger.py) | independent_sumo | local_engineering; conditional | Delivered-only policy/physical feedback transactions and strict per-tick replay | No external method source declared; novelty unestablished |
+| [`service_ledger_mechanics`](research/audits/audit_sumo_service_ledger.py) | independent_sumo | local_engineering; conditional | Constructed histories, adverse-demand commitments, arithmetic extrema and archived-source mechanics verification | No external method source declared; novelty unestablished |
 <!-- methodology-methods:end -->
 
 The latest additions cover switching-margin proposals, causal pressure history, delivered-history reconstruction, the shared checkpointed panel collector, recorded-runtime verification and the same-state observation audit. Whole-symbol contracts identify the implementation that a paper description must match. They are not formal verification, an exhaustive source audit or a novelty certificate.
@@ -3639,7 +3650,7 @@ These checks distinguish project verification from scientific experiments. No ne
 
 The November 2 follow-up checks the premise that every algorithm, method and configuration must be new for a credible paper. Established algorithms may be used with attribution. The paper's original contribution must instead identify a precise question, method, finding or artifact and explain its difference from close work. A different name, a new combination of familiar blocks or a changed constant does not establish that difference.
 
-**The present audit does not establish a new FlowSync controller or globally unprecedented methodology.** The main ingredients have published precedents. The implemented platform, controlled protocols and source/runtime evidence are concrete project work. Their scientific distinctiveness still needs a narrower comparison. No untested controller is introduced solely to support a novelty label before writing.
+**The section 51 audit did not establish a new FlowSync controller or globally unprecedented methodology.** The main ingredients have published precedents. The implemented platform, controlled protocols and source/runtime evidence are concrete project work. Their scientific distinctiveness still needs a narrower comparison. The subsequently requested hybrid research prototype is separately described in section 52, with its own method, verification and untested performance status.
 
 Novelty, attribution and plagiarism are separate questions. A citation identifies an idea's source; it does not prove source-code authorship, authorize copied code or clear copied prose. This review checks selected implementation descriptions, conceptual attribution and nearby primary literature. It does not compare the repository against every external code/text corpus, inspect the unwritten author manuscript or provide a plagiarism-clearance certificate. The exporter explicitly retains `algorithmic_novelty_established:false` and `plagiarism_clearance_established:false`.
 
@@ -3682,7 +3693,7 @@ The source review found residual claims outside the earlier shared-agent cleanup
 | [Prioritized replay insertion](server/app/rl/replay_buffer.py) | Describes the running raw-priority maximum and single alpha transform. Insertion increases sampling priority but cannot guarantee immediate selection in a stochastic minibatch. |
 | [Interactive phase and schedule helpers](server/app/websockets/simulation_ws.py) | Replaces the hard-coded 25-second/guaranteed-service description with the actual configured phase-service threshold. Requested-arrival pairing is distinct from realized admission and trajectories. |
 
-These edits change docstrings/comments only. The executable AST fingerprints of all three files match their pre-edit fingerprints. No learning update, reward, controller decision, configuration constant or stored result is changed. Historical source archives remain authoritative for old byte-exact replay. The catalogue adds the legacy teacher as a reviewed contract and now covers **135 selected parameters and 35 methods**, as reflected in the generated inventory.
+The section 51 edits change docstrings/comments only. The executable AST fingerprints of all three files match their pre-edit fingerprints. No learning update, reward, controller decision, configuration constant or stored result is changed. Historical source archives remain authoritative for old byte-exact replay. That snapshot added the legacy teacher as a reviewed contract and covered **135 selected parameters and 35 methods**. The generated inventory also includes later additions from section 52.
 
 Recheck source identity, role completeness and generated documentation with:
 
@@ -3697,5 +3708,130 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m pytest \
 A new export must use an unused directory, for example `results/methodology/attribution_review_20261102`. Earlier methodology exports retain their original source and schema contents. The follow-up does not introduce a new maintained document, paper manuscript, training experiment, traffic panel or promoted controller. The verification record below covers this attribution extension; the full-suite record in section 50 belongs to its stated earlier snapshot.
 
 Verification: **51 focused tests passed**: 33 catalogue tests and 18 existing methodology-boundary tests. Eight added cases cover malformed/incomplete reference roles, the distinction between comparison/dependency/adaptation and historical-schema refusal without rewriting inputs. Repository checks pass for **414 Python files and 525 local links**, and both generated tables match the reviewed catalogue. Executable AST equality holds for all three source-comment repairs. All 22 frozen history-panel source hashes still match. `git diff --check` passes. Existing dependency warnings remain. The entire backend suite, frontend and traffic panels were not rerun for this metadata/documentation follow-up.
+
+[Back to Top](#top)
+
+## 52. Service-ledger hybrid controller: research candidate
+
+### 52.1 Proposed mechanism and scope
+
+The November 2 implementation adds a concrete hybrid candidate with the working name **FlowSync service-ledger controller**. It combines Max-Pressure nomination, pressure-weighted allocation debt, nonpreemptive green batches and receipts from actual physical execution. Its question is whether carrying and fulfilling observed allocation shortfalls can improve the efficiency/service tradeoff beyond equally informed pressure and batching controls.
+
+This is a **new project-specific research mechanism**, with implemented code and deterministic mechanics checks. Global algorithmic novelty and traffic benefit remain unestablished. The proposal is a classical scheduling hybrid, with no trained neural weights. It does not retrain or replace D3QN, transfer its four-action checkpoints into two-phase SUMO, or appear as a new website default/controller choice. Its first integration targets the independent, straight-only NS/EW SUMO boundary. CCTV still lacks the validated prospective movement/downstream/signal inputs described earlier.
+
+Two design shapes were compared before implementation. A short queue-model rollout would score a complete 24–32-second exchange against replanned MP. It required projecting edge occupancy into ready queues, a fixed service rate, frozen outgoing penalties and an uncalibrated future-arrival palette. The selected feedback scheduler avoids those assumptions and addresses the narrower problem of allocation promises being revoked or credited without execution. It carries only a signed ledger and one batch. The interval-receipt audit and an explicit adverse-demand countercase were retained from the rollout alternative. The [versioned design manifest](research/manifests/service_ledger_design.json) records the synthesis, equations, assumptions, controls and references. No existing failed recipe, source archive, checkpoint or continuation screen is changed.
+
+### 52.2 Data and execution flow
+
+The [policy](research/policies/sumo_service_ledger.py) accepts the existing immutable delivered `Counts` and canonical `Clock`. Counts retain incoming/outgoing edge occupancy and halted-count semantics. Pressure remains the sum of individually clipped straight-movement incoming-minus-destination-outgoing differences. It is neither measured flow nor a receiving-capacity model. The allocation rule uses incoming/outgoing pressure; the halted vector remains part of the delivered schema but does not set its priority.
+
+The [new runtime adapter](research/experiments/sumo_service_ledger.py) follows one transaction per 0.1-second interval:
+
+1. Deliver the synthetic packet captured from the preceding completed simulator row. No future schedule, raw vehicles, fault probability, hidden backlog or individual wait enters the policy.
+2. Call `begin_interval(counts, before_clock)`. The policy validates the expected physical clock and returns an immutable proposal/interval token. New batches can start only on the existing two-second grid after physical eligibility.
+3. Supply an explicit integer phase request to the unchanged physical `Signal`/`advance` path at every gate. This prevents `first_action=None` from selecting the privileged raw-queue fallback.
+4. Read the **post-request, pre-timer-advance** executed clock. A request to switch enters yellow immediately; a pre-request green clock is not service.
+5. Call `finish_interval(the_same_proposal, executed_clock)`. The policy validates the actual transition before changing committed debt or batch receipts. Wrong-owner, stale, duplicate, missing and out-of-order transactions are rejected. Recovery is deterministic replay into a fresh owner.
+6. Save delivered sensing, gate decisions and per-tick allocation proposals/receipts. Replay reconstructs all of them before the independent lamp and accounting checks. The accounting bridge's clean offline packet is not a policy input.
+
+Each episode starts at green age zero in either canonical phase. Minimum green remains **8 s**, yellow **3 s**, and all-red **1 s** in the frozen two-phase FSM. The policy owns allocation state; the physical FSM owns executed transition legality. Invalid feedback stops the research episode rather than silently choosing another controller.
+
+### 52.3 Equations, constants and commitment
+
+Let `P_NS,P_EW` be delivered phase pressures. Let `S=1,048,576` fixed-point units, `Q=80` executed-green ticks and `G=20` ticks per decision gate. One tick is 0.1 s. The signed debt `z` represents `D_NS=z`, `D_EW=-z`; a positive debt means that a phase received less green than its accumulated observed-pressure share. Divide debt by `S` to obtain green-opportunity ticks, or by `10S` for seconds. This is not vehicle waiting time.
+
+For positive total pressure:
+
+```text
+w_NS = round_nearest_even(S * P_NS / (P_NS + P_EW))
+w_EW = S - w_NS
+z_next = z + w_NS - S * 1[executed phase is NS]     # actual GREEN only
+```
+
+Share rounding uses integer division and ties to even. The opposite share is derived from the same value, preserving phase symmetry. The per-charged-tick share error is at most `1/(2S)` relative to the unquantized ratio. This numerical bound does not establish action parity near discrete thresholds. `S` is numerical resolution, not calibrated confidence.
+
+Clearance creates no service opportunity and leaves debt unchanged. If both pressures are zero, actual green reduces that phase's positive existing debt toward zero by at most one tick; it never pushes it through zero. A zero observation alone does not reset debt. At an unlocked eligible gate with zero total pressure and absolute debt below `Q*S`, the policy holds without purchasing an empty batch. Positive off-gate observations still update allocation memory; the next eligible gate can arbitrate them.
+
+When a batch can start:
+
+```text
+if a phase has debt >= Q*S:
+    target = that unique positive debtor
+else:
+    target = Max-Pressure preference, retaining current phase on exact ties
+
+L = min(3Q, Q + G * ceil(max(D_target,0) / (S*G)))   # green ticks
+```
+
+`Q` supplies a base eight-second allocation quantum and the debt-priority threshold. Gate-rounded positive debt buys additional green. A phase owed eight seconds therefore receives a **16-second batch**. The maximum single batch is **24 s**. These quantities derive from the chosen allocation rule and existing timing contract; their traffic efficiency has not been optimized or validated. Consecutive batches may select the same phase, so 24 s is **not** a maximum continuous green duration.
+
+The target and budget are latched once. Only actual target-green intervals retire the budget; neither a request, yellow/all-red nor a changed observation counts as a receipt. An unfinished batch remains pending through physical clearance. New counts cannot revoke, resize or repeatedly re-credit it. An episode ending before completion records the remaining obligation as endpoint-censored. No terminal flush invents completed service.
+
+Batch completion and debt repayment are different. A target entitled to every current green opportunity can complete its batch with old positive debt still present. Debt can also reach zero before the batch ends. The batch still requires its promised number of executed-green receipts. Longer commitments can waste green when demand changes; that tradeoff is part of the candidate, not an established benefit.
+
+### 52.4 Conditional allocation-debt invariant
+
+For the debt-priority rules, the proposed local property is:
+
+```text
+|z| <= 2*Q*S
+```
+
+With the stated constants this bounds allocation debt magnitude by **16 green-opportunity seconds**. It does not bound a phase's red time, individual vehicle waiting, queue length or traffic delay.
+
+The induction assumes one state owner, complete and correctly ordered interval feedback, fresh initialization, `G<=Q`, `Q` divisible by `G`, and gate-aligned clearance/batch completion. Initial minimum green can create at most one quantum of debt. Idle begins below one quantum; off-gate positive-share changes add at most `G` ticks before arbitration. At batch admission, a selected negative debt must exceed `-Q*S`, otherwise the opposite debtor would have priority. A base `Q` budget cannot reduce it below `-2Q*S`. For selected nonnegative debt `x`, rounding gives `L*S <= Q*S+x+G*S`, so `x-L*S >= -(Q+G)*S >= -2Q*S`. Selected debt cannot increase while that phase is green. Opposing debt is its exact negative. Clearance preserves debt, while zero-pressure retirement reduces its magnitude. The induction therefore closes.
+
+The corresponding `L<=3Q` cap is inactive on reachable primary states under these assumptions; the code does not clamp debt to manufacture the bound. The cap can be active in an ablation without debt-priority arbitration, whose accumulated debt is not covered by this property. The mechanics audit checks the 19 extreme integer cases covering the constant-budget ceiling regions. The algebra plus these finite cases are not a formal all-state safety proof or an inherited MP/DRR stability theorem. No unconditional service deadline is claimed, particularly for completely missed or quantized-to-zero demand.
+
+Online work has a constant number of arithmetic operations/state fields. Count arithmetic depends on input bit length, monotone identifiers grow with episode length, and debt can grow in priority-disabled ablations. No neural inference, future simulation, scenario optimizer or training runs online.
+
+### 52.5 Constructive witness and adverse cases
+
+Two constructed histories start with 80 zero-pressure intervals and then 160 green intervals of continuously positive demand in both phases. In one history phase pressures are `(1,1)`; in the other they are `(9,1)`. Both retain NS green with identical phase-service and continuously-positive-demand ages. At interval 240 both receive the same `(9,1)` packet. Ordinary MP prefers NS in both.
+
+The balanced history has accumulated eight seconds of EW allocation debt; the skewed history has approximately 1.6 seconds. The candidate requests EW with a 160-tick batch in the first and NS with an 80-tick batch in the second. Thus its sufficient state differs from a timer based on phase service history, current counts and demand-recency alone. This does not establish distinction from every weighted-demand/fair-scheduling method.
+
+The accepted EW request executes 30 yellow and ten all-red ticks, then target green at intervals **280–439**. All 160 green receipts are required. At interval 360, the physical minimum green has already elapsed, but 80 promised receipts remain. Reversing pressure toward NS does not cancel them. Empty observations can retire old debt before the batch ends, while an all-EW entitlement can leave debt positive at completion. Both cases are retained. Phase-swapped versions verify symmetry. These are controlled packet/clock calculations, not measured traffic-delay or throughput improvements.
+
+### 52.6 Controls and closest prior work
+
+Four modes are implemented from the same policy owner and execution rules:
+
+| Mode | Nomination | Budget | Purpose |
+| --- | --- | --- | --- |
+| `ledger` | Debt priority, otherwise MP | Debt-extended | Primary candidate. |
+| `pressure_budget` | MP | Same causal debt-extended rule | Separates debt arbitration from budget generation. Its own executed history determines its debt. |
+| `pressure_batch` | MP | Fixed `Q` | Separates variable budgets from uniform batching. |
+| `debt_batch` | Debt priority, otherwise MP | Fixed `Q` | Separates arbitration from additional committed green. |
+
+A later traffic study also needs the original equally sensed MP and a declared demand-conditioned watchdog/cycle-service control. Baselines must build their own state from their own execution. Replaying the candidate's future service schedule into a baseline would leak information. A gain against Fixed alone, a better allocation ledger or an improved commitment-completion counter would not establish superior traffic control.
+
+The closest conceptual sources are [Varaiya's pressure control](https://people.eecs.berkeley.edu/~varaiya/publications.html) and [Varghese/Shreedhar's deficit fair scheduling](https://repository.library.washu.edu/cse_research/339/). The latter concerns communication scheduling; the traffic policy is not full DRR and inherits no published fairness theorem. [Cycle-based MP](https://www.aimspress.com/article/id/9228e06c-d535-4104-8012-ccc999771a1d) already addresses phase service and switching bounds. [Self-organizing control](https://arxiv.org/abs/nlin/0411066), [Lämmer/Helbing's anticipation plus stabilization](https://arxiv.org/abs/0802.0403) and [SCMP/LESCMP switching-loss control](https://www.sciencedirect.com/science/article/pii/S0968090X22001139) are related precedents. Those checks used primary abstracts or publisher overviews, not independent reproductions or full theorem comparisons.
+
+The precise local construction is a **pressure-share shortfall converted once into a receipt-retired nonpreemptive green budget**, with a specified causal/physical boundary and matched controls. That supplies a concrete mechanism to test. Combining its established ingredients, naming it FlowSync or checking its allocation algebra does not establish global novelty or a paper-worthy control advantage. Closest-method full-text comparison and fresh matched traffic evidence remain required.
+
+### 52.7 Implementation checks and bounded mechanics command
+
+Files are the [policy](research/policies/sumo_service_ledger.py), [runtime/replay adapter](research/experiments/sumo_service_ledger.py), [design manifest](research/manifests/service_ledger_design.json), [mechanics collector/verifier](research/audits/audit_sumo_service_ledger.py) and [regression tests](server/tests/test_sumo_service_ledger.py). The current source-checked catalogue adds six parameter surfaces and three method contracts. The generated inventory gives the current totals; older exports remain preserved.
+
+Run only the deterministic mechanism check into a new directory:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.audit_sumo_service_ledger \
+  --output results/service_ledger_mechanics/new_check
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.audit_sumo_service_ledger \
+  --verify results/service_ledger_mechanics/new_check
+```
+
+This checks **20 constructed controller-input sequences / 8,800 physical-clock intervals**, including the four modes, both starts, matching histories and adverse/empty observations. It runs the actual policy and frozen `Signal`, saves exact traces plus source/design hashes and reconstructs them during verification. It opens no native SUMO process, camera or model. These 20 correlated mechanics cases are not traffic replicates. Reports retain `scientific_panel_complete:false`, `performance_evaluated:false`, `algorithmic_novelty_established:false` and no promotion/publication claim. Existing output directories and nested writes into old evidence are refused; changed reports/traces are rejected even after output-hash repair.
+
+The fake-runtime integration tests separately exercise actual `CountSensor` delivery, both canonical starts, clean/mixed faults, all four modes, every gate's explicit request, full sensor/debt/budget/receipt reconstruction, frozen signal auditing and waiting/admission accounting. They also preserve a reachable **79-tick debt → idle → 98-tick debt → arbitration** boundary case. No program state setter injects these witness debts. Old frozen methods and all 22 sources of the completed history-panel manifest remain unchanged.
+
+The final targeted regression pass records **193 passing tests**, including **73 new candidate tests**. Coverage includes exact rational share rounding, phase symmetry, constructive/adverse histories, empty idle and sub-quantum reentry, receipt identity and transactional failures, primary debt bounds under abrupt shares, all coded controls, real delivery plus fake-runtime/physical/accounting reconstruction, corrupt evidence and collector preservation. Existing history, classical, sensing, physical-branch and methodology tests also pass. This is a targeted backend/research pass, not a rerun of the entire application or frontend suite. Existing dependency warnings remain. Repository checks cover **418 Python files and 545 local documentation links**, with both generated tables matching reviewed source. `git diff --check` passes.
+
+There is no new training job, native performance panel, website deployment, checkpoint promotion or real-world validation in this implementation. A separate bounded, frozen, paired study is the next scientific task after this mechanism review; no old failed screen is relaxed.
 
 [Back to Top](#top)

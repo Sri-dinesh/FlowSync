@@ -102,6 +102,16 @@
       "title": "Python built-in sum: floating-point summation changed in Python 3.12",
       "url": "https://docs.python.org/3.14/library/functions.html#sum",
       "role": "Runtime-specific verification rationale, not a new traffic-control method."
+    },
+    "deficit_scheduling": {
+      "title": "Varghese and Shreedhar: Efficient Fair Queueing using Deficit Round Robin, WUCS-94-17 (1994)",
+      "url": "https://repository.library.washu.edu/cse_research/339/",
+      "role": "Fair-scheduling foundation; traffic ledger is not a full DRR reproduction and inherits no theorem."
+    },
+    "cycle_mp": {
+      "title": "Stability and implementation of a cycle-based max pressure controller for signalized traffic networks",
+      "url": "https://www.aimspress.com/article/id/9228e06c-d535-4104-8012-ccc999771a1d",
+      "role": "Related minimum-phase-service and switching-rate controller, not the algorithm implemented by this candidate."
     }
   },
   "parameters": [
@@ -3311,6 +3321,141 @@
         }
       ],
       "unit": "probability"
+    },
+    {
+      "id": "ledger.quantum_ticks",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "QUANTUM_TICKS"
+      },
+      "reviewed_ast_sha256": "136a684d5960a3ed32fb09c893b9cc731b457ada5c8fadec0cd412b5e79bc99b",
+      "purpose": "Base green allocation quantum and debt-priority threshold",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "derived",
+      "status": "conditional",
+      "justification": "Tied to the existing 80-tick physical minimum green. Batching beyond that minimum is a new local hypothesis, not an optimal duration.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_service_ledger.py",
+            "scope": "budget_certificate",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "33895b5713f8a378bf41c123a6fe07b0957830bd1cacf68f4b8e95148148126f"
+        }
+      ],
+      "unit": "executed green ticks"
+    },
+    {
+      "id": "ledger.decision_ticks",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "DECISION_TICKS"
+      },
+      "reviewed_ast_sha256": "fff1988a1403f98e7d5ffcdcd24f992c82a7937282c71e1887bc0558f72a9c16",
+      "purpose": "New-batch gate alignment",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Retains the existing two-second SUMO decision grid. Batch budgets and clearance are aligned to this grid.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [],
+      "unit": "ticks/gate"
+    },
+    {
+      "id": "ledger.share_scale",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "SHARE_SCALE"
+      },
+      "reviewed_ast_sha256": "b0f5471201681ea54898adf68d0f8075ff6b828204fe55ddddfa8645903013fd",
+      "purpose": "Fixed-point pressure-share resolution",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "2**20 units per opportunity tick; nearest/even quantization has at most 1/(2S) share error per charged green tick. Not a confidence probability.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [],
+      "unit": "allocation units/green tick"
+    },
+    {
+      "id": "ledger.maximum_batch",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "MAX_BATCH_TICKS"
+      },
+      "reviewed_ast_sha256": "d46560bba9936fff50d0c1e2cdf6987a4b601dd3cbb15bdf39f6977ae31fb696",
+      "purpose": "Maximum single batch, distinct from maximum continuous phase green",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "derived",
+      "status": "conditional",
+      "justification": "3Q follows from the primary 2Q debt bound and aligned gate rounding. The cap may be active in debt-priority-disabled ablations.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [],
+      "unit": "executed green ticks"
+    },
+    {
+      "id": "ledger.debt_priority",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "Rule",
+        "kind": "assignment",
+        "target": "debt_priority"
+      },
+      "reviewed_ast_sha256": "fc49e3ff31db631b11fdae65c1243eea50afe64ff7f1cddca82c434c55e40498",
+      "purpose": "Allocation-debt arbitration ablation flag",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Separates nomination by accumulated allocation debt from nomination by instantaneous MP.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [],
+      "unit": "boolean"
+    },
+    {
+      "id": "ledger.debt_budget",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "Rule",
+        "kind": "assignment",
+        "target": "debt_budget"
+      },
+      "reviewed_ast_sha256": "fc49e3ff31db631b11fdae65c1243eea50afe64ff7f1cddca82c434c55e40498",
+      "purpose": "Debt-extended versus fixed-quantum batch ablation flag",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Separates the selection rule from extra green commitment. Completing a batch need not repay allocation debt.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [],
+      "unit": "boolean"
     }
   ],
   "methods": [
@@ -4335,6 +4480,201 @@
       "reviewed_ast_sha256": "f4b76da9a00f57ed6d21c50e18ca2dc54e044eee8b3322a0d413e1555d708ae2",
       "consumers": [],
       "limitations": "No performance percentage, independent algorithm novelty, immediate replay-sampling guarantee or camera-observed teacher claim."
+    },
+    {
+      "id": "service_ledger_policy",
+      "source": {
+        "file": "research/policies/sumo_service_ledger.py",
+        "scope": "ServiceLedgerPolicy",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "b07332c8261186977d646210aedb177f3ba1b0b6d2f0a2e4d2416f62b77303ec",
+      "purpose": "Pressure-share debt, nonpreemptive green allocation and receipt-validated executed feedback",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Combines pressure and fair-scheduling foundations in a project-specific allocation mechanism. Bounded-debt reasoning is local and conditional; no global novelty, stability or traffic-gain claim.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [
+        "pressure",
+        "deficit_scheduling",
+        "cycle_mp"
+      ],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "_pressure_share",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "e6538844e9bf7a89739029aae31a28d49f63197e3143ac1879410b4fb1ab8cd0"
+        },
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "_settle",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "9519d0c1db6f51c625ba1bf3cb02f1189eac82b3a15e20c4fd2ae60f03fe34a9"
+        },
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "_budget_ticks",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "55ec3effba3510be6f4141b0da3d5f1a565e9f07d6594543fea0628629d8f5ef"
+        },
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "Rule",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "4c5179e75ee06c308015ec9578509075ad57449d0f7361aab934ae42e7aa47aa"
+        },
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "_clock",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "954cb2eab71dafbe246a802396d82e968e8ea9084dbb2f2a474d6abe0a4dbafb"
+        },
+        {
+          "source": {
+            "file": "research/policies/sumo_service_ledger.py",
+            "scope": "",
+            "kind": "assignment",
+            "target": "RULES"
+          },
+          "reviewed_ast_sha256": "d1c511140b6e03d0ddc765da85a816665beb91b38b95733d652975642ac97481"
+        }
+      ],
+      "reference_roles": {
+        "pressure": "adaptation",
+        "deficit_scheduling": "foundation",
+        "cycle_mp": "related_only"
+      },
+      "limitations": "Two-phase prototype. Historical pressure shares allocate green opportunities, not vehicle waits/departures. Long batches can waste green after demand changes."
+    },
+    {
+      "id": "service_ledger_runtime",
+      "source": {
+        "file": "research/experiments/sumo_service_ledger.py",
+        "scope": "episode",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "8e9b97ed3bcab1156dd61d05fbbc4647d82016da83029bdf223e50b0835334b9",
+      "purpose": "Delivered-only policy/physical feedback transactions and strict per-tick replay",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Keeps execution receipt bookkeeping and raw accounting separate. Explicit requests at every gate prevent the old raw-queue fallback from selecting actions.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_ledger.py",
+            "scope": "validate_trace",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "587562a97ff9c3f7cf1dd9c0ef5165d6063b3244ca24ecc65043290fa55bf520"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_ledger.py",
+            "scope": "record",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "b84701cf94da90d14d8272a810efe4d90c53e0b3a9a913976d1bd6a757fbcfe6"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_ledger.py",
+            "scope": "_same",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d89978cb269eed0f52cd029df4d33ce9bea03a020faf46ceb59245a8b063c3be"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_ledger.py",
+            "scope": "_clock",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "527c622c78a8fcf79d15803c0d8ac23ec8d16ce3febf856d61bd25f55404b50b"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_ledger.py",
+            "scope": "_setup",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "a49a2599973681f5aae190c0068064d07a0322bc4fce4b363fdd5a783e405ea0"
+        }
+      ],
+      "reference_roles": {},
+      "limitations": "Synthetic/fake-runtime mechanics do not establish native SUMO traffic performance or CCTV-to-signal operation."
+    },
+    {
+      "id": "service_ledger_mechanics",
+      "source": {
+        "file": "research/audits/audit_sumo_service_ledger.py",
+        "scope": "run_checks",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "4cc9f173cc379d02fb4003a30b5d8526f11cc08891ed3212a851a269b3c6af5f",
+      "purpose": "Constructed histories, adverse-demand commitments, arithmetic extrema and archived-source mechanics verification",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "A repeatable mechanism check with scope flags. Its constructed cases and finite arithmetic checks are not independent scientific traffic replicates or a formal safety proof.",
+      "override_notes": "Applies only to the isolated service-ledger candidate and its declared ablations. No website/default change, learning, native performance study or parameter optimality follows.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_service_ledger.py",
+            "scope": "budget_certificate",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "33895b5713f8a378bf41c123a6fe07b0957830bd1cacf68f4b8e95148148126f"
+        },
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_service_ledger.py",
+            "scope": "sequence",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "6d293cee26dacce021dad1b8d3527098fe9f3f74a686b122ab30f3c47dd59210"
+        },
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_service_ledger.py",
+            "scope": "create",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "5a8ca321b637e5d9a4c003082a621ff6a377b4c22621961c391ea778c452a74c"
+        },
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_service_ledger.py",
+            "scope": "verify",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "0befd5b1913cb2ada474d40920b91454068aafcc8fd7d0472a049a757f4615b3"
+        }
+      ],
+      "reference_roles": {},
+      "limitations": "No training or native traffic. Conditional allocation debt is distinct from stopped waiting, discharge fairness and real-world safety."
     }
   ],
   "open_evidence_requirements": [
@@ -4348,6 +4688,7 @@
     "Historical research/calibration/profiles/calib_profile_v1.json is example data; its is_calibrated flag is not evidence of measured accuracy.",
     "Source fixes require original source snapshots when replaying historical strict-hash studies. Old checkpoints, reports and archives are preserved.",
     "This catalogue reviews named method-critical surfaces, not every numerical literal or every possible runtime environment override.",
-    "Reference roles distinguish implemented adaptations, conceptual foundations, software dependencies and related work. They do not certify global novelty, independent authorship or absence of plagiarism."
+    "Reference roles distinguish implemented adaptations, conceptual foundations, software dependencies and related work. They do not certify global novelty, independent authorship or absence of plagiarism.",
+    "The service-ledger hybrid is a mechanics-verified research candidate. Its pressure-weighted allocation objective, traffic tradeoff, algorithmic novelty and learned-model connection remain unestablished; future evaluation needs a separate frozen matched-control study."
   ]
 }
