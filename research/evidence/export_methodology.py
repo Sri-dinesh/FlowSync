@@ -21,6 +21,12 @@ TABLE_START = "<!-- methodology-parameters:start -->"
 TABLE_END = "<!-- methodology-parameters:end -->"
 METHODS_START = "<!-- methodology-methods:start -->"
 METHODS_END = "<!-- methodology-methods:end -->"
+REFERENCE_ROLES = {
+    "foundation": "Established conceptual basis; not a full reproduction",
+    "adaptation": "Implemented adaptation with local differences",
+    "dependency": "External software or language behavior used by this path",
+    "related_only": "Comparison reference; not implemented by this contract",
+}
 
 
 def digest(raw):
@@ -150,8 +156,8 @@ def inspect(root=ROOT, catalogue=CATALOGUE):
     root = Path(root).resolve()
     catalogue_path = local_path(root,str(catalogue))
     data = json.loads(catalogue_path.read_text())
-    if data.get("schema_version") != "methodology_v1":
-        raise ValueError("Unknown methodology catalogue schema")
+    if data.get("schema_version") != "methodology_v2":
+        raise ValueError("Unsupported methodology catalogue schema; use its archived exporter for a historical catalogue")
     profiles = set(data["profiles"])
     references = data["references"]
     if not profiles or any(not r.get("url","").startswith("https://") for r in references.values()):
@@ -184,6 +190,11 @@ def inspect(root=ROOT, catalogue=CATALOGUE):
                 issues.append(f"Unknown activity status: {identity}")
             if group == "parameters" and not entry.get("unit"):
                 issues.append(f"Missing unit: {identity}")
+            if group == "methods":
+                roles = entry.get("reference_roles")
+                if (not isinstance(roles, dict) or set(roles) != set(entry.get("references", []))
+                        or any(not isinstance(role, str) or role not in REFERENCE_ROLES for role in roles.values())):
+                    issues.append(f"Every method reference needs an explicit valid role: {identity}")
             try:
                 current = resolve(entry["source"])
                 if current["expression_sha256"] != entry["reviewed_ast_sha256"]:
@@ -203,12 +214,15 @@ def inspect(root=ROOT, catalogue=CATALOGUE):
             except (ValueError,KeyError,SyntaxError,OSError) as exc:
                 issues.append(f"{identity}: {exc}")
     return dict(schema_version=data["schema_version"],structural_integrity_passed=not issues,issues=issues,
-        profiles=data["profiles"],references=references,parameters=parameters,methods=methods,
+        profiles=data["profiles"],references=references,reference_role_definitions=REFERENCE_ROLES,
+        parameters=parameters,methods=methods,
         source_sha256=sources,catalogue_sha256=digest(catalogue_path.read_bytes()),
         coverage="Curated method-critical parameter surfaces and implementation contracts, not every local variable or numerical literal.",
         authority="Source defaults only. Executed settings require the corresponding run manifest/checkpoint; physical measurements require independent data.",
         open_evidence_requirements=data["open_evidence_requirements"],
-        algorithmic_novelty_established=False,field_validation_established=False,production_certified=False)
+        algorithmic_novelty_established=False,field_validation_established=False,production_certified=False,
+        plagiarism_clearance_established=False,
+        attribution_scope="Reviewed citation roles and source identity only. No exhaustive external text/code comparison or author manuscript review.")
 
 
 def compare_sources(root, manifest_path):
@@ -258,6 +272,8 @@ def content_table(report):
 
 
 def check_content(report, path):
+    if not report["structural_integrity_passed"]:
+        return ["Review catalogue/source issues before validating generated documentation"]
     text = Path(path).read_text()
     issues = []
     for name, start, end, render in (("parameter", TABLE_START, TABLE_END, content_table),
@@ -275,7 +291,8 @@ def method_rows(report):
     return [dict(id=m["id"], profiles=";".join(m["profiles"]), purpose=m["purpose"],
         origin=m["origin"], status=m["status"], justification=m["justification"],
         override_notes=m["override_notes"], limitations=m.get("limitations", ""),
-        references=";".join(m["references"]), file=m["source"]["file"], line=m["line"],
+        references=";".join(m["references"]), reference_roles=json.dumps(m["reference_roles"],sort_keys=True),
+        file=m["source"]["file"], line=m["line"],
         expression_sha256=m["expression_sha256"], source_sha256=report["source_sha256"][m["source"]["file"]])
         for m in report["methods"]]
 
@@ -285,10 +302,11 @@ def methods_table(report):
     def cell(value):
         return value.replace("|", "\\|").replace("\n", " ")
     lines = [f"The reviewed catalogue covers **{len(report['parameters'])} selected parameters and {len(report['methods'])} method contracts**.",
-             "", "| Contract and implementation | Runtime profiles | Origin and activity | Purpose | Conceptual references |",
+             "", "| Contract and implementation | Runtime profiles | Origin and activity | Purpose | References and roles |",
              "| --- | --- | --- | --- | --- |"]
     for row in report["methods"]:
-        refs = ", ".join(f"[{key}]({report['references'][key]['url']})" for key in row["references"]) or "Local engineering; no new algorithm claim"
+        refs = ", ".join(f"[{key}]({report['references'][key]['url']}) ({row['reference_roles'][key]})"
+                         for key in row["references"]) or "No external method source declared; novelty unestablished"
         lines.append(f"| [`{row['id']}`]({row['source']['file']}) | {', '.join(row['profiles'])} | "
                      f"{row['origin']}; {row['status']} | {cell(row['purpose'])} | {refs} |")
     return "\n".join(lines)
@@ -349,7 +367,8 @@ def main():
     print(json.dumps(dict(structural_integrity_passed=report["structural_integrity_passed"],
         parameters=len(report["parameters"]),methods=len(report["methods"]),issues=report["issues"],
         dynamic_parameters=sum(p["resolution"] == "dynamic" for p in report["parameters"]),
-        algorithmic_novelty_established=False,field_validation_established=False,production_certified=False),indent=2))
+        algorithmic_novelty_established=False,field_validation_established=False,production_certified=False,
+        plagiarism_clearance_established=False),indent=2))
     if not report["structural_integrity_passed"]:
         raise SystemExit(1)
 

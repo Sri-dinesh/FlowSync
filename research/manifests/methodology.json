@@ -1,5 +1,5 @@
 {
-  "schema_version": "methodology_v1",
+  "schema_version": "methodology_v2",
   "review_date": "2026-11-02",
   "profiles": {
     "interactive_legacy": "Website custom simulation/training. v6/v4 legacy behavior; no audited headless parity.",
@@ -3333,7 +3333,8 @@
       "references": [],
       "reviewed_ast_sha256": "5f153bb4459e04e9ebb6ae33f01755f24fc2cb7d3823a79f96bbf8c180540f89",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "reward_definition",
@@ -3363,7 +3364,8 @@
           "reviewed_ast_sha256": "a5693f999e468be26a463f0a35eb6e07f2eb5a5ad468381f415ce0942277464c"
         }
       ],
-      "limitations": "Local synthetic reward scales, not fitted traffic utility. v4/v5 differ in physical switch-event attribution."
+      "limitations": "Local synthetic reward scales, not fitted traffic utility. v4/v5 differ in physical switch-event attribution.",
+      "reference_roles": {}
     },
     {
       "id": "physical_signal",
@@ -3384,7 +3386,8 @@
       "references": [],
       "reviewed_ast_sha256": "e5bd6ff1740ae2f00585b33697e0acc2abcb508153de8989481e0ed9e3084836",
       "consumers": [],
-      "limitations": "Synthetic min-green/clearance rules only; no real cabinet, pedestrian or formal collision-safety proof."
+      "limitations": "Synthetic min-green/clearance rules only; no real cabinet, pedestrian or formal collision-safety proof.",
+      "reference_roles": {}
     },
     {
       "id": "pressure_control",
@@ -3406,7 +3409,10 @@
       ],
       "reviewed_ast_sha256": "bd7f79a338c671555f73454279dfde342f119c5b033357526439f354531aa8d2",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "pressure": "adaptation"
+      }
     },
     {
       "id": "extra_shield",
@@ -3428,7 +3434,10 @@
       ],
       "reviewed_ast_sha256": "3e95ebba853d6da7a013324755188f93702f24d06b5ceab1b3040a25c323c82d",
       "consumers": [],
-      "limitations": "Related shielding concept, not the cited temporal-logic synthesis or inherited guarantee."
+      "limitations": "Related shielding concept, not the cited temporal-logic synthesis or inherited guarantee.",
+      "reference_roles": {
+        "shielding": "related_only"
+      }
     },
     {
       "id": "network",
@@ -3451,7 +3460,10 @@
       ],
       "reviewed_ast_sha256": "b490cb28bae350fde88392d1518a2392134d942771a53d08220a345f293da539",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "dueling": "adaptation"
+      }
     },
     {
       "id": "double_dqn_update",
@@ -3477,7 +3489,13 @@
       ],
       "reviewed_ast_sha256": "510f3dc3b05cf2df8c4284788f083168daea30b17b8dc0adc0fe1fff0cb910d9",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "dqn": "foundation",
+        "double_dqn": "adaptation",
+        "per": "adaptation",
+        "dqfd": "adaptation"
+      }
     },
     {
       "id": "prioritized_replay",
@@ -3500,7 +3518,10 @@
       ],
       "reviewed_ast_sha256": "2d4e8dfebf57e5d64873d3471e8c619ff08805211e919085abf4ae439ddd3d2b",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "per": "adaptation"
+      }
     },
     {
       "id": "app_training",
@@ -3539,7 +3560,10 @@
           "reviewed_ast_sha256": "3f9b4c1984e9248f7d677adcbe6551cba6213a8951f61fc4df9c80a2892369cf"
         }
       ],
-      "limitations": "Separate from audited v5 proposed-action collection; UI/headless training parity is not established."
+      "limitations": "Separate from audited v5 proposed-action collection; UI/headless training parity is not established.",
+      "reference_roles": {
+        "dqfd": "foundation"
+      }
     },
     {
       "id": "research_training",
@@ -3563,7 +3587,12 @@
       ],
       "reviewed_ast_sha256": "ea5e91525098a5a3ec4f0e803c62c1bdd6ec39620d19898c0a32e5b59461dc3b",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "dqn": "foundation",
+        "double_dqn": "foundation",
+        "dqfd": "foundation"
+      }
     },
     {
       "id": "observation_versions",
@@ -3583,7 +3612,8 @@
       "references": [],
       "reviewed_ast_sha256": "8451caafa08cd613307f84c2bc81769a8d00b794b0486df568bd5d3829087383",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "queue_uncertainty",
@@ -3612,7 +3642,8 @@
           "reviewed_ast_sha256": "e1605bdb33e25072269c271a136d726e383e4b202bc6aa5ddff2783977528fc0"
         }
       ],
-      "limitations": "Not accident risk or fallback benefit. Current FlowSyncUQ call leaves tracking-loss input zero; forecast_features argument is unused."
+      "limitations": "Not accident risk or fallback benefit. Current FlowSyncUQ call leaves tracking-loss input zero; forecast_features argument is unused.",
+      "reference_roles": {}
     },
     {
       "id": "authority_supervisor",
@@ -3632,7 +3663,8 @@
       "references": [],
       "reviewed_ast_sha256": "2e6a7904d380f6b109bbd0ffa1ae446b11d6d12998ca2b35f640b8596d41f2e8",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "ppo",
@@ -3664,7 +3696,11 @@
           "reviewed_ast_sha256": "65678300bcee21ce004dd309dad1193dd68d574de855f3e5137275d163b3832d"
         }
       ],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "ppo": "adaptation",
+        "gae": "adaptation"
+      }
     },
     {
       "id": "count_restoration",
@@ -3684,7 +3720,8 @@
       "references": [],
       "reviewed_ast_sha256": "0738cbdb04a56a3ee3e319e110048edb93576f8b40cbb002f72f611a86e58b6f",
       "consumers": [],
-      "limitations": "Reconstruction accuracy is separate from useful control; no real detector restoration validation."
+      "limitations": "Reconstruction accuracy is separate from useful control; no real detector restoration validation.",
+      "reference_roles": {}
     },
     {
       "id": "arrival_window",
@@ -3706,7 +3743,10 @@
       ],
       "reviewed_ast_sha256": "1a8d39989c0035252cc5191e262fbd050f1be6d5b73cf856cf75a359a8038a2b",
       "consumers": [],
-      "limitations": "Arrival-aware pressure/green extension are prior concepts; local service proxy is not a full-run benefit bound or new-theory claim."
+      "limitations": "Arrival-aware pressure/green extension are prior concepts; local service proxy is not a full-run benefit bound or new-theory claim.",
+      "reference_roles": {
+        "advanced_mp": "adaptation"
+      }
     },
     {
       "id": "sumo_classical",
@@ -3729,7 +3769,11 @@
       ],
       "reviewed_ast_sha256": "45d90a0d49579b9530876496bc878f955808c9234f3d8683a2d8a5a90ca9b7ba",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {
+        "sumo": "dependency",
+        "pressure": "adaptation"
+      }
     },
     {
       "id": "sumo_sensing",
@@ -3751,7 +3795,10 @@
       ],
       "reviewed_ast_sha256": "48892d54c88ca71c073af04ea92a7153c135d36404730ad8c814e61991acb24e",
       "consumers": [],
-      "limitations": "Synthetic assumptions, not measured camera calibration; capture clock differs from custom research sensor contracts."
+      "limitations": "Synthetic assumptions, not measured camera calibration; capture clock differs from custom research sensor contracts.",
+      "reference_roles": {
+        "sumo": "dependency"
+      }
     },
     {
       "id": "centroid_tracker",
@@ -3773,7 +3820,10 @@
       ],
       "reviewed_ast_sha256": "d22be2d9d1ccd6d254cb7bf1ca93d43696152c76838aca45f7b2b76ee512670f",
       "consumers": [],
-      "limitations": "ByteTrack is related work only; this code does not implement ByteTrack or calibrated metric vehicle waiting."
+      "limitations": "ByteTrack is related work only; this code does not implement ByteTrack or calibrated metric vehicle waiting.",
+      "reference_roles": {
+        "bytetrack": "related_only"
+      }
     },
     {
       "id": "camera_detector",
@@ -3795,7 +3845,10 @@
       ],
       "reviewed_ast_sha256": "97795d2db696b60e274ea845a721196a72224d6542975b2e055b42ea4758ddda",
       "consumers": [],
-      "limitations": "Model-label compatibility is structural; no provided footage establishes accuracy or hardware speed."
+      "limitations": "Model-label compatibility is structural; no provided footage establishes accuracy or hardware speed.",
+      "reference_roles": {
+        "yolo": "dependency"
+      }
     },
     {
       "id": "event_flow_estimation",
@@ -3815,7 +3868,8 @@
       "references": [],
       "reviewed_ast_sha256": "7435cd3fcdfb727de71aa21f3577d6f6747e298af6db5a4e3d888da39b13aac9",
       "consumers": [],
-      "limitations": "Occupancy/discharges cannot calibrate demand. Accepted event syntax and file hashes do not validate measurement accuracy or completeness."
+      "limitations": "Occupancy/discharges cannot calibrate demand. Accepted event syntax and file hashes do not validate measurement accuracy or completeness.",
+      "reference_roles": {}
     },
     {
       "id": "checkpoint_identity",
@@ -3835,7 +3889,8 @@
       "references": [],
       "reviewed_ast_sha256": "6c43abe317c0a1ac22b6fc641272c434cec1468bf36c49014eb7c1de76286a39",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "model_discovery",
@@ -3855,7 +3910,8 @@
       "references": [],
       "reviewed_ast_sha256": "ccf1c69ed114c1059227704da08c3daaca3f1ffb79c0d14a2d817af14b10d112",
       "consumers": [],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "training_request_boundary",
@@ -3892,7 +3948,8 @@
           "reviewed_ast_sha256": "1e6cfa12fbaafea6891f5dbd8e38b6d60ba6eda0bbc2079dc05051b33c1b9d03"
         }
       ],
-      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority."
+      "limitations": "Implementation/mechanics checks do not establish field validation, new theory or performance superiority.",
+      "reference_roles": {}
     },
     {
       "id": "training_task_lifecycle",
@@ -3921,7 +3978,8 @@
           "reviewed_ast_sha256": "b9edde610e3943e6b1128974cfab987f4e09c615e9e87317f1622d27b3cfa973"
         }
       ],
-      "limitations": "Prevents duplicate start/model replacement during covered preparation and task states; not general distributed concurrency, persistence or cancellation safety."
+      "limitations": "Prevents duplicate start/model replacement during covered preparation and task states; not general distributed concurrency, persistence or cancellation safety.",
+      "reference_roles": {}
     },
     {
       "id": "checkpoint_storage",
@@ -3990,7 +4048,8 @@
           "reviewed_ast_sha256": "c5986c3fe3d9bc638d8faa6518975013fca7aa9f70229e9a05e60eb78d334b3d"
         }
       ],
-      "limitations": "Upload acknowledgement is not independently verified cloud persistence. Atomic replacement does not supply distributed writers, immutable history or power-loss guarantees."
+      "limitations": "Upload acknowledgement is not independently verified cloud persistence. Atomic replacement does not supply distributed writers, immutable history or power-loss guarantees.",
+      "reference_roles": {}
     },
     {
       "id": "effective_run_configuration",
@@ -4019,7 +4078,8 @@
           "reviewed_ast_sha256": "a4e46a7f751be2e269a7409f65c82e8642b773ce80cb6b58d70e69b7dd698659"
         }
       ],
-      "limitations": "Not every dependency or RNG state is recorded. Website training has no declared global policy seed; source/setting records do not establish deterministic reruns or field calibration."
+      "limitations": "Not every dependency or RNG state is recorded. Website training has no declared global policy seed; source/setting records do not establish deterministic reruns or field calibration.",
+      "reference_roles": {}
     },
     {
       "id": "training_configuration_bundle",
@@ -4064,7 +4124,8 @@
           "reviewed_ast_sha256": "472ec1a73f02558fc35b004b756ccef318da0ce9e157d898390415e3a731e79e"
         }
       ],
-      "limitations": "Verifier reconstructs saved hash/configuration linkage without new traffic trajectories. Complete live cloud/browser lifecycle and adversarial signing are outside this evidence."
+      "limitations": "Verifier reconstructs saved hash/configuration linkage without new traffic trajectories. Complete live cloud/browser lifecycle and adversarial signing are outside this evidence.",
+      "reference_roles": {}
     },
     {
       "id": "pressure_margin",
@@ -4086,7 +4147,10 @@
         "pressure"
       ],
       "consumers": [],
-      "limitations": "No inherited stability theorem, adaptive threshold or new-controller claim."
+      "limitations": "No inherited stability theorem, adaptive threshold or new-controller claim.",
+      "reference_roles": {
+        "pressure": "foundation"
+      }
     },
     {
       "id": "causal_pressure_history",
@@ -4119,7 +4183,12 @@
           "reviewed_ast_sha256": "c07df1c7d0be2bfcfdb40bea710929402b0061bd52516501bcdbfa087bc327dc"
         }
       ],
-      "limitations": "Averages clipped phase pressures, not clean counts. Latency remains; no calibrated uncertainty or inherited stability proof."
+      "limitations": "Averages clipped phase pressures, not clean counts. Latency remains; no calibrated uncertainty or inherited stability proof.",
+      "reference_roles": {
+        "pressure": "adaptation",
+        "moving_average": "foundation",
+        "causal_fir": "foundation"
+      }
     },
     {
       "id": "delivered_history_validation",
@@ -4148,7 +4217,8 @@
           "reviewed_ast_sha256": "a08d74a21522a546a3885e575a98c452684532530e4dc2872844614c2a41ca2e"
         }
       ],
-      "limitations": "Saved-trace reconstruction does not independently rerun native SUMO trajectories."
+      "limitations": "Saved-trace reconstruction does not independently rerun native SUMO trajectories.",
+      "reference_roles": {}
     },
     {
       "id": "checkpointed_panel",
@@ -4168,7 +4238,8 @@
       "override_notes": "Each study supplies its protocol, jobs, measurements and analysis. Completed evidence cannot be resealed.",
       "references": [],
       "consumers": [],
-      "limitations": "Does not validate demand realism, statistical population coverage or hardware/field safety."
+      "limitations": "Does not validate demand realism, statistical population coverage or hardware/field safety.",
+      "reference_roles": {}
     },
     {
       "id": "recorded_runtime_verification",
@@ -4199,7 +4270,10 @@
           "reviewed_ast_sha256": "7047bb818b57b071610057507a963469abb81b963a35b822ccc9c98cad3bb7e0"
         }
       ],
-      "limitations": "Runtime selection and hash receipts are not signing or a fresh native traffic rerun."
+      "limitations": "Runtime selection and hash receipts are not signing or a fresh native traffic rerun.",
+      "reference_roles": {
+        "python_sum": "dependency"
+      }
     },
     {
       "id": "same_state_sensing_audit",
@@ -4230,7 +4304,37 @@
           "reviewed_ast_sha256": "31a186c8ba9ecd69c18d1b7eab2670d04e3e53bc4e6387bf868eabc3fb3a469a"
         }
       ],
-      "limitations": "Same-state proposal differences cannot establish counterfactual traffic benefit."
+      "limitations": "Same-state proposal differences cannot establish counterfactual traffic benefit.",
+      "reference_roles": {
+        "pressure": "foundation"
+      }
+    },
+    {
+      "id": "legacy_demonstration_teacher",
+      "source": {
+        "file": "server/app/simulation/greedy_teacher.py",
+        "scope": "GreedyTeacher",
+        "kind": "symbol"
+      },
+      "purpose": "Legacy simulator-pressure teacher and masked demonstration replay collection",
+      "profiles": [
+        "interactive_legacy"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Pressure ranking and demonstration seeding have established precedents; the collector does not reproduce the complete DQfD algorithm.",
+      "override_notes": "Reads privileged simulator pressure. The action mask and environment govern executability; stores executed actions in legacy replay. Distinct from audited research collection.",
+      "references": [
+        "pressure",
+        "dqfd"
+      ],
+      "reference_roles": {
+        "pressure": "adaptation",
+        "dqfd": "foundation"
+      },
+      "reviewed_ast_sha256": "f4b76da9a00f57ed6d21c50e18ca2dc54e044eee8b3322a0d413e1555d708ae2",
+      "consumers": [],
+      "limitations": "No performance percentage, independent algorithm novelty, immediate replay-sampling guarantee or camera-observed teacher claim."
     }
   ],
   "open_evidence_requirements": [
@@ -4243,6 +4347,7 @@
     "Camera target FPS, pixel tracking gates, queue weights and signal timings are engineering assumptions without independent field calibration.",
     "Historical research/calibration/profiles/calib_profile_v1.json is example data; its is_calibrated flag is not evidence of measured accuracy.",
     "Source fixes require original source snapshots when replaying historical strict-hash studies. Old checkpoints, reports and archives are preserved.",
-    "This catalogue reviews named method-critical surfaces, not every numerical literal or every possible runtime environment override."
+    "This catalogue reviews named method-critical surfaces, not every numerical literal or every possible runtime environment override.",
+    "Reference roles distinguish implemented adaptations, conceptual foundations, software dependencies and related work. They do not certify global novelty, independent authorship or absence of plagiarism."
   ]
 }

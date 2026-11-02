@@ -24,7 +24,7 @@ def fixture_catalogue(tmp_path, *, unused=False):
     if unused:
         consumer = dict(file="source.py",scope="consumer",kind="symbol")
         item["consumers"] = [dict(source=consumer,reviewed_ast_sha256=expression_fingerprint(select(tree,consumer)))]
-    catalogue = dict(schema_version="methodology_v1",profiles={"test":"Fixture"},references={},parameters=[item],methods=[],
+    catalogue = dict(schema_version="methodology_v2",profiles={"test":"Fixture"},references={},parameters=[item],methods=[],
         open_evidence_requirements=["No external validation"])
     path = tmp_path/"catalogue.json"
     path.write_text(json.dumps(catalogue))
@@ -41,6 +41,16 @@ def test_source_defaults_are_read_without_importing_and_numbers_require_review(t
     changed = inspect(tmp_path,path.name)
     assert not changed["structural_integrity_passed"] and changed["parameters"][0]["value"] == .98
     assert any("Unreviewed source" in issue for issue in changed["issues"])
+
+
+def test_historical_catalogues_require_their_original_exporter(tmp_path):
+    _, path, catalogue = fixture_catalogue(tmp_path)
+    catalogue['schema_version'] = 'methodology_v1'
+    path.write_text(json.dumps(catalogue))
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match='archived exporter'):
+        inspect(tmp_path, path.name)
+    assert path.read_bytes() == before
 
 
 def test_unchanged_unused_declaration_cannot_hide_new_consumer_use(tmp_path):
@@ -97,6 +107,7 @@ def test_documented_method_inventory_rejects_stale_or_broken_content(tmp_path, c
     method['reviewed_ast_sha256'] = expression_fingerprint(select(ast.parse((tmp_path/'source.py').read_text()), method['source']))
     catalogue['references']['concept'] = dict(url='https://example.org/original', title='Original method')
     method['references'] = ['concept']
+    method['reference_roles'] = {'concept': 'foundation'}
     catalogue['methods'] = [method]
     path.write_text(json.dumps(catalogue))
     report = inspect(tmp_path, path.name)
@@ -130,6 +141,32 @@ def test_named_positional_preset_selection_is_static_and_detects_drift(tmp_path)
     assert not report['structural_integrity_passed']
 
 
+@pytest.mark.parametrize('roles', [None, [], {}, {'concept':'invented_here'}, {'concept':[]},
+                                 {'concept':'foundation', 'other':'related_only'}])
+def test_method_references_need_complete_explicit_valid_roles(tmp_path, roles):
+    _, path, catalogue = fixture_catalogue(tmp_path)
+    method = deepcopy(catalogue['parameters'][0])
+    method.update(id='method', references=['concept'], reference_roles=roles)
+    catalogue['references'] = {'concept':dict(url='https://example.org/method')}
+    catalogue['methods'] = [method]
+    path.write_text(json.dumps(catalogue))
+    report = inspect(tmp_path, path.name)
+    assert not report['structural_integrity_passed']
+    assert any('explicit valid role' in issue for issue in report['issues'])
+    assert check_content(report, tmp_path/'not_rendered.md')
+
+
+def test_related_work_is_distinct_from_implemented_method_sources():
+    report = inspect()
+    methods = {m['id']:m for m in report['methods']}
+    assert methods['centroid_tracker']['reference_roles'] == {'bytetrack':'related_only'}
+    assert methods['extra_shield']['reference_roles'] == {'shielding':'related_only'}
+    assert methods['camera_detector']['reference_roles'] == {'yolo':'dependency'}
+    assert methods['arrival_window']['reference_roles'] == {'advanced_mp':'adaptation'}
+    assert not report['plagiarism_clearance_established']
+    assert 'No exhaustive' in report['attribution_scope']
+
+
 @pytest.mark.parametrize('position', [-1, True, '1', 3])
 def test_positional_selectors_reject_invalid_or_missing_arguments(position):
     tree = ast.parse('PRESET = Fault("delay", 20, .3)')
@@ -156,6 +193,7 @@ def test_real_catalogue_exports_sources_not_measurement_or_production_certificat
         methods = {row['id']: row for row in csv.DictReader(stream)}
     assert set(methods) == {m['id'] for m in report['methods']}
     assert methods['causal_pressure_history']['references'] == 'pressure;moving_average;causal_fir'
+    assert json.loads(methods['centroid_tracker']['reference_roles']) == {'bytetrack':'related_only'}
     assert 'not clean counts' in methods['causal_pressure_history']['limitations']
     assert (target/'method_table.md').read_text().strip() == methods_table(report)
     manifest = json.loads((target/'manifest.json').read_text())
