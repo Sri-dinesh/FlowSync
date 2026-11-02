@@ -39,7 +39,9 @@ def mock_model_service():
         }
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
+    from app.services import model_service
+    monkeypatch.setattr(model_service, "LOCAL_MODELS_DIR", tmp_path / "models")
     # Use TestClient with the lifespan context manager
     with TestClient(app) as c:
         yield c
