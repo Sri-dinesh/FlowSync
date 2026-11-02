@@ -1,17 +1,18 @@
 """
 greedy_teacher.py — Greedy Demonstration Collector for Warm-Start Buffer Seeding
 ==================================================================================
-Task 5.1: Implements the Greedy (Max-Queue) controller and seeds the RL agent's
-replay buffer with high-quality Greedy demonstrations before RL training begins.
+Collects pressure-heuristic transitions for the legacy application trainer.
 
 Motivation:
   During early training (large epsilon), the RL agent explores randomly and generates
-  poor transitions. If we first fill the replay buffer with Greedy demonstrations,
-  the agent starts learning from competent baseline behavior, dramatically accelerating
-  convergence and preventing the agent from getting stuck in obviously bad policies.
+  varied transitions. Teacher seeding supplies an existing heuristic's decisions
+  before online learning. Its effect requires a matched experiment.
 
-This technique is known as Demonstration Warm-Start or Teacher Seeding and is widely
-used in traffic RL (FPA-DQN, 3DQN-PER, and Curriculum RL papers).
+Conceptual precedents are pressure control (Varaiya, 2013) and demonstration-
+assisted learning (Hester et al., DQfD, 2018):
+https://people.eecs.berkeley.edu/~varaiya/publications.html
+https://research.google/pubs/deep-q-learning-from-demonstrations/
+This collector is not a reproduction of the complete DQfD algorithm.
 
 Usage:
     from server.app.simulation.greedy_teacher import GreedyTeacher
@@ -36,13 +37,11 @@ logger = logging.getLogger(__name__)
 
 class GreedyTeacher:
     """
-    Max-pressure greedy heuristic controller that generates demonstration transitions
-    for seeding the RL replay buffer.
+    Privileged simulator-pressure teacher for demonstration replay collection.
 
-    The Greedy policy always selects the phase with the highest total movement pressure,
-    subject to minimum green time constraints. This is a competitive baseline that
-    generally outperforms Fixed-Timer by 20-40% and provides a strong starting point
-    for the RL agent to improve upon.
+    The selector reads simulator-derived movement pressure and uses scan order
+    to break ties. The collector applies the action mask; the environment enforces
+    physical signal transitions. No performance improvement is guaranteed.
 
     Args:
         env: TrafficEnv instance (used for generating transitions).
@@ -55,15 +54,14 @@ class GreedyTeacher:
         """
         Select the phase with highest total movement pressure.
 
-        Uses the environment's internal pressure computation to determine
-        the optimal greedy action. During yellow/all-red phases, returns
-        the current pending phase (effectively a no-op).
+        Uses the environment's internal pressure computation. During
+        yellow/all-red phases, returns the current phase.
 
         Args:
             state: Current observation (used only for API consistency).
 
         Returns:
-            Greedy-optimal phase index (0-3).
+            Pressure-maximizing phase index (0-3), or current phase in clearance.
         """
         signal = self.env.intersection.signal
         pressures = self.env._compute_movement_pressures(self.env.intersection)
@@ -124,7 +122,7 @@ class GreedyTeacher:
             next_state, reward, terminated, truncated, info = self.env.step_decision(action)
             done = terminated or truncated
 
-            # Push using executed action (handles watchdog overrides correctly)
+            # Legacy replay labels this transition with the executed action.
             executed_action = info.get("executed_action", action)
             next_action_mask = info["valid_action_mask"]
             replay_buffer.push(

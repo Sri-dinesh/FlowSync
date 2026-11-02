@@ -123,7 +123,10 @@ class PrioritizedReplayBuffer:
         is_demo: bool = False,
     ) -> None:
         """
-        Add transition with maximum-priority guarantee to ensure immediate sampling.
+        Insert using the running raw-priority maximum, raised to alpha once.
+
+        Sampling remains stochastic; insertion does not guarantee selection
+        in the next minibatch.
         """
         if valid_action_mask is None:
             valid_action_mask = np.ones(HP.ACTION_DIM, dtype=bool)

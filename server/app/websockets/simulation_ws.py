@@ -211,8 +211,8 @@ def _select_ai_phase_action(
     """
     Selects AI signal phase action with:
       1. Dynamic 4-Phase Demand Calculation (0: NS_THRU, 1: EW_THRU, 2: NS_LEFT, 3: EW_LEFT).
-      2. Starvation Watchdog: tracks wait time per phase; if any phase with waiting vehicles
-         has been starved >= 25s, it is guaranteed service (prevents left-turn lockup).
+      2. Phase-service watchdog: requests a demanded phase after its service timer
+         reaches signal.STARVATION_THRESHOLD. This is not an individual wait bound.
       3. Max-Green Ceiling: forces switch if current phase exceeds MAX_GREEN_TIME.
       4. DQN Q-Value Policy with Demand Action Masking over all valid phases.
     Returns: (action, was_watchdog_override)
@@ -1171,11 +1171,13 @@ def _generate_scenario_traffic(
 ) -> List[Dict[str, Any]]:
     """
     Pre-generate a deterministic vehicle arrival schedule for the entire scenario duration.
-    Guarantees 100% mathematical identicality across Fixed, Greedy, and DQN:
+    Supplies a common requested-arrival schedule to paired controllers:
       - Exact same total vehicle count
       - Exact same arrival timestamps (time_s)
       - Exact same lanes and turns
       - Exact same initial speed (DEFAULT_SPEED) and zero wait time
+
+    Realized admission, trajectories and outcomes can depend on the controller.
     """
     rng = np.random.default_rng(int(seed))
     arrivals: List[Dict[str, Any]] = []
