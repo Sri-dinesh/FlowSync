@@ -6,7 +6,9 @@ import tempfile
 from pathlib import Path
 import pytest
 import torch
+import numpy as np
 from server.app.controllers import D3QNController
+from server.app.controllers.base import ControllerContext
 
 from research.legacy.run_ablations import build_ablation_controllers, run_ablation_experiments
 from research.analysis.failure_analysis import (
@@ -26,14 +28,15 @@ def test_ablation_controller_specifications():
     assert "minus Fallback (No-Fallback)" in variants
     assert "minus MaxPressure (Fixed Fallback)" in variants
 
-    # Check structural single-variable modifications
+    # These are legacy configurations; No-UQ and No-Fallback are control aliases.
     full = variants["Full FlowSync-UQ"]
     assert full.enable_shield is True
     assert full.fallback_controller_name == "max_pressure"
     assert full.uncertainty_threshold == 0.45
 
     no_uq = variants["minus Uncertainty (No-UQ)"]
-    assert no_uq.uncertainty_threshold > 100.0  # Inactive threshold
+    assert no_uq.uncertainty_threshold == full.uncertainty_threshold
+    assert no_uq.enable_fallback is False
 
     no_shield = variants["minus Safety Shield (No-Shield)"]
     assert no_shield.enable_shield is False
@@ -44,6 +47,23 @@ def test_ablation_controller_specifications():
 
     fixed_fb = variants["minus MaxPressure (Fixed Fallback)"]
     assert fixed_fb.fallback_controller_name == "fixed"
+
+
+@pytest.mark.parametrize('name', ['minus Uncertainty (No-UQ)', 'minus Fallback (No-Fallback)'])
+def test_disabled_legacy_fallback_stays_on_policy_even_with_stale_delivery(name, monkeypatch):
+    controller = build_ablation_controllers()[name]
+    called = []
+    def policy(observation, context):
+        called.append(context.timestep)
+        return 0
+    def unexpected_fallback(*args):
+        pytest.fail('Disabled fallback must never receive control')
+    monkeypatch.setattr(controller.d3qn, 'act', policy)
+    monkeypatch.setattr(controller.fallback, 'act', unexpected_fallback)
+    context = ControllerContext(timestep=1, extra_telemetry={'observation_age_ms': 2000.0, 'frame_dropped': True})
+    controller.act(np.zeros(28, dtype=np.float32), context)
+    assert called == [1]
+    assert controller.get_diagnostics()['active_controller'] == 'd3qn'
 
 
 def test_failure_taxonomy_classification():
@@ -123,6 +143,9 @@ def test_ablation_and_reliability_execution_smoke():
             checkpoint_path=str(weights),
         )
         assert len(res_ablation) == 5
+        for row in res_ablation:
+            if row['variant'] in ('minus Uncertainty (No-UQ)', 'minus Fallback (No-Fallback)'):
+                assert row['fallback_rate'] == 0.0
         assert (tmp_path / "ablations" / "table_ablations.tex").exists()
         assert (tmp_path / "ablations" / "table_ablations.csv").exists()
 

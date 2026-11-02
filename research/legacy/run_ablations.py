@@ -3,10 +3,14 @@ run_ablations.py — Component Ablation Study (Phase J / Task J1)
 ==============================================================
 Evaluates the contribution of each FlowSync-UQ architectural component:
 1. Full FlowSync-UQ (D3QN + UQ + Shield + Supervisor + MaxPressure Fallback)
-2. minus Uncertainty Estimator (No UQ: threshold set to infinity, fallback never called)
-3. minus Safety Shield (No Shield: raw policy actions executed without constraints)
+2. Legacy No-UQ label: explicitly disables fallback; uncertainty telemetry remains
+3. minus Safety Shield: bypasses the additional shield; the physical FSM remains
 4. minus Fallback (No Fallback: keeps executing D3QN under corruption)
 5. minus Max-Pressure Fallback (Fixed cycle fallback instead of Max-Pressure)
+
+No-UQ and No-Fallback have the same control configuration. Their historical
+labels remain for compatibility; they are not independent component ablations.
+Use the audited evaluation path for frozen scientific comparisons.
 """
 
 from __future__ import annotations
@@ -39,7 +43,7 @@ def build_ablation_controllers(checkpoint_path: Optional[str] = None) -> Dict[st
         "minus Uncertainty (No-UQ)": FlowSyncUQController(
             checkpoint_path=checkpoint_path,
             enable_fallback=False,
-            uncertainty_threshold=999.0,  # Never triggers fallback
+            uncertainty_threshold=0.45,
             enable_shield=True,
             fallback_controller_name="max_pressure",
         ),
@@ -60,7 +64,7 @@ def build_ablation_controllers(checkpoint_path: Optional[str] = None) -> Dict[st
             checkpoint_path=checkpoint_path,
             uncertainty_threshold=0.45,
             enable_shield=True,
-            fallback_controller_name="fixed",  # Falls back to Webster fixed
+            fallback_controller_name="fixed",  # Preset fixed schedule
         ),
     }
 
