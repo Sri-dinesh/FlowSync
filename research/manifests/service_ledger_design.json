@@ -1,0 +1,68 @@
+{
+  "version": "sumo_service_ledger_v1",
+  "status": "research_prototype_mechanics_only",
+  "working_name": "FlowSync service-ledger controller",
+  "question": "Can pressure-weighted allocation debt converted into receipt-verified green batches improve the efficiency/service tradeoff beyond matched pressure and batching controls?",
+  "selected_design": "Feedback scheduling: Max-Pressure nomination, signed allocation debt, debt-dependent nonpreemptive green budgets, and actual executed-green receipts.",
+  "synthesis": {
+    "base": "candidate_b",
+    "reason": "Fewer uncalibrated traffic-model/future-arrival assumptions, a smaller state interface, a reachable decision difference, and a directly checkable allocation-debt invariant.",
+    "unselected": "candidate_a: complete reference-relative rollout exchanges. Incoming occupancy projected to ready queues, fixed outgoing penalties, finite toy arrivals and 24-32 second commitments were too weak a model for the first prototype.",
+    "grafts": ["Explicit interval receipt identity and expected physical transition checking", "Adverse delivered-demand and empty-support cases retained beside the constructive witness"],
+    "revisions": ["Idle without a new batch when both pressures vanish and absolute debt is below one quantum", "Batch completion is not debt repayment", "Witness histories both retain positive demand so ordinary demand-recency timers match", "Debt bound applies to the debt-priority rule under aligned, uninterrupted paired calls"]
+  },
+  "boundary": {
+    "runtime": "independent straight-only two-phase SUMO research",
+    "inputs": ["Delivered incoming/outgoing/halted Counts", "Authoritative pre-request and executed interval Clock"],
+    "no_policy_inputs": ["Future arrival schedule", "Simulator backlog or hidden waits", "Raw vehicles", "Sensor fault probability", "Source timestamps", "Four-action DQN checkpoints"],
+    "count_semantics": "Existing clipped straight-movement edge-occupancy pressure; neither flow nor receiving capacity.",
+    "call_order": "begin_interval(counts,before); physical request and interval; finish_interval(the_same_proposal,executed)",
+    "cadence": "Every 0.1-second interval supplies feedback; new batches only at 20-tick gates after physical eligibility.",
+    "initialization": "Fresh episode at green age zero in either canonical phase.",
+    "execution": "Only post-request, pre-timer-advance green intervals credit a target batch. Yellow/all-red receive no service credit.",
+    "endpoints": "Unfinished batch remains endpoint-censored; no fabricated completion or terminal flush."
+  },
+  "equations": {
+    "share": "w_NS = round_nearest_even(S*P_NS/(P_NS+P_EW)); w_EW=S-w_NS; no share when total pressure is zero.",
+    "positive_pressure": "z_next = z + w_NS - S*1[executed NS green], only on actual green.",
+    "zero_pressure": "Actual green moves that phase's positive debt toward zero by at most S; zero packets alone never erase debt.",
+    "clearance": "z_next=z; no green receipts.",
+    "selection": "At an unlocked eligible gate, select the unique phase with debt>=Q*S if any; otherwise Max-Pressure with current-phase ties.",
+    "budget": "L=min(3Q,Q+G*ceil(max(D_selected,0)/(S*G))) green ticks. L is latched and cannot be canceled by subsequent counts.",
+    "state": "D_NS=z, D_EW=-z; one signed ledger and at most one batch."
+  },
+  "parameters": {
+    "dt_s": {"value":0.1,"basis":"Existing frozen SUMO step; no timing change."},
+    "decision_ticks": {"value":20,"basis":"Existing two-second gate grid; not tuned."},
+    "quantum_ticks": {"value":80,"basis":"Base allocation quantum tied to existing eight-second physical minimum green; its traffic merit remains unmeasured."},
+    "share_scale": {"value":1048576,"basis":"Fixed-point numerical resolution 2**20, not a calibrated probability or behavioral optimization."},
+    "maximum_batch_ticks": {"expression":"3*quantum_ticks","value":240,"basis":"Derived from the primary 2Q debt bound and gate-rounded budget; not a maximum phase-green duration."}
+  },
+  "local_invariant": {
+    "statement":"For the debt-priority rule, |z|<=2Q*S, under the declared fresh, aligned, complete execution contract. Debt is not clamped to obtain this bound.",
+    "assumptions":["G<=Q and Q divisible by G", "Clearance duration divisible by G", "All proposed/actual intervals paired once and validated", "Service budgets credited only by actual target green", "Idle gaps with positive shares last at most G intervals before a new eligible gate"],
+    "proof":"At admission, a selected negative debt x must exceed -Q*S or the opposite debtor would have priority; its Q-tick batch can reduce x by at most Q*S. For nonnegative x, gate rounding gives L*S<=Q*S+x+G*S, hence x-L*S>=-(Q+G)*S>=-2Q*S. Selected debt is nonincreasing during its own green. Opposing debt is exactly its negative. Clearance preserves it and zero-pressure retirement reduces magnitude. Initial minimum green adds at most Q*S. Idle begins with |z|<Q*S and adds at most G*S before arbitration. Thus induction closes, and L<=3Q without an active cap on reachable primary states.",
+    "scope":"Allocation arithmetic and execution assumption only; not queue stability, traffic improvement, discharge fairness or individual waiting safety. No unconditional service deadline claimed."
+  },
+  "controls": {
+    "ledger":"Debt priority plus debt-extended budgets; primary candidate.",
+    "pressure_budget":"Same live debt-derived budget and receipt rule; MP nomination without debt priority. Allocation debt is not bounded by the primary lemma in this ablation.",
+    "pressure_batch":"MP nomination with uniform Q-tick receipt batches.",
+    "debt_batch":"Debt priority with uniform Q-tick receipt batches.",
+    "required_later":"Original equally sensed MP and a declared matched demand-conditioned watchdog/cycle-service control, plus all four coded modes. Each control derives its own causal state; no candidate future schedule is replayed into a baseline."
+  },
+  "tradeoffs":["Allocates observed-pressure shares of green opportunity, not measured departures or the stopped-wait objective.","A committed batch can continue while current pressure favors the other phase or observations become empty.","Stale, missed and biased counts can misallocate service. Wholly missed demand has no unconditional guarantee.","Repeated batches can keep the same phase green beyond 24 seconds; the cap is per batch, not maximum green.","Batch receipt completion can leave debt positive or can occur after it crossed zero.","The implementation uses a constant number of state fields; identifiers require logarithmically growing bits with episode length, and ablation debt may grow."],
+  "references":[
+    {"title":"Varaiya: Max pressure control of a network of signalized intersections","url":"https://people.eecs.berkeley.edu/~varaiya/publications.html","role":"pressure adaptation"},
+    {"title":"Varghese and Shreedhar: Efficient Fair Queueing using Deficit Round Robin, WUCS-94-17","url":"https://repository.library.washu.edu/cse_research/339/","role":"fair-scheduling foundation; no full reproduction or inherited theorem"},
+    {"title":"Anderson et al.: Stability and implementation of a cycle-based max pressure controller for signalized traffic networks","url":"https://www.aimspress.com/article/id/9228e06c-d535-4104-8012-ccc999771a1d","role":"related phase service/switching bounds; not implemented here"},
+    {"title":"Gershenson: Self-Organizing Traffic Lights","url":"https://arxiv.org/abs/nlin/0411066","role":"related accumulated-demand/self-organizing control"},
+    {"title":"Lammer and Helbing: Self-Control of Traffic Lights and Vehicle Flows in Urban Road Networks","url":"https://arxiv.org/abs/0802.0403","role":"related optimization/stabilization scheduling"},
+    {"title":"Wang et al.: Learning the max pressure control for urban traffic networks considering the phase switching loss","url":"https://www.sciencedirect.com/science/article/pii/S0968090X22001139","role":"related switching-loss and learned pressure control"}
+  ],
+  "next_scientific_gate":"No performance command is authorized by this mechanics protocol. Freeze a separate bounded paired study only after mechanical checks and mechanism review, keeping all replicates and unfavorable outcomes. No old failed screens or seeds become fresh confirmation.",
+  "algorithmic_novelty_established":false,
+  "traffic_benefit_established":false,
+  "publication_ready":false,
+  "automatic_promotion":false
+}
