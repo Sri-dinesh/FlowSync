@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CATALOGUE = Path("research/manifests/methodology.json")
 TABLE_START = "<!-- methodology-parameters:start -->"
 TABLE_END = "<!-- methodology-parameters:end -->"
+METHODS_START = "<!-- methodology-methods:start -->"
+METHODS_END = "<!-- methodology-methods:end -->"
 
 
 def digest(raw):
@@ -70,13 +72,20 @@ def select(tree, ref):
         pairs = list(zip(args[len(args)-len(scope.args.defaults):],scope.args.defaults))
         pairs += list(zip(scope.args.kwonlyargs,scope.args.kw_defaults))
         matches = [value for argument,value in pairs if argument.arg == target and value is not None]
-    elif kind == "call_keyword":
+    elif kind in ("call_keyword", "call_argument"):
+        if kind == "call_argument" and (type(ref.get("position")) is not int or ref["position"] < 0):
+            raise ValueError("Call argument position must be a nonnegative integer")
         for node in body_nodes(scope):
             if not isinstance(node,ast.Call) or ast.unparse(node.func) != ref["call"]:
                 continue
             if "tag" in ref and (not node.args or not isinstance(node.args[0],ast.Constant) or node.args[0].value != ref["tag"]):
                 continue
-            matches.extend(k.value for k in node.keywords if k.arg == target)
+            if kind == "call_keyword":
+                matches.extend(k.value for k in node.keywords if k.arg == target)
+            elif any(isinstance(arg, ast.Starred) for arg in node.args):
+                raise ValueError("Positional arguments cannot be resolved through starred expressions")
+            elif ref["position"] < len(node.args):
+                matches.append(node.args[ref["position"]])
     elif kind == "compare_rhs":
         nodes = list(body_nodes(scope))
         if "guard" in ref:
@@ -231,7 +240,7 @@ def parameter_rows(report):
 
 def content_table(report):
     """Deterministic source-default table for the maintained reference."""
-    lines = ["| Parameter | Source default | Unit | Activity | Source |",
+    lines = ["| Parameter | Source value (default or contract) | Unit | Activity | Source |",
              "| --- | --- | --- | --- | --- |"]
     for row in report["parameters"]:
         if row["resolution"] == "dynamic":
@@ -250,12 +259,39 @@ def content_table(report):
 
 def check_content(report, path):
     text = Path(path).read_text()
-    if text.count(TABLE_START) != 1 or text.count(TABLE_END) != 1:
-        return ["CONTENT.md requires exactly one generated methodology parameter table"]
-    actual = text.split(TABLE_START,1)[1].split(TABLE_END,1)[0].strip()
-    if actual != content_table(report):
-        return ["CONTENT.md parameter table differs from reviewed sources; regenerate it after reviewing catalogue drift"]
-    return []
+    issues = []
+    for name, start, end, render in (("parameter", TABLE_START, TABLE_END, content_table),
+                                     ("method", METHODS_START, METHODS_END, methods_table)):
+        if text.count(start) != 1 or text.count(end) != 1 or text.index(start) > text.index(end):
+            issues.append(f"CONTENT.md requires exactly one generated methodology {name} table")
+            continue
+        actual = text.split(start,1)[1].split(end,1)[0].strip()
+        if actual != render(report):
+            issues.append(f"CONTENT.md {name} table differs from reviewed sources; regenerate it after reviewing catalogue drift")
+    return issues
+
+
+def method_rows(report):
+    return [dict(id=m["id"], profiles=";".join(m["profiles"]), purpose=m["purpose"],
+        origin=m["origin"], status=m["status"], justification=m["justification"],
+        override_notes=m["override_notes"], limitations=m.get("limitations", ""),
+        references=";".join(m["references"]), file=m["source"]["file"], line=m["line"],
+        expression_sha256=m["expression_sha256"], source_sha256=report["source_sha256"][m["source"]["file"]])
+        for m in report["methods"]]
+
+
+def methods_table(report):
+    """Keep method ownership and conceptual attribution next to reviewed source."""
+    def cell(value):
+        return value.replace("|", "\\|").replace("\n", " ")
+    lines = [f"The reviewed catalogue covers **{len(report['parameters'])} selected parameters and {len(report['methods'])} method contracts**.",
+             "", "| Contract and implementation | Runtime profiles | Origin and activity | Purpose | Conceptual references |",
+             "| --- | --- | --- | --- | --- |"]
+    for row in report["methods"]:
+        refs = ", ".join(f"[{key}]({report['references'][key]['url']})" for key in row["references"]) or "Local engineering; no new algorithm claim"
+        lines.append(f"| [`{row['id']}`]({row['source']['file']}) | {', '.join(row['profiles'])} | "
+                     f"{row['origin']}; {row['status']} | {cell(row['purpose'])} | {refs} |")
+    return "\n".join(lines)
 
 
 def export(report, output, root=ROOT):
@@ -270,8 +306,14 @@ def export(report, output, root=ROOT):
         writer = csv.DictWriter(stream,fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+    rows = method_rows(report)
+    with (output/"methods.csv").open("x",newline="") as stream:
+        writer = csv.DictWriter(stream,fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
     (output/"methodology.json").write_text(json.dumps(report,indent=2,allow_nan=False)+"\n")
     (output/"parameter_table.md").write_text(content_table(report)+"\n")
+    (output/"method_table.md").write_text(methods_table(report)+"\n")
     paths = set(report["source_sha256"])|{str(CATALOGUE),str(Path(__file__).resolve().relative_to(ROOT))}
     with zipfile.ZipFile(output/"source_snapshot.zip","x",compression=zipfile.ZIP_DEFLATED) as archive:
         for name in sorted(paths):
@@ -289,6 +331,7 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check",action="store_true")
     mode.add_argument("--table",action="store_true",help="Print the reviewed source-default table for CONTENT.md")
+    mode.add_argument("--methods-table",action="store_true",help="Print the reviewed method/attribution table for CONTENT.md")
     mode.add_argument("--output",type=Path)
     mode.add_argument("--compare-manifest",type=Path)
     args = parser.parse_args()
@@ -296,10 +339,10 @@ def main():
         print(json.dumps(compare_sources(ROOT,args.compare_manifest),indent=2))
         return
     report = inspect()
-    if args.table:
+    if args.table or args.methods_table:
         if not report["structural_integrity_passed"]:
             raise SystemExit("Review source/catalogue drift before rendering the table")
-        print(content_table(report))
+        print(methods_table(report) if args.methods_table else content_table(report))
         return
     if args.output:
         export(report,args.output)

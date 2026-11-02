@@ -1,4 +1,5 @@
 import ast
+import csv
 from copy import deepcopy
 import hashlib
 import json
@@ -6,7 +7,10 @@ import zipfile
 
 import pytest
 
-from research.evidence.export_methodology import ROOT,TABLE_START,TABLE_END,check_content,compare_sources,content_table,export,expression_fingerprint,inspect,select
+from research.evidence.export_methodology import (
+    ROOT, TABLE_START, TABLE_END, METHODS_START, METHODS_END, check_content, compare_sources,
+    content_table, export, expression_fingerprint, inspect, methods_table, select,
+)
 
 
 def fixture_catalogue(tmp_path, *, unused=False):
@@ -78,10 +82,65 @@ def test_documented_parameter_table_cannot_silently_drift(tmp_path):
     _,path,_ = fixture_catalogue(tmp_path)
     report = inspect(tmp_path,path.name)
     document = tmp_path/"CONTENT.md"
-    document.write_text(TABLE_START+"\n"+content_table(report)+"\n"+TABLE_END)
+    document.write_text(TABLE_START+"\n"+content_table(report)+"\n"+TABLE_END+
+                        "\n"+METHODS_START+"\n"+methods_table(report)+"\n"+METHODS_END)
     assert not check_content(report,document)
     document.write_text(document.read_text().replace("0.99","0.98"))
     assert check_content(report,document)
+
+
+@pytest.mark.parametrize("change", ["missing", "duplicate", "reversed", "count", "attribution", "source"])
+def test_documented_method_inventory_rejects_stale_or_broken_content(tmp_path, change):
+    _, path, catalogue = fixture_catalogue(tmp_path)
+    method = deepcopy(catalogue['parameters'][0])
+    method.update(id='test_method', source=dict(file='source.py', scope='consumer', kind='symbol'))
+    method['reviewed_ast_sha256'] = expression_fingerprint(select(ast.parse((tmp_path/'source.py').read_text()), method['source']))
+    catalogue['references']['concept'] = dict(url='https://example.org/original', title='Original method')
+    method['references'] = ['concept']
+    catalogue['methods'] = [method]
+    path.write_text(json.dumps(catalogue))
+    report = inspect(tmp_path, path.name)
+    assert report['structural_integrity_passed']
+    block = METHODS_START+'\n'+methods_table(report)+'\n'+METHODS_END
+    document = tmp_path/'CONTENT.md'
+    prefix = TABLE_START+'\n'+content_table(report)+'\n'+TABLE_END+'\n'
+    document.write_text(prefix+block)
+    assert not check_content(report, document)
+    if change == 'missing': block = ''
+    elif change == 'duplicate': block += block
+    elif change == 'reversed': block = METHODS_END+'\n'+methods_table(report)+'\n'+METHODS_START
+    elif change == 'count': block = block.replace('1 method contracts', '2 method contracts')
+    elif change == 'attribution': block = block.replace('https://example.org/original', 'https://example.org/wrong')
+    else: block = block.replace('](source.py)', '](wrong.py)')
+    document.write_text(prefix+block)
+    assert check_content(report, document)
+
+
+def test_named_positional_preset_selection_is_static_and_detects_drift(tmp_path):
+    source, path, catalogue = fixture_catalogue(tmp_path)
+    source.write_text(source.read_text()+'\nPRESETS = (Fault("clean", 0, 0.), Fault("delay", 20, .3))\n')
+    item = catalogue['parameters'][0]
+    item['source'] = dict(file='source.py', kind='call_argument', call='Fault', tag='delay', position=1)
+    item['reviewed_ast_sha256'] = expression_fingerprint(select(ast.parse(source.read_text()), item['source']))
+    path.write_text(json.dumps(catalogue))
+    assert inspect(tmp_path, path.name)['parameters'][0]['value'] == 20
+    source.write_text(source.read_text().replace('"delay", 20', '"delay", 21'))
+    report = inspect(tmp_path, path.name)
+    assert report['parameters'][0]['value'] == 21
+    assert not report['structural_integrity_passed']
+
+
+@pytest.mark.parametrize('position', [-1, True, '1', 3])
+def test_positional_selectors_reject_invalid_or_missing_arguments(position):
+    tree = ast.parse('PRESET = Fault("delay", 20, .3)')
+    with pytest.raises(ValueError):
+        select(tree, dict(kind='call_argument', call='Fault', tag='delay', position=position))
+
+
+@pytest.mark.parametrize('source', ['A = Fault("delay", 20)\nB = Fault("delay", 30)', 'A = Fault("delay", *values)'])
+def test_positional_selectors_reject_ambiguous_or_starred_calls(source):
+    with pytest.raises(ValueError):
+        select(ast.parse(source), dict(kind='call_argument', call='Fault', tag='delay', position=1))
 
 
 def test_real_catalogue_exports_sources_not_measurement_or_production_certification(tmp_path):
@@ -93,6 +152,15 @@ def test_real_catalogue_exports_sources_not_measurement_or_production_certificat
     target = tmp_path/"export"
     export(report,target)
     assert (target/"parameters.csv").exists()
+    with (target/'methods.csv').open() as stream:
+        methods = {row['id']: row for row in csv.DictReader(stream)}
+    assert set(methods) == {m['id'] for m in report['methods']}
+    assert methods['causal_pressure_history']['references'] == 'pressure;moving_average;causal_fir'
+    assert 'not clean counts' in methods['causal_pressure_history']['limitations']
+    assert (target/'method_table.md').read_text().strip() == methods_table(report)
+    manifest = json.loads((target/'manifest.json').read_text())
+    for name in ('methods.csv', 'method_table.md'):
+        assert manifest['output_sha256'][name] == hashlib.sha256((target/name).read_bytes()).hexdigest()
     with zipfile.ZipFile(target/"source_snapshot.zip") as archive:
         assert not any(name.endswith((".env",".pt",".pth")) for name in archive.namelist())
     with pytest.raises(FileExistsError):

@@ -1,6 +1,6 @@
 {
   "schema_version": "methodology_v1",
-  "review_date": "2026-10-31",
+  "review_date": "2026-11-02",
   "profiles": {
     "interactive_legacy": "Website custom simulation/training. v6/v4 legacy behavior; no audited headless parity.",
     "audited_custom_research": "Explicit versioned checkpoints and delivered inputs in audited custom simulation. Actual values belong to each frozen run.",
@@ -87,6 +87,21 @@
       "title": "UCATSC: Uncertainty-Aware Constrained Traffic Signal Control Under Vision-Based Partial Observability",
       "url": "https://arxiv.org/abs/2602.07784",
       "role": "Conceptual attribution or explicitly related work; does not prescribe local numerical values."
+    },
+    "moving_average": {
+      "title": "Steven W. Smith: The Scientist and Engineer's Guide to Digital Signal Processing, chapter 15",
+      "url": "https://www.dspguide.com/CH15.PDF",
+      "role": "Established filter definition, not traffic-control optimality or the source of a fitted window."
+    },
+    "causal_fir": {
+      "title": "MathWorks: How Is a Moving Average Filter Different from an FIR Filter?",
+      "url": "https://www.mathworks.com/help/dsp/ug/how-is-moving-average-filter-different-from-an-fir-filter.html",
+      "role": "Past-sample finite window definition only. No MATLAB implementation copied."
+    },
+    "python_sum": {
+      "title": "Python built-in sum: floating-point summation changed in Python 3.12",
+      "url": "https://docs.python.org/3.14/library/functions.html#sum",
+      "role": "Runtime-specific verification rationale, not a new traffic-control method."
     }
   },
   "parameters": [
@@ -3149,6 +3164,153 @@
       "references": [],
       "reviewed_ast_sha256": "4f7b6a7359c51bddc1cec35eee6483511d58c59cabd521fdcaa19f1411bab7ea",
       "consumers": []
+    },
+    {
+      "id": "sumo.history_window",
+      "source": {
+        "file": "research/pilots/run_sumo_history_panel.py",
+        "scope": "protocol",
+        "kind": "compare_rhs",
+        "target": "spec['window_ticks']",
+        "operator": "NotEq"
+      },
+      "reviewed_ast_sha256": "fff1988a1403f98e7d5ffcdcd24f992c82a7937282c71e1887bc0558f72a9c16",
+      "purpose": "Required history span; buffer includes the current frame and therefore has span + 1 samples",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Two seconds matches the predeclared decision interval. Chosen before collection, not tuned after its outcome.",
+      "override_notes": "Frozen synthetic protocol requirement, not a calibrated physical setting or universally optimal value. Historical run manifests retain authority.",
+      "references": [
+        "moving_average",
+        "causal_fir"
+      ],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/policies/sumo_history.py",
+            "scope": "PressureHistory",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d1fbc88ff3a8204a49d9c5957af626851902f4adf5430c0fd48d9c3b2176c190"
+        }
+      ],
+      "unit": "ticks"
+    },
+    {
+      "id": "sumo.history_decision_interval",
+      "source": {
+        "file": "research/pilots/run_sumo_history_panel.py",
+        "scope": "protocol",
+        "kind": "compare_rhs",
+        "target": "spec['decision_ticks']",
+        "operator": "NotEq"
+      },
+      "reviewed_ast_sha256": "fff1988a1403f98e7d5ffcdcd24f992c82a7937282c71e1887bc0558f72a9c16",
+      "purpose": "Required pressure-history decision cadence",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Keeps current, lag and mean arms on the same two-second decision grid.",
+      "override_notes": "Frozen synthetic protocol requirement, not a calibrated physical setting or universally optimal value. Historical run manifests retain authority.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/experiments/sumo_history.py",
+            "scope": "episode",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "a08d74a21522a546a3885e575a98c452684532530e4dc2872844614c2a41ca2e"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_history.py",
+            "scope": "validate_trace",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "1396aa5f4b17d07f5c65f9b84803c91e35fd6f5d22cddfd3971cd2e569a3861d"
+        }
+      ],
+      "unit": "ticks/decision"
+    },
+    {
+      "id": "sumo.sensor_delay",
+      "source": {
+        "file": "research/observation/sumo_sensing.py",
+        "scope": "",
+        "kind": "call_argument",
+        "call": "Fault",
+        "tag": "delay2s",
+        "position": 1
+      },
+      "reviewed_ast_sha256": "fff1988a1403f98e7d5ffcdcd24f992c82a7937282c71e1887bc0558f72a9c16",
+      "purpose": "Transport delay in the delay2s preset",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Synthetic two-second transport fault at 0.1 seconds/tick; not a measured camera latency distribution.",
+      "override_notes": "Frozen synthetic protocol requirement, not a calibrated physical setting or universally optimal value. Historical run manifests retain authority.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/observation/sumo_sensing.py",
+            "scope": "",
+            "kind": "assignment",
+            "target": "PRESETS"
+          },
+          "reviewed_ast_sha256": "e737fe8dd80c7514100e5692ca0c002ed0ee1551eab72991a93d718d441d4e3e"
+        }
+      ],
+      "unit": "ticks"
+    },
+    {
+      "id": "sumo.sensor_miss_probability",
+      "source": {
+        "file": "research/observation/sumo_sensing.py",
+        "scope": "",
+        "kind": "call_argument",
+        "call": "Fault",
+        "tag": "miss30",
+        "position": 2
+      },
+      "reviewed_ast_sha256": "b2c45f7fe015c16e902eaa49d31812d3cfe6d1f34a388beac50ffb8ec2518385",
+      "purpose": "Per-vehicle count miss probability in the miss30 preset",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "justification": "Synthetic thirty-percent count misses; not measured detector recall or independent frames.",
+      "override_notes": "Frozen synthetic protocol requirement, not a calibrated physical setting or universally optimal value. Historical run manifests retain authority.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/observation/sumo_sensing.py",
+            "scope": "",
+            "kind": "assignment",
+            "target": "PRESETS"
+          },
+          "reviewed_ast_sha256": "e737fe8dd80c7514100e5692ca0c002ed0ee1551eab72991a93d718d441d4e3e"
+        },
+        {
+          "source": {
+            "file": "research/observation/sumo_sensing.py",
+            "scope": "CountSensor.step",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "48892d54c88ca71c073af04ea92a7153c135d36404730ad8c814e61991acb24e"
+        }
+      ],
+      "unit": "probability"
     }
   ],
   "methods": [
@@ -3903,6 +4065,172 @@
         }
       ],
       "limitations": "Verifier reconstructs saved hash/configuration linkage without new traffic trajectories. Complete live cloud/browser lifecycle and adversarial signing are outside this evidence."
+    },
+    {
+      "id": "pressure_margin",
+      "source": {
+        "file": "research/policies/sumo_switching.py",
+        "scope": "propose",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "718b70d32ca10c3136c14ceea7227aec6959d383b0c76d3e66079f9de82f34f2",
+      "purpose": "Fixed positive-pressure switching margin on the existing classical proposal",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Established hysteresis/switch suppression implemented as a local baseline, not a learned controller.",
+      "override_notes": "The executed method tuple fixes the margin. Zero current pressure bypasses margin holding.",
+      "references": [
+        "pressure"
+      ],
+      "consumers": [],
+      "limitations": "No inherited stability theorem, adaptive threshold or new-controller claim."
+    },
+    {
+      "id": "causal_pressure_history",
+      "source": {
+        "file": "research/policies/sumo_history.py",
+        "scope": "PressureHistory",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "d1fbc88ff3a8204a49d9c5957af626851902f4adf5430c0fd48d9c3b2176c190",
+      "purpose": "Current, pure-lag and finite trailing-mean pressure scores from consecutive delivered frames",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "literature_adaptation",
+      "status": "conditional",
+      "justification": "Established finite filtering with project-specific delivery/startup telemetry and matched controls.",
+      "override_notes": "The caller declares span and estimator. Mean uses available frames during startup; lag uses zero until the buffer fills.",
+      "references": [
+        "pressure",
+        "moving_average",
+        "causal_fir"
+      ],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/policies/sumo_history.py",
+            "scope": "propose",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "c07df1c7d0be2bfcfdb40bea710929402b0061bd52516501bcdbfa087bc327dc"
+        }
+      ],
+      "limitations": "Averages clipped phase pressures, not clean counts. Latency remains; no calibrated uncertainty or inherited stability proof."
+    },
+    {
+      "id": "delivered_history_validation",
+      "source": {
+        "file": "research/experiments/sumo_history.py",
+        "scope": "validate_trace",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "1396aa5f4b17d07f5c65f9b84803c91e35fd6f5d22cddfd3971cd2e569a3861d",
+      "purpose": "Reconstruct every delivered packet, history score, proposal and physical/accounting trace",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Explicit observation boundary and saved-data reconstruction support an auditable empirical comparison.",
+      "override_notes": "Only the frozen window, sensor preset, canonical start and trace length are accepted.",
+      "references": [],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/experiments/sumo_history.py",
+            "scope": "episode",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "a08d74a21522a546a3885e575a98c452684532530e4dc2872844614c2a41ca2e"
+        }
+      ],
+      "limitations": "Saved-trace reconstruction does not independently rerun native SUMO trajectories."
+    },
+    {
+      "id": "checkpointed_panel",
+      "source": {
+        "file": "research/experiments/sumo_panel.py",
+        "scope": "Panel",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "17316f339a21a1e21176dfd56cfb4647f7c04dedaa4047751bd13895e5f4e75c",
+      "purpose": "Frozen jobs, atomic episode checkpoints, bounded sessions and strict source/coverage verification",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Shared evidence collection and interruption recovery are reproducibility engineering, not controller novelty.",
+      "override_notes": "Each study supplies its protocol, jobs, measurements and analysis. Completed evidence cannot be resealed.",
+      "references": [],
+      "consumers": [],
+      "limitations": "Does not validate demand realism, statistical population coverage or hardware/field safety."
+    },
+    {
+      "id": "recorded_runtime_verification",
+      "source": {
+        "file": "research/audits/verify_sumo_panel.py",
+        "scope": "verify",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "337e457cacc8b7889d796c33261530438e438c10f2c8c6802ab6c72a96a3f0a6",
+      "purpose": "Dispatch exact saved-panel verification under its recorded Python version",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Float summation is runtime-dependent. Preserve the original exact verifier and reports rather than relaxing comparisons.",
+      "override_notes": "Only explicitly supported frozen protocols and a matching interpreter are accepted.",
+      "references": [
+        "python_sum"
+      ],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/audits/verify_sumo_panel.py",
+            "scope": "select_interpreter",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "7047bb818b57b071610057507a963469abb81b963a35b822ccc9c98cad3bb7e0"
+        }
+      ],
+      "limitations": "Runtime selection and hash receipts are not signing or a fresh native traffic rerun."
+    },
+    {
+      "id": "same_state_sensing_audit",
+      "source": {
+        "file": "research/audits/audit_sumo_observation_timing.py",
+        "scope": "audit_trace",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "4eeeb0f6917ed1aebd7d8bb2112b3b53d956c3d44a3e945e080ac2a7b82a5461",
+      "purpose": "Compare clean, delayed, missed and mixed proposals on the same recorded states",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "justification": "Controlled offline query separates delivered-state/action sensitivity from a different closed-loop trajectory.",
+      "override_notes": "The declared audit plan fixes eligible clocks and comparisons. Retain each visited-controller basis.",
+      "references": [
+        "pressure"
+      ],
+      "consumers": [
+        {
+          "source": {
+            "file": "research/audits/audit_sumo_observation_timing.py",
+            "scope": "probe",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "31a186c8ba9ecd69c18d1b7eab2670d04e3e53bc4e6387bf868eabc3fb3a469a"
+        }
+      ],
+      "limitations": "Same-state proposal differences cannot establish counterfactual traffic benefit."
     }
   ],
   "open_evidence_requirements": [

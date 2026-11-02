@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-11-01, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-11-02, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -17,12 +17,12 @@ Use this document as an evidence-bounded drafting reference. It describes implem
 | Problem, scope and contribution | [Scope](#1-project-scope-and-ownership), [attribution](#14-technique-attribution-and-primary-references), [novelty assessment](#15-novelty-assessment-independent-of-measured-performance), [evidence status](#17-current-status-and-evidence-authority) and [empirical questions](#361-evidence-backed-empirical-questions). State the exact evaluated question rather than a general smart-city or optimal-control claim. |
 | Architecture and application workflow | [Architecture](#2-current-system-architecture), sections 3–4 and 26, [checkpoint lifecycle](#46-training-checkpoint-and-task-lifecycle) and [effective configuration/persistence](#47-effective-training-configuration-and-checkpoint-persistence). Distinguish the web application, custom research runtime and independent SUMO path. |
 | Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. |
-| Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit) and [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence). The current catalogue contains 131 selected parameters and 28 methods; it is not every literal in the repository. Report executed overrides and units, not just source defaults. |
+| Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit), [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence) and the [generated current inventory](#501-source-checked-method-inventory). Report executed overrides and units, not just source defaults. The catalogue selects method-critical values; it is not every literal in the repository. |
 | Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
-| Recorded outcomes and ablations | Sections 21–24, 32–35 and 37–44. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Section 44 includes a complete 72-episode sensing panel after a disclosed execution-budget extension. Include failed screens and unfavorable replicates. |
-| Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established) and [arrival-control precedents](#412-novelty-assessment-and-closest-precedents). Separate implemented techniques from related work. |
+| Recorded outcomes and ablations | Sections 21–24, 32–35, 37–44 and 48–49. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Sections 48–49 cover the completed switching/history studies, same-state audit and verification-runtime correction. Include failed screens and unfavorable replicates. |
+| Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established), [arrival-control precedents](#412-novelty-assessment-and-closest-precedents) and the [November 2 literature check](#503-related-work-update-and-contribution-boundary). Separate implemented techniques from related work. |
 | Limitations and external validity | [Open requirements](#293-outstanding-scientific-and-application-requirements), [empirical limits](#365-limitations-and-current-research-decision) and [application acceptance boundaries](#477-remaining-acceptance-boundaries). No field, camera-accuracy or physical-actuation validation follows from simulation. |
-| Software verification and artifact access | [Quality gates](#28-verification-and-quality-gates), [maintenance index](#30-evidence-and-maintenance-index) and sections 46–47. Local ignored results/checkpoints are not automatically publicly available. Software regression tests are distinct from scientific traffic samples. |
+| Software verification and artifact access | [Quality gates](#28-verification-and-quality-gates), [maintenance index](#30-evidence-and-maintenance-index), sections 46–49 and the [current methodology checks](#504-reproducible-methodology-review-and-verification-scope). Local ignored results/checkpoints are not automatically publicly available. Software regression tests are distinct from scientific traffic samples. |
 
 Keep the measurement units and populations attached to every table. Custom-simulator stopped delay is accumulated stopped waiting per arrived vehicle; SUMO waiting uses requested vehicles, including entry waiting. Neither is trip travel time. Branch gains in vehicle-seconds, count prediction error, Q-target error and optimizer loss are different quantities. Reported aggregate p95 values average within-run percentiles rather than pooling all vehicles. Frames, branches and future continuations are correlated samples. Changed Q values, changed proposed actions, executed interventions and full-run control benefit are separate observations. Zero sampled lamp violations establishes finite simulated coverage.
 
@@ -80,6 +80,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [47. Effective training configuration and checkpoint persistence](#47-effective-training-configuration-and-checkpoint-persistence)
 - [48. Clean-pressure margin and sensing robustness diagnostic](#48-clean-pressure-margin-and-sensing-robustness-diagnostic)
 - [49. Causal pressure-history baseline and controlled experiment](#49-causal-pressure-history-baseline-and-controlled-experiment)
+- [50. Methodology review for paper drafting](#50-methodology-review-for-paper-drafting)
 
 ## 1. Project scope and ownership
 
@@ -577,7 +578,7 @@ The October 31 source audit removed unsupported FPA-DQN/“3DQN 2025”/“3DQN-
 | Separation of numerical sensitivity, action change, future-stable advantage and full-run benefit | A candidate empirical framing and tool workflow. These distinctions are not claimed as newly discovered concepts. |
 | Camera-to-signal cyber-physical operation | Proposed future integration, not demonstrated operation or a present contribution. |
 
-The architecture is a legitimate implementation of identifiable components, with the compatibility gaps described here. It cannot be certified novel by naming the combination FlowSync-UQ. Existing related-work records in `research/docs/papers/` include RESCO, LibSignal and close traffic-control methods. A full-text uncertainty-gated DQN lead remains unresolved. A defensible paper must identify a precise distinction, acknowledge these precedents and support that distinction with implementation/evidence. Neither attractive workflow diagrams nor removing unfavorable results creates novelty.
+The architecture is a legitimate implementation of identifiable components, with the compatibility gaps described here. It cannot be certified novel by naming the combination FlowSync-UQ. Existing related-work records in `research/docs/papers/` include RESCO, LibSignal and close traffic-control methods. A full-text uncertainty-gated DQN lead remains unresolved. Section 50.3 adds a November 2 check of recent pressure-control precedents. A defensible paper must identify a precise distinction, acknowledge these precedents and support that distinction with implementation/evidence. Neither attractive workflow diagrams nor removing unfavorable results creates novelty.
 
 ## 16. Maintained documentation and verification boundary
 
@@ -1273,7 +1274,7 @@ Exporters are experiment-specific. A compatible old evaluation export does not a
 
 The [source-checked novelty triage](research/docs/papers/RESEARCH_NOVELTY_TRIAGE_20261022.md) records targeted primary-source checks, not a systematic literature review. It identifies close precedent for spatial pressure/representations (Advanced-MP/Advanced-XLight), switching-aware learned pressure control, counterfactual traffic-control methods and robustness benchmarking. The repository's baseline does not reproduce those methods merely by changing an incoming-count accessor.
 
-A particularly close uncertainty-gated DQN bibliographic lead remains **methodologically unverified** because the primary IEEE page was inaccessible during that review. Its title/index listing is not enough to characterize its full method. Retrieve and compare it before claiming novelty. Prior papers' reported gains are not FlowSync measurements, and absence of an exact phrase match would not prove a first contribution.
+A particularly close bibliographic lead is *Uncertainty-Aware Gated DQN for Robust Traffic Signal Control under Imperfect Sensing Conditions*, DOI [10.1109/CAC67268.2025.11487190](https://doi.org/10.1109/CAC67268.2025.11487190). It remains **methodologically unverified**: the primary IEEE page was inaccessible during the earlier review and the November 2 retry. Its title/index listing is not enough to characterize its full method. Retrieve and compare it before claiming novelty. Prior papers' reported gains are not FlowSync measurements, and absence of an exact phrase match would not prove a first contribution.
 
 The accepted paper direction is a simulation-only empirical evaluation: evaluation authority matters; count-error uncertainty differs from fallback benefit; hindsight labels can be future-sensitive; richer observed features can move Q magnitudes without changing actions; and geometric demand specificity can fail to improve closed-loop control. Independent SUMO work now replicates future-sensitive labels in a bounded setup and measures a classical waiting/throughput trade-off. This is partial external-simulator evidence, with no transferred FlowSync policy or real-demand validation. Novelty and venue fit remain open. An empirical paper does not fulfill the original superior-controller objective by changing the paper's label.
 
@@ -1327,7 +1328,7 @@ The sensing comparison is now complete after a disclosed budget extension. Its n
 | Training run identity and storage behavior | [Checkpoint/task lifecycle](#46-training-checkpoint-and-task-lifecycle), [effective run configuration](#47-effective-training-configuration-and-checkpoint-persistence), [saved-run verifier](research/audits/verify_training_run.py) |
 | Local artifacts and missing fresh-clone weights | [artifact policy](#36-paper-evidence-map-and-reporting-boundaries) |
 | Contribution/security/CI | [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [repository checker](scripts/check_repository.py), [workflow](.github/workflows/ci.yml) |
-| Paper claims and limits | [paper index](#29-paper-scope-novelty-and-remaining-requirements), [novelty triage](research/docs/papers/RESEARCH_NOVELTY_TRIAGE_20261022.md) |
+| Paper claims and limits | [paper index](#29-paper-scope-novelty-and-remaining-requirements), [historical novelty triage](research/docs/papers/RESEARCH_NOVELTY_TRIAGE_20261022.md), [current method/related-work review](#50-methodology-review-for-paper-drafting) |
 
 ### 30.2 Maintaining this comprehensive reference
 
@@ -1335,7 +1336,7 @@ Keep a dated distinction between implemented behavior, measured outcomes, hypoth
 
 Use portable repository-relative links in this document. Some earlier links named files that are absent or were only design references; those paths remain inline and explicitly historical, rather than being redirected to an unrelated file. Current source links above point to maintained implementations. Local ignored artifacts may be unavailable in a fresh clone; provide provenance and an artifact policy rather than pretending the source includes trained weights or footage.
 
-PR #7 merged the earlier repository organization into `main` at `fa96432`; that is a historical milestone, not the current implementation boundary. Later control studies are covered in sections 37–44, and October 31 methodology/training/storage work in sections 45–47. The [paper drafting map](#paper-drafting-map) identifies current coverage. Work and focused commits continue on `main`; the chore branch is historical. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
+PR #7 merged the earlier repository organization into `main` at `fa96432`; that is a historical milestone, not the current implementation boundary. Later control studies are covered in sections 37–44 and 48–49. Sections 45–47 describe the methodology/training/storage work. Section 50 adds the current method inventory and literature check. The [paper drafting map](#paper-drafting-map) identifies current coverage. Work and focused commits continue on `main`; the chore branch is historical. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
 
 ---
 
@@ -2655,7 +2656,7 @@ To reproduce the export, use `--source results/sumo_sensing_recovery/full_202610
 
 This October 31 methodology pass addressed implementation correctness, attribution and reproducible method description without tuning constants, training a new controller, rerunning performance panels or promoting checkpoints. The separate SUMO sensing panel in section 44 later completed after an audited timeout recovery and disclosed execution-budget extension. Earlier learned-control performance screens and negative results retain their original meaning.
 
-The [methodology catalogue](research/manifests/methodology.json), extended by sections 46 and 47, describes **131 selected parameters and 28 method contracts**. It records the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references for each entry. It covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
+The [methodology catalogue](research/manifests/methodology.json), extended by sections 46–50, records selected parameters and method contracts. The [generated inventory](#501-source-checked-method-inventory) gives its current counts and method ownership. Entries record the source selector, unit, runtime profile, activity status, numerical origin, justification, override notes and conceptual references. The catalogue covers method-critical surfaces rather than every numerical literal in the repository. Whole-function contracts additionally cover reward coefficients and algorithm logic. The catalogue is machine-readable review metadata; `CONTENT.md` remains the maintained narrative reference.
 
 Three authorities must remain distinct:
 
@@ -2665,7 +2666,7 @@ Three authorities must remain distinct:
 | What executed in a particular experiment? | Its frozen configuration, manifest, checkpoint metadata/hash and archived source/runtime | Current defaults cannot retroactively describe an old run. |
 | Does this represent an actual intersection or detector? | Independent footage, counts, timing plans, geometry, annotations and validation | Syntax checks, hashes and synthetic fixtures do not establish measurement accuracy. |
 
-The inspector reads Python ASTs without importing application modules, opening models, reading private environment files, contacting Supabase or executing source expressions. It supports explicit assignments, argument defaults, call keywords, guarded comparisons and whole-symbol contracts. A selector must resolve exactly once. Dynamic expressions remain unresolved references; an actual `None` default remains a literal. Network layer specifications preserve symbolic input/output dimensions. Source files are hashed independently of expression fingerprints.
+The inspector reads Python ASTs without importing application modules, opening models, reading private environment files, contacting Supabase or executing source expressions. It supports explicit assignments, argument defaults, call keywords, named-call positional arguments, guarded comparisons and whole-symbol contracts. A selector must resolve exactly once. Positional selectors reject starred arguments and invalid indices. Dynamic expressions remain unresolved references; an actual `None` default remains a literal. Network layer specifications preserve symbolic input/output dimensions. Source files are hashed independently of expression fingerprints.
 
 ### 45.2 Runtime profiles and complete control flow
 
@@ -2792,7 +2793,7 @@ HTTP model loading stages independent simulation and training agents, then repla
 The following table is generated from reviewed source selectors. `conditional` means runtime selection/overrides matter; `declared_unused` means the audited consumer does not read that declaration. `active` and `historical_example` are supported catalogue statuses when appropriate. A `dynamic reference` is deliberately not executed by the inspector. Longer structured schemas are available in full in the referenced source and exported JSON/CSV.
 
 <!-- methodology-parameters:start -->
-| Parameter | Source default | Unit | Activity | Source |
+| Parameter | Source value (default or contract) | Unit | Activity | Source |
 | --- | --- | --- | --- | --- |
 | `learning.state_dim` | `28` | features | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.action_dim` | `4` | phases | conditional | [source](server/app/rl/hyperparams.py) |
@@ -2925,6 +2926,10 @@ The following table is generated from reviewed source selectors. `conditional` m
 | `sumo.yellow_ticks` | `30` | ticks | conditional | [source](research/audits/sumo_branch_feasibility.py) |
 | `sumo.red_ticks` | `10` | ticks | conditional | [source](research/audits/sumo_branch_feasibility.py) |
 | `sumo.fixed_green` | `300` | ticks | conditional | [source](research/policies/sumo_classical.py) |
+| `sumo.history_window` | `20` | ticks | conditional | [source](research/pilots/run_sumo_history_panel.py) |
+| `sumo.history_decision_interval` | `20` | ticks/decision | conditional | [source](research/pilots/run_sumo_history_panel.py) |
+| `sumo.sensor_delay` | `20` | ticks | conditional | [source](research/observation/sumo_sensing.py) |
+| `sumo.sensor_miss_probability` | `0.3` | probability | conditional | [source](research/observation/sumo_sensing.py) |
 <!-- methodology-parameters:end -->
 
 Review metadata stores source AST fingerprints rather than a second editable copy of each numeric default. A changed expression, selected method or relevant consumer fails review. Comments/docstrings and line movement alone do not change those AST fingerprints; full source hashes still record byte-level differences. After reviewing an intentional change, update its explicit catalogue metadata/fingerprint and regenerate the marked table. The inspector provides no command to automatically approve drift.
@@ -3184,7 +3189,7 @@ npm --prefix client run lint
 npm --prefix client run build
 ```
 
-The current static catalogue contains 131 parameters and 28 methods. A separate clean-source export uses `results/methodology/run_configuration_20261031/`, preserving earlier snapshots. Configuration capture, hashes, atomic files and receipts are established engineering techniques. They support a more defensible methodology/reproducibility description without establishing a superior controller, novelty or publication/field readiness.
+The section 47 snapshot contains 131 parameters and 28 methods. Its separate clean-source export uses `results/methodology/run_configuration_20261031/`, preserving earlier snapshots. Section 50 records the later catalogue extension. Configuration capture, hashes, atomic files and receipts are established engineering techniques. They support a more defensible methodology/reproducibility description without establishing a superior controller, novelty or publication/field readiness.
 
 ### 47.7 Remaining acceptance boundaries
 
@@ -3493,5 +3498,135 @@ Four deliberate perturbations to an aggregate, interval, seed contrast and start
 Reproduce the export into a new output using `server/venv/bin/python results/sumo_history_analysis/20261101/analyze.py --source results/sumo_history/full_20261101 --verification results/sumo_history_verification/full_20261101/verification.json --output results/paper_evidence/new_history_export`, with bytecode disabled. It collects no traffic and requires a valid strict recorded-runtime receipt. Raw traces remain in the listed local input directories, so this is not a standalone public raw-data release. No manuscript is edited.
 
 Collection, raw saved-data verification, arithmetic review and documentation are complete. The completed original artifacts are preserved and there is no pending scientific collection command for this closed recipe.
+
+[Back to Top](#top)
+
+## 50. Methodology review for paper drafting
+
+### 50.1 Source-checked method inventory
+
+The November 2 pass updates the writing reference and executable review metadata. It adds no controller, training run, traffic panel, fitted threshold or performance claim. Existing architecture, learning equations, reward definitions, sensor availability, physical transition rules and runtime differences remain described in sections 2–14 and 45–49. These are implementation descriptions, not proof that every operating path has been validated.
+
+The inventory below is generated from [methodology.json](research/manifests/methodology.json). Each contract has a reviewed AST fingerprint. Consumer fingerprints cover linked behavior where declared. The full exported JSON and `methods.csv` also contain justifications, override notes and available method-specific limitations. References identify conceptual sources; they do not imply a literal reproduction of the cited paper, its constants, results or theorem. The runtime profile names are defined in section 45.2. A conditional contract applies when that feature/path is selected.
+
+<!-- methodology-methods:start -->
+The reviewed catalogue covers **135 selected parameters and 34 method contracts**.
+
+| Contract and implementation | Runtime profiles | Origin and activity | Purpose | Conceptual references |
+| --- | --- | --- | --- | --- |
+| [`custom_dynamics`](server/app/simulation/intersection.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Normalized-position traffic stepping and stopped waiting | Local engineering; no new algorithm claim |
+| [`reward_definition`](server/app/simulation/environment.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Tick-delay, pressure, throughput and explicit timing penalty coefficients | Local engineering; no new algorithm claim |
+| [`physical_signal`](server/app/simulation/traffic_signal.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Single executed-lamp authority for queued operator/priority and per-tick policy requests | Local engineering; no new algorithm claim |
+| [`pressure_control`](server/app/controllers/max_pressure.py) | audited_custom_research | literature_adaptation; conditional | Clipped queue-differential pressure with declared destinations | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) |
+| [`extra_shield`](server/app/controllers/safety_shield.py) | audited_custom_research | local_engineering; conditional | Additional modeled guard/intervention rules | [shielding](https://ojs.aaai.org/index.php/AAAI/article/view/11797) |
+| [`network`](server/app/rl/dqn_network.py) | interactive_legacy, audited_custom_research | literature_adaptation; conditional | Shared numeric features, value/advantage heads and local masked centering | [dueling](https://proceedings.mlr.press/v48/wangf16.html) |
+| [`double_dqn_update`](server/app/rl/dqn_agent.py) | interactive_legacy, audited_custom_research | literature_adaptation; conditional | Masked Double-DQN, weighted Huber TD, demo margin and gradient clipping | [dqn](https://arxiv.org/abs/1312.5602), [double_dqn](https://arxiv.org/abs/1509.06461), [per](https://arxiv.org/html/1511.05952v4), [dqfd](https://research.google/pubs/deep-q-learning-from-demonstrations/) |
+| [`prioritized_replay`](server/app/rl/replay_buffer.py) | interactive_legacy, audited_custom_research | literature_adaptation; conditional | SumTree replay, per-transition discounts, importance weights and demo flags | [per](https://arxiv.org/html/1511.05952v4) |
+| [`app_training`](server/app/rl/trainer.py) | interactive_legacy | local_engineering; conditional | Legacy v4 application training and executed-action replay | [dqfd](https://research.google/pubs/deep-q-learning-from-demonstrations/) |
+| [`research_training`](research/training/train_policy.py) | audited_custom_research | literature_adaptation; conditional | Completed decision-to-decision proposed-action replay with incomplete endpoint dropping | [dqn](https://arxiv.org/abs/1312.5602), [double_dqn](https://arxiv.org/abs/1509.06461), [dqfd](https://research.google/pubs/deep-q-learning-from-demonstrations/) |
+| [`observation_versions`](server/app/rl/observations.py) | audited_custom_research | local_engineering; conditional | Version-specific delivered-input encodings, including matched zero-input controls | Local engineering; no new algorithm claim |
+| [`queue_uncertainty`](research/uncertainty/estimator.py) | audited_custom_research | local_engineering; conditional | Heuristic or fitted synthetic count-error score; queue-EWMA mean absolute deviation | Local engineering; no new algorithm claim |
+| [`authority_supervisor`](server/app/controllers/supervisor.py) | audited_custom_research | local_engineering; conditional | Hysteretic fallback authority with call-count dwell/recovery | Local engineering; no new algorithm claim |
+| [`ppo`](research/training/ppo.py) | audited_custom_research | literature_adaptation; conditional | Research-only clipped policy update, value regression and variable-duration collection | [ppo](https://arxiv.org/abs/1707.06347), [gae](https://arxiv.org/abs/1506.02438) |
+| [`count_restoration`](research/observation/count_restoration.py) | audited_custom_research | local_engineering; conditional | Causal delivered-count features for fitted restoration experiments | Local engineering; no new algorithm claim |
+| [`arrival_window`](research/policies/arrival_extension.py) | audited_custom_research | local_engineering; conditional | Observed-cohort hold/switch proxy with declared timing envelopes | [advanced_mp](https://proceedings.mlr.press/v162/zhang22ah.html) |
+| [`sumo_classical`](research/policies/sumo_classical.py) | independent_sumo | literature_adaptation; conditional | Two-phase matched-count Fixed/halted/pressure comparisons | [sumo](https://sumo.dlr.de/docs/Publications.html), [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) |
+| [`sumo_sensing`](research/observation/sumo_sensing.py) | independent_sumo | local_engineering; conditional | Coherent per-vehicle misses and causal fixed-delay delivery | [sumo](https://sumo.dlr.de/docs/Publications.html) |
+| [`centroid_tracker`](server/app/realworld/pipeline/vehicle_tracker.py) | cctv_experimental | local_engineering; conditional | Nearest-centroid association under explicit source/receipt clocks | [bytetrack](https://arxiv.org/abs/2110.06864) |
+| [`camera_detector`](server/app/realworld/pipeline/yolo_detector.py) | cctv_experimental | literature_adaptation; conditional | External YOLO loading with atomic model/taxonomy publication and explicit format preference | [yolo](https://docs.ultralytics.com/models/yolov8/) |
+| [`event_flow_estimation`](server/app/realworld/digital_twin/flow_calibrator.py) | cctv_experimental | local_engineering; conditional | Unique supplied upstream arrivals divided by explicit source-clock exposure | Local engineering; no new algorithm claim |
+| [`checkpoint_identity`](server/app/services/checkpoint_loading.py) | interactive_legacy | local_engineering; conditional | Stage version-compatible tensors before publishing actual trained episode and file slot | Local engineering; no new algorithm claim |
+| [`model_discovery`](server/app/services/model_service.py) | interactive_legacy | local_engineering; conditional | Read-only model discovery; listing never uploads local checkpoint data | Local engineering; no new algorithm claim |
+| [`training_request_boundary`](server/app/schemas/training_schema.py) | interactive_legacy | local_engineering; conditional | Finite/ranged training request values shared by HTTP and WebSocket adapters | Local engineering; no new algorithm claim |
+| [`training_task_lifecycle`](server/app/services/training_tasks.py) | interactive_legacy | local_engineering; conditional | Single-process reservation of training start/load preparation and shared background failure delivery | Local engineering; no new algorithm claim |
+| [`checkpoint_storage`](server/app/services/model_service.py) | interactive_legacy | local_engineering; conditional | Single serialization, atomic local replacement, explicit upload receipt and byte-level checkpoint identity | Local engineering; no new algorithm claim |
+| [`effective_run_configuration`](server/app/rl/run_configuration.py) | interactive_legacy | local_engineering; conditional | Selected live optimizer/replay/environment values, declared settings, episode contexts and exact source bytes | Local engineering; no new algorithm claim |
+| [`training_configuration_bundle`](server/app/services/model_service.py) | interactive_legacy | local_engineering; conditional | Per-run local configuration, source archive, episode hashes and checkpoint linkage | Local engineering; no new algorithm claim |
+| [`pressure_margin`](research/policies/sumo_switching.py) | independent_sumo | literature_adaptation; conditional | Fixed positive-pressure switching margin on the existing classical proposal | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) |
+| [`causal_pressure_history`](research/policies/sumo_history.py) | independent_sumo | literature_adaptation; conditional | Current, pure-lag and finite trailing-mean pressure scores from consecutive delivered frames | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html), [moving_average](https://www.dspguide.com/CH15.PDF), [causal_fir](https://www.mathworks.com/help/dsp/ug/how-is-moving-average-filter-different-from-an-fir-filter.html) |
+| [`delivered_history_validation`](research/experiments/sumo_history.py) | independent_sumo | local_engineering; conditional | Reconstruct every delivered packet, history score, proposal and physical/accounting trace | Local engineering; no new algorithm claim |
+| [`checkpointed_panel`](research/experiments/sumo_panel.py) | independent_sumo | local_engineering; conditional | Frozen jobs, atomic episode checkpoints, bounded sessions and strict source/coverage verification | Local engineering; no new algorithm claim |
+| [`recorded_runtime_verification`](research/audits/verify_sumo_panel.py) | independent_sumo | local_engineering; conditional | Dispatch exact saved-panel verification under its recorded Python version | [python_sum](https://docs.python.org/3.14/library/functions.html#sum) |
+| [`same_state_sensing_audit`](research/audits/audit_sumo_observation_timing.py) | independent_sumo | local_engineering; conditional | Compare clean, delayed, missed and mixed proposals on the same recorded states | [pressure](https://people.eecs.berkeley.edu/~varaiya/publications.html) |
+<!-- methodology-methods:end -->
+
+The latest additions cover switching-margin proposals, causal pressure history, delivered-history reconstruction, the shared checkpointed panel collector, recorded-runtime verification and the same-state observation audit. Whole-symbol contracts identify the implementation that a paper description must match. They are not formal verification, an exhaustive source audit or a novelty certificate.
+
+### 50.2 Parameter decisions and data needed to reproduce a method
+
+The generated parameter table in section 45.8 now includes the latest history/sensing controls. Interpret their values as follows:
+
+| Setting | Executable value and meaning | Basis and limit |
+| --- | --- | --- |
+| History span | 20 ticks at 0.1 s/tick; current sample plus 20 preceding deliveries gives 21 samples once full | Fixed engineering choice equal to the declared two-second decision interval. The finite filter is established. No search establishes this as optimal. |
+| History decision cadence | 20 ticks per proposal opportunity | The protocol guard, collection path and reconstruction path are reviewed together. It is distinct from the 80-tick physical minimum green. |
+| Transport fault | `delay2s`: 20 ticks; the mixed preset retains the same delay | Synthetic experimental condition. It is not a measured CCTV latency distribution. |
+| Detection fault | `miss30`: probability 0.3; the mixed preset retains the same probability | Deterministic seeded per-vehicle count retention for replay. It is not detector recall measured on footage. The complete preset declaration is fingerprinted as a consumer. |
+
+Source defaults, frozen protocol requirements and runtime measurements have different authority. For every method included in the paper, retain the following run-specific information:
+
+1. Execution path and simulator/runtime versions, including the producer Python version when exact report arithmetic depends on it.
+2. Observation schema and units, capture/control/availability clocks, missing-data representation, fault preset and any history startup rule.
+3. Phase/action mapping, decision interval, action mask, proposal, optional supervisor/shield and shared physical transition rules.
+4. Actual model/checkpoint identity, observation and reward versions, training seed, source/configuration hashes and executed parameter overrides when learning is involved.
+5. Demand family, traffic seed and role, horizon, controller pairing, starting-phase pairing and branch-selection versus checking futures.
+6. Exact metric numerator/denominator and endpoint population, statistical resampling unit, complete raw coverage and verification scope.
+
+Sections 25, 31, 45–49 and each frozen manifest supply these fields for their respective paths. Do not fill missing historical fields with current defaults. The local trained parents, recorded inputs and experiment results are excluded from Git; source availability alone does not make a checkpoint or dataset publicly downloadable. Cite a public artifact only after publishing that exact, privacy-reviewed bundle.
+
+### 50.3 Related-work update and contribution boundary
+
+The following targeted primary-source check was performed on November 2, 2026. It supplements sections 14–15 and 29.2. These methods are **related work, not implemented FlowSync algorithms or matched executed baselines**. The check identifies overlap and limits a claim. It is not a systematic review, independent reproduction or completed theorem comparison. Preprints are identified as preprints.
+
+| Primary source and inspected scope | Relevance to the paper's claim |
+| --- | --- |
+| Xu, Barman and Levin, *Smoothing-MP: A novel max-pressure signal control considering signal coordination to smooth traffic in urban networks*, Transportation Research Part C 166, 104760 (2024). [Publisher preview and abstract](https://www.sciencedirect.com/science/article/pii/S0968090X2400281X). | Coordinates signals across a network. Its name does not describe FlowSync's finite trailing average. Do not identify the local history baseline as Smoothing-MP or inherit its network theorem. Full-text comparison remains pending. |
+| Tan, Hu and Wang, *Regret-Based Max-Pressure Traffic Signal Control under Uncertain Traffic States*, arXiv:2610.32290v1, October 23, 2026. [Primary full-text HTML, abstract and method overview inspected](https://arxiv.org/html/2610.32290v1). | Uses phase-selection regret for stochastic and distributionally robust uncertainty decisions. A generic claim that uncertainty matters through phase ranking has close precedent. FlowSync's count-error supervisor and branch diagnostics do not implement these optimizations. Proof assumptions were not independently checked. |
+| Tan, *Decision Timescales in Max-Pressure Traffic Signal Control: Theory, Methodology, and Validation*, arXiv:2610.32280v1, October 23, 2026. [Primary abstract inspected](https://arxiv.org/abs/2610.32280v1). | Treats the decision interval as a traffic-dependent control variable. FlowSync's fixed cadence, switching-loss diagnostics and closed fixed-margin test do not establish a new variable-timescale controller. Full-text comparison remains pending. |
+| Zhu and Tan, *Stability-Preserving Reinforcement Learning for Heterogeneity-Aware Composite Max-Pressure Traffic Signal Control*, arXiv:2610.31037v1, October 22, 2026. [Primary abstract inspected](https://arxiv.org/abs/2610.31037v1). | Learns a context-dependent composition of pressure formulations. FlowSync's D3QN proposals with optional fallback/shield are a different implementation. Neither is novel merely because it combines RL and pressure control. No stability guarantee transfers to FlowSync. Full-text comparison remains pending. |
+| Wan, Pan, Chen, Li and Luo, *LMP-GNN: Probabilistic Reconstruction of Missing Lane Counts for Signed Max-Pressure Traffic Signal Control*, arXiv:2608.21734v2, September 17, 2026. [Primary abstract inspected](https://arxiv.org/abs/2608.21734v2). | Reconstructs missing lane counts with a probabilistic graph model and evaluates decision fidelity as well as traffic. FlowSync's count-restoration experiment is not this GNN. Reconstruction error, phase disagreement and closed-loop performance are established distinct evaluation levels. Full-text comparison remains pending. |
+
+The repository-specific work supports a precise **systems and empirical evaluation** description: versioned delivered-observation controls; explicit separation of proposal, intervention and executed lamps; paired counterfactual diagnostics with declared future roles; and frozen evidence with source/runtime identity and interruption recovery. The code implements these mechanisms, and the earlier sections identify their evidence and limits. These engineering mechanisms and evaluation distinctions are not claimed as newly invented concepts. Establishing a distinct research contribution still requires comparison with close full texts and a venue-appropriate empirical question. The accepted scope does not require inventing a superior controller to describe the implemented platform honestly.
+
+Do not claim a new DQN family, first uncertainty-aware pressure controller, optimal smart-signal control, formal safety/stability guarantees, validated CCTV control or production field readiness. None follows from architecture documentation or software regression checks. The inaccessible uncertainty-gated DQN lead in section 29.2 also remains unresolved. Removing these qualifications would make the methodology less accurate.
+
+### 50.4 Reproducible methodology review and verification scope
+
+Run the static checks without launching experiments:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology --check
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
+```
+
+The repository check now requires exact agreement of **both** generated tables, including method count, source links, runtime profiles and conceptual references. Print replacements after reviewing source changes with `python -m research methodology --table` and `python -m research methodology --methods-table`, using the project interpreter and disabled bytecode as above. A changed source/consumer fingerprint must be reviewed before regeneration; updating a table cannot override failed source integrity.
+
+For a new static source snapshot, choose an unused output directory:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m research methodology \
+  --output results/methodology/paper_review_20261102
+```
+
+The export includes `parameters.csv`, `methods.csv`, both generated tables, full review metadata, selected source bytes and a hashed manifest. It preserves previous exports and opens no checkpoint, traffic simulation, camera, private environment or cloud connection. Generated Markdown inside this ignored artifact is a snapshot, not a second maintained guide. AST source identity documents the reviewed implementation but does not establish end-to-end correctness, realism, novelty or numerical optimality.
+
+The full-suite review also exposed an outdated call in [the legacy ablation helper](research/legacy/run_ablations.py). It passed an invalid uncertainty threshold of 999 despite already declaring `enable_fallback=False`. The helper now retains the valid 0.45 threshold and uses the explicit flag. Regression cases force stale observations and verify that policy authority remains active. The legacy **No-UQ** label still computes uncertainty telemetry and is a control alias of **No-Fallback**; it is not a separate estimator-removal experiment. Its No-Shield label bypasses the additional shield while preserving the physical FSM, and its fixed fallback is a preset schedule rather than a derived Webster timing plan. These legacy definitions do not replace the audited frozen ablations.
+
+API regression tests now place local model/configuration artifacts in per-test temporary directories. This prevents training-endpoint tests from writing run bundles into the project's model directory. The application storage behavior is unchanged.
+
+Verification on November 2:
+
+| Check | Observed result and scope |
+| --- | --- |
+| Full backend/research regression suite | **1,265 passed** after the ablation correction. Command: `PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m pytest server/tests --no-cov -p no:cacheprovider -q`. |
+| API isolation recheck | **32 passed** with the final temporary-storage fixture. This overlaps the full suite rather than adding independent coverage. |
+| Methodology catalogue tests | **25 passed**, including new static positional selectors and rejection of stale method counts, attribution, source links and table markers. These also overlap the full suite. |
+| Frontend | `npm run lint`, `npm run typecheck`, all **nine** `npm test` cases and `npm run build` passed from `client/`. These checks do not constitute a browser/cloud/camera end-to-end trial. |
+| Source and documentation | Catalogue integrity and both generated tables pass. Repository checks cover **414 Python files and 517 local documentation links**. `git diff --check` passes. External citation checking is the separate targeted review above. |
+| Frozen-source preservation | All **22** source identities in the completed history-panel manifest still match. This is a read-only hash comparison, not another trajectory replay. |
+
+Existing Python dependency deprecations and Node module/deprecation warnings remain. The initial failed backend run and passing verification logs are preserved locally under `results/maintenance/paper_review_20261102/`; the static methodology export uses the separate directory shown above. No extra maintained project document is introduced.
+
+These checks distinguish project verification from scientific experiments. No new scientific training or traffic panel is added by this review. Regression fixtures may step the simulator; those checks are not new performance evidence. No scientific panel needs rerunning for these catalogue/documentation and legacy-helper changes.
 
 [Back to Top](#top)
