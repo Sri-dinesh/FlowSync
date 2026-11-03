@@ -39,7 +39,7 @@ def ledger_witness():
     b.text(5,6.55,"Constructed mechanism illustration; no traffic-delay result",size=9,bold=True)
     h1=b.box(.3,4.85,4.25,1.15,"History A: balanced pressures","0–8 s: (0, 0); 8–24 s: (1, 1)\nBoth phases have positive pressure after 8 s")
     h2=b.box(5.45,4.85,4.25,1.15,"History B: skewed pressures","0–8 s: (0, 0); 8–24 s: (9, 1)\nBoth phases have positive pressure after 8 s")
-    common=b.box(2.0,3.2,6.0,1.05,"Same decision state at t = 24 s","Pressures (9, 1); NS GREEN age 24 s; MP prefers NS",tone="gray")
+    common=b.box(2.0,3.2,6.0,1.05,"Same current counts + physical clock at t = 24 s","Pressures (9, 1); NS GREEN age 24 s; MP prefers NS",tone="gray")
     b.arrow(h1.bottom,(3.5,4.25),via=((2.425,4.5),(3.5,4.5)))
     b.arrow(h2.bottom,(6.5,4.25),via=((7.575,4.5),(6.5,4.5)))
     x0,scale=2.0,7.7/44

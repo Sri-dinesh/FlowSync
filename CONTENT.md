@@ -8,7 +8,7 @@ FlowSync is a simulation application and experimental traffic-control research p
 
 This reference describes the actual application first. Separate experiment results begin at section 17. Camera accuracy, physical signal operation, hardware latency, public production hardening and complete application/headless parity remain unestablished. Research-only training and diagnostics do not automatically change application defaults or promote models.
 
-**Writing freeze, November 3:** implementation and configuration are frozen at commit `61a58287605a44dae5811590390e2afdff5c185b` on `main`. Current work is limited to documentation and read-only readiness checks. Training, parameter search and further traffic collection are on hold. Historical reproduction commands and the section 53 launcher remain reference material. They are not an instruction to start another experiment during this freeze. [Section 54](#54-paper-writing-baseline-and-code-freeze) records the writing baseline and methods checklist.
+**Writing freeze, November 3:** implementation and configuration are frozen at commit `61a58287605a44dae5811590390e2afdff5c185b` on `main`. Documentation, readiness checks and the separately authorized [paper-figure tools](#55-reproducible-methodology-figures) support writing without changing that implementation. Training, parameter search and further traffic collection are on hold. Historical reproduction commands and the section 53 launcher remain reference material. They are not an instruction to start another experiment during this freeze. [Section 54](#54-paper-writing-baseline-and-code-freeze) records the writing baseline and methods checklist.
 
 ## Paper drafting map
 
@@ -87,6 +87,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [52. Service-ledger hybrid controller: research candidate](#52-service-ledger-hybrid-controller-research-candidate)
 - [53. Frozen service-ledger traffic evaluation](#53-frozen-service-ledger-traffic-evaluation)
 - [54. Paper writing baseline and code freeze](#54-paper-writing-baseline-and-code-freeze)
+- [55. Reproducible methodology figures](#55-reproducible-methodology-figures)
 
 ## 1. Project scope and ownership
 
@@ -105,7 +106,7 @@ FlowSync has three execution paths: the interactive Next.js/FastAPI application,
 | [research](research/) | Headless training/evaluation, sensor faults, bounded studies, verification and exports. |
 | [results](results/) | Local experimental artifacts. Most are ignored and absent from a fresh clone. |
 
-The writing freeze applies on `main`. Documentation corrections use focused commits; executable code and configuration stay at the section 54 baseline until further development is requested. Preserve existing environments, checkpoints, data and source archives.
+The writing freeze applies on `main`. Documentation and paper-asset tools use focused commits; the application, controller, trainer and experiment configurations stay at the section 54 baseline. Preserve existing environments, checkpoints, data and source archives.
 
 ## 2. Current system architecture
 
@@ -3965,7 +3966,7 @@ The November 3 writing freeze pins executable behavior and configuration to:
 | Detailed static snapshot | `results/methodology/service_ledger_panel_reviewed_20261103/` |
 | Writing-freeze inventory | `results/paper_readiness/writing_freeze_20261103/receipt.json` |
 
-Later documentation commits can advance `main` without changing this implementation baseline. `CONTENT.md` is the maintained explanation of the frozen code. The Git commit and each experiment's own archived source/configuration identify what actually ran. The writing freeze starts no new training, traffic collection, tuning, model promotion or application integration. The section 53 scientific panel remains deferred, with its protocol and completed mechanics evidence preserved.
+Later documentation and figure-tool commits can advance `main` without changing this implementation baseline. The section 55 illustration package and its tests are authorized additions outside the original protected files. `CONTENT.md` is the maintained explanation of the frozen code. The Git commit and each experiment's own archived source/configuration identify what actually ran. The writing freeze starts no new training, traffic collection, tuning, model promotion or application integration. The section 53 scientific panel remains deferred, with its protocol and completed mechanics evidence preserved.
 
 This reference is prepared for drafting the architecture, methodology, algorithms, implementation and reproducibility sections within the stated simulation scope. It is a software/methods reference, not a manuscript or a certification of publication readiness. A paper can describe the implemented system and local design choices while qualifying what has not been validated. Extra features or renamed constants do not establish novelty.
 
@@ -4009,15 +4010,17 @@ The writing-freeze receipt records the baseline commit/tree, SHA-256 inventory o
 
 ### 54.4 Readiness checks and remaining author decisions
 
-The writing-freeze review checks the methodology catalogue against source, compares both generated tables, validates local documentation links and verifies that every tracked file other than `CONTENT.md` still matches the frozen baseline. The focused catalogue/documentation tests cover these checks. Prior runtime tests retain their recorded scopes; this review does not relabel them as a new full application test.
+The writing-freeze review checks the methodology catalogue against source, compares both generated tables, validates local documentation links and verifies that the original protected files still match the frozen baseline. The figure package and its new tests are separately authorized additions. The focused catalogue/documentation tests cover the reference checks. Prior runtime tests retain their recorded scopes; this review does not relabel them as a new full application test.
 
-This documentation pass completes with **38 focused tests passed**, 149 parameter entries and 41 method contracts matching their reviewed sources, and both generated tables current. Repository checks cover 423 Python files and 574 local links. `git diff --check` passes. Every tracked file other than `CONTENT.md` matches the implementation baseline. Existing dependency warnings remain. No frontend build, application end-to-end session, model update or new traffic experiment is part of this pass.
+The original freeze-registration pass completed with **38 focused tests passed**, 149 parameter entries and 41 method contracts matching their reviewed sources, and both generated tables current. That snapshot checked 423 Python files and 574 local links. All 713 protected tracked files matched the implementation baseline. Existing dependency warnings remain. No frontend build, application end-to-end session, model update or new traffic experiment was part of that pass. Section 55 records the later illustration-tool checks.
 
 Read-only checks for this baseline are:
 
 ```bash
 git show --no-patch --oneline 61a58287605a44dae5811590390e2afdff5c185b
-git diff --exit-code 61a58287605a44dae5811590390e2afdff5c185b -- . ':(exclude)CONTENT.md'
+git diff --exit-code 61a58287605a44dae5811590390e2afdff5c185b -- . \
+  ':(exclude)CONTENT.md' ':(exclude)research/paper_figures' \
+  ':(exclude)server/tests/test_paper_figures.py'
 
 PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
   -m research.evidence.export_methodology --check
@@ -4031,5 +4034,82 @@ PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m pytest \
 ```
 
 The architecture and method descriptions can now be drafted from this reference while the code remains frozen. The author still selects the paper's central question and method, venue format, authors/affiliations, final bibliography and artifact distribution plan. A close related-work comparison remains necessary for any global novelty claim. Results, statistical conclusions and real-world validation retain their existing evidence requirements and are outside this documentation pass. None of those requirements is resolved by describing the software as production-ready or universally optimal.
+
+[Back to Top](#top)
+
+## 55. Reproducible methodology figures
+
+### 55.1 Folder, figures and selection
+
+The [paper_figures package](research/paper_figures/) adds Python scripts for static methodology diagrams. It is separate from the historical disabled figure script and the data-derived evidence exporters. It uses Matplotlib with its headless `Agg` backend and Pillow for the overview sheet. These dependencies are already declared through [research/requirements.txt](research/requirements.txt). No TeX installation, Graphviz, browser, image-generation service or native SUMO process is required.
+
+The [catalogue](research/paper_figures/catalog.py) supplies titles, captions, source references and explicit figure status. [Architecture diagrams](research/paper_figures/architecture.py), [learning diagrams](research/paper_figures/learning.py), [signal/design diagrams](research/paper_figures/signals.py) and [ledger diagrams](research/paper_figures/ledger.py) use the shared [drawing helpers](research/paper_figures/drawing.py). The [generator/verifier](research/paper_figures/generate.py) exports the assets and their provenance.
+
+| Figure ID | Content | Appropriate use |
+| --- | --- | --- |
+| `fig01_system_architecture` | Application, audited custom simulator, independent SUMO and experimental CCTV ownership. | System overview. The paths remain distinct. |
+| `fig02_control_boundary` | Delivered observations, policy, optional supervision/shield, physical FSM and separate truth/audit branches. | Audited custom-simulator methodology and information boundary. |
+| `fig03_observation_schemas` | v6/v7/v8/v9 input blocks, dimensions and zero-extension controls. | Learned-policy input encoding and observation ablations. |
+| `fig04_dueling_network` | Shared 256-unit blocks, value/advantage heads, masked centering and valid-action selection. | Custom-simulator D3QN architecture. |
+| `fig05_research_training` | Teacher data, completed macro-transitions, prioritized replay, Double-DQN targets, losses and checkpoint validation. | Corrected custom research learning workflow, separate from legacy website training. |
+| `fig06_signal_execution` | SUMO GREEN/YELLOW/ALL-RED transitions and an illustrative 8/3/1-second timing example. | Physical execution; the numbers apply to this SUMO contract. |
+| `fig07_ledger_mechanism` | Debt arbitration, committed budget, proposal token and executed-green receipt cycle. | The separate classical service-ledger candidate. |
+| `fig08_ledger_witness` | Two constructed pressure histories with the same current state and different debt-dependent choices. | Mechanism explanation, including the adverse-demand cost of commitment. It is not traffic performance. |
+| `fig09_paired_study_design` | Six seeds, paired starting phases, sensing conditions, controls and overlapping endpoints. | The deferred protocol, only when explicitly described as a proposed design. |
+| `fig10_evidence_workflow` | Source/configuration identity, traces, manifests, verification and paper assets. | Reproducibility and evidence ownership. |
+
+Include figures relevant to the paper's chosen method. A system overview and causal control diagram can accompany either framing. Network/training figures support the learned-method discussion; ledger figures support the separate classical candidate. The observation, execution and provenance diagrams are useful when those details are central. Every generated figure is optional; a short paper need not include all ten. The planned-study figure cannot be used as evidence that its scientific collection occurred.
+
+### 55.2 Generate and use the assets
+
+From the repository root:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.paper_figures.generate --list
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.paper_figures.generate \
+  --output research/paper_figures/generated
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.paper_figures.generate --verify research/paper_figures/generated
+```
+
+The default exports each figure as **SVG, PDF and 300-DPI PNG**. PDF/SVG preserve vector lines and text. The canvas width is 7.16 inches, suitable as a starting point for a two-column figure; confirm the target venue's final dimensions. PNG is a preview and raster fallback. Text uses DejaVu Sans with embedded TrueType PDF fonts; SVG text remains editable. Appearance is tuned for a white paper background with restrained colors, explicit labels and hatching where needed. Captions belong outside the artwork and do not assert traffic gains or global novelty.
+
+The output also contains:
+
+- `overview.png`, a labelled contact sheet for choosing figures.
+- `all_figures.pdf`, a multipage vector preview when PDF is selected.
+- `captions.json`, figure titles, captions, implementation references and scope labels.
+- `figures.tex`, optional `graphicx` figure blocks when PDF or PNG assets exist. Copy the selected assets into the paper's `figures/` folder or adjust the paths. Do not include every generated block automatically.
+- `source_snapshot.zip` and `manifest.json`, archived source and exact input/generator/output hashes plus rendering environment and layout-check metadata.
+
+Existing output directories are preserved. For another version, use a new directory. For example:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.paper_figures.generate \
+  --figures fig01_system_architecture fig02_control_boundary fig07_ledger_mechanism \
+  --formats svg pdf png --dpi 300 \
+  --output results/paper_figures/selected_export
+```
+
+`--formats` accepts SVG, PDF and PNG; PNG resolution is limited to 72–600 DPI. An SVG-only export omits the LaTeX snippet rather than referencing an absent PDF. Generated default assets are ignored under `research/paper_figures/generated/`; scripts and the source-pin manifest are tracked. A fresh clone recreates them with the command above. The generated files can be copied into the manuscript without moving or rewriting the research evidence.
+
+### 55.3 Source identity, mechanics illustration and verification scope
+
+The [source manifest](research/paper_figures/source_manifest.json) pins each referenced implementation file to the section 54 baseline. Generation refuses changed or missing source bytes. It checks figure text against page/box bounds and rejects overlapping opaque boxes. The generator records source hashes, its own code hashes, Python/Matplotlib/Pillow/FreeType versions and font identity. It disables PDF/SVG timestamps and fixes the SVG hash salt and source-archive timestamps. This supports stable reproduction in the recorded rendering environment; it does not guarantee identical font rasterization across all machines or software versions.
+
+`fig08` reuses the frozen audit's `sequence` function for two **constructed** 440-tick policy/clock sequences, 880 controller intervals in total. It calls the existing pure policy and physical `Signal`, with no native simulator, traffic metrics, new training or prior result-table input. At 24 seconds the histories have the same delivered counts and physical clock. Their EW allocation debt differs: 8 seconds versus approximately 1.6 seconds. The resulting EW/NS choices and 16/8-second budgets come from the policy rather than a hand-drawn fabricated trajectory. Following NS-only pressure demonstrates the possible cost of commitment. This is a mechanism illustration; it is not an independent traffic experiment or a claim that the chosen action is optimal.
+
+`--verify` checks saved-output coverage/hashes, current source pins, catalogue/caption identity, generator identity and source-archive bytes. It does not re-render images or rerun traffic. Hash integrity, layout checks and perceptual inspection are distinct checks; a receipt is not a signature or proof of scientific correctness. Keep a published figure bundle with its archived generator and exact source. Later style edits require a new output bundle.
+
+The additional package and its [tests](server/tests/test_paper_figures.py) leave the original 713 protected tracked files and the application/controller/training configurations unchanged. The figure tools are an authorized paper-asset addition to the writing freeze. No learned model, website control option, experiment protocol, historical result or stored checkpoint is modified.
+
+The focused figure/catalogue/documentation run passes **57 tests**. The 19 figure tests also pass after the final observed-state label clarification; those are overlapping checks, not extra independent coverage. Coverage includes real exports of all ten diagrams, source drift, altered assets/captions, missing outputs, scope relabelling, deterministic SVG/archive bytes, output preservation and deliberately bad layouts. All 28 diagram source pins and the 713 original protected files match. Repository checks pass for 432 Python files and 588 local links; `git diff --check` passes. Existing dependency warnings remain.
+
+The generated default bundle is `research/paper_figures/generated/`, with ten SVGs, ten individual PDFs, ten 300-DPI PNGs, the ten-page combined PDF, overview, captions, LaTeX snippet, source archive and manifest. PDF inspection confirms embedded fonts. The overview and detailed control/training diagrams were visually reviewed during authoring; the final ledger diagrams are checked after the label clarification. The saved-output verifier checks 35 generated assets, with `manifest.json` as the separate receipt. A portable copy is `results/paper_figures/flowsync_paper_figures_20261103.zip`. The earlier pre-clarification bundle remains preserved under `results/paper_figures/before_observed_state_label_review_20261103/`; it is not the current default.
 
 [Back to Top](#top)
