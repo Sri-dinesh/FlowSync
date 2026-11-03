@@ -3640,10 +3640,10 @@
       ],
       "origin": "local_engineering",
       "status": "conditional",
-      "references": [],
+      "references": ["pressure"],
       "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
-      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
-      "reference_roles": {},
+      "justification": "The comparator delegates to the existing attributed MP adaptation and adds a local observed-demand service timer. Its 240-tick threshold is a predeclared engineering choice, not a published optimum or field calibration.",
+      "reference_roles": {"pressure": "adaptation"},
       "consumers": [
         {
           "source": {
