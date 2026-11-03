@@ -2,7 +2,7 @@
 
 <a id="top"></a>
 
-Updated 2026-11-02, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
+Updated 2026-11-03, Asia/Kolkata. This is the maintained project reference. Code defines executable behavior; experiment manifests, source archives and frozen protocols define historical evidence. Root community/security policies retain their own administrative purpose. Other dated research documents are preserved records, not alternative current guides.
 
 FlowSync is a simulation application and experimental traffic-control research platform. Its implementation combines established methods with project-specific integration, diagnostics and evidence tooling. **Algorithmic or architectural novelty is not established merely by that combination.** The attribution and novelty assessment in sections 14–15 distinguishes existing techniques, local adaptations and unverified historical claims.
 
@@ -83,6 +83,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [50. Methodology review for paper drafting](#50-methodology-review-for-paper-drafting)
 - [51. Algorithmic originality, attribution and defensible contribution](#51-algorithmic-originality-attribution-and-defensible-contribution)
 - [52. Service-ledger hybrid controller: research candidate](#52-service-ledger-hybrid-controller-research-candidate)
+- [53. Frozen service-ledger traffic evaluation](#53-frozen-service-ledger-traffic-evaluation)
 
 ## 1. Project scope and ownership
 
@@ -2798,6 +2799,14 @@ The following table is generated from reviewed source selectors. `conditional` m
 <!-- methodology-parameters:start -->
 | Parameter | Source value (default or contract) | Unit | Activity | Source |
 | --- | --- | --- | --- | --- |
+| `service_watchdog_limit` | `240` | 0.1 s intervals | conditional | [source](research/policies/sumo_service_watchdog.py) |
+| `ledger_panel_full_steps` | `3600` | 0.1 s intervals | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_smoke_steps` | `800` | 0.1 s intervals | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_session_cap_seconds` | `900` | wall-clock seconds | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_smoke_session_cap_seconds` | `600` | wall-clock seconds | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_max_sessions` | `4` | sessions | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_minimum_delay_gain_fraction` | `0.02` | fraction | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
+| `ledger_panel_maximum_seed_mean_delay_loss_fraction` | `0.01` | fraction | conditional | [source](research/pilots/run_sumo_service_ledger_panel.py) |
 | `learning.state_dim` | `28` | features | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.action_dim` | `4` | phases | conditional | [source](server/app/rl/hyperparams.py) |
 | `learning.learning_rate` | `0.0003` | optimizer step size | conditional | [source](server/app/rl/hyperparams.py) |
@@ -3519,10 +3528,13 @@ The November 2 pass updates the writing reference and executable review metadata
 The inventory below is generated from [methodology.json](research/manifests/methodology.json). Each contract has a reviewed AST fingerprint. Consumer fingerprints cover linked behavior where declared. The full exported JSON and `methods.csv` also contain justifications, override notes, reference roles and available method-specific limitations. References distinguish conceptual foundations, implemented adaptations, software dependencies and related work, as defined in section 51.2. They do not imply a literal reproduction of a cited paper, its constants, results or theorem. The runtime profile names are defined in section 45.2. A conditional contract applies when that feature/path is selected.
 
 <!-- methodology-methods:start -->
-The reviewed catalogue covers **141 selected parameters and 38 method contracts**.
+The reviewed catalogue covers **149 selected parameters and 41 method contracts**.
 
 | Contract and implementation | Runtime profiles | Origin and activity | Purpose | References and roles |
 | --- | --- | --- | --- | --- |
+| [`service_watchdog_control`](research/policies/sumo_service_watchdog.py) | independent_sumo | local_engineering; conditional | Observed-demand service-watchdog pressure comparator | No external method source declared; novelty unestablished |
+| [`service_ledger_panel_protocol`](research/pilots/run_sumo_service_ledger_panel.py) | independent_sumo | local_engineering; conditional | Frozen ledger controls, traffic seeds, endpoint and continuation screen | No external method source declared; novelty unestablished |
+| [`service_ledger_panel_analysis`](research/analysis/sumo_service_ledger_metrics.py) | independent_sumo | local_engineering; conditional | Seed-level paired traffic contrasts and separate sensing screens | No external method source declared; novelty unestablished |
 | [`custom_dynamics`](server/app/simulation/intersection.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Normalized-position traffic stepping and stopped waiting | No external method source declared; novelty unestablished |
 | [`reward_definition`](server/app/simulation/environment.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Tick-delay, pressure, throughput and explicit timing penalty coefficients | No external method source declared; novelty unestablished |
 | [`physical_signal`](server/app/simulation/traffic_signal.py) | interactive_legacy, audited_custom_research | local_engineering; conditional | Single executed-lamp authority for queued operator/priority and per-tick policy requests | No external method source declared; novelty unestablished |
@@ -3836,6 +3848,88 @@ The final targeted regression pass records **193 passing tests**, including **73
 
 The saved mechanics artifact is `results/service_ledger_mechanics/mechanics_20261102/`, produced from clean commit `a504e5f404240cc7f8a1e1014aa319d420298003`. Actual CLI verification reconstructs the same report and all 8,800 intervals under both **Python 3.14.8 and 3.11.15**. This cross-runtime check applies to the new integer mechanics artifact, not to historical floating-point panels. Its receipt is `results/service_ledger_verification/mechanics_20261102.json`. The separate clean-source methodology export is `results/methodology/service_ledger_20261102/`, with 141 selected parameters, 38 method contracts and 58 selected implementation sources. Design alternatives, the synthesis/code review and regression log are preserved under `results/hybrid_design/service_ledger_20261102/`. These are local ignored evidence artifacts; public source alone does not include them.
 
-There is no new training job, native performance panel, website deployment, checkpoint promotion or real-world validation in this implementation. A separate bounded, frozen, paired study is the next scientific task after this mechanism review; no old failed screen is relaxed.
+The November 2 implementation performs no training, native traffic collection, website deployment, checkpoint promotion or real-world validation. Section 53 adds a separate frozen paired traffic collector after this mechanism review; no old failed screen is relaxed.
+
+[Back to Top](#top)
+
+## 53. Frozen service-ledger traffic evaluation
+
+### 53.1 Question, controls and separation
+
+The November 3 follow-up adds a [frozen protocol](research/manifests/sumo_service_ledger_panel.json), [collector](research/pilots/run_sumo_service_ledger_panel.py) and [analysis](research/analysis/sumo_service_ledger_metrics.py) for the section 52 candidate. The question is whether its allocation memory and irrevocable budgets improve actual waiting, tails and completed trips against equally sensed controls. This is a **classical-controller development study**, not a learned-policy experiment or independent confirmation of global novelty. Preparing or verifying its collection software does not establish a traffic gain.
+
+Each of six controller modes runs under clean and `delay2s_miss30` sensing:
+
+| Mode | Distinction and reason for inclusion |
+| --- | --- |
+| `ledger` | Primary: pressure-share debt priority and variable committed batches. |
+| `pressure_budget` | MP nomination with its own debt-derived budget; controls for variable commitment without debt arbitration. |
+| `pressure_batch` | MP nomination with fixed eight-second batches. |
+| `debt_batch` | Debt arbitration with fixed eight-second batches. |
+| `max_pressure` | Original MP through the unchanged, byte-pinned switching adapter and zero margin. It keeps the original two-second decision cadence without an extra batch. |
+| `watchdog` | MP with a fixed observed-demand phase-service watchdog; compares allocation memory against a conventional timer-based protection rule. |
+
+All methods receive the same fault mechanism, delivered count schema, physical timing constraints and requested-arrival schedule within each paired case. Actual counts depend on each controller's own traffic trajectory. Every baseline builds its memory from its own executed history; it receives neither the ledger's future service schedule nor clean simulator truth. The four ledger modes retain their original policy and adapter bytes. All 22 sources frozen by the completed history panel remain unchanged. The new manifest pins them as the baseline and additionally archives its own implementation and the ledger design.
+
+The [watchdog policy](research/policies/sumo_service_watchdog.py) maintains two ages, initially zero. After each executed interval, a phase's age resets only if that phase executes GREEN or its delivered incoming demand is absent; otherwise the age increments, including during clearance. At an eligible two-second decision gate, positive incoming demand on the other phase with age **at least 240 ticks / 24 s** forces that phase; otherwise the original MP proposal applies. The shared FSM still enforces minimum green and clearance. An unexecuted request cannot reset the age. The [adapter and replay](research/experiments/sumo_service_watchdog.py) reconstruct every delivered packet, gate decision, age transition, executed lamp and accounting row.
+
+The threshold equals the ledger's maximum *single-batch* length, a declared engineering comparison scale chosen before traffic inspection. It is neither optimized nor a literature-prescribed numerical optimum. Consecutive ledger batches can keep a phase green longer than 24 s. Watchdog age concerns observed phase demand without green, not the longest-waiting vehicle; misses can reset it. This local comparator is not Advanced-MP, a reproduced stabilization theorem or an optimized watchdog. Stronger literature baselines remain necessary before broad superiority claims.
+
+### 53.2 Grid, units, budgets and analysis
+
+The scientific grid contains **144 episodes / 518,400 signal samples**: six fresh traffic seeds, two canonical starting phases, six controllers and two sensing conditions. The known demand families retain rates `(0.2,0.2)`, `(0.3,0.1)` and `(0.1,0.3)` for NS/EW arrivals. Their new development seeds are **1380001/1380002**, **1380101/1380102** and **1380201/1380202**. Smoke uses the separate balanced seed **1380901**. These are new realizations of already inspected Bernoulli families, not new demand families or a final test. The prior 137xxxx history cases and other consumed panels are not pooled into this sample.
+
+Each scientific episode lasts **360 s**. The fixed primary endpoint is 360 s; the overlapping 180 s prefix is secondary and cannot replace it. The primary traffic metric remains stopped waiting per **requested** vehicle, including entry waiting and vehicles retained at the endpoint. It is not completed-trip travel time. Tail summaries average within-run p95 values. Completed trips, maximum waiting, final active vehicles, entry backlog, retained/pending endpoint maximum waiting and switch onsets remain visible.
+
+Evaluation-only diagnostics add actual NS/EW green, clearance, green with no delivered incoming demand, green with no incoming vehicle in the **post-step simulator truth**, peak observed-demand time without phase green, batch starts/extensions, budgeted/credited green and maximum allocation debt. The post-step emptiness diagnostic does not measure the complete occupancy during the preceding interval. These diagnostic truth values never enter control. Batch completion, bounded allocation debt and green allocation are mechanism measurements, not substitutes for traffic benefit. The raw replay also preserves unfinished batches as endpoint-censored.
+
+Average the two starts within each traffic seed before resampling. Means give each seed equal weight. Exact family-stratified resampling enumerates **64 ordered draws**, with two seeds resampled within each of three families. Report both sensing strata, every seed/context, family/start summaries, five ledger-versus-control contrasts and the debt-priority-by-variable-budget interaction in each stratum. The latter is `ledger - pressure_budget - debt_batch + pressure_batch`, an additive interaction rather than a benefit score. Negative candidate-minus-control waiting and positive completed trips favor the candidate. These are descriptive bootstrap intervals with a very small seed population; no guaranteed coverage, multiplicity-adjusted inference or equivalence follows. Float means and linear combinations use `math.fsum`; the strict recorded-producer-runtime verifier remains authoritative for native traces and summaries.
+
+The continuation gate is frozen **before scientific collection**. In **each** sensing stratum, the primary ledger must:
+
+- Reduce aggregate mean waiting by at least **2% against both original MP and `pressure_budget`**.
+- Avoid aggregate mean loss against `pressure_batch`, `debt_batch` and the watchdog.
+- In every comparison, avoid aggregate p95 or completed-trip loss, avoid starting-phase-group mean loss, and avoid a seed mean more than **1% worse**, after averaging the paired starts.
+- Complete all jobs and strict sensor/receipt/signal/accounting audits, with paired requested arrivals and zero measured signal violations.
+
+A failed screen closes this exact quantum/share/budget/debt/watchdog recipe without searching its thresholds, arms, windows, seeds or endpoints on this panel. A passing screen permits further bounded development only. It does not authorize training, promotion, deployment or a novelty/publication claim. In particular, matching the same-budget control cannot establish that debt arbitration added value.
+
+Collection allows at most **four sessions**, with a cooperative **900 s** cap per full session: **3,600 s** declared full collection allowance. Smoke uses 600 s session caps. Preparation and standalone verification lie outside collection timers. Each complete episode gets an immutable trace and checked record. Budget pauses auto-resume only the frozen pending jobs; Ctrl+C requires an explicit later `--resume`. Hard-kill elapsed times stay unknown, and integrity failures block continuation. Incomplete output cannot be labelled scientific success. A successful full run requires the exact same verified smoke source, runtime and topology.
+
+### 53.3 Mechanics and reproducible commands
+
+The new native mechanics panel plans **56 jobs / 35,200 samples**: all 12 controller/fault cells in both starts for 80 s, repeated primary/watchdog episodes, and an independent 40 s prefix replay of every cell/start. It requires exact repeated primary/watchdog trajectories, exact prefix parity, strict replay of delivered sensing and executed actions, credited/completed primary batches, and a planned interruption after two immutable episode checkpoints followed by resume. It has **no performance screen**, parameter selection or favorable-endpoint selection. Its one traffic seed is development mechanics evidence, not a scientific replication count. Original MP uses the frozen adapter directly; the collector does not claim an additional independently implemented MP anchor.
+
+Source/protocol changes must be committed before collection. Native collection uses the pinned SUMO 1.24.0 / Python 3.11.15 environment. The commands below name distinct immutable outputs; do not overwrite or delete an existing artifact to reuse a name.
+
+```bash
+# Bounded mechanics only; no training or scientific continuation claim.
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_service_ledger_panel \
+  --smoke --output results/sumo_service_ledger/smoke_20261103
+
+# Strict verification dispatched to the recorded producer interpreter.
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.verify_sumo_panel \
+  results/sumo_service_ledger/smoke_20261103
+
+# Readiness check: creates no scientific output and collects no traffic.
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_service_ledger_panel \
+  --preflight results/sumo_service_ledger/full_20261103 \
+  --mechanics results/sumo_service_ledger/smoke_20261103
+
+# User-run longer job, only after mechanics verification and preflight pass.
+PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
+  -m research.pilots.run_sumo_service_ledger_panel \
+  --output results/sumo_service_ledger/full_20261103 \
+  --mechanics results/sumo_service_ledger/smoke_20261103
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.audits.verify_sumo_panel \
+  results/sumo_service_ledger/full_20261103
+```
+
+After an explicit interruption, add `--resume` to the same collection command with the same output, mode and mechanics input. Do not use it to replace a sealed complete study. The [new regression tests](server/tests/test_sumo_service_ledger_panel.py) use constructed outcomes and a stopped-vehicle fake runtime to exercise proposal/receipt delivery, strict reconstruction, frozen controls, seed-level analysis and harm-sensitive screens. Such tests are software evidence, not scientific traffic results. The current native collection and preflight status is recorded below after execution; implementation alone leaves the main control-benefit objective unachieved.
 
 [Back to Top](#top)

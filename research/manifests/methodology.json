@@ -1,6 +1,6 @@
 {
   "schema_version": "methodology_v2",
-  "review_date": "2026-11-02",
+  "review_date": "2026-11-03",
   "profiles": {
     "interactive_legacy": "Website custom simulation/training. v6/v4 legacy behavior; no audited headless parity.",
     "audited_custom_research": "Explicit versioned checkpoints and delivered inputs in audited custom simulation. Actual values belong to each frozen run.",
@@ -115,6 +115,173 @@
     }
   },
   "parameters": [
+    {
+      "id": "service_watchdog_limit",
+      "source": {
+        "file": "research/policies/sumo_service_watchdog.py",
+        "scope": "",
+        "kind": "assignment",
+        "target": "WATCHDOG_TICKS"
+      },
+      "unit": "0.1 s intervals",
+      "purpose": "Demand-conditioned phase-service watchdog threshold",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "cea62a265fc3919c8cd0450fec8c24d5dd631458b8a9a8f630b5a95a68e239f3"
+    },
+    {
+      "id": "ledger_panel_full_steps",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "full_steps"
+      },
+      "unit": "0.1 s intervals",
+      "purpose": "Frozen service-ledger panel full_steps",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "05190392463390863bd0a68736f124aaeb6e827a497020b36861ca695f8d992f"
+    },
+    {
+      "id": "ledger_panel_smoke_steps",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "smoke_steps"
+      },
+      "unit": "0.1 s intervals",
+      "purpose": "Frozen service-ledger panel smoke_steps",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "ae96375a698f16175ea1099fd2ab6f125a14ebeb8dabd58b32b544ad9dc3be7c"
+    },
+    {
+      "id": "ledger_panel_session_cap_seconds",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "session_cap_seconds"
+      },
+      "unit": "wall-clock seconds",
+      "purpose": "Frozen service-ledger panel session_cap_seconds",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "d574a5a1341f1db8e41ea69f7db100bea5dc222f48de8b6826bac73b6bc640ce"
+    },
+    {
+      "id": "ledger_panel_smoke_session_cap_seconds",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "smoke_session_cap_seconds"
+      },
+      "unit": "wall-clock seconds",
+      "purpose": "Frozen service-ledger panel smoke_session_cap_seconds",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "a86264d4d4ee1396efd77501228b7d02cd99355e396b12be2e6a2eded20fd6d7"
+    },
+    {
+      "id": "ledger_panel_max_sessions",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "max_sessions"
+      },
+      "unit": "sessions",
+      "purpose": "Frozen service-ledger panel max_sessions",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "7fa6730d4945a002ebf7a3d96cb8c4b63b4695bf939159aead9a8eb0ce69acff"
+    },
+    {
+      "id": "ledger_panel_minimum_delay_gain_fraction",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "minimum_delay_gain_fraction"
+      },
+      "unit": "fraction",
+      "purpose": "Frozen service-ledger panel minimum_delay_gain_fraction",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "e5764de850edfdd0c06df1fb90787edfab3ae9c9eeba380baf521fc31f834c38"
+    },
+    {
+      "id": "ledger_panel_maximum_seed_mean_delay_loss_fraction",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "call_keyword",
+        "call": "dict",
+        "target": "maximum_seed_mean_delay_loss_fraction"
+      },
+      "unit": "fraction",
+      "purpose": "Frozen service-ledger panel maximum_seed_mean_delay_loss_fraction",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "synthetic_protocol",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reviewed_ast_sha256": "8530690a006323b2d55a0633fe64f6581a15bcdf80eee5733c6547397e763ef2"
+    },
     {
       "id": "learning.state_dim",
       "source": {
@@ -3460,6 +3627,168 @@
   ],
   "methods": [
     {
+      "id": "service_watchdog_control",
+      "source": {
+        "file": "research/policies/sumo_service_watchdog.py",
+        "scope": "propose",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "60880df08ea217d902315110b9f391643d52a8926c44a5068c83fea4e31017bf",
+      "purpose": "Observed-demand service-watchdog pressure comparator",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reference_roles": {},
+      "consumers": [
+        {
+          "source": {
+            "file": "research/policies/sumo_service_watchdog.py",
+            "scope": "after_execution",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "82c4e9b60cb67211928ce8c93d31f86a74d15e24dadb5cf514baf7bffa862ba6"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_watchdog.py",
+            "scope": "episode",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "54938fc66355bb12c5ea103732739771aafe888a7a860e515d99db0218cc82ea"
+        },
+        {
+          "source": {
+            "file": "research/experiments/sumo_service_watchdog.py",
+            "scope": "validate_trace",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "75f7f48768f496c8df765b1edd85195c724bd8409f4e4956d3f0de38d1d465da"
+        }
+      ],
+      "limitations": "Development-only straight two-phase synthetic SUMO. No global novelty, tuned baseline optimality, calibrated statistical coverage, learned-model improvement or real-camera/field claim."
+    },
+    {
+      "id": "service_ledger_panel_protocol",
+      "source": {
+        "file": "research/pilots/run_sumo_service_ledger_panel.py",
+        "scope": "protocol",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "d853e00a249e7dd2e4cff862e34a0ceb9749f031c85c9376cac989a8b97e822d",
+      "purpose": "Frozen ledger controls, traffic seeds, endpoint and continuation screen",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reference_roles": {},
+      "consumers": [
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "configuration",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "1176e9c40d785e57760a430a20ed6fcf79a4629d3af4a288588c0c10e7f1524d"
+        },
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "plans",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "4d7d5182a97b8f0b50e1d680b5d54def75663ed179f9d2a42dc0710d012a91ff"
+        },
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "jobs",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "4fec5a1818d9441c645a324f6c808a546c7d2e491cea5fc56751e97d42f7471e"
+        },
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "episode",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "47d531cf3cb1b2168709f199c6378089d7a8f3b9d5034464c722a0e9e63880fd"
+        },
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "measurements",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "d14bc3a2fd6efcdac1d1b2d2b97a991fdcf2e55638e66c74b6e46e386689342a"
+        }
+      ],
+      "limitations": "Development-only straight two-phase synthetic SUMO. No global novelty, tuned baseline optimality, calibrated statistical coverage, learned-model improvement or real-camera/field claim."
+    },
+    {
+      "id": "service_ledger_panel_analysis",
+      "source": {
+        "file": "research/analysis/sumo_service_ledger_metrics.py",
+        "scope": "summarize",
+        "kind": "symbol"
+      },
+      "reviewed_ast_sha256": "a4b4552e590ad37704fd919f0b39634e5e1fa60c2e13f206e7b1e37cda91037d",
+      "purpose": "Seed-level paired traffic contrasts and separate sensing screens",
+      "profiles": [
+        "independent_sumo"
+      ],
+      "origin": "local_engineering",
+      "status": "conditional",
+      "references": [],
+      "override_notes": "Frozen development default; no runtime tuning or retrospective threshold changes. Executed manifests remain authoritative.",
+      "justification": "Predeclared before scientific traffic collection. Engineering choices are not optimized numerical constants or field calibration.",
+      "reference_roles": {},
+      "consumers": [
+        {
+          "source": {
+            "file": "research/analysis/sumo_service_ledger_metrics.py",
+            "scope": "seed_interval",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "95aa0d55a1694c92863cd1568f7bf169017895a8694a0a6a3e86b88ccca967bc"
+        },
+        {
+          "source": {
+            "file": "research/analysis/sumo_service_ledger_metrics.py",
+            "scope": "mean",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "1dae3b9d491dcdab53be81a8e16c8e746db2f089691096d6cf81fb8f8fdc2dcc"
+        },
+        {
+          "source": {
+            "file": "research/analysis/sumo_service_ledger_metrics.py",
+            "scope": "mechanics",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "e99f04072ec470773474e7138691547886e36fddc3fd28ca8872eec23ce93041"
+        },
+        {
+          "source": {
+            "file": "research/pilots/run_sumo_service_ledger_panel.py",
+            "scope": "traffic_diagnostics",
+            "kind": "symbol"
+          },
+          "reviewed_ast_sha256": "82d76b6db82908aaea832e51ce6a192744b87c83a0457f7dc84daf39daa4c8e1"
+        }
+      ],
+      "limitations": "Development-only straight two-phase synthetic SUMO. No global novelty, tuned baseline optimality, calibrated statistical coverage, learned-model improvement or real-camera/field claim."
+    },
+    {
       "id": "custom_dynamics",
       "source": {
         "file": "server/app/simulation/intersection.py",
@@ -4406,6 +4735,15 @@
         "python_sum"
       ],
       "consumers": [
+        {
+          "source": {
+            "file": "research/audits/verify_sumo_panel.py",
+            "scope": "",
+            "kind": "assignment",
+            "target": "MODULES"
+          },
+          "reviewed_ast_sha256": "c12b438ebdc1ecfbaefb6e99848dec3d671c1d65d22bd18f19d8aa6961b7d20e"
+        },
         {
           "source": {
             "file": "research/audits/verify_sumo_panel.py",
