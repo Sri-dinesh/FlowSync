@@ -26,6 +26,21 @@ def test_current_interpreter_is_used_when_it_matches_without_querying_others(tmp
     assert tool.select_interpreter('3.11.15 fixture')==current
 
 
+def test_new_ledger_panel_dispatch_preserves_the_strict_source_verifier(source,tmp_path,monkeypatch):
+    path=source/'manifest.json'; manifest=json.loads(path.read_text())
+    manifest['protocol']['version']='sumo_service_ledger_panel_v1'; path.write_text(json.dumps(manifest))
+    selected=tmp_path/'producer'; calls=[]
+    monkeypatch.setattr(tool,'select_interpreter',lambda *args:selected)
+    def run(command,**kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0,stdout=json.dumps(proof()),stderr='')
+    monkeypatch.setattr(tool.subprocess,'run',run)
+    receipt=tool.verify(source)
+    assert calls==[[str(selected),'-m','research.pilots.run_sumo_service_ledger_panel','--verify',str(source)]]
+    assert receipt['verification_module']=='research.pilots.run_sumo_service_ledger_panel'
+    assert receipt['native_traffic_runs']==0
+
+
 def test_wrong_explicit_interpreter_is_rejected_before_replay(tmp_path,monkeypatch):
     current=tmp_path/'python'; current.touch()
     monkeypatch.setattr(tool.sys,'executable',str(current)); monkeypatch.setattr(tool.sys,'version','3.14 fixture')

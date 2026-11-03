@@ -9,7 +9,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULES = dict(sumo_history_v1="research.pilots.run_sumo_history_panel",
-               sumo_switching_v1="research.pilots.run_sumo_switching_panel")
+               sumo_switching_v1="research.pilots.run_sumo_switching_panel",
+               sumo_service_ledger_panel_v1="research.pilots.run_sumo_service_ledger_panel")
 
 
 def select_interpreter(recorded_version, preferred=None):
