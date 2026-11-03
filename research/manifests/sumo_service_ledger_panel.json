@@ -1,0 +1,179 @@
+{
+  "version": "sumo_service_ledger_panel_v1",
+  "question": "Does executed pressure-share debt arbitration with committed variable green improve traffic waiting over matched pressure, batching, arbitration-only and demand-conditioned service-watchdog controls?",
+  "base_source_sha256": {
+    "research/analysis/sumo_classical_metrics.py": "458229f453b3821a6caaf137e97988f12cfd31e637a6b5abe4e414382253a64f",
+    "research/analysis/sumo_history_metrics.py": "2cdb7bb24b8ee42516997e9a4973c24649369f45f10291ac8beed174bd2b3297",
+    "research/analysis/sumo_sensing_metrics.py": "7ba69fe0109fc2f3eabcaf675a69334cdbfdf304c76067d56843a4e2b95f58a5",
+    "research/analysis/sumo_switching_metrics.py": "c49152a1507b1b819749aa60e3c33d2a8edf08276ab4c4283d9de1e8079f1136",
+    "research/audits/sumo_branch_feasibility.py": "f150579af1bb14befaf2f9af2a930929b532dcc77639dc7d78bb4672bbed329b",
+    "research/experiments/sumo_classical_runtime.py": "8f0fb676984d760c8274abd2343e40aeeffcc86f1a3c1281fe8b925c42989140",
+    "research/experiments/sumo_history.py": "f8e42a97ae4f08a7825087c0679658f7f65765a768cd87e74558c2770432c387",
+    "research/experiments/sumo_observed_episode.py": "2aa8f40f5ddf37679e61cdaf76e1774b61696723e100d7c88717584e985df73e",
+    "research/experiments/sumo_panel.py": "2acdab9bfc8cc75f9f40f5f4dfe32b6a93cdcb0ecd6765b1319eeed708676654",
+    "research/experiments/sumo_sensing.py": "094f32a7fa753aee6c73c8ef6fabfc7e5e04435a418510e87a1e6501ca0367db",
+    "research/experiments/sumo_switching.py": "3490928b2027dfe4e73bc73954fcfea4598426bc5ce58533b3185d45e5353488",
+    "research/manifests/sumo_history.json": "6e6c0616dbabfe156650812d6138ac8f57d31155e7a5ddbb781a0fad6871a953",
+    "research/manifests/sumo_switching.json": "4244d62e92cd431a34a7976d40d92bf6b3b320de8b2ea3c508ab7e4d09ee9954",
+    "research/observation/sumo_sensing.py": "63fdb4741bcdd07c26a7d75795c6b790bf416df1ce82df408603bbd411ff7491",
+    "research/pilots/run_sumo_future_panel.py": "32f0b58a3f67b7feb1967dfe56cbed8b49d0b4a822da69e575d99e3047d1470f",
+    "research/pilots/run_sumo_history_panel.py": "60adcb3c9339f9b51db1f3260884a5d96e4c7b3d7bb585c4953dbb89e7599bbe",
+    "research/pilots/run_sumo_sensing_panel.py": "e59397d11a17684daf008a6e461137c72f4aa950e1a63d8759299d6a0bf0081a",
+    "research/pilots/run_sumo_switching_panel.py": "80e8e8625bee0015a1d5f6cc0e06e1493b85db7dc82342314df70c48e8d6d65e",
+    "research/policies/sumo_classical.py": "15c66f3f47507496204595823d026df6d4bc25bacd8d5456918ce8a1d2c30be1",
+    "research/policies/sumo_history.py": "f133a64c5687e40d7fa313f48695320db7c5b7cc86c903da17980a33e3b17b9c",
+    "research/policies/sumo_switching.py": "89aa4f430be8305930832ae0291404c30acfbb23c9271c6587511fa4eb9c42d5",
+    "research/requirements-sumo.txt": "93657bae83da23c577aa5efabd8634e6a163c43b1451a51a2300de25164f2fce"
+  },
+  "dt_s": 0.1,
+  "decision_ticks": 20,
+  "quantum_ticks": 80,
+  "share_scale": 1048576,
+  "max_batch_ticks": 240,
+  "watchdog_ticks": 240,
+  "physical_timings_ticks": {
+    "min_green": 80,
+    "yellow": 30,
+    "all_red": 10
+  },
+  "methods": [
+    {
+      "name": "ledger_clean",
+      "mode": "ledger",
+      "fault": "clean"
+    },
+    {
+      "name": "ledger_mixed",
+      "mode": "ledger",
+      "fault": "delay2s_miss30"
+    },
+    {
+      "name": "pressure_budget_clean",
+      "mode": "pressure_budget",
+      "fault": "clean"
+    },
+    {
+      "name": "pressure_budget_mixed",
+      "mode": "pressure_budget",
+      "fault": "delay2s_miss30"
+    },
+    {
+      "name": "pressure_batch_clean",
+      "mode": "pressure_batch",
+      "fault": "clean"
+    },
+    {
+      "name": "pressure_batch_mixed",
+      "mode": "pressure_batch",
+      "fault": "delay2s_miss30"
+    },
+    {
+      "name": "debt_batch_clean",
+      "mode": "debt_batch",
+      "fault": "clean"
+    },
+    {
+      "name": "debt_batch_mixed",
+      "mode": "debt_batch",
+      "fault": "delay2s_miss30"
+    },
+    {
+      "name": "max_pressure_clean",
+      "mode": "max_pressure",
+      "fault": "clean"
+    },
+    {
+      "name": "max_pressure_mixed",
+      "mode": "max_pressure",
+      "fault": "delay2s_miss30"
+    },
+    {
+      "name": "watchdog_clean",
+      "mode": "watchdog",
+      "fault": "clean"
+    },
+    {
+      "name": "watchdog_mixed",
+      "mode": "watchdog",
+      "fault": "delay2s_miss30"
+    }
+  ],
+  "families": [
+    {
+      "name": "balanced",
+      "ns_rate": 0.2,
+      "ew_rate": 0.2,
+      "seeds": [
+        1380001,
+        1380002
+      ]
+    },
+    {
+      "name": "ns_dominant",
+      "ns_rate": 0.3,
+      "ew_rate": 0.1,
+      "seeds": [
+        1380101,
+        1380102
+      ]
+    },
+    {
+      "name": "ew_dominant",
+      "ns_rate": 0.1,
+      "ew_rate": 0.3,
+      "seeds": [
+        1380201,
+        1380202
+      ]
+    }
+  ],
+  "smoke_family": {
+    "name": "balanced",
+    "ns_rate": 0.2,
+    "ew_rate": 0.2,
+    "seeds": [
+      1380901
+    ]
+  },
+  "initial_phases": [
+    0,
+    1
+  ],
+  "full_steps": 3600,
+  "full_endpoint_ticks": [
+    1800,
+    3600
+  ],
+  "smoke_steps": 800,
+  "smoke_endpoint_ticks": [
+    400,
+    800
+  ],
+  "session_cap_seconds": 900,
+  "smoke_session_cap_seconds": 600,
+  "max_sessions": 4,
+  "smoke_pause_after_jobs": 2,
+  "primary_candidate": "ledger",
+  "gain_references": [
+    "max_pressure",
+    "pressure_budget"
+  ],
+  "nonloss_references": [
+    "pressure_batch",
+    "debt_batch",
+    "watchdog"
+  ],
+  "candidate_screen": {
+    "minimum_delay_gain_fraction": 0.02,
+    "maximum_seed_mean_delay_loss_fraction": 0.01,
+    "no_aggregate_p95_or_throughput_loss": true,
+    "no_start_group_mean_delay_loss": true,
+    "separate_sensing_screens": true
+  },
+  "analysis": "Primary 360 s; overlapping secondary 180 s. Equal-weight starts within each seed, equal-weight seeds. Exact 64 ordered family-stratified descriptive bootstrap draws (two seeds per known family); frames, starts, faults and endpoints are paired, not independent replicates. All mean operations and linear contrasts use math.fsum. Report all cells, seed/family/start contrasts and the debt-priority by budget interaction separately for both faults; no arm/window/endpoint selection or multiplicity-adjusted population claim.",
+  "mechanics": "24 long native episodes cover all 12 method/fault cells in both starts; repeat the primary and watchdog cells once (8 repeats); independently replay all 24 prefixes. Total 56 jobs / 35,200 signal samples. Exact primary/watchdog repeat and every-prefix equality, strict per-tick sensor/policy/executed-signal/accounting reconstruction, credited and completed primary batches, checkpoint interruption/resumption. Smoke has no performance screen or tuning.",
+  "watchdog_rationale": "Fixed 240 ticks equals the candidate maximum single batch, chosen before traffic inspection, not an optimized optimum. Each interval resets an age on actual phase GREEN or absent delivered incoming demand; otherwise increments it, including clearance. At eligible two-second gates a demanded other phase aged >=240 ticks overrides MP. Requests/clearance cannot reset age. Counts are incoming edge occupancy, not ready queues, and packet misses can reset age. No individual-vehicle deadline, tuned strong-baseline claim, or field safety guarantee.",
+  "continuation": "In EACH clean and mixed sensing stratum, ledger must improve aggregate mean stopped waiting >=2% over original MP AND pressure_budget; it must have no aggregate mean loss against pressure_batch, debt_batch or watchdog. Every one of those comparisons also requires no aggregate p95 or completed-trip loss, no start-group mean loss, and no seed mean >1% worse after averaging starts. All 144 jobs and all sensor/receipt/signal/accounting audits must complete with zero measured signal violations and paired requested arrivals. Failure closes this exact Q/share/budget/debt/watchdog recipe without threshold, arm, horizon, seed or window search on this panel. Passing only permits further bounded development, not training, deployment, learned-policy superiority, algorithmic novelty or publication readiness.",
+  "limits": "New traffic realizations of already inspected Bernoulli demand families; development screen, not independent-family confirmation. Straight-only two-phase isolated SUMO, deterministic driving, synthetic sensing, empty starts, finite horizons, no pedestrians/camera calibration/hardware evidence. Original MP is the local implementation, not Advanced-MP. The declared watchdog is an engineering comparator, not a tuned research baseline. Allocation debt and batch completion are mechanism checks, not traffic improvement.",
+  "restart_contract": "At most four cooperative sessions, 900 s per full collection session (3,600 s declared allowance), 600 s per smoke session. Immutable source/protocol/archive and exact completed-prefix records. Budget and planned smoke pause may auto-resume; Ctrl+C needs explicit --resume, hard-kill timing stays unknown, integrity failures block continuation. Preparation and standalone verification are outside collection timers. No changes to historical panels or producer runtime."
+}
