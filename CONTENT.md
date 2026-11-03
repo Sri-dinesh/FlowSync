@@ -8,6 +8,8 @@ FlowSync is a simulation application and experimental traffic-control research p
 
 This reference describes the actual application first. Separate experiment results begin at section 17. Camera accuracy, physical signal operation, hardware latency, public production hardening and complete application/headless parity remain unestablished. Research-only training and diagnostics do not automatically change application defaults or promote models.
 
+**Writing freeze, November 3:** implementation and configuration are frozen at commit `61a58287605a44dae5811590390e2afdff5c185b` on `main`. Current work is limited to documentation and read-only readiness checks. Training, parameter search and further traffic collection are on hold. Historical reproduction commands and the section 53 launcher remain reference material. They are not an instruction to start another experiment during this freeze. [Section 54](#54-paper-writing-baseline-and-code-freeze) records the writing baseline and methods checklist.
+
 ## Paper drafting map
 
 Use this document as an evidence-bounded drafting reference. It describes implemented methods, their sources, executed studies and remaining requirements. It does not establish a new superior controller or certify that a manuscript is ready for submission. The accepted direction is a simulation-only empirical evaluation; manuscript writing remains outside the current project task.
@@ -16,9 +18,9 @@ Use this document as an evidence-bounded drafting reference. It describes implem
 | --- | --- |
 | Problem, scope and contribution | [Scope](#1-project-scope-and-ownership), [attribution](#14-technique-attribution-and-primary-references), [novelty assessment](#15-novelty-assessment-independent-of-measured-performance), [evidence status](#17-current-status-and-evidence-authority) and [empirical questions](#361-evidence-backed-empirical-questions). State the exact evaluated question rather than a general smart-city or optimal-control claim. |
 | Architecture and application workflow | [Architecture](#2-current-system-architecture), sections 3–4 and 26, [checkpoint lifecycle](#46-training-checkpoint-and-task-lifecycle) and [effective configuration/persistence](#47-effective-training-configuration-and-checkpoint-persistence). Distinguish the web application, custom research runtime and independent SUMO path. |
-| Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. The separately proposed [service-ledger hybrid](#52-service-ledger-hybrid-controller-research-candidate) is an independent two-phase research candidate, not a new trained D3QN checkpoint. |
+| Controller, observations, reward and learning | Sections 6–9 and 19–20; [source-grounded method contracts](#45-methodology-contracts-parameter-provenance-and-implementation-audit). Describe the method/version actually executed, including masking, demonstrations, additional shield and shared physical FSM. The separately proposed [service-ledger hybrid](#52-service-ledger-hybrid-controller-research-candidate) is an independent two-phase research candidate, not a new trained D3QN checkpoint. The [writing checklist](#542-methodology-description-checklist) identifies the fields needed for each path. |
 | Constants and hyperparameters | [Parameter provenance](#45-methodology-contracts-parameter-provenance-and-implementation-audit), [executed training configuration](#47-effective-training-configuration-and-checkpoint-persistence) and the [generated current inventory](#501-source-checked-method-inventory). Report executed overrides and units, not just source defaults. The catalogue selects method-critical values; it is not every literal in the repository. |
-| Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. |
+| Experimental design and reproducibility | [Frozen parents and seed roles](#25-reproducibility-parent-checkpoints-and-experimental-separation), [SUMO contracts](#31-independent-sumo-architecture-and-execution-contracts), [panel separation](#362-panels-seeds-and-units-that-must-remain-separate) and the experiment-specific frozen protocols/manifests. Keep development selection separate from confirmation. The [latest ledger panel](#53-frozen-service-ledger-traffic-evaluation) has a frozen design and mechanics evidence; its scientific collection is deferred. |
 | Recorded outcomes and ablations | Sections 21–24, 32–35, 37–44 and 48–49. [Evidence inventory](#363-artifact-inventory-for-writing-and-review) identifies the underlying artifacts. Sections 48–49 cover the completed switching/history studies, same-state audit and verification-runtime correction. Include failed screens and unfavorable replicates. |
 | Related work and references | [Primary method references](#14-technique-attribution-and-primary-references), [novelty requirements](#292-what-novelty-checking-has-and-has-not-established), [arrival-control precedents](#412-novelty-assessment-and-closest-precedents), the [November 2 literature check](#503-related-work-update-and-contribution-boundary) and the [claim-by-claim originality assessment](#51-algorithmic-originality-attribution-and-defensible-contribution). Separate implemented techniques from related work. |
 | Limitations and external validity | [Open requirements](#293-outstanding-scientific-and-application-requirements), [empirical limits](#365-limitations-and-current-research-decision) and [application acceptance boundaries](#477-remaining-acceptance-boundaries). No field, camera-accuracy or physical-actuation validation follows from simulation. |
@@ -84,6 +86,7 @@ Before submission, the author must still supply authors/affiliations, a venue-sp
 - [51. Algorithmic originality, attribution and defensible contribution](#51-algorithmic-originality-attribution-and-defensible-contribution)
 - [52. Service-ledger hybrid controller: research candidate](#52-service-ledger-hybrid-controller-research-candidate)
 - [53. Frozen service-ledger traffic evaluation](#53-frozen-service-ledger-traffic-evaluation)
+- [54. Paper writing baseline and code freeze](#54-paper-writing-baseline-and-code-freeze)
 
 ## 1. Project scope and ownership
 
@@ -102,7 +105,7 @@ FlowSync has three execution paths: the interactive Next.js/FastAPI application,
 | [research](research/) | Headless training/evaluation, sensor faults, bounded studies, verification and exports. |
 | [results](results/) | Local experimental artifacts. Most are ignored and absent from a fresh clone. |
 
-Work continues on `main`. Keep code fixes and documentation tasks in focused commits. Preserve existing environments, checkpoints, data and source archives.
+The writing freeze applies on `main`. Documentation corrections use focused commits; executable code and configuration stay at the section 54 baseline until further development is requested. Preserve existing environments, checkpoints, data and source archives.
 
 ## 2. Current system architecture
 
@@ -1340,7 +1343,7 @@ Keep a dated distinction between implemented behavior, measured outcomes, hypoth
 
 Use portable repository-relative links in this document. Some earlier links named files that are absent or were only design references; those paths remain inline and explicitly historical, rather than being redirected to an unrelated file. Current source links above point to maintained implementations. Local ignored artifacts may be unavailable in a fresh clone; provide provenance and an artifact policy rather than pretending the source includes trained weights or footage.
 
-PR #7 merged the earlier repository organization into `main` at `fa96432`; that is a historical milestone, not the current implementation boundary. Later control studies are covered in sections 37–44 and 48–49. Sections 45–47 describe the methodology/training/storage work. Section 50 adds the current method inventory and literature check. The [paper drafting map](#paper-drafting-map) identifies current coverage. Work and focused commits continue on `main`; the chore branch is historical. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
+PR #7 merged the earlier repository organization into `main` at `fa96432`; that is a historical milestone, not the current implementation boundary. Later control studies are covered in sections 37–44 and 48–49. Sections 45–47 describe the methodology/training/storage work. Section 50 adds the current method inventory and literature check. Sections 52–53 describe the ledger candidate and its deferred traffic protocol. The [paper drafting map](#paper-drafting-map) identifies current coverage. Section 54 pins the writing freeze on `main`; the chore branch is historical. Updating this reference does not rerun training, migrate a database, promote a checkpoint, deploy a service or establish a new paper result.
 
 ---
 
@@ -3856,7 +3859,7 @@ The November 2 implementation performs no training, native traffic collection, w
 
 ### 53.1 Question, controls and separation
 
-The November 3 follow-up adds a [frozen protocol](research/manifests/sumo_service_ledger_panel.json), [collector](research/pilots/run_sumo_service_ledger_panel.py) and [analysis](research/analysis/sumo_service_ledger_metrics.py) for the section 52 candidate. The question is whether its allocation memory and irrevocable budgets improve actual waiting, tails and completed trips against equally sensed controls. This is a **classical-controller development study**, not a learned-policy experiment or independent confirmation of global novelty. Preparing or verifying its collection software does not establish a traffic gain.
+The November 3 follow-up adds a [frozen protocol](research/manifests/sumo_service_ledger_panel.json), [collector](research/pilots/run_sumo_service_ledger_panel.py) and [analysis](research/analysis/sumo_service_ledger_metrics.py) for the section 52 candidate. The question is whether its allocation memory and irrevocable budgets improve actual waiting, tails and completed trips against equally sensed controls. This is a **classical-controller development study**, not a learned-policy experiment or independent confirmation of global novelty. Preparing or verifying its collection software does not establish a traffic gain. Scientific collection is on hold during the writing freeze; the protocol remains preserved.
 
 Each of six controller modes runs under clean and `delay2s_miss30` sensing:
 
@@ -3919,7 +3922,7 @@ PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
   --preflight results/sumo_service_ledger/full_20261103 \
   --mechanics results/sumo_service_ledger/smoke_20261103
 
-# User-run longer job, only after mechanics verification and preflight pass.
+# Deferred during the writing freeze; retained for later reproduction.
 PYTHONDONTWRITEBYTECODE=1 results/runtime/sumo_1_24_0/bin/python \
   -m research.pilots.run_sumo_service_ledger_panel \
   --output results/sumo_service_ledger/full_20261103 \
@@ -3943,5 +3946,90 @@ The strict dispatcher independently reconstructed the saved report/trace evidenc
 The full-grid preflight passed: **144 planned runs, six traffic seeds, 12 paired starting contexts, 518,400 samples, 360 s primary endpoint**, with four 900 s collection sessions available. Its receipt is `results/service_ledger_verification/preflight_20261103.json`. Preflight creates no full output and collects no scientific traffic. The full scientific panel has **not** been started by this implementation task, and no new traffic-benefit or superiority conclusion follows from smoke.
 
 The final clean-source methodology snapshot is `results/methodology/service_ledger_panel_reviewed_20261103/`: **149 selected parameter entries / 41 method contracts**, with source hashes and generated tables verified. The earlier `results/methodology/service_ledger_panel_20261103/` export is preserved; the final review explicitly attributes the watchdog's inherited pressure nomination. All 22 frozen history-panel sources still match their historical hashes. Repository checks pass for 423 Python files and 564 local links; `git diff --check` passes. These counts describe this reviewed snapshot, not an unconditional readiness guarantee. The ignored local results/receipts are not automatically distributed by pushing the public source. No training, model promotion, Supabase upload, application default change or real-world actuation occurred.
+
+[Back to Top](#top)
+
+## 54. Paper writing baseline and code freeze
+
+### 54.1 Frozen implementation and writing scope
+
+The November 3 writing freeze pins executable behavior and configuration to:
+
+| Identity | Frozen value |
+| --- | --- |
+| Repository | `https://github.com/Sri-dinesh/FlowSync` |
+| Branch at freeze | `main` |
+| Implementation commit | `61a58287605a44dae5811590390e2afdff5c185b` |
+| Git tree at that commit | `7dbc0c46b10a6f091a16d074c6af2b9906fc2ccf` |
+| Method catalogue | `methodology_v2`, 149 selected parameter entries, 41 method contracts and 62 selected implementation sources |
+| Detailed static snapshot | `results/methodology/service_ledger_panel_reviewed_20261103/` |
+| Writing-freeze inventory | `results/paper_readiness/writing_freeze_20261103/receipt.json` |
+
+Later documentation commits can advance `main` without changing this implementation baseline. `CONTENT.md` is the maintained explanation of the frozen code. The Git commit and each experiment's own archived source/configuration identify what actually ran. The writing freeze starts no new training, traffic collection, tuning, model promotion or application integration. The section 53 scientific panel remains deferred, with its protocol and completed mechanics evidence preserved.
+
+This reference is prepared for drafting the architecture, methodology, algorithms, implementation and reproducibility sections within the stated simulation scope. It is a software/methods reference, not a manuscript or a certification of publication readiness. A paper can describe the implemented system and local design choices while qualifying what has not been validated. Extra features or renamed constants do not establish novelty.
+
+Choose one runtime for each method description. The custom learned controller and the SUMO ledger are separate methods. In particular, the ledger is a classical scheduler with no learned weights. Describing it as the final stage of the trained D3QN pipeline would combine implementations that are not connected. The CCTV tools describe experimental perception and recorded-observation interfaces; their existence does not complete a camera-to-signal actuation pipeline.
+
+### 54.2 Methodology description checklist
+
+The following items have implementation references in this document. Include the items relevant to the method selected for the paper, rather than combining every experimental branch into one algorithm.
+
+| Material to describe | Required distinctions | Reference |
+| --- | --- | --- |
+| Problem and system boundary | Single intersection; simulation scope; custom four-phase control versus independent two-phase straight-only SUMO; recorded camera utilities as a separate path. | Sections 1–2, 19, 31 and 45.2. |
+| Architecture and workflow | Browser, API, session/service ownership, simulator, observation producer, controller, physical execution, audit and storage. Identify which messages and components the selected path actually uses. | Sections 2–4, 11–13, 26 and 46–47. |
+| Data available to a decision | Delivered feature schema, count semantics, normalization, packet capture and availability clocks, missing-data handling and optional history. Evaluation truth and future arrivals stay outside the policy input. | Sections 8, 19–20, 23, 31 and 45.2. |
+| Action and transition model | Phase labels, proposal cadence, action mask, minimum green, yellow and all-red; distinguish a proposal from the executed lamps and an extra shield from physical transition enforcement. | Sections 5, 9, 19, 31 and 45.4. |
+| Learned policy | Network dimensions, valid-action dueling centering, masked Double-DQN target, replay priorities, importance weights, demonstration loss and target synchronization. | Sections 6–7, 20, 45.3 and the generated method inventory. |
+| Learning collection and reward | Macro-action duration and discounting, proposed versus executed replay action, incomplete endpoint handling, reward version and one-time switch charge. Keep application v4 behavior separate from corrected research v5. | Sections 20.3, 45.3, 46 and 47. |
+| New ledger candidate | Pressure-share quantization, signed allocation debt, arbitration, latched batch budget, actual-green receipts, empty-demand behavior and unfinished endpoint obligations. State the assumptions of the debt bound. | Sections 52.2–52.5 and the versioned design manifest. |
+| Controls and component attribution | Original MP, fixed and variable batching, debt arbitration ablations and the declared observed-demand watchdog. A planned comparison remains planned. | Sections 52.6 and 53.1–53.2. |
+| Constants and numerical rationale | Units, active runtime, source default, executed override, engineering rationale and calibration status. Avoid calling a default an experimentally optimal value. | Sections 45.5, 45.8, 47.1, 50.2 and 52.3. |
+| Uncertainty and intervention authority | What error the uncertainty score represents, fallback hysteresis, shield rules, physical FSM and intervention counters. A count-error score is not a calibrated bound on control benefit. | Sections 9, 19.4 and 45.4. |
+| Camera preprocessing | Detector identity, centroid association, supplied geometry, source-clock event semantics, annotated signal history and missing prospective movement/downstream inputs. | Section 10 and the camera contracts in sections 45 and 50. |
+| Measurement and reproducibility | Metric numerator and denominator, retained/backlogged vehicles, endpoint population, independent replicate unit, seed role, checkpoint hash, source/configuration identity and verifier scope. | Sections 25, 31, 36, 47 and 53. |
+| Attribution and originality | Identify each borrowed foundation, implemented adaptation, software dependency and related-only method. Describe the local mechanism without inheriting another paper's theorem or result. | Sections 14–15, 50.3, 51 and 52.6. |
+
+For a service-ledger algorithm description, `begin_interval` creates the proposal and interval token. The unchanged physical FSM then executes its transition. `finish_interval` validates that feedback before updating committed debt and receipts. Clearance is not green service; a batch's completion does not imply that its phase debt is zero. These details distinguish the implemented mechanism from a pressure threshold or an ordinary maximum-green timer. The conditional allocation-debt bound concerns green opportunities, not queue stability or individual vehicle waiting.
+
+For a learned-controller description, identify one actual checkpoint's observation/reward versions and training configuration. Observation widths 28, 36, 48 and 64 refer to different encodings. The larger encodings are not simultaneous parts of every policy. Demonstration collection, imitation updates, TD warmup and online learning are separate stages. Warm-start improvement cannot be attributed to later online updates merely because both use the same model name.
+
+### 54.3 Configuration, environment and artifact identity
+
+Current source defaults and executed historical settings have different authority. Use the generated source table to explain implementation choices. Use the chosen run's saved configuration, checkpoint metadata and manifest to report its actual values. Missing historical values remain unknown; the writing freeze does not fill them with current defaults.
+
+The freeze review records the installed application/research Python as **3.14.8**, Torch as **2.14.1** and FastAPI as **0.143.0**. The independent native environment is **Python 3.11.15**, with `eclipse-sumo`, `traci` and `sumolib` each pinned to **1.24.0** in [requirements-sumo.txt](research/requirements-sumo.txt). Native binary identities and the complete producer Python string belong to each run manifest. Selecting the same package version alone does not establish bit-for-bit native reproducibility.
+
+The observed frontend tools are **Node 26.8.1** and **npm 11.19.0**. These are the tools installed during this review, not newly measured performance or universal minimum requirements. [package.json](client/package.json) declares Node `>=20.9.0` and npm `>=10`; [package-lock.json](client/package-lock.json) records dependency resolution. The root and server dependency specifications remain part of the frozen repository. No dependencies are upgraded for paper preparation.
+
+Preserve the frozen parents, data, source archives and recorded protocol versions. Local checkpoints, results and receipts are mostly ignored by Git. A clone of the public source therefore does not contain all research artifacts. The [software citation](CITATION.cff) identifies the repository; include the implementation commit and the particular artifact version in a reproducibility statement. Paper authorship and affiliation are author-supplied information, not the software citation's generic contributor label. The repository's [MIT license](LICENSE) does not assign licenses or permissions to third-party model weights or video.
+
+The writing-freeze receipt records the baseline commit/tree, SHA-256 inventory of protected tracked files, methodology catalogue/table checks, installed runtime identities and the paths of existing static snapshots. It contains no new traffic or training measurements. `CONTENT.md` is excluded from the protected-file inventory so that documentation corrections can continue. The Git tree still identifies its original baseline copy.
+
+### 54.4 Readiness checks and remaining author decisions
+
+The writing-freeze review checks the methodology catalogue against source, compares both generated tables, validates local documentation links and verifies that every tracked file other than `CONTENT.md` still matches the frozen baseline. The focused catalogue/documentation tests cover these checks. Prior runtime tests retain their recorded scopes; this review does not relabel them as a new full application test.
+
+This documentation pass completes with **38 focused tests passed**, 149 parameter entries and 41 method contracts matching their reviewed sources, and both generated tables current. Repository checks cover 423 Python files and 574 local links. `git diff --check` passes. Every tracked file other than `CONTENT.md` matches the implementation baseline. Existing dependency warnings remain. No frontend build, application end-to-end session, model update or new traffic experiment is part of this pass.
+
+Read-only checks for this baseline are:
+
+```bash
+git show --no-patch --oneline 61a58287605a44dae5811590390e2afdff5c185b
+git diff --exit-code 61a58287605a44dae5811590390e2afdff5c185b -- . ':(exclude)CONTENT.md'
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python \
+  -m research.evidence.export_methodology --check
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python scripts/check_repository.py
+
+PYTHONDONTWRITEBYTECODE=1 server/venv/bin/python -m pytest \
+  server/tests/test_methodology_catalogue.py \
+  server/tests/test_repository_documentation.py \
+  --no-cov -p no:cacheprovider -q
+```
+
+The architecture and method descriptions can now be drafted from this reference while the code remains frozen. The author still selects the paper's central question and method, venue format, authors/affiliations, final bibliography and artifact distribution plan. A close related-work comparison remains necessary for any global novelty claim. Results, statistical conclusions and real-world validation retain their existing evidence requirements and are outside this documentation pass. None of those requirements is resolved by describing the software as production-ready or universally optimal.
 
 [Back to Top](#top)
