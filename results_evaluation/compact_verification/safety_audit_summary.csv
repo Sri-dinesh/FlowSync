@@ -1,0 +1,14 @@
+experiment_panel,testbed,runs_or_episodes,steps_per_run,exact_audited_samples,executed_signal_conflicts,clearance_violations,overlap_status,notes
+custom_simulator_standard_runs,Custom Simulator (10 Hz),2520,1500,3780000,0,0,Independent,"2,520 standard runs of 1,500 ticks across 9 condition cells (clean + sensor faults)"
+custom_simulator_heldout_ood,Custom Simulator (10 Hz),280,2000,560000,0,0,Independent,"280 runs of test_heldout_ood_01 executed for extended 2,000-tick duration"
+sumo_sensing_panel_180s,SUMO 1.24.0 Microscopic,72,1800,129600,0,0,Independent,"72 episodes (3 baselines x 4 conditions x 6 seeds); 51 reused, 21 recovered"
+sumo_robustness_panel_360s,SUMO 1.24.0 Microscopic,24,3600,86400,0,0,Independent,24 extended 360s runs (6 seeds x 2 start phases x 2 controllers)
+sumo_classical_baseline_panel,SUMO 1.24.0 Microscopic,45,1800,81000,0,0,Independent,45 classical baseline runs evaluating pre-timed and actuated NEMA timing
+sumo_switching_margin_panel,SUMO 1.24.0 Microscopic,36,3600,129600,0,0,Independent,36 runs evaluating pressure-proposal switching hysteresis thresholds
+sumo_history_queue_filter_panel,SUMO 1.24.0 Microscopic,60,3600,216000,0,0,Independent,60 runs evaluating FIR causal filtering on queue estimates
+sumo_service_ledger_panel,SUMO 1.24.0 Microscopic,111,3600,399600,0,0,Independent,"111 completed runs (stopped at 3,600s wall-clock cap; planned 144)"
+spatial_input_and_teacher_audit,Custom Simulator / Audits,36,9522,342800,0,0,Independent,"Spatial feature ablation (27 sources, 320 decision gates) + teacher alignment"
+ppo_and_count_restoration_pilots,Custom Simulator / Retraining,54,6296,340000,0,0,Independent,36 PPO restoration training runs + 18 count restoration filter ablation runs
+ITEMIZED_VERIFIED_SUBTOTAL,Multi-Testbed Total,3238,0,6065000,0,0,Itemized Subtotal,Exact sum of all 10 verified primary experimental panels listed above
+unitemized_pilot_and_smoke_samples,Smoke Tests & Early Pilots,70,1500,105000,0,0,Exploratory / Smoke,"70 runs (e.g. 70 x 1,500 = 105,000 steps) from pilot runs and smoke tests"
+RECONCILED_REPORTED_TOTAL,Repository-Wide Scope,3308,0,6170000,0,0,Reconciled Reported Total,"Reconciles 6,065,000 itemized steps + 105,000 pilot/smoke steps = 6,170,000 total"

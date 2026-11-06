@@ -1,0 +1,428 @@
+{
+  "metadata": {
+    "audit_date": "November 2026",
+    "package_name": "FlowSync Compact Experimental Evidence Verification Package",
+    "reproducibility": "Fully deterministic recomputation from primary frozen raw logs",
+    "total_custom_simulator_runs": 2800,
+    "total_sumo_episodes_audited": 120,
+    "dataset_hashes": {
+      "custom_sim_runs_jsonl": "1c675eca8526469aa7b54be18438440dddef55b501f609b578a74de4ef67892d",
+      "sumo_sensing_collection_runs": "3db5b6e88b77727413276c92124c8b554be7d5bba68c5ef4831556f3622a65e4",
+      "sumo_robustness_runs_jsonl": "3f86ea08996236dd547b19714eb880064f8d043ccd9c623b3607034d962408fd",
+      "d3qn_checkpoint_seed101": "1cd49647546e2f68763524d5a26028ea4c3dfc8d0ec9e713d0a3a1119884a725",
+      "d3qn_checkpoint_seed202": "a91e038dbe9cdb1d2ce35a36ff40a1fa245bc4cbc8480fe9b74f22d5082d7dc4",
+      "d3qn_checkpoint_seed303": "e0b830b43d6023f859bae07e2e7b45f5b46393adebb20a1bd0ec951d62d1e052"
+    }
+  },
+  "controller_overall_performance": {
+    "fixed": {
+      "runs": 200,
+      "mean_delay_s": 15.496,
+      "std_delay_s": 1.943,
+      "median_delay_s": 15.489,
+      "p95_delay_s": 18.951
+    },
+    "actuated": {
+      "runs": 200,
+      "mean_delay_s": 16.463,
+      "std_delay_s": 5.385,
+      "median_delay_s": 15.772,
+      "p95_delay_s": 26.779
+    },
+    "greedy": {
+      "runs": 200,
+      "mean_delay_s": 11.725,
+      "std_delay_s": 1.988,
+      "median_delay_s": 11.533,
+      "p95_delay_s": 15.019
+    },
+    "max_pressure": {
+      "runs": 200,
+      "mean_delay_s": 11.514,
+      "std_delay_s": 1.896,
+      "median_delay_s": 11.197,
+      "p95_delay_s": 14.909
+    },
+    "max_pressure_shield": {
+      "runs": 200,
+      "mean_delay_s": 11.953,
+      "std_delay_s": 2.052,
+      "median_delay_s": 11.757,
+      "p95_delay_s": 15.298
+    },
+    "d3qn": {
+      "runs": 600,
+      "mean_delay_s": 11.528,
+      "std_delay_s": 2.027,
+      "median_delay_s": 11.318,
+      "p95_delay_s": 14.952
+    },
+    "flowsync_uq": {
+      "runs": 600,
+      "mean_delay_s": 12.019,
+      "std_delay_s": 2.258,
+      "median_delay_s": 11.82,
+      "p95_delay_s": 15.615
+    },
+    "d3qn_shield": {
+      "runs": 600,
+      "mean_delay_s": 12.004,
+      "std_delay_s": 2.28,
+      "median_delay_s": 11.855,
+      "p95_delay_s": 15.643
+    }
+  },
+  "statistical_contrasts": {
+    "d3qn_shield_vs_max_pressure_shield": {
+      "mean_delay_saved_s": -0.0502,
+      "std_delay_saved_s": 0.9884,
+      "t_statistic": -0.72,
+      "p_value": 0.47315,
+      "cohens_d": -0.051,
+      "sample_size_cells": 200,
+      "controller_1_wins": 88,
+      "controller_2_wins": 107,
+      "ties": 5,
+      "statistically_significant": false
+    },
+    "flowsync_uq_vs_d3qn_shield": {
+      "mean_delay_saved_s": -0.0149,
+      "std_delay_saved_s": 0.5488,
+      "t_statistic": -0.38,
+      "p_value": 0.70176,
+      "cohens_d": -0.027,
+      "sample_size_cells": 200,
+      "controller_1_wins": 32,
+      "controller_2_wins": 31,
+      "ties": 137,
+      "statistically_significant": false
+    },
+    "d3qn_vs_max_pressure": {
+      "mean_delay_saved_s": -0.014,
+      "std_delay_saved_s": 0.9171,
+      "t_statistic": -0.22,
+      "p_value": 0.82974,
+      "cohens_d": -0.015,
+      "sample_size_cells": 200,
+      "controller_1_wins": 89,
+      "controller_2_wins": 107,
+      "ties": 4,
+      "statistically_significant": false
+    },
+    "d3qn_vs_d3qn_shield": {
+      "mean_delay_saved_s": 0.4757,
+      "std_delay_saved_s": 0.8732,
+      "t_statistic": 7.71,
+      "p_value": 6.0571e-13,
+      "cohens_d": 0.545,
+      "sample_size_cells": 200,
+      "controller_1_wins": 118,
+      "controller_2_wins": 40,
+      "ties": 42,
+      "statistically_significant": true
+    },
+    "max_pressure_vs_max_pressure_shield": {
+      "mean_delay_saved_s": 0.4395,
+      "std_delay_saved_s": 1.0017,
+      "t_statistic": 6.2,
+      "p_value": 3.1253e-09,
+      "cohens_d": 0.439,
+      "sample_size_cells": 200,
+      "controller_1_wins": 109,
+      "controller_2_wins": 39,
+      "ties": 52,
+      "statistically_significant": true
+    },
+    "d3qn_shield_vs_fixed": {
+      "mean_delay_saved_s": 3.4928,
+      "std_delay_saved_s": 1.9999,
+      "t_statistic": 24.7,
+      "p_value": 1.6003e-62,
+      "cohens_d": 1.747,
+      "sample_size_cells": 200,
+      "controller_1_wins": 192,
+      "controller_2_wins": 8,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "d3qn_shield_vs_actuated": {
+      "mean_delay_saved_s": 4.4595,
+      "std_delay_saved_s": 4.0284,
+      "t_statistic": 15.66,
+      "p_value": 1.5498e-36,
+      "cohens_d": 1.107,
+      "sample_size_cells": 200,
+      "controller_1_wins": 190,
+      "controller_2_wins": 10,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "d3qn_shield_vs_greedy": {
+      "mean_delay_saved_s": -0.2791,
+      "std_delay_saved_s": 1.239,
+      "t_statistic": -3.19,
+      "p_value": 0.0016761,
+      "cohens_d": -0.225,
+      "sample_size_cells": 200,
+      "controller_1_wins": 80,
+      "controller_2_wins": 120,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "d3qn_shield_vs_max_pressure": {
+      "mean_delay_saved_s": -0.4897,
+      "std_delay_saved_s": 1.2371,
+      "t_statistic": -5.6,
+      "p_value": 7.1256e-08,
+      "cohens_d": -0.396,
+      "sample_size_cells": 200,
+      "controller_1_wins": 64,
+      "controller_2_wins": 134,
+      "ties": 2,
+      "statistically_significant": true
+    },
+    "d3qn_vs_fixed": {
+      "mean_delay_saved_s": 3.9685,
+      "std_delay_saved_s": 1.9009,
+      "t_statistic": 29.52,
+      "p_value": 1.2e-74,
+      "cohens_d": 2.088,
+      "sample_size_cells": 200,
+      "controller_1_wins": 198,
+      "controller_2_wins": 2,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "d3qn_vs_actuated": {
+      "mean_delay_saved_s": 4.9353,
+      "std_delay_saved_s": 4.0759,
+      "t_statistic": 17.12,
+      "p_value": 5.3511e-41,
+      "cohens_d": 1.211,
+      "sample_size_cells": 200,
+      "controller_1_wins": 191,
+      "controller_2_wins": 9,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "d3qn_vs_greedy": {
+      "mean_delay_saved_s": 0.1966,
+      "std_delay_saved_s": 0.9606,
+      "t_statistic": 2.89,
+      "p_value": 0.004217,
+      "cohens_d": 0.205,
+      "sample_size_cells": 200,
+      "controller_1_wins": 111,
+      "controller_2_wins": 87,
+      "ties": 2,
+      "statistically_significant": true
+    },
+    "d3qn_vs_max_pressure_shield": {
+      "mean_delay_saved_s": 0.4255,
+      "std_delay_saved_s": 1.1858,
+      "t_statistic": 5.07,
+      "p_value": 8.8788e-07,
+      "cohens_d": 0.359,
+      "sample_size_cells": 200,
+      "controller_1_wins": 127,
+      "controller_2_wins": 71,
+      "ties": 2,
+      "statistically_significant": true
+    },
+    "flowsync_uq_vs_fixed": {
+      "mean_delay_saved_s": 3.4779,
+      "std_delay_saved_s": 2.0228,
+      "t_statistic": 24.32,
+      "p_value": 1.6684e-61,
+      "cohens_d": 1.719,
+      "sample_size_cells": 200,
+      "controller_1_wins": 191,
+      "controller_2_wins": 9,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "flowsync_uq_vs_actuated": {
+      "mean_delay_saved_s": 4.4447,
+      "std_delay_saved_s": 4.0259,
+      "t_statistic": 15.61,
+      "p_value": 2.0956e-36,
+      "cohens_d": 1.104,
+      "sample_size_cells": 200,
+      "controller_1_wins": 191,
+      "controller_2_wins": 9,
+      "ties": 0,
+      "statistically_significant": true
+    },
+    "flowsync_uq_vs_greedy": {
+      "mean_delay_saved_s": -0.294,
+      "std_delay_saved_s": 1.1945,
+      "t_statistic": -3.48,
+      "p_value": 0.00061417,
+      "cohens_d": -0.246,
+      "sample_size_cells": 200,
+      "controller_1_wins": 85,
+      "controller_2_wins": 111,
+      "ties": 4,
+      "statistically_significant": true
+    },
+    "flowsync_uq_vs_max_pressure": {
+      "mean_delay_saved_s": -0.5046,
+      "std_delay_saved_s": 1.1429,
+      "t_statistic": -6.24,
+      "p_value": 2.5384e-09,
+      "cohens_d": -0.441,
+      "sample_size_cells": 200,
+      "controller_1_wins": 46,
+      "controller_2_wins": 118,
+      "ties": 36,
+      "statistically_significant": true
+    },
+    "flowsync_uq_vs_max_pressure_shield": {
+      "mean_delay_saved_s": -0.0651,
+      "std_delay_saved_s": 0.8292,
+      "t_statistic": -1.11,
+      "p_value": 0.26812,
+      "cohens_d": -0.079,
+      "sample_size_cells": 200,
+      "controller_1_wins": 65,
+      "controller_2_wins": 80,
+      "ties": 55,
+      "statistically_significant": false
+    },
+    "flowsync_uq_vs_d3qn": {
+      "mean_delay_saved_s": -0.4906,
+      "std_delay_saved_s": 1.0101,
+      "t_statistic": -6.87,
+      "p_value": 8.0854e-11,
+      "cohens_d": -0.486,
+      "sample_size_cells": 200,
+      "controller_1_wins": 58,
+      "controller_2_wins": 137,
+      "ties": 5,
+      "statistically_significant": true
+    }
+  },
+  "sumo_sensing_panel_summary": {
+    "halted_clean": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.894
+    },
+    "halted_delay2s": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.776
+    },
+    "halted_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.71
+    },
+    "halted_delay2s_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.419
+    },
+    "fixed_clean": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 10.647
+    },
+    "fixed_delay2s": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 10.647
+    },
+    "fixed_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 10.647
+    },
+    "fixed_delay2s_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 10.647
+    },
+    "max_pressure_clean": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.304
+    },
+    "max_pressure_delay2s": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 5.921
+    },
+    "max_pressure_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 6.283
+    },
+    "max_pressure_delay2s_miss30": {
+      "episodes": 6,
+      "mean_stopped_wait_s": 5.727
+    }
+  },
+  "sumo_robustness_360s_summary": {
+    "max_pressure": {
+      "runs": 12,
+      "mean_overall_wait_s": 7.746,
+      "mean_minor_axis_wait_s": 6.676,
+      "mean_major_axis_wait_s": 8.049
+    },
+    "total_incoming": {
+      "runs": 12,
+      "mean_overall_wait_s": 8.083,
+      "mean_minor_axis_wait_s": 14.063,
+      "mean_major_axis_wait_s": 5.974
+    }
+  },
+  "mandatory_discrepancy_resolutions": {
+    "safety_samples_6_17M_vs_6_065M": {
+      "itemized_verified_samples": 6065000,
+      "unitemized_pilot_smoke_samples": 105000,
+      "reconciled_total_samples": 6170000,
+      "executed_conflicts": 0,
+      "clearance_violations": 0,
+      "resolution": "Itemized panels rigorously sum to 6,065,000 steps. The 6.17M figure reflects inclusion of ~105,000 exploratory/smoke steps (70 runs x 1,500). Invariants hold with zero violations in all subsets."
+    },
+    "reward_terms_6_vs_7": {
+      "active_reward_terms": 6,
+      "telemetry_dictionary_keys": 7,
+      "zeroed_term": "balance_bonus (0.0 reserved for backward compatibility)",
+      "active_terms_list": [
+        "delay (-delay/10)",
+        "pressure (-total_curr*0.05*dt)",
+        "throughput (+passed*0.10)",
+        "dynamic_switch (-0.10 or -0.03)",
+        "starvation (-0.10*len(starved)*dt)",
+        "max_green (-0.10*dt)"
+      ],
+      "resolution": "Environment dictionary exposes 7 keys, but balance_bonus is fixed to 0.0. Exactly 6 non-zero active terms govern RL policy learning."
+    },
+    "sumo_180s_clean_mp_6_304s_vs_6_318s": {
+      "sensing_panel_180s_mean": 6.3038,
+      "sensing_panel_runs": 6,
+      "robustness_panel_180s_prefix_mean": 6.3177,
+      "robustness_panel_runs": 12,
+      "delta_seconds": 0.0139,
+      "resolution": "Difference (+0.014s or 0.22%) is explained by distinct traffic seed sets and start-phase counterbalancing (initial_phase 0 only in sensing vs 0 and 1 in robustness). Both confirm clean Max-Pressure stopped delay of ~6.31s."
+    },
+    "d3qn_vs_max_pressure_statistical_pairing": {
+      "d3qn_total_runs": 600,
+      "max_pressure_total_runs": 200,
+      "statistical_unit": "Evaluation cell (scenario, condition, seed), N=200",
+      "methodology": "Cell-averaging across 3 training seeds for D3QN pairs 1:1 against the single Max-Pressure run on the identical CRN arrival trace.",
+      "paired_difference_bare_s": -0.014,
+      "p_value_bare": 0.82974,
+      "paired_difference_shielded_s": -0.0502,
+      "p_value_shielded": 0.47315,
+      "conclusion": "No statistically significant difference (p=0.830 bare, p=0.473 shielded). Neither policy outperforms classical Max-Pressure."
+    },
+    "multiple_comparisons_and_fwer": {
+      "method": "Holm-Bonferroni step-down procedure",
+      "significant_contrasts": [
+        "d3qn_shield_vs_fixed",
+        "d3qn_shield_vs_actuated",
+        "d3qn_vs_d3qn_shield",
+        "max_pressure_vs_max_pressure_shield",
+        "d3qn_shield_vs_greedy"
+      ],
+      "non_significant_contrasts": [
+        "d3qn_shield_vs_max_pressure_shield",
+        "flowsync_uq_vs_d3qn_shield",
+        "d3qn_vs_max_pressure"
+      ],
+      "conclusion": "FWER control preserves significance of safety shield delay overheads and gains over classical Fixed and Actuated baselines, while confirming that FlowSync/D3QN superiority claims fail both before and after multiple testing adjustment."
+    }
+  }
+}

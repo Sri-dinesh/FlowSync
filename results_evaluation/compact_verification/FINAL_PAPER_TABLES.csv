@@ -1,0 +1,39 @@
+# SECTION 1: CONTROLLER OVERALL PERFORMANCE (2800 CUSTOM SIMULATOR RUNS)
+controller,runs,mean_delay_s,std_delay_s,median_delay_s,p25_delay_s,p75_delay_s,p95_delay_s,mean_within_run_p95_s,mean_throughput_veh,mean_queue_veh,mean_max_queue_veh,mean_queue_area_veh_s,mean_service_rate,mean_starvation_count,total_shield_interventions,total_fallback_steps,total_safety_samples,executed_conflict_violations,executed_clearance_violations
+fixed,200,15.496,1.943,15.489,13.959,16.589,18.951,40.539,97.51,17.17,31.84,2705.4,0.835,0.0,0,0,310000,0,0
+actuated,200,16.463,5.385,15.772,12.464,19.159,26.779,63.448,92.75,18.39,34.35,2938.0,0.808,4.86,0,0,310000,0,0
+greedy,200,11.725,1.988,11.533,10.281,13.212,15.019,41.891,100.41,14.52,25.95,2296.7,0.861,3.38,0,0,310000,0,0
+max_pressure,200,11.514,1.896,11.197,9.993,13.065,14.909,39.418,100.52,14.37,25.84,2272.1,0.861,3.03,0,0,310000,0,0
+max_pressure_shield,200,11.953,2.052,11.757,10.389,13.473,15.298,40.029,100.02,14.7,27.28,2324.4,0.858,3.07,300,0,310000,0,0
+d3qn,600,11.528,2.027,11.318,10.095,12.751,14.952,40.285,101.12,14.4,25.91,2278.3,0.867,3.17,0,0,930000,0,0
+d3qn_shield,600,12.004,2.28,11.855,10.262,13.565,15.643,40.241,100.77,14.78,27.58,2339.2,0.865,3.16,896,0,930000,0,0
+flowsync_uq,600,12.019,2.258,11.82,10.346,13.565,15.615,40.112,100.33,14.79,27.55,2340.2,0.86,3.13,881,260298,930000,0,0
+
+# SECTION 2: STATISTICAL PAIRED CONTRASTS (N=200 EVALUATION CELLS)
+# Protocol pre-specification: Exactly ONE primary comparison pre-specified (d3qn_shield_vs_max_pressure_shield).
+# The 8-comparison Table 2 grouping was assembled post hoc; is_posthoc_table2_contrast and posthoc_subset_holm_adj_p are exploratory.
+# Confirmatory multiplicity adjustment across all 19 comparisons uses holm_adj_p_19_all.
+# Inference is conditional on the 3 evaluated training seeds averaged per cell and does not fully estimate between-training-seed variance.
+# Paired Cohen's dz = mean_delay_saved_s / std_delay_saved_s.
+# Bootstrap 95% CIs computed via 10,000 percentile resamples with replacement.
+# Non-significant results (p_adj >= 0.05) fail to reject the null and do NOT establish statistical equivalence.
+comparison,controller_1,controller_2,sample_size_cells,mean_delay_saved_s,std_delay_saved_s,standard_error_s,t_statistic,raw_p_value,holm_adj_p_19_all,posthoc_subset_holm_adj_p,is_posthoc_table2_contrast,t_ci95_low_s,t_ci95_high_s,bootstrap_ci95_low_s,bootstrap_ci95_high_s,paired_cohens_dz,c1_wins,c2_wins,ties,significance_alpha_0_05
+d3qn_shield_vs_fixed,d3qn_shield,fixed,200,3.4928,1.9999,0.1414,24.70,1.6004e-62,2.8808e-61,1.2804e-61,True,3.2139,3.7716,3.0469,3.9011,1.7465,192,8,0,Significant (p_adj < 0.05)
+d3qn_shield_vs_actuated,d3qn_shield,actuated,200,4.4595,4.0284,0.2848,15.66,1.5498e-36,2.3248e-35,1.0849e-35,True,3.8978,5.0213,3.8305,5.1056,1.1070,190,10,0,Significant (p_adj < 0.05)
+d3qn_vs_fixed,d3qn,fixed,200,3.9685,1.9009,0.1344,29.52,1.1998e-74,2.2797e-73,1.3198e-73,False,3.7035,4.2336,3.5555,4.3650,2.0877,198,2,0,Significant (p_adj < 0.05)
+d3qn_vs_actuated,d3qn,actuated,200,4.9353,4.0759,0.2882,17.12,5.3509e-41,8.5615e-40,4.8158e-40,False,4.3669,5.5036,4.3404,5.5629,1.2108,191,9,0,Significant (p_adj < 0.05)
+flowsync_uq_vs_fixed,flowsync_uq,fixed,200,3.4779,2.0228,0.1430,24.32,1.6683e-61,2.8361e-60,1.6683e-60,False,3.1959,3.7600,3.0269,3.8968,1.7194,191,9,0,Significant (p_adj < 0.05)
+flowsync_uq_vs_actuated,flowsync_uq,actuated,200,4.4447,4.0259,0.2847,15.61,2.0956e-36,2.9338e-35,1.6765e-35,False,3.8833,5.0060,3.8158,5.0917,1.1040,191,9,0,Significant (p_adj < 0.05)
+d3qn_vs_d3qn_shield,d3qn,d3qn_shield,200,0.4757,0.8732,0.0617,7.71,6.0555e-13,7.8721e-12,3.6333e-12,True,0.3540,0.5975,0.2906,0.6607,0.5448,118,40,42,Significant (p_adj < 0.05)
+flowsync_uq_vs_d3qn,flowsync_uq,d3qn,200,-0.4906,1.0101,0.0714,-6.87,8.0852e-11,9.7022e-10,5.6596e-10,False,-0.6315,-0.3498,-0.6958,-0.2946,-0.4857,58,137,5,Significant (p_adj < 0.05)
+flowsync_uq_vs_max_pressure,flowsync_uq,max_pressure,200,-0.5046,1.1429,0.0808,-6.24,2.5383e-09,2.7922e-08,1.5230e-08,False,-0.6640,-0.3452,-0.6889,-0.3296,-0.4415,46,118,36,Significant (p_adj < 0.05)
+max_pressure_vs_max_pressure_shield,max_pressure,max_pressure_shield,200,0.4395,1.0017,0.0708,6.20,3.1253e-09,3.1253e-08,1.5626e-08,True,0.2998,0.5791,0.3020,0.5725,0.4387,109,39,52,Significant (p_adj < 0.05)
+d3qn_shield_vs_max_pressure,d3qn_shield,max_pressure,200,-0.4897,1.2371,0.0875,-5.60,7.1259e-08,6.4133e-07,3.5629e-07,False,-0.6622,-0.3172,-0.6989,-0.2893,-0.3958,64,134,2,Significant (p_adj < 0.05)
+d3qn_vs_max_pressure_shield,d3qn,max_pressure_shield,200,0.4255,1.1858,0.0838,5.07,8.8787e-07,7.1030e-06,3.5515e-06,False,0.2602,0.5908,0.2150,0.6382,0.3588,127,71,2,Significant (p_adj < 0.05)
+flowsync_uq_vs_greedy,flowsync_uq,greedy,200,-0.2940,1.1945,0.0845,-3.48,6.1418e-04,4.2993e-03,1.8425e-03,False,-0.4605,-0.1274,-0.4843,-0.1208,-0.2461,85,111,4,Significant (p_adj < 0.05)
+d3qn_shield_vs_greedy,d3qn_shield,greedy,200,-0.2791,1.2390,0.0876,-3.19,1.6762e-03,1.0057e-02,6.7048e-03,True,-0.4519,-0.1063,-0.4650,-0.0957,-0.2253,80,120,0,Significant (p_adj < 0.05)
+d3qn_vs_greedy,d3qn,greedy,200,0.1966,0.9606,0.0679,2.89,4.2168e-03,2.1084e-02,8.4336e-03,False,0.0627,0.3306,0.0567,0.3497,0.2047,111,87,2,Significant (p_adj < 0.05)
+flowsync_uq_vs_max_pressure_shield,flowsync_uq,max_pressure_shield,200,-0.0651,0.8292,0.0586,-1.11,2.6812e-01,1.0000e+00,2.6812e-01,False,-0.1807,0.0505,-0.2039,0.0667,-0.0785,65,80,55,Not Significant (p_adj >= 0.05)
+d3qn_shield_vs_max_pressure_shield,d3qn_shield,max_pressure_shield,200,-0.0502,0.9884,0.0699,-0.72,4.7315e-01,1.0000e+00,1.0000e+00,True,-0.1881,0.0876,-0.2189,0.1251,-0.0508,88,107,5,Not Significant (p_adj >= 0.05)
+flowsync_uq_vs_d3qn_shield,flowsync_uq,d3qn_shield,200,-0.0149,0.5488,0.0388,-0.38,7.0175e-01,1.0000e+00,1.0000e+00,True,-0.0914,0.0616,-0.1042,0.0712,-0.0271,32,31,137,Not Significant (p_adj >= 0.05)
+d3qn_vs_max_pressure,d3qn,max_pressure,200,-0.0140,0.9171,0.0648,-0.22,8.2975e-01,1.0000e+00,1.0000e+00,True,-0.1418,0.1139,-0.1799,0.1513,-0.0152,89,107,4,Not Significant (p_adj >= 0.05)
