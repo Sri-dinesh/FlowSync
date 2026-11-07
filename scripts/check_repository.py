@@ -171,7 +171,7 @@ def check_hygiene(root):
             continue
         path = Path(name)
         if path.suffix == ".md" and not name.startswith((*FROZEN_EVIDENCE, ".github/")) and name not in {
-            "CONTENT.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", "EXPECTED_RESEARCH_RESULTS.md",
+            "CONTENT.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", "EXPECTED_RESEARCH_RESULTS.md", "context.md",
         }:
             issues.append(f"{name}: consolidate maintained project documentation into CONTENT.md")
         if path.suffix in {".pyc", ".pyo", ".pt", ".pth", ".ckpt"} or "__pycache__" in path.parts:
