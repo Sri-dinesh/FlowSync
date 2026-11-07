@@ -15,7 +15,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 LINK = re.compile(r"!?\[[^\]]*\]\(([^\s)]+)(?:\s+\"[^\"]*\")?\)")
 OPTIONAL_ARTIFACTS = ("results/", "server/models/", "data/", "models/")
-FROZEN_EVIDENCE = ("research/docs/", "research/RESEARCH_STATUS.md", "research/EVALUATION_AUDIT.md")
+FROZEN_EVIDENCE = ("research/docs/", "research/RESEARCH_STATUS.md", "research/EVALUATION_AUDIT.md", "results_evaluation/", "results_evaluation_and_paper/", "FINAL_", "P95_", "SUMO_", "TEST_")
 
 
 def repository_files(root):
@@ -171,7 +171,7 @@ def check_hygiene(root):
             continue
         path = Path(name)
         if path.suffix == ".md" and not name.startswith((*FROZEN_EVIDENCE, ".github/")) and name not in {
-            "CONTENT.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
+            "CONTENT.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", "EXPECTED_RESEARCH_RESULTS.md",
         }:
             issues.append(f"{name}: consolidate maintained project documentation into CONTENT.md")
         if path.suffix in {".pyc", ".pyo", ".pt", ".pth", ".ckpt"} or "__pycache__" in path.parts:

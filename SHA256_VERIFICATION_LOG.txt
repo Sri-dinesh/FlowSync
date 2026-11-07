@@ -1,0 +1,255 @@
+================================================================================
+FLOWSYNC SHA-256 INDEPENDENT CRYPTOGRAPHIC AUDIT LOG
+Audit Timestamp: 2026-11-06T16:02:18.397960+00:00
+Governing Manifest: SHA256SUMS.txt (49 entries)
+================================================================================
+
+[01/49] MATCH / VERIFIED
+     Path: research/docs/protocols/MATCHED_SHIELD_PROTOCOL_20261015.md
+     Size: 4,665 bytes
+     Hash: e92e659c35adc051bf18c424223e47af6cc8cd1eea082e77b9fc896ad09d692b
+
+[02/49] MATCH / VERIFIED
+     Path: results/replicate_evaluation/matched_shield_v5_20261015/manifest.json
+     Size: 1,543,416 bytes
+     Hash: 4af8127418f08cbc80fe5715e92e24237564192f0a2d860e49798b17ad0f5a1a
+
+[03/49] MATCH / VERIFIED
+     Path: results/sumo_sensing_recovery/full_20261031/manifest.json
+     Size: 8,671 bytes
+     Hash: a49874a0bf940a349a950fa3afd1fa51963b2d00a7c83766dfb8564a0f7c172a
+
+[04/49] MATCH / VERIFIED
+     Path: results/sumo_robustness/full_20261023/manifest.json
+     Size: 8,529 bytes
+     Hash: c9b2d5fceaf3b4e67df572d7b29133add0c5546702ec598b666619ce583b63e5
+
+[05/49] MATCH / VERIFIED
+     Path: research/manifests/service_ledger_design.json
+     Size: 8,526 bytes
+     Hash: 654a4c27b35d6e503d4db461bebcf792c0cdc1869a2f27d7ec3e05217981e4db
+
+[06/49] MATCH / VERIFIED
+     Path: research/manifests/methodology.json
+     Size: 209,576 bytes
+     Hash: 675a5091f75b433dedc9d0ae32d243d235cdad93e5781ccd9859c2a83913417f
+
+[07/49] MATCH / VERIFIED
+     Path: research/paper_figures/source_manifest.json
+     Size: 3,398 bytes
+     Hash: 839f21244ade3164d51593f109d1c92f95d3ece703df47f9671fb343099d954a
+
+[08/49] MATCH / VERIFIED
+     Path: results/replicate_evaluation/matched_shield_v5_20261015/runs.jsonl
+     Size: 10,381,256 bytes
+     Hash: 1c675eca8526469aa7b54be18438440dddef55b501f609b578a74de4ef67892d
+
+[09/49] MATCH / VERIFIED
+     Path: results/replicate_evaluation/matched_shield_v5_20261015/report.json
+     Size: 41,800 bytes
+     Hash: 46e8a6505dc36192b52038281555899fdaf401c07d99d233c0d095977920fcb9
+
+[10/49] MATCH / VERIFIED
+     Path: results/research_training/pilot_v5_kbW0lsY3/seed_101/checkpoint_warmup.pt
+     Size: 2,327,247 bytes
+     Hash: 1cd49647546e2f68763524d5a26028ea4c3dfc8d0ec9e713d0a3a1119884a725
+
+[11/49] MATCH / VERIFIED
+     Path: results/research_training/pilot_v5_kbW0lsY3/seed_202/checkpoint_50.pt
+     Size: 2,326,903 bytes
+     Hash: a91e038dbe9cdb1d2ce35a36ff40a1fa245bc4cbc8480fe9b74f22d5082d7dc4
+
+[12/49] MATCH / VERIFIED
+     Path: results/research_training/pilot_v5_kbW0lsY3/seed_303/checkpoint_100.pt
+     Size: 2,326,989 bytes
+     Hash: e0b830b43d6023f859bae07e2e7b45f5b46393adebb20a1bd0ec951d62d1e052
+
+[13/49] MATCH / VERIFIED
+     Path: results/sumo_sensing_recovery/full_20261031/collection/runs.jsonl
+     Size: 78,470 bytes
+     Hash: 3db5b6e88b77727413276c92124c8b554be7d5bba68c5ef4831556f3622a65e4
+
+[14/49] MATCH / VERIFIED
+     Path: results/sumo_sensing_recovery/full_20261031/report.json
+     Size: 15,880 bytes
+     Hash: 5357399a007b826d0e526c39a8e2a908b4dda584040ddb7f4ff31f1bffd2e7f6
+
+[15/49] MATCH / VERIFIED
+     Path: results/sumo_robustness/full_20261023/runs.jsonl
+     Size: 62,514 bytes
+     Hash: 3f86ea08996236dd547b19714eb880064f8d043ccd9c623b3607034d962408fd
+
+[16/49] MATCH / VERIFIED
+     Path: results/sumo_robustness/full_20261023/report.json
+     Size: 87,260 bytes
+     Hash: 1d3b6e7f9f2109e268cdd3821ef6c2046abf1de38350abecc351c5cc67799c5e
+
+[17/49] MATCH / VERIFIED
+     Path: results/sumo_classical_panel/full_20261023/report.json
+     Size: 20,768 bytes
+     Hash: 7cd78ca440dd49157d5046aebc9256b4e5f35fc20b07a713064f9d61410fd1bc
+
+[18/49] MATCH / VERIFIED
+     Path: results/sumo_switching/full_20261101/report.json
+     Size: 77,468 bytes
+     Hash: 99ad29153c321330319607486e34aafa90d764c6ee48ef703f73a9175b6afcf2
+
+[19/49] MATCH / VERIFIED
+     Path: results/sumo_history/full_20261101/report.json
+     Size: 159,904 bytes
+     Hash: 123f44e192825cb4414ec12bc63b5a471c5d9cd81bf93e3179b0cb47e8f7ed5e
+
+[20/49] MATCH / VERIFIED
+     Path: results/sumo_service_ledger/full_20261103/report.json
+     Size: 37,253 bytes
+     Hash: 5fd11192075de61561dcebe7647bc2ca9d1cc5a1899c442f77e6d557eb4770dc
+
+[21/49] MATCH / VERIFIED
+     Path: results/final/latency_profile_full.json
+     Size: 4,281 bytes
+     Hash: d38bd92135e90661a31b9d2d64dcc21538d04b2a28fadbe0e45677b9e1938560
+
+[22/49] MATCH / VERIFIED
+     Path: results/uncertainty_calibration/pilot_20261014/calibration.json
+     Size: 16,072 bytes
+     Hash: 272d10a0968dc9be7a295f1f8baf7b53497da34a37b28ec76aa6fc635404e521
+
+[23/49] MATCH / VERIFIED
+     Path: results/spatial_input_audit/pilot_20261022/report.json
+     Size: 40,185 bytes
+     Hash: 9d752fa858a633cff03d8be2804e684368dedd3136dc7ee379c12b407f8faaf7
+
+[24/49] MATCH / VERIFIED
+     Path: results/spatial_input_audit/pilot_20261022/sources.jsonl
+     Size: 1,406,075 bytes
+     Hash: cb46e53b8e83b27f5d01e4bc716664340cfadaff94be7b041ffcf4876faeb0be
+
+[25/49] MATCH / VERIFIED
+     Path: results/teacher_alignment/pilot_20261022/report.json
+     Size: 52,077 bytes
+     Hash: cc145dfdc94d937e53dea6afde97eb131e1aa35d3d22cd83961bc92fe5a631f4
+
+[26/49] MATCH / VERIFIED
+     Path: results/teacher_alignment/pilot_20261022/sources.jsonl
+     Size: 649,320 bytes
+     Hash: 838809ce323f051fcdb4f7bee855afc20eeba1ca339198972da6333f259bcda8
+
+[27/49] MATCH / VERIFIED
+     Path: results/teacher_horizon/pilot_20261022/report.json
+     Size: 3,393 bytes
+     Hash: 34dc39f57870dfb1839a6869c08465e38f456d23c3e860d65813a356669b166b
+
+[28/49] MATCH / VERIFIED
+     Path: results/teacher_horizon/pilot_20261022/sources.jsonl
+     Size: 390,014 bytes
+     Hash: 3d43502d4f2d19b69888bda629f6af02aa669ffbce1e42ea0e6e72531833aaee
+
+[29/49] MATCH / VERIFIED
+     Path: results/research_training/spatial_smoke_20261021/report.json
+     Size: 4,225 bytes
+     Hash: 04e6e6f95116b9554cbe22e8935e45f7690367a2b1621321a261b2db1a8b1504
+
+[30/49] MATCH / VERIFIED
+     Path: results/research_training/spatial_smoke_20261021/evaluation.jsonl
+     Size: 86,159 bytes
+     Hash: 929decc4b67a3aec42ca849f5a4cabd84b547c7cb9f94beb9972a4bdbc8281e4
+
+[31/49] MATCH / VERIFIED
+     Path: results/count_restoration/pilot_20261029/report.json
+     Size: 21,520 bytes
+     Hash: 4aa000137564ed1af9b82dfd9951ecf9f650691de7c2d00b6d466bce52b589d4
+
+[32/49] MATCH / VERIFIED
+     Path: results/count_restoration/pilot_20261029/control.jsonl
+     Size: 49,915 bytes
+     Hash: bceda4710a1063da36456109e42ea05386ef4d3c549de60d08e7e60e3bbb959a
+
+[33/49] MATCH / VERIFIED
+     Path: results/ppo_restoration/recovered_20261030/report.json
+     Size: 548,413 bytes
+     Hash: 615680722cf1fcf9da1e6cb84ba054a8b47d3dc99fd69984a2beb876c528ff27
+
+[34/49] MATCH / VERIFIED
+     Path: results/ppo_restoration/recovered_20261030/recovery.json
+     Size: 27,062 bytes
+     Hash: b43529ec84a2a54b13e830b245f7ae16a7bddd777f8398d51d8c40ffa47a52af
+
+[35/49] MATCH / VERIFIED
+     Path: results/exp_canonical_4way_arterial_d3qn_s1101_1791214705/metadata.json
+     Size: 444 bytes
+     Hash: 3083752af8312eff5b62dde814b74a102ec4bfbda0c09e2e73f18bc522b4ff4d
+
+[36/49] MATCH / VERIFIED
+     Path: results/exp_canonical_4way_arterial_d3qn_s1101_1791214705/metrics.json
+     Size: 444 bytes
+     Hash: 3083752af8312eff5b62dde814b74a102ec4bfbda0c09e2e73f18bc522b4ff4d
+
+[37/49] MATCH / VERIFIED
+     Path: results/exp_canonical_4way_arterial_d3qn_s1101_1791214705/trajectory.jsonl
+     Size: 4,685,024 bytes
+     Hash: e7fe64f584fcacace65408c24e1cd6132c2f78aa31afce0f46e624375c299dea
+
+[38/49] MATCH / VERIFIED
+     Path: results_evaluation/FINAL_PAPER_TABLES.csv
+     Size: 6,072 bytes
+     Hash: 4320c054224df1e420640206fc423b9a3dac65aca12a2b0851132ca165199bf1
+
+[39/49] MATCH / VERIFIED
+     Path: results_evaluation/FINAL_RESULTS_PROVENANCE.md
+     Size: 16,942 bytes
+     Hash: 0f9999fefbdbcd78521d68c3d2be4a2bd1509f4ea0b2acbc27a7e80e6e432e0b
+
+[40/49] MATCH / VERIFIED
+     Path: results_evaluation/FINAL_PAPER_RESULTS.md
+     Size: 29,685 bytes
+     Hash: 6313d094286a587c577a07729439212d8c298ae218407dbfeb29fc8a191b9f2c
+
+[41/49] MATCH / VERIFIED
+     Path: results_evaluation/FINAL_SUMO_RESULTS.md
+     Size: 13,911 bytes
+     Hash: 42681b648c4091cd26a54602b3ea082522a75675460afe72cfff3d0b84a04975
+
+[42/49] MATCH / VERIFIED
+     Path: results_evaluation/SECONDARY_RESULTS_RECONCILIATION.md
+     Size: 12,464 bytes
+     Hash: 6969af9e190bcb07b58b3a3ade6c55f382fa46ae5d17d82260fa9f533f791d92
+
+[43/49] MATCH / VERIFIED
+     Path: results_evaluation/STEP_COUNT_POPULATION_RECONCILIATION.md
+     Size: 2,278 bytes
+     Hash: ed9137ee1a77d83a8c8cf20d718847c2111519827293156114283c4d0f7d92e3
+
+[44/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/controller_summary.csv
+     Size: 12,807 bytes
+     Hash: cb5d8cc914fc75c54b5a6d89248c918ccccd00ccc277bdc12573e74317b14353
+
+[45/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/paired_comparisons.csv
+     Size: 1,114,536 bytes
+     Hash: 6143e6250908aec3f0079eeb60b857526e6a447d81cef1da48ff8fd87d41fc23
+
+[46/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/sumo_summary.csv
+     Size: 31,384 bytes
+     Hash: 170e920dc2571bdc0eac8521a29d7c9de8a66d86d75b212474077c3fb498e6bc
+
+[47/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/safety_audit_summary.csv
+     Size: 2,255 bytes
+     Hash: a5b13828b07c8645f8d927895fa21bfbdf794aefcb8e7f7329f176af39eeab81
+
+[48/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/training_summary.csv
+     Size: 1,085 bytes
+     Hash: 0f7c9c2a045260722f9b2d2540b5add04f9ce2adf4f8c9991a7e6815bec15297
+
+[49/49] MATCH / VERIFIED
+     Path: results_evaluation/compact_verification/compact_verification_summary.json
+     Size: 13,363 bytes
+     Hash: d0cfbf28073417280db7b5efe6f2870f963e91e20c2dcd2646282706efadae83
+
+================================================================================
+SUMMARY: Total Entries: 49 | Matches: 49 | Mismatches: 0 | Missing: 0
+VERDICT: 100% OF 49 MANIFEST HASHES INDEPENDENTLY RECALCULATED AND VERIFIED
+================================================================================
