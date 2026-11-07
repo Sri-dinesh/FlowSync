@@ -212,3 +212,7 @@ research-paper-ieee/
 docs/research/
 docs/frontend/
 IEEE-conference-template-062824/
+
+# Freeze & Packaging Staging Artifacts
+results_evaluation_and_paper/
+results_evaluation_and_paper.zip
